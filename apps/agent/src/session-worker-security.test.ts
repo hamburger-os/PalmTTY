@@ -7,7 +7,7 @@ import { SessionManager } from "./session-manager.js";
 import { SessionWorkerServer } from "./session-worker.js";
 import type { PtyFactory, PtyHandle } from "./session-runtime.js";
 import { WorkerClient } from "./worker-client.js";
-import type { WorkerBootstrap } from "./worker-protocol.js";
+import { WorkerRequestSchema, type WorkerBootstrap } from "./worker-protocol.js";
 import {
   ensureRuntimeLayout,
   readWorkerRecord,
@@ -88,6 +88,16 @@ function bootstrap(runtimeDir: string): WorkerBootstrap {
 }
 
 describe("session worker security boundary", () => {
+  it("rejects terminal input larger than the browser protocol limit", () => {
+    const parsed = WorkerRequestSchema.safeParse({
+      type: "input",
+      requestId: "request-1",
+      data: "A".repeat(64 * 1024 + 1)
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+
   it("rejects a controller with the wrong per-session secret", async () => {
     const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-auth-"));
     runtimeDirs.add(runtimeDir);
