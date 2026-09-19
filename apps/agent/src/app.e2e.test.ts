@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseConfig, type PalmTTYConfig } from "@palmtty/config";
 import {
@@ -84,6 +87,27 @@ function createPtyHarness(): PtyHarness {
   };
 }
 
+class EmbeddedWorkerSpawner implements WorkerSpawner {
+  private readonly servers: SessionWorkerServer[] = [];
+
+  constructor(readonly pty: PtyHarness) {}
+
+  async spawn(bootstrap: WorkerBootstrap): Promise<void> {
+    const server = new SessionWorkerServer(bootstrap, {
+      ptyFactory: this.pty.factory
+    });
+    await server.start();
+    this.servers.push(server);
+  }
+
+  async closeAll(): Promise<void> {
+    await Promise.all(this.servers.map((server) =>
+      server.shutdown({ killPty: true, cleanupState: true })
+    ));
+    this.servers.length = 0;
+  }
+}
+
 type AppInstance = Awaited<ReturnType<typeof buildApp>>;
 
 type Harness = {
@@ -92,9 +116,13 @@ type Harness = {
   origin: string;
   wsBase: string;
   pty: PtyHarness;
+  runtimeDir: string;
+  workerSpawner: EmbeddedWorkerSpawner;
 };
 
 const liveApps = new Set<AppInstance>();
+const liveSpawners = new Set<EmbeddedWorkerSpawner>();
+const liveRuntimeDirs = new Set<string>();
 
 afterEach(async () => {
   for (const app of liveApps) {
@@ -105,6 +133,16 @@ afterEach(async () => {
     }
   }
   liveApps.clear();
+
+  for (const spawner of liveSpawners) {
+    await spawner.closeAll().catch(() => undefined);
+  }
+  liveSpawners.clear();
+
+  for (const runtimeDir of liveRuntimeDirs) {
+    await rm(runtimeDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+  liveRuntimeDirs.clear();
   delete process.env[TOKEN_ENV];
 });
 
@@ -135,8 +173,14 @@ async function startHarness(
   });
   mutate?.(config);
 
+  const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-e2e-"));
+  liveRuntimeDirs.add(runtimeDir);
   const pty = createPtyHarness();
-  const app = await buildApp(config, { ptyFactory: pty.factory });
+  const workerSpawner = new EmbeddedWorkerSpawner(pty);
+  liveSpawners.add(workerSpawner);
+  const app = await buildApp(config, {
+    sessionManager: { runtimeDir, workerSpawner }
+  });
   liveApps.add(app);
   const address = await app.listen({ host: "127.0.0.1", port: 0 });
   const origin = new URL(address).origin;
@@ -150,7 +194,9 @@ async function startHarness(
     config,
     origin,
     wsBase: origin.replace(/^http/, "ws"),
-    pty
+    pty,
+    runtimeDir,
+    workerSpawner
   };
 }
 
