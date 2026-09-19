@@ -37,6 +37,7 @@ type ManagedSession = {
   historyBytes: number;
   clients: Set<WebSocket>;
   pipeline: Promise<void>;
+  cleanupTimer?: NodeJS.Timeout;
 };
 
 function sessionId(): string {
@@ -139,6 +140,7 @@ export class SessionManager {
         session.state = "exited";
         session.exitCode = exitCode;
         this.broadcast(session, { type: "exit", exitCode });
+        this.scheduleCleanup(session);
       });
     });
 
@@ -230,6 +232,7 @@ export class SessionManager {
       for (const client of session.clients) {
         try { client.close(1001, "PalmTTY Agent shutting down"); } catch { /* best effort */ }
       }
+      if (session.cleanupTimer) clearTimeout(session.cleanupTimer);
       session.mirror.dispose();
     }
     this.sessions.clear();
@@ -250,12 +253,29 @@ export class SessionManager {
 
   private trimHistory(session: ManagedSession): void {
     while (
-      session.history.length > 1 &&
+      session.history.length > 0 &&
       session.historyBytes > this.config.sessions.replayBytes
     ) {
       const removed = session.history.shift();
       if (removed) session.historyBytes -= removed.bytes;
     }
+  }
+
+  private scheduleCleanup(session: ManagedSession): void {
+    if (session.cleanupTimer) clearTimeout(session.cleanupTimer);
+    session.cleanupTimer = setTimeout(() => {
+      const current = this.sessions.get(session.id);
+      if (current !== session || session.state !== "exited") return;
+      for (const client of session.clients) {
+        try { client.close(1000, "Exited session retention expired"); } catch { /* best effort */ }
+      }
+      session.clients.clear();
+      session.history = [];
+      session.historyBytes = 0;
+      session.mirror.dispose();
+      this.sessions.delete(session.id);
+    }, this.config.sessions.exitedRetentionMinutes * 60_000);
+    session.cleanupTimer.unref();
   }
 
   private broadcast(session: ManagedSession, message: ServerMessage): void {
