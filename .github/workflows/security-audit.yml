@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   audit:
-    name: production-dependencies
+    name: Security Audit / production-dependencies
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
