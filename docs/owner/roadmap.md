@@ -13,23 +13,23 @@
 - xterm headless snapshot + replay 重连；
 - 手机端 xterm/PWA 界面；
 - 特殊键栏和长文本 Composer；
-- Windows/Linux CI 配置；
+- Windows/Ubuntu 双平台 CI 已通过；
+- Windows CI 会实际启动 PowerShell 7/ConPTY，并验证终端 resize 与中文 Unicode 往返；
 - 四层文档体系与 docs-sync Agent Skill；
 - Apache-2.0。
 
 ## 下一阶段优先级
 
-### P0：跑通真实 Windows 11
+### P0：真实设备与长期运行验证
 
-需要持续验证：
+自动化 CI 已验证 Windows PowerShell 7/ConPTY 启动、resize 调用和中文 Unicode 往返。仍需要真实使用场景持续验证：
 
-- PowerShell 7 启动；
-- Codex CLI 交互；
-- 中文/IME；
-- Ctrl+C；
-- resize；
-- 手机切网与锁屏；
-- 长时间运行后的内存上限。
+- Codex CLI 长时间交互；
+- iPhone/Android 中文 IME 与语音输入；
+- Ctrl+C 等交互式中断；
+- 手机 Wi‑Fi/蜂窝切换、锁屏和恢复；
+- QNAP/Caddy 或私有 HTTPS 入口实机部署；
+- 长时间运行后的内存与会话清理行为。
 
 ### P1：独立 Session Worker
 
