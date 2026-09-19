@@ -39,6 +39,7 @@ Status: **alpha foundation implemented; CI and real-device hardening are require
 - snapshot fallback when state is new/stale
 - per-WebSocket `bufferedAmount` backpressure cutoff
 - ordered server pipeline around mirror update, sequence assignment and broadcast
+- bounded exited-session retention with automatic disposal
 
 ### Web/mobile
 
