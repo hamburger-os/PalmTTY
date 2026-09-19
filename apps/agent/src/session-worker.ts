@@ -60,6 +60,7 @@ export class SessionWorkerServer {
       cols: bootstrap.cols,
       rows: bootstrap.rows,
       config: bootstrap.session,
+      excludedEnvKeys: bootstrap.excludedEnvKeys,
       ptyFactory: options.ptyFactory
     });
 
