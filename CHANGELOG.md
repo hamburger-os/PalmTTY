@@ -8,6 +8,10 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 
 ### Added
 
+- Independent detached Session Worker per terminal, with Agent-restart persistence and authenticated local IPC.
+- Worker recovery metadata, per-session 256-bit secrets, startup READY handshake, heartbeat/reconnect and orphan-state cleanup.
+- Cross-process integration tests proving a Worker survives creator-Agent exit and can be rediscovered with replay intact.
+
 - Windows-first PowerShell 7 terminal sessions through node-pty / ConPTY.
 - Mobile React + xterm.js PWA with special-key controls and multiline composer.
 - Server-side headless terminal snapshot plus bounded sequenced replay.
@@ -20,6 +24,10 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - Community governance files, contribution templates and security automation.
 
 ### Security
+
+- Worker secrets never reach the browser and are excluded from argv/URL/default logs; the login-token environment variable is stripped from Worker/PTTY environments.
+- Stale Worker records are cleaned without PID-based process killing, avoiding PID-reuse hazards.
+- Worker IPC terminal input and frames/backpressure are bounded.
 
 - Application heartbeat detects half-open mobile WebSocket connections.
 - Established terminal WebSockets expire with the login session.
