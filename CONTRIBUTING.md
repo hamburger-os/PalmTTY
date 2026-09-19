@@ -44,7 +44,7 @@ pnpm build
 
 Repository-wide changes should pass `pnpm check`.
 
-CI repeats the acceptance path on Windows and Ubuntu. The Agent suite includes end-to-end Fastify HTTP/WebSocket/SessionManager coverage with a deterministic PTY adapter for authentication, Origin enforcement, ordered resume/input/resize handling, reconnect recovery, backpressure, auth expiry and exited-session cleanup. Windows CI separately runs a real node-pty + PowerShell 7 / ConPTY Unicode smoke test. Pull requests also run the production-dependency vulnerability audit and CodeQL.
+CI repeats the acceptance path on Windows and Ubuntu. The Agent suite covers Fastify HTTP/WebSocket plus authenticated Session Worker IPC, including Agent restart rediscovery, replay/snapshot recovery, wrong Worker-secret rejection, stale recovery cleanup, backpressure, auth expiry, exited-session cleanup and concurrent session limits. A detached-process integration test proves a Worker survives the complete exit of the Agent process that created it. Windows CI separately runs a real node-pty + PowerShell 7 / ConPTY Unicode smoke test. Pull requests also run the production-dependency vulnerability audit and CodeQL.
 
 影响行为的修改必须按 `.agents/skills/docs-sync/SKILL.md` 同步四层文档。安全、协议、会话生命周期与重连逻辑的改动不能只改代码。
 
@@ -66,6 +66,6 @@ Keep PRs focused. Explain why the change is needed, not only what files changed.
 - Remote callers select configured workspaces; they do not gain arbitrary cwd/shell authority. / 远程端只能选择预配置 workspace。
 - New buffers and long-lived state must be bounded. / 新增缓冲区和长期内存状态必须有明确上限。
 - Codex and other AI CLIs remain workloads, not PalmTTY protocol dependencies. / AI CLI 是工作负载，不是核心协议依赖。
-- Do not claim Agent-restart persistence until session workers exist and are tested. / 未实现独立 worker 前，不宣称 Agent 重启可恢复会话。
+- Keep Agent lifetime separate from terminal lifetime: PTY, headless terminal state, seq and replay belong to the Session Worker. / Agent 生命周期不能重新绑定终端生命周期；PTY、headless 状态、seq 与 replay 必须归 Session Worker。
 
 Contributions are licensed under Apache-2.0 and must follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
