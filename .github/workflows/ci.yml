@@ -14,6 +14,7 @@ permissions:
 
 jobs:
   check:
+    name: CI / check (${{ matrix.os }})
     timeout-minutes: 20
     strategy:
       fail-fast: false

@@ -77,8 +77,8 @@ Status: **alpha foundation implemented and passing Windows/Ubuntu CI; open-sourc
 - Windows CI validates ConPTY/PowerShell, but real owner workstation + mobile Safari/Chrome + Codex validation is still required.
 - No Git/file preview subsystem yet.
 - Linux/macOS/WSL are not first-class supported hosts yet.
-- GitHub repository Ruleset and repository-level feature/merge/security settings are documented in `docs/owner/github-governance.md` but cannot be applied through the currently available connector API; they remain a maintainer Settings task.
-- GitHub Dependency Review is not enabled because the repository Dependency graph setting is currently off; the portable `pnpm audit --prod` gate is enforced instead until that repository setting is enabled.
+- Active `main` Ruleset requires pull requests, squash-only merge, linear history, conversation resolution, up-to-date branches, no force-push/deletion, and four green automated checks; human and Code Owner approval are intentionally not required for the AI-maintained workflow.
+- GitHub Dependency Review is not enabled because the Dependency graph was off when tested; the portable `pnpm audit --prod` gate is enforced instead. The current Ruleset configuration is accepted as the project's final AI-first governance model for this phase.
 
 ## Required honesty rule
 
