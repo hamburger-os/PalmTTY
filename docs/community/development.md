@@ -55,7 +55,7 @@ pnpm test
 pnpm build
 ```
 
-仓库级变更可以直接执行 `pnpm check`。CI 在 Windows 和 Ubuntu 上使用 `pnpm install --frozen-lockfile` 安装依赖；Windows 测试还会真实启动 PowerShell 7/ConPTY 并验证 Unicode 往返。PR 还会执行生产依赖安全审计和 CodeQL；受保护的 `main` 必须通过 PR 和四项自动检查。普通改动设计为无需强制人工 approval；CI、依赖与 workspace 门禁等 trust-root 文件由精简后的 CODEOWNERS 单独标记，计划要求维护者审核。修改依赖清单时必须同步更新 `pnpm-lock.yaml`。
+仓库级变更可以直接执行 `pnpm check`。CI 在 Windows 和 Ubuntu 上使用 `pnpm install --frozen-lockfile` 安装依赖；Windows 测试还会真实启动 PowerShell 7/ConPTY 并验证 Unicode 往返。PR 还会执行生产依赖安全审计和 CodeQL；受保护的 `main` 必须通过 PR 和四项自动检查。当前 AI 主维护治理模型有意不强制人工 approval，也不强制 Code Owner approval。修改依赖清单时必须同步更新 `pnpm-lock.yaml`。
 
 任何影响行为的 PR 都必须按 `.agents/skills/docs-sync/SKILL.md` 同步文档。安全、会话生命周期、重连、协议、配置的变更始终需要文档审查。
 
