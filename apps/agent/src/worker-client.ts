@@ -75,10 +75,12 @@ export class WorkerClient {
         protocol: WORKER_PROTOCOL_VERSION,
         secret: options.secret
       });
-      const parsed = SessionPublicSchema.parse(
-        (result as { session?: unknown }).session
+      if (!result || typeof result !== "object" || !("session" in result)) {
+        throw new Error("Session worker authentication response was malformed");
+      }
+      client.latestSession = SessionPublicSchema.parse(
+        (result as { session: unknown }).session
       );
-      client.latestSession = parsed;
       client.startHeartbeat();
       return client;
     } catch (error) {
