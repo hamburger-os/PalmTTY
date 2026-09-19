@@ -153,23 +153,36 @@ export class SessionManager {
     };
 
     await this.workerSpawner.spawn(bootstrap);
-    const worker = await this.connectWithRetry(
-      endpoint,
-      secret,
-      CREATE_CONNECT_DELAYS_MS
-    );
-    const record = await this.readRecordWithRetry(id);
+    let worker: WorkerClient | undefined;
+    try {
+      worker = await this.connectWithRetry(
+        endpoint,
+        secret,
+        CREATE_CONNECT_DELAYS_MS
+      );
+      const record = await this.readRecordWithRetry(id);
 
-    const managed: ManagedWorker = {
-      record,
-      secret,
-      worker,
-      session: worker.session,
-      clients: new Map(),
-      reconnecting: false
-    };
-    this.install(managed);
-    return this.publicSession(managed);
+      const managed: ManagedWorker = {
+        record,
+        secret,
+        worker,
+        session: worker.session,
+        clients: new Map(),
+        reconnecting: false
+      };
+      this.install(managed);
+      return this.publicSession(managed);
+    } catch (error) {
+      if (worker) {
+        await worker.terminate().catch(() => undefined);
+        worker.close();
+      }
+      await removeWorkerState(this.runtimeDir, {
+        sessionId: id,
+        endpointId: endpoint
+      });
+      throw error;
+    }
   }
 
   async attach(id: string, socket: WebSocket, lastSeq: number): Promise<void> {
