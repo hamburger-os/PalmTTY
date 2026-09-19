@@ -137,7 +137,7 @@ pnpm build
 pnpm check
 ```
 
-CI runs with a committed `pnpm-lock.yaml` and `--frozen-lockfile` on Windows and Ubuntu. Pull requests also receive dependency review and CodeQL analysis.
+CI runs with a committed `pnpm-lock.yaml` and `--frozen-lockfile` on Windows and Ubuntu. Pull requests also receive a production-dependency vulnerability audit and CodeQL analysis.
 
 ## Documentation / 文档
 
