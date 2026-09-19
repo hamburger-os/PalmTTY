@@ -27,6 +27,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
   const terminalRef = useRef<Terminal | null>(null);
   const lastSeqRef = useRef(0);
   const intentionalCloseRef = useRef(false);
+  const sessionExitedRef = useRef(false);
   const ctrlRef = useRef(false);
   const altRef = useRef(false);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
@@ -45,6 +46,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
     const host = hostRef.current;
     if (!host) return;
     intentionalCloseRef.current = false;
+    sessionExitedRef.current = false;
 
     const terminal = new Terminal({
       cursorBlink: true,
@@ -75,12 +77,15 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
     });
 
     let reconnectTimer: number | undefined;
+    let heartbeatTimer: number | undefined;
     let attempt = 0;
+    let ready = false;
+    let lastPongAt = Date.now();
 
     const sendResize = () => {
       fit.fit();
       const socket = socketRef.current;
-      if (socket?.readyState === WebSocket.OPEN) {
+      if (ready && socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "resize", cols: terminal.cols, rows: terminal.rows }));
       }
     };
@@ -93,6 +98,8 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
       socketRef.current = socket;
 
       socket.addEventListener("open", () => {
+        ready = false;
+        lastPongAt = Date.now();
         socket.send(JSON.stringify({ type: "resume", lastSeq: lastSeqRef.current }));
       });
 
@@ -107,6 +114,8 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
 
         if (message.type === "hello") {
           attempt = 0;
+          ready = true;
+          lastPongAt = Date.now();
           setConnection("connected");
           window.setTimeout(sendResize, 0);
           return;
@@ -130,7 +139,14 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
           return;
         }
 
+        if (message.type === "pong") {
+          lastPongAt = Date.now();
+          return;
+        }
+
         if (message.type === "exit") {
+          sessionExitedRef.current = true;
+          ready = false;
           terminal.write(`\r\n\u001b[90m[PalmTTY] session exited${message.exitCode === undefined ? "" : ` (${message.exitCode})`}\u001b[0m\r\n`);
           setConnection("closed");
         }
@@ -140,9 +156,21 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
         }
       });
 
-      socket.addEventListener("close", () => {
+      socket.addEventListener("close", (event) => {
         if (socketRef.current === socket) socketRef.current = null;
-        if (intentionalCloseRef.current) return;
+        ready = false;
+        if (intentionalCloseRef.current || sessionExitedRef.current) {
+          setConnection("closed");
+          return;
+        }
+        if (event.code === 1008) {
+          if (event.reason === "Authentication expired") {
+            window.location.reload();
+            return;
+          }
+          setConnection("closed");
+          return;
+        }
         setConnection("reconnecting");
         attempt += 1;
         const delay = Math.min(5000, 400 * 2 ** Math.min(attempt, 4));
@@ -156,11 +184,22 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
     observer.observe(host);
 
     connect();
+    heartbeatTimer = window.setInterval(() => {
+      const socket = socketRef.current;
+      if (!ready || socket?.readyState !== WebSocket.OPEN) return;
+      const now = Date.now();
+      if (now - lastPongAt > 45_000) {
+        socket.close(1012, "Heartbeat timeout");
+        return;
+      }
+      socket.send(JSON.stringify({ type: "ping", id: String(now) }));
+    }, 15_000);
     window.setTimeout(sendResize, 0);
 
     return () => {
       intentionalCloseRef.current = true;
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+      if (heartbeatTimer !== undefined) window.clearInterval(heartbeatTimer);
       observer.disconnect();
       dataDisposable.dispose();
       socketRef.current?.close(1000, "Leaving terminal view");
@@ -184,6 +223,10 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
 
   const key = (label: string, data: string) => (
     <button type="button" onClick={() => {
+      ctrlRef.current = false;
+      altRef.current = false;
+      setCtrl(false);
+      setAlt(false);
       sendInput(data);
       terminalRef.current?.focus();
     }}>{label}</button>
