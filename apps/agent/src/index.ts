@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { loadConfig } from "@palmtty/config";
 import { buildApp } from "./app.js";
-import { assertSecureExposure } from "./security.js";\nimport { runSessionWorkerFromStdin } from "./session-worker.js";
+import { assertSecureExposure } from "./security.js";
+import { runSessionWorkerFromStdin } from "./session-worker.js";
 
 function defaultConfigPath(): string {
   if (process.platform === "win32") {
