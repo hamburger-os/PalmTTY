@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseConfig, type PalmTTYConfig } from "@palmtty/config";
 import {
@@ -13,7 +12,39 @@ import { buildApp } from "./app.js";
 const TOKEN_ENV = "PALMTTY_E2E_TOKEN";
 const TOKEN = "0123456789abcdef0123456789abcdef";
 
-const TEST_SHELL_PATH = fileURLToPath(new URL("../test-fixtures/e2e-terminal.mjs", import.meta.url));
+const isWindows = process.platform === "win32";
+
+const shellConfig = isWindows
+  ? {
+      shellPath: "pwsh.exe",
+      args: ["-NoLogo", "-NoProfile"],
+      command: "Write-Output ('PALMTTY_' + 'READY')"
+    }
+  : {
+      shellPath: "/bin/sh",
+      args: ["-i"],
+      command: "printf '%s%s\\n' PALMTTY_ READY"
+    };
+
+const commands = {
+  ordered: isWindows
+    ? "Write-Output ('ACK:' + 'ORDERED')"
+    : "printf '%s%s\\n' ACK: ORDERED",
+  later: isWindows
+    ? "Start-Sleep -Milliseconds 150; Write-Output ('LATE_' + 'MARKER')"
+    : "sleep 0.15; printf '%s%s\\n' LATE_ MARKER",
+  burst: isWindows
+    ? "Write-Output (('B' * 4096) + 'STALE_' + 'MARKER')"
+    : "printf '%4096s%s%s\\n' '' STALE_ MARKER",
+  backpressure: isWindows
+    ? "Write-Output ('BACK' + 'PRESSURE')"
+    : "printf '%s%s\\n' BACK PRESSURE",
+  exit: "exit 7"
+} as const;
+
+function sendTerminalCommand(socket: WebSocket, command: string): void {
+  socket.send(JSON.stringify({ type: "input", data: `${command}\r` }));
+}
 
 type AppInstance = Awaited<ReturnType<typeof buildApp>>;
 
@@ -59,8 +90,9 @@ async function startHarness(
       name: "E2E",
       cwd: process.cwd(),
       shell: "custom",
-      shellPath: process.execPath,
-      args: [TEST_SHELL_PATH]
+      shellPath: shellConfig.shellPath,
+      args: shellConfig.args,
+      command: shellConfig.command
     }]
   });
   mutate?.(config);
@@ -294,7 +326,7 @@ describe("terminal WebSocket integration", () => {
 
     socket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     socket.send(JSON.stringify({ type: "resize", cols: 120, rows: 35 }));
-    socket.send(JSON.stringify({ type: "input", data: "ORDERED\r" }));
+    sendTerminalCommand(socket, commands.ordered);
 
     await inbox.next((message) => message.type === "hello");
     await inbox.waitForText("ACK:ORDERED");
@@ -321,7 +353,7 @@ describe("terminal WebSocket integration", () => {
     const resumeFrom = firstInbox.latestSeq;
     expect(resumeFrom).toBeGreaterThan(0);
 
-    firstSocket.send(JSON.stringify({ type: "input", data: "LATER\r" }));
+    sendTerminalCommand(firstSocket, commands.later);
     const firstClosed = waitForClose(firstSocket);
     firstSocket.close(1000, "simulate browser navigation");
     await firstClosed;
@@ -365,7 +397,7 @@ describe("terminal WebSocket integration", () => {
     const staleSeq = firstInbox.latestSeq;
     expect(staleSeq).toBeGreaterThan(0);
 
-    firstSocket.send(JSON.stringify({ type: "input", data: "BURST\r" }));
+    sendTerminalCommand(firstSocket, commands.burst);
     await firstInbox.waitForText("STALE_MARKER");
     const closed = waitForClose(firstSocket);
     firstSocket.close(1000, "force stale resume");
@@ -429,7 +461,7 @@ describe("terminal WebSocket integration", () => {
     // Force the configured cutoff branch deterministically after attachment.
     harness.config.sessions.maxSocketBufferedBytes = -1;
     const slowClosed = waitForClose(slowSocket);
-    slowSocket.send(JSON.stringify({ type: "input", data: "BACKPRESSURE\r" }));
+    sendTerminalCommand(slowSocket, commands.backpressure);
     await expect(slowClosed).resolves.toMatchObject({
       code: 1013,
       reason: "Client is too slow; reconnect to resume"
@@ -441,7 +473,7 @@ describe("terminal WebSocket integration", () => {
     await waitForOpen(exitSocket);
     exitSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     await exitInbox.next((message) => message.type === "hello");
-    exitSocket.send(JSON.stringify({ type: "input", data: "EXIT\r" }));
+    sendTerminalCommand(exitSocket, commands.exit);
 
     const exit = await exitInbox.next((message) => message.type === "exit");
     expect(exit).toMatchObject({ type: "exit", exitCode: 7 });
