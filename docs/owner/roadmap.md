@@ -4,7 +4,7 @@
 
 本次仓库基础已经包含：
 
-- TypeScript/pnpm monorepo；
+- TypeScript/pnpm monorepo，并提交 `pnpm-lock.yaml`，CI 使用 frozen lockfile 保证依赖解析可重复；
 - Windows 优先的 node-pty/ConPTY Session Manager；
 - PowerShell 7 workspace；
 - HTTP/WebSocket API；
@@ -16,7 +16,7 @@
 - Windows/Ubuntu 双平台 CI 已通过；
 - Windows CI 会实际启动 PowerShell 7/ConPTY，并验证终端 resize 与中文 Unicode 往返；
 - 四层文档体系与 docs-sync Agent Skill；
-- Apache-2.0。
+- Apache-2.0；当前生产依赖许可证扫描只发现 MIT、ISC、BSD-3-Clause，与项目的 Apache-2.0 分发方式没有发现明显冲突。
 
 ## 下一阶段优先级
 
