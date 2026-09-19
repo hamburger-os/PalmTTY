@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseConfig } from "@palmtty/config";
-import { assertSecureExposure, isTrustedOrigin } from "./security.js";
+import { FixedWindowLimiter, assertSecureExposure, isTrustedOrigin } from "./security.js";
 
 function config(overrides: object = {}) {
   return parseConfig({
@@ -22,6 +22,16 @@ describe("security boundary", () => {
       auth: { enabled: false }
     });
     expect(() => assertSecureExposure(value)).toThrow();
+  });
+
+  it("bounds rate-limiter bucket state while preserving limits", () => {
+    const limiter = new FixedWindowLimiter(2, 1_000, 2);
+    expect(limiter.allow("a", 0)).toBe(true);
+    expect(limiter.allow("b", 0)).toBe(true);
+    expect(limiter.allow("c", 0)).toBe(true);
+    expect(limiter.allow("c", 1)).toBe(true);
+    expect(limiter.allow("c", 2)).toBe(false);
+    expect(limiter.allow("a", 2)).toBe(true);
   });
 
   it("uses exact origin matching", () => {
