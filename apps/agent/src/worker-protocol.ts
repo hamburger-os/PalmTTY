@@ -1,7 +1,7 @@
 import net from "node:net";
 import { z } from "zod";
 import { WorkspaceConfigSchema } from "@palmtty/config";
-import { ServerMessageSchema, SessionPublicSchema } from "@palmtty/protocol";
+import { MAX_INPUT_BYTES, ServerMessageSchema, SessionPublicSchema } from "@palmtty/protocol";
 
 export const WORKER_PROTOCOL_VERSION = 1 as const;
 export const MAX_WORKER_FRAME_BYTES = 64 * 1024 * 1024;
@@ -50,7 +50,10 @@ export const WorkerRequestSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("input"),
     requestId: RequestIdSchema,
-    data: z.string()
+    data: z.string().refine(
+      (value) => Buffer.byteLength(value, "utf8") <= MAX_INPUT_BYTES,
+      "terminal input exceeds 64 KiB"
+    )
   }),
   z.object({
     type: z.literal("resize"),
