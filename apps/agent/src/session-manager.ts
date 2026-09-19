@@ -138,6 +138,7 @@ export class SessionManager {
       sessionId: id,
       endpointId: endpoint,
       secret,
+      excludedEnvKeys: [this.config.auth.tokenEnv],
       createdAt,
       workspace,
       session: {
