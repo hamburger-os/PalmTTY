@@ -22,7 +22,7 @@ pnpm test
 pnpm build
 ```
 
-For a repository-wide change, `pnpm check` runs the same acceptance path. CI runs it on Windows and Ubuntu; the Windows test suite also performs a real PowerShell 7/ConPTY Unicode smoke test.
+For a repository-wide change, `pnpm check` runs the same acceptance path. CI installs with `pnpm install --frozen-lockfile` on Windows and Ubuntu; the Windows test suite also performs a real PowerShell 7/ConPTY Unicode smoke test. Update `pnpm-lock.yaml` whenever dependency manifests change.
 
 Any behavior-changing PR must use the documentation-sync workflow in `.agents/skills/docs-sync/SKILL.md`. Security, session lifecycle, reconnect behavior, protocol and configuration changes always require a documentation review.
 
@@ -55,7 +55,7 @@ pnpm test
 pnpm build
 ```
 
-仓库级变更可以直接执行 `pnpm check`。CI 会在 Windows 和 Ubuntu 上执行；Windows 测试还会真实启动 PowerShell 7/ConPTY 并验证 Unicode 往返。
+仓库级变更可以直接执行 `pnpm check`。CI 在 Windows 和 Ubuntu 上使用 `pnpm install --frozen-lockfile` 安装依赖；Windows 测试还会真实启动 PowerShell 7/ConPTY 并验证 Unicode 往返。修改依赖清单时必须同步更新 `pnpm-lock.yaml`。
 
 任何影响行为的 PR 都必须按 `.agents/skills/docs-sync/SKILL.md` 同步文档。安全、会话生命周期、重连、协议、配置的变更始终需要文档审查。
 

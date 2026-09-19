@@ -8,9 +8,10 @@ Status: **alpha foundation implemented and passing Windows/Ubuntu CI; real mobil
 
 - pnpm/TypeScript monorepo
 - Agent/Web/protocol/config packages
+- committed pnpm lockfile with frozen-lockfile CI installs
 - Windows + Ubuntu CI passing
 - Windows-only ConPTY smoke test that spawns PowerShell 7, resizes the PTY and round-trips Unicode
-- Apache-2.0
+- Apache-2.0; production dependency audit currently contains MIT, ISC and BSD-3-Clause licenses
 - four documentation layers
 - `.agents/skills/docs-sync/SKILL.md`
 - automated documentation contract check
