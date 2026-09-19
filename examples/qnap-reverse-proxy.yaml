@@ -1,0 +1,31 @@
+# Example for HTTPS reverse proxy access through QNAP/Caddy.
+# Replace the domain and Windows workspace path.
+# Set PALMTTY_ACCESS_TOKEN to a long random secret in the Windows environment.
+
+server:
+  host: 0.0.0.0
+  port: 7688
+  trustedOrigins:
+    - https://dev.example.com
+  secureCookies: true
+  unsafeAllowInsecureLan: false
+
+auth:
+  enabled: true
+  tokenEnv: PALMTTY_ACCESS_TOKEN
+  sessionTtlMinutes: 720
+
+sessions:
+  maxSessions: 8
+  scrollbackLines: 10000
+  replayBytes: 2097152
+  maxSocketBufferedBytes: 2097152
+
+workspaces:
+  - id: palmtty
+    name: PalmTTY
+    cwd: D:\\Code\\PalmTTY
+    shell: pwsh
+    args:
+      - -NoLogo
+    command: codex
