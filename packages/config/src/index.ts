@@ -30,6 +30,7 @@ const ServerConfigSchema = z.object({
 const AuthConfigSchema = z.object({
   enabled: z.boolean().default(true),
   tokenEnv: z.string().min(1).default("PALMTTY_ACCESS_TOKEN"),
+  maxLoginSessions: z.number().int().min(1).max(256).default(32),
   sessionTtlMinutes: z.number().int().min(5).max(10080).default(720)
 });
 
@@ -52,6 +53,7 @@ export const PalmTTYConfigSchema = z.object({
   auth: AuthConfigSchema.default({
     enabled: true,
     tokenEnv: "PALMTTY_ACCESS_TOKEN",
+    maxLoginSessions: 32,
     sessionTtlMinutes: 720
   }),
   sessions: SessionConfigSchema.default({
