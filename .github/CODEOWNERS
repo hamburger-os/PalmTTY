@@ -1,11 +1,19 @@
-# Default owner
-* @hamburger-os
+# PalmTTY AI-maintenance trust root
+#
+# Normal application/docs changes are intentionally NOT code-owned so AI can
+# maintain them without a mandatory human approval. The entries below protect
+# the mechanism that decides whether a PR is allowed to merge.
 
-# Architecture- and security-critical surfaces
-/apps/agent/ @hamburger-os
-/packages/protocol/ @hamburger-os
-/packages/config/ @hamburger-os
+/.github/CODEOWNERS @hamburger-os
 /.github/workflows/ @hamburger-os
-/SECURITY.md @hamburger-os
-/docs/owner/ @hamburger-os
-/docs/ai/ @hamburger-os
+/.github/dependabot.yml @hamburger-os
+
+# Root quality-gate / workspace definitions.
+/package.json @hamburger-os
+/pnpm-workspace.yaml @hamburger-os
+/tsconfig.base.json @hamburger-os
+/scripts/docs-check.mjs @hamburger-os
+
+# Package manifests define the recursive test/typecheck/build commands and
+# dependency authority used by pnpm check.
+**/package.json @hamburger-os
