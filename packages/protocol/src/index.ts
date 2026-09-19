@@ -5,6 +5,11 @@ export const WS_SUBPROTOCOL = "palmtty.v1";
 export const MAX_INPUT_BYTES = 64 * 1024;
 export const MAX_MESSAGE_BYTES = 80 * 1024;
 
+const encoder = new TextEncoder();
+function utf8ByteLength(value: string): number {
+  return encoder.encode(value).byteLength;
+}
+
 export const SessionStateSchema = z.enum(["starting", "running", "exited", "failed"]);
 export type SessionState = z.infer<typeof SessionStateSchema>;
 
@@ -44,7 +49,7 @@ export const ResumeMessageSchema = z.object({
 export const InputMessageSchema = z.object({
   type: z.literal("input"),
   data: z.string().superRefine((value, ctx) => {
-    if (Buffer.byteLength(value, "utf8") > MAX_INPUT_BYTES) {
+    if (utf8ByteLength(value) > MAX_INPUT_BYTES) {
       ctx.addIssue({ code: "custom", message: "terminal input exceeds 64 KiB" });
     }
   })
@@ -118,7 +123,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;
 
 export function parseClientMessage(raw: string): ClientMessage {
-  if (Buffer.byteLength(raw, "utf8") > MAX_MESSAGE_BYTES) {
+  if (utf8ByteLength(raw) > MAX_MESSAGE_BYTES) {
     throw new Error("WebSocket frame too large");
   }
   return ClientMessageSchema.parse(JSON.parse(raw));
