@@ -46,7 +46,7 @@ The Agent owns a headless xterm state mirror. PTY output is serialized through o
 On attach:
 
 - a live browser with a retained sequence can receive missing replay frames;
-- a new/reloaded browser, or a client that fell behind the retained buffer, receives a serialized terminal snapshot;
+- a new/reloaded browser, or a client that fell behind the retained buffer, receives the current terminal snapshot; before any PTY output (`seq = 0`) that snapshot is deterministically empty, otherwise it is serialized from the headless terminal;
 - after the boundary is established, live output continues normally;
 - an application heartbeat detects half-open mobile connections and forces reconnect when pong responses stop.
 
@@ -99,7 +99,7 @@ Agent 内维护 headless xterm 终端状态镜像。PTY 输出经过同一个有
 重新连接时：
 
 - 仍保存旧序号的浏览器可以补发缺失帧；
-- 页面重载、浏览器被系统杀掉、或者落后太多时，直接收到当前终端序列化快照；
+- 页面重载、浏览器被系统杀掉、或者落后太多时，直接收到当前终端快照；若尚无任何 PTY 输出（`seq = 0`），快照确定为空，否则从 headless terminal 序列化；
 - 完成恢复边界后再继续接收实时输出；
 - 应用层心跳用于发现手机换网后遗留的半开连接，连续收不到 pong 时主动重连。
 
