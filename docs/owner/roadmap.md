@@ -26,8 +26,9 @@ AI 主维护模式的 `main` Ruleset 已启用：PR 必须经过 Windows/Ubuntu 
 
 已启用 Auto-merge、Update branch、自动删除已合并分支、Discussions，并关闭 Wiki、补齐 Topics。
 
-仍建议按 [github-governance.md](github-governance.md) 完成两项 Ruleset 微调：
+仍建议按 [github-governance.md](github-governance.md) 完成三项 Ruleset 微调：
 
+- 打开 **Require review from Code Owners**；CODEOWNERS 已缩小到 CI/依赖/workspace trust root，因此普通 AI 代码 PR 不会被人工审批阻塞；
 - 打开 **Require branches to be up to date before merging**；
 - 给 Repository administrators 增加 **Pull requests only** 的紧急恢复 bypass。
 
