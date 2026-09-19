@@ -77,7 +77,7 @@ export class SessionManager {
     await cleanupDanglingWorkerState(this.runtimeDir);
 
     const records = await listWorkerRecords(this.runtimeDir);
-    for (const record of records) {
+    await Promise.all(records.map(async (record) => {
       try {
         const secret = await readWorkerSecret(this.runtimeDir, record.sessionId);
         const worker = await this.connectWithRetry(
@@ -98,7 +98,7 @@ export class SessionManager {
         // Only authenticated IPC can terminate a worker.
         await removeWorkerState(this.runtimeDir, record);
       }
-    }
+    }));
   }
 
   list(): SessionPublic[] {
