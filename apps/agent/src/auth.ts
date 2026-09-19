@@ -43,6 +43,13 @@ export class AuthService {
   }
 
   createLoginSession(now = Date.now()): string {
+    this.pruneExpired(now);
+    while (this.loginSessions.size >= this.config.maxLoginSessions) {
+      const oldest = this.loginSessions.keys().next().value as string | undefined;
+      if (!oldest) break;
+      this.loginSessions.delete(oldest);
+    }
+
     const id = randomBytes(32).toString("base64url");
     this.loginSessions.set(id, {
       expiresAt: now + this.config.sessionTtlMinutes * 60_000
@@ -62,8 +69,27 @@ export class AuthService {
     return true;
   }
 
+  remainingSessionMs(sessionId: string | undefined, now = Date.now()): number | undefined {
+    if (!this.config.enabled) return undefined;
+    if (!sessionId) return undefined;
+    const session = this.loginSessions.get(sessionId);
+    if (!session) return undefined;
+    const remaining = session.expiresAt - now;
+    if (remaining <= 0) {
+      this.loginSessions.delete(sessionId);
+      return undefined;
+    }
+    return remaining;
+  }
+
   revoke(sessionId: string | undefined): void {
     if (sessionId) this.loginSessions.delete(sessionId);
+  }
+
+  private pruneExpired(now: number): void {
+    for (const [id, session] of this.loginSessions) {
+      if (session.expiresAt <= now) this.loginSessions.delete(id);
+    }
   }
 
   get enabled(): boolean {
