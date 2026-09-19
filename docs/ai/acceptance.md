@@ -29,7 +29,7 @@ Security and reconnect changes should include or update tests for:
 - backpressure / slow-client cutoff
 - exit delivery and retained-session cleanup
 
-The Agent suite includes an end-to-end Fastify HTTP/WebSocket + node-pty harness for these lifecycle boundaries. Windows CI separately keeps the real PowerShell 7 / ConPTY Unicode smoke path.
+The Agent suite includes an end-to-end Fastify HTTP/WebSocket + SessionManager harness with a deterministic PTY adapter for these lifecycle boundaries. Windows CI separately keeps the real node-pty + PowerShell 7 / ConPTY Unicode smoke path.
 
 ## Build
 
