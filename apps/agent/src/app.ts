@@ -17,7 +17,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import { AUTH_COOKIE, AuthService } from "./auth.js";
 import { FixedWindowLimiter, isTrustedOrigin } from "./security.js";
-import { SessionManager, type PtyFactory } from "./session-manager.js";
+import { SessionManager, type SessionManagerOptions } from "./session-manager.js";
 
 const LoginSchema = z.object({ token: z.string().min(1).max(4096) });
 
@@ -48,7 +48,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   const auth = new AuthService(config.auth);
-  const sessions = new SessionManager(config, options.ptyFactory);
+  const sessions = new SessionManager(config, options.sessionManager);\n  await sessions.initialize();
   const createLimiter = new FixedWindowLimiter(20, 60_000);
 
   function authenticated(request: FastifyRequest): boolean {
@@ -131,7 +131,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       return reply.code(400).send({ error: "invalid_session_request" });
     }
     try {
-      const session = sessions.create(parsed.data.workspaceId, parsed.data.cols, parsed.data.rows);
+      const session = await sessions.create(parsed.data.workspaceId, parsed.data.cols, parsed.data.rows);
       return reply.code(201).send({ session });
     } catch (error) {
       request.log.warn({ err: error }, "Session creation failed");
@@ -140,7 +140,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   app.delete<{ Params: { id: string } }>("/api/v1/sessions/:id", { preHandler: [requireOrigin, requireAuth] }, async (request, reply) => {
-    if (!sessions.terminate(request.params.id)) {
+    if (!await sessions.terminate(request.params.id)) {
       return reply.code(404).send({ error: "session_not_found" });
     }
     return reply.code(204).send();
@@ -208,7 +208,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
             }
 
             if (message.type === "input") {
-              sessions.write(id, message.data);
+              await sessions.write(id, message.data);
             } else if (message.type === "resize") {
               await sessions.resize(id, message.cols, message.rows);
             }
@@ -256,7 +256,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   app.addHook("onClose", async () => {
-    sessions.close();
+    await sessions.close();
   });
 
   return app;
