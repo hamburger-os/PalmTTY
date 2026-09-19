@@ -77,8 +77,8 @@ Status: **alpha foundation implemented and passing Windows/Ubuntu CI; open-sourc
 - Windows CI validates ConPTY/PowerShell, but real owner workstation + mobile Safari/Chrome + Codex validation is still required.
 - No Git/file preview subsystem yet.
 - Linux/macOS/WSL are not first-class supported hosts yet.
-- Active `main` Ruleset requires pull requests, squash-only merge, linear history, conversation resolution, no force-push/deletion, and four green automated checks; human/code-owner approval is intentionally not required for the AI-maintained workflow.
-- GitHub Dependency Review is not enabled because the repository Dependency graph setting was off when tested; the portable `pnpm audit --prod` gate is enforced instead. Ruleset strict-up-to-date and an admin-only emergency recovery bypass are documented recommendations still requiring GitHub Settings changes.
+- Active `main` Ruleset requires pull requests, squash-only merge, linear history, conversation resolution, no force-push/deletion, and four green automated checks; ordinary changes intentionally require no human approval. CODEOWNERS has been narrowed to a small CI/dependency/workspace trust root so Code Owner review can be enabled without blocking normal AI maintenance.
+- GitHub Dependency Review is not enabled because the repository Dependency graph setting was off when tested; the portable `pnpm audit --prod` gate is enforced instead. Ruleset Code Owner review for the narrow trust root, strict-up-to-date, and an admin-only emergency recovery bypass are documented recommendations still requiring GitHub Settings changes.
 
 ## Required honesty rule
 
