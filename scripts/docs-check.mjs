@@ -1,1 +1,52 @@
-import { readdir, readFile, stat } from "node:fs/promises";\nimport path from "node:path";\n\nconst root = process.cwd();\nconst layers = ["community", "standards", "owner", "ai"];\nconst failures = [];\n\nasync function exists(file) {\n  try { await stat(file); return true; } catch { return false; }\n}\n\nconst docsIndexPath = path.join(root, "docs", "README.md");\nif (!(await exists(docsIndexPath))) {\n  failures.push("docs/README.md is missing");\n} else {\n  const docsIndex = await readFile(docsIndexPath, "utf8");\n  for (const layer of layers) {\n    if (!docsIndex.includes(`${layer}/README.md`)) failures.push(`docs/README.md does not index ${layer}/README.md`);\n  }\n}\n\nfor (const layer of layers) {\n  const dir = path.join(root, "docs", layer);\n  const indexPath = path.join(dir, "README.md");\n  if (!(await exists(indexPath))) {\n    failures.push(`docs/${layer}/README.md is missing`);\n    continue;\n  }\n  const index = await readFile(indexPath, "utf8");\n  const entries = (await readdir(dir)).filter((name) => name.endsWith(".md") && name !== "README.md");\n  for (const entry of entries) {\n    if (!index.includes(entry)) failures.push(`docs/${layer}/README.md does not index ${entry}`);\n    const content = await readFile(path.join(dir, entry), "utf8");\n    if (layer === "owner" && !/[\u3400-\u9fff]/u.test(content)) failures.push(`docs/owner/${entry} should be written in Chinese`);\n    if (layer === "community" && !content.includes("<!-- bilingual -->")) failures.push(`docs/community/${entry} is missing the bilingual marker`);\n  }\n}\n\nconst skillPath = path.join(root, ".agents", "skills", "docs-sync", "SKILL.md");\nif (!(await exists(skillPath))) {\n  failures.push(".agents/skills/docs-sync/SKILL.md is missing");\n} else {\n  const skill = await readFile(skillPath, "utf8");\n  if (!/^---[\s\S]*?name:\s*docs-sync[\s\S]*?description:[\s\S]*?---/m.test(skill)) failures.push("docs-sync SKILL.md is missing required Agent Skills frontmatter");\n}\n\nif (failures.length) {\n  console.error("Documentation contract check failed:");\n  for (const failure of failures) console.error(`- ${failure}`);\n  process.exit(1);\n}\nconsole.log("Documentation contract check passed.");\n
+import { readdir, readFile, stat } from "node:fs/promises";
+import path from "node:path";
+
+const root = process.cwd();
+const layers = ["community", "standards", "owner", "ai"];
+const failures = [];
+
+async function exists(file) {
+  try { await stat(file); return true; } catch { return false; }
+}
+
+const docsIndexPath = path.join(root, "docs", "README.md");
+if (!(await exists(docsIndexPath))) {
+  failures.push("docs/README.md is missing");
+} else {
+  const docsIndex = await readFile(docsIndexPath, "utf8");
+  for (const layer of layers) {
+    if (!docsIndex.includes(`${layer}/README.md`)) failures.push(`docs/README.md does not index ${layer}/README.md`);
+  }
+}
+
+for (const layer of layers) {
+  const dir = path.join(root, "docs", layer);
+  const indexPath = path.join(dir, "README.md");
+  if (!(await exists(indexPath))) {
+    failures.push(`docs/${layer}/README.md is missing`);
+    continue;
+  }
+  const index = await readFile(indexPath, "utf8");
+  const entries = (await readdir(dir)).filter((name) => name.endsWith(".md") && name !== "README.md");
+  for (const entry of entries) {
+    if (!index.includes(entry)) failures.push(`docs/${layer}/README.md does not index ${entry}`);
+    const content = await readFile(path.join(dir, entry), "utf8");
+    if (layer === "owner" && !/[\u3400-\u9fff]/u.test(content)) failures.push(`docs/owner/${entry} should be written in Chinese`);
+    if (layer === "community" && !content.includes("<!-- bilingual -->")) failures.push(`docs/community/${entry} is missing the bilingual marker`);
+  }
+}
+
+const skillPath = path.join(root, ".agents", "skills", "docs-sync", "SKILL.md");
+if (!(await exists(skillPath))) {
+  failures.push(".agents/skills/docs-sync/SKILL.md is missing");
+} else {
+  const skill = await readFile(skillPath, "utf8");
+  if (!/^---[\s\S]*?name:\s*docs-sync[\s\S]*?description:[\s\S]*?---/m.test(skill)) failures.push("docs-sync SKILL.md is missing required Agent Skills frontmatter");
+}
+
+if (failures.length) {
+  console.error("Documentation contract check failed:");
+  for (const failure of failures) console.error(`- ${failure}`);
+  process.exit(1);
+}
+console.log("Documentation contract check passed.");
