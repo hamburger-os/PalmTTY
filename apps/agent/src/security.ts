@@ -56,12 +56,18 @@ export class FixedWindowLimiter {
 
   constructor(
     private readonly limit: number,
-    private readonly windowMs: number
+    private readonly windowMs: number,
+    private readonly maxBuckets = 1024
   ) {}
 
   allow(key: string, now = Date.now()): boolean {
     const current = this.buckets.get(key);
     if (!current || now - current.startedAt >= this.windowMs) {
+      this.prune(now);
+      if (!this.buckets.has(key) && this.buckets.size >= this.maxBuckets) {
+        const oldestKey = this.buckets.keys().next().value as string | undefined;
+        if (oldestKey) this.buckets.delete(oldestKey);
+      }
       this.buckets.set(key, { startedAt: now, count: 1 });
       return true;
     }
@@ -72,5 +78,11 @@ export class FixedWindowLimiter {
 
   reset(key: string): void {
     this.buckets.delete(key);
+  }
+
+  private prune(now: number): void {
+    for (const [key, bucket] of this.buckets) {
+      if (now - bucket.startedAt >= this.windowMs) this.buckets.delete(key);
+    }
   }
 }
