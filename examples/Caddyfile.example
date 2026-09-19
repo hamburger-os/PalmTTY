@@ -1,0 +1,6 @@
+# Run this at the trusted HTTPS ingress (for example on QNAP Container Station).
+# Replace both the public domain and the private Windows host address.
+
+dev.example.com {
+    reverse_proxy http://192.168.1.100:7688
+}
