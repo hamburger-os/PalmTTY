@@ -17,12 +17,13 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import { AUTH_COOKIE, AuthService } from "./auth.js";
 import { FixedWindowLimiter, isTrustedOrigin } from "./security.js";
-import { SessionManager } from "./session-manager.js";
+import { SessionManager, type PtyFactory } from "./session-manager.js";
 
 const LoginSchema = z.object({ token: z.string().min(1).max(4096) });
 
 export type BuildAppOptions = {
   webRoot?: string;
+  ptyFactory?: PtyFactory;
 };
 
 export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions = {}) {
@@ -47,7 +48,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   const auth = new AuthService(config.auth);
-  const sessions = new SessionManager(config);
+  const sessions = new SessionManager(config, options.ptyFactory);
   const createLimiter = new FixedWindowLimiter(20, 60_000);
 
   function authenticated(request: FastifyRequest): boolean {
