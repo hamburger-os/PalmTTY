@@ -1,24 +1,39 @@
-# PalmTTY example configuration — draft schema
+# Safe local/development example.
+# Copy to palmtty.local.yaml and change the workspace path.
+# Set PALMTTY_ACCESS_TOKEN before starting PalmTTY.
 
 server:
   host: 127.0.0.1
   port: 7688
   trustedOrigins:
-    - https://dev.example.com
+    - http://127.0.0.1:7688
+    - http://127.0.0.1:5173
+  secureCookies: false
+  unsafeAllowInsecureLan: false
+
+auth:
+  enabled: true
+  tokenEnv: PALMTTY_ACCESS_TOKEN
+  sessionTtlMinutes: 720
 
 sessions:
   maxSessions: 8
   scrollbackLines: 10000
-  idleTimeoutMinutes: 0
+  replayBytes: 2097152
+  maxSocketBufferedBytes: 2097152
 
 workspaces:
   - id: palmtty
     name: PalmTTY
     cwd: D:\\Code\\PalmTTY
     shell: pwsh
+    args:
+      - -NoLogo
     command: codex
 
   - id: powershell
     name: PowerShell
-    cwd: C:\\Users\\me
+    cwd: C:\\Users\\Public
     shell: pwsh
+    args:
+      - -NoLogo
