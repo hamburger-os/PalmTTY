@@ -8,38 +8,95 @@ import {
 } from "@palmtty/protocol";
 import WebSocket from "ws";
 import { buildApp } from "./app.js";
+import type { PtyFactory, PtyHandle } from "./session-manager.js";
 
 const TOKEN_ENV = "PALMTTY_E2E_TOKEN";
 const TOKEN = "0123456789abcdef0123456789abcdef";
 
-const isWindows = process.platform === "win32";
+class DeterministicPty implements PtyHandle {
+  private readonly dataListeners = new Set<(data: string) => void>();
+  private readonly exitListeners = new Set<(event: { exitCode: number; signal?: number }) => void>();
+  private pending = "";
+  private exited = false;
 
-const shellConfig = isWindows
-  ? { shellPath: "pwsh.exe", args: ["-NoLogo", "-NoProfile"] }
-  : { shellPath: "/bin/sh", args: ["-i"] };
+  constructor(readonly pid: number) {}
 
-const commands = {
-  ready: isWindows
-    ? "Write-Output ('PALMTTY_' + 'READY')"
-    : "printf '%s%s\\n' PALMTTY_ READY",
-  ordered: isWindows
-    ? "Write-Output ('ACK:' + 'ORDERED')"
-    : "printf '%s%s\\n' ACK: ORDERED",
-  later: isWindows
-    ? "Start-Sleep -Milliseconds 150; Write-Output ('LATE_' + 'MARKER')"
-    : "sleep 0.15; printf '%s%s\\n' LATE_ MARKER",
-  burst: isWindows
-    ? "Write-Output (('B' * 4096) + 'STALE_' + 'MARKER')"
-    : "printf '%4096s%s%s\\n' '' STALE_ MARKER",
-  backpressure: isWindows
-    ? "Write-Output ('BACK' + 'PRESSURE')"
-    : "printf '%s%s\\n' BACK PRESSURE",
-  exit: "exit 7"
-} as const;
+  onData(listener: (data: string) => void): { dispose(): void } {
+    this.dataListeners.add(listener);
+    return { dispose: () => { this.dataListeners.delete(listener); } };
+  }
 
-function sendTerminalCommand(socket: WebSocket, command: string): void {
-  const lineEnding = isWindows ? "\r" : "\n";
-  socket.send(JSON.stringify({ type: "input", data: `${command}${lineEnding}` }));
+  onExit(listener: (event: { exitCode: number; signal?: number }) => void): { dispose(): void } {
+    this.exitListeners.add(listener);
+    return { dispose: () => { this.exitListeners.delete(listener); } };
+  }
+
+  write(data: string): void {
+    if (this.exited) return;
+    this.pending += data;
+    const lines = this.pending.split(/\r\n|\r|\n/);
+    this.pending = lines.pop() ?? "";
+
+    for (const raw of lines) {
+      const command = raw.trim();
+      if (!command) continue;
+      this.handle(command);
+    }
+  }
+
+  resize(_cols: number, _rows: number): void {
+    // SessionManager owns the public dimensions; this adapter only confirms
+    // that the resize call reaches the PTY boundary without throwing.
+  }
+
+  kill(_signal?: string): void {
+    this.emitExit(0);
+  }
+
+  private handle(command: string): void {
+    switch (command) {
+      case "READY":
+        this.emitData("PALMTTY_READY\r\n");
+        return;
+      case "ORDERED":
+        this.emitData("ACK:ORDERED\r\n");
+        return;
+      case "LATER": {
+        const timer = setTimeout(() => this.emitData("LATE_MARKER\r\n"), 150);
+        timer.unref();
+        return;
+      }
+      case "BURST":
+        this.emitData(`${"B".repeat(4096)}STALE_MARKER\r\n`);
+        return;
+      case "BACKPRESSURE":
+        this.emitData("BACKPRESSURE\r\n");
+        return;
+      case "EXIT": {
+        const timer = setTimeout(() => this.emitExit(7), 20);
+        timer.unref();
+        return;
+      }
+      default:
+        this.emitData(`ACK:${command}\r\n`);
+    }
+  }
+
+  private emitData(data: string): void {
+    if (this.exited) return;
+    for (const listener of [...this.dataListeners]) listener(data);
+  }
+
+  private emitExit(exitCode: number): void {
+    if (this.exited) return;
+    this.exited = true;
+    for (const listener of [...this.exitListeners]) listener({ exitCode });
+  }
+}
+
+function createPtyFactory(): PtyFactory {
+  let nextPid = 40_000;
+  return () => new DeterministicPty(nextPid++);
 }
 
 type AppInstance = Awaited<ReturnType<typeof buildApp>>;
@@ -86,13 +143,13 @@ async function startHarness(
       name: "E2E",
       cwd: process.cwd(),
       shell: "custom",
-      shellPath: shellConfig.shellPath,
-      args: shellConfig.args
+      shellPath: "deterministic-test-pty",
+      args: []
     }]
   });
   mutate?.(config);
 
-  const app = await buildApp(config);
+  const app = await buildApp(config, { ptyFactory: createPtyFactory() });
   liveApps.add(app);
   const address = await app.listen({ host: "127.0.0.1", port: 0 });
   const origin = new URL(address).origin;
@@ -163,6 +220,10 @@ function socketFor(
     protocol,
     { headers }
   );
+}
+
+function sendTerminalCommand(socket: WebSocket, command: string): void {
+  socket.send(JSON.stringify({ type: "input", data: `${command}\r` }));
 }
 
 function waitForOpen(socket: WebSocket, timeoutMs = 3_000): Promise<void> {
@@ -313,7 +374,7 @@ describe("terminal WebSocket integration", () => {
       code: 1002,
       reason: "Unsupported PalmTTY protocol"
     });
-  }, 10_000);
+  });
 
   it("serializes resume, resize, and input frames in connection order", async () => {
     const harness = await startHarness();
@@ -325,7 +386,7 @@ describe("terminal WebSocket integration", () => {
 
     socket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     socket.send(JSON.stringify({ type: "resize", cols: 120, rows: 35 }));
-    sendTerminalCommand(socket, commands.ordered);
+    sendTerminalCommand(socket, "ORDERED");
 
     await inbox.next((message) => message.type === "hello");
     await inbox.waitForText("ACK:ORDERED");
@@ -337,7 +398,7 @@ describe("terminal WebSocket integration", () => {
     expect(body.session.rows).toBe(35);
 
     socket.close(1000, "test complete");
-  }, 10_000);
+  });
 
   it("keeps the PTY alive across browser disconnect and replays retained output", async () => {
     const harness = await startHarness();
@@ -349,12 +410,12 @@ describe("terminal WebSocket integration", () => {
     await waitForOpen(firstSocket);
     firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     await firstInbox.next((message) => message.type === "hello");
-    sendTerminalCommand(firstSocket, commands.ready);
+    sendTerminalCommand(firstSocket, "READY");
     await firstInbox.waitForText("PALMTTY_READY");
     const resumeFrom = firstInbox.latestSeq;
     expect(resumeFrom).toBeGreaterThan(0);
 
-    sendTerminalCommand(firstSocket, commands.later);
+    sendTerminalCommand(firstSocket, "LATER");
     const firstClosed = waitForClose(firstSocket);
     firstSocket.close(1000, "simulate browser navigation");
     await firstClosed;
@@ -379,7 +440,7 @@ describe("terminal WebSocket integration", () => {
     await secondInbox.waitForText("LATE_MARKER");
 
     secondSocket.close(1000, "test complete");
-  }, 10_000);
+  });
 
   it("falls back to a snapshot when replay history is stale", async () => {
     const harness = await startHarness((config) => {
@@ -395,12 +456,12 @@ describe("terminal WebSocket integration", () => {
     await waitForOpen(firstSocket);
     firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     await firstInbox.next((message) => message.type === "hello");
-    sendTerminalCommand(firstSocket, commands.ready);
+    sendTerminalCommand(firstSocket, "READY");
     await firstInbox.waitForText("PALMTTY_READY");
     const staleSeq = firstInbox.latestSeq;
     expect(staleSeq).toBeGreaterThan(0);
 
-    sendTerminalCommand(firstSocket, commands.burst);
+    sendTerminalCommand(firstSocket, "BURST");
     await firstInbox.waitForText("STALE_MARKER");
     const closed = waitForClose(firstSocket);
     firstSocket.close(1000, "force stale resume");
@@ -418,7 +479,7 @@ describe("terminal WebSocket integration", () => {
     expect(recovery.type).toBe("snapshot");
 
     secondSocket.close(1000, "test complete");
-  }, 10_000);
+  });
 
   it("actively closes established sockets when authentication expires", async () => {
     const harness = await startHarness();
@@ -460,13 +521,13 @@ describe("terminal WebSocket integration", () => {
     await waitForOpen(slowSocket);
     slowSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     await slowInbox.next((message) => message.type === "hello");
-    sendTerminalCommand(slowSocket, commands.ready);
+    sendTerminalCommand(slowSocket, "READY");
     await slowInbox.waitForText("PALMTTY_READY");
 
     // Force the configured cutoff branch deterministically after attachment.
     harness.config.sessions.maxSocketBufferedBytes = -1;
     const slowClosed = waitForClose(slowSocket);
-    sendTerminalCommand(slowSocket, commands.backpressure);
+    sendTerminalCommand(slowSocket, "BACKPRESSURE");
     await expect(slowClosed).resolves.toMatchObject({
       code: 1013,
       reason: "Client is too slow; reconnect to resume"
@@ -478,7 +539,7 @@ describe("terminal WebSocket integration", () => {
     await waitForOpen(exitSocket);
     exitSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     await exitInbox.next((message) => message.type === "hello");
-    sendTerminalCommand(exitSocket, commands.exit);
+    sendTerminalCommand(exitSocket, "EXIT");
 
     const exit = await exitInbox.next((message) => message.type === "exit");
     expect(exit).toMatchObject({ type: "exit", exitCode: 7 });
