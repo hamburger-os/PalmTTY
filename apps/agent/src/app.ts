@@ -48,7 +48,8 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   const auth = new AuthService(config.auth);
-  const sessions = new SessionManager(config, options.sessionManager);\n  await sessions.initialize();
+  const sessions = new SessionManager(config, options.sessionManager);
+  await sessions.initialize();
   const createLimiter = new FixedWindowLimiter(20, 60_000);
 
   function authenticated(request: FastifyRequest): boolean {
