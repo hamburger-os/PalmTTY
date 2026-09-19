@@ -92,13 +92,14 @@ export class ProcessWorkerSpawner implements WorkerSpawner {
       child.stdout!.on("data", onData);
     });
 
-    await new Promise<void>((resolve, reject) => {
+    const bootstrapWritten = new Promise<void>((resolve, reject) => {
       child.stdin!.once("error", reject);
       child.stdin!.end(JSON.stringify(bootstrap), "utf8", () => resolve());
     });
 
     try {
-      await ready;
+      await Promise.all([bootstrapWritten, ready]);
+      child.unref();
     } catch (error) {
       try { child.kill(); } catch { /* best effort */ }
       throw error;
@@ -106,7 +107,5 @@ export class ProcessWorkerSpawner implements WorkerSpawner {
       child.stdout.destroy();
       child.stderr.destroy();
     }
-
-    child.unref();
   }
 }
