@@ -44,6 +44,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    intentionalCloseRef.current = false;
 
     const terminal = new Terminal({
       cursorBlink: true,
