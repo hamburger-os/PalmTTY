@@ -1,11 +1,15 @@
+import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseConfig } from "@palmtty/config";
 import {
   ServerMessageSchema,
-  type ServerMessage
+  SessionPublicSchema,
+  type ServerMessage,
+  type SessionPublic
 } from "@palmtty/protocol";
 import type WebSocket from "ws";
 import { SessionManager } from "./session-manager.js";
@@ -65,9 +69,41 @@ function testConfig() {
     auth: { enabled: false },
     workspaces: [workspace]
   });
-  // Test-only short retention; the public config intentionally requires >= 1 minute.
   config.sessions.exitedRetentionMinutes = 0.01;
   return config;
+}
+
+async function createFromAgentProcess(runtimeDir: string): Promise<SessionPublic> {
+  const fixture = fileURLToPath(new URL("./session-worker-parent.fixture.ts", import.meta.url));
+  const child = spawn(
+    process.execPath,
+    ["--import", "tsx", fixture, runtimeDir],
+    {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true
+    }
+  );
+
+  let stdout = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+
+  const exitCode = await new Promise<number | null>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", resolve);
+  });
+  if (exitCode !== 0) {
+    throw new Error(`Agent parent fixture failed (${exitCode}): ${stderr}`);
+  }
+
+  const line = stdout.trim().split(/\r?\n/).at(-1);
+  if (!line) throw new Error("Agent parent fixture did not return a session");
+  return SessionPublicSchema.parse(JSON.parse(line));
 }
 
 function maxSeq(messages: ServerMessage[]): number {
@@ -93,42 +129,21 @@ async function waitFor(
 }
 
 describe("detached session worker process", () => {
-  it("survives Agent teardown and is rediscovered with replay intact", async () => {
+  it("survives the creator Agent process exit and preserves replay across another restart", async () => {
     const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-process-"));
     runtimeDirs.add(runtimeDir);
     const config = testConfig();
 
-    const firstManager = new SessionManager(config, { runtimeDir });
-    managers.add(firstManager);
-    await firstManager.initialize();
-
-    const session = await firstManager.create("process", 80, 24);
+    // This subprocess creates the Worker and then exits completely. The Worker
+    // must remain alive as a detached grandchild before this process reconnects.
+    const session = await createFromAgentProcess(runtimeDir);
     expect(session.pid).toBeTypeOf("number");
-
-    const firstSocket = new FakeSocket();
-    await firstManager.attach(
-      session.id,
-      firstSocket as unknown as WebSocket,
-      0
-    );
-    const resumeFrom = maxSeq(firstSocket.messages);
-
-    const delayedOutputCommand = process.platform === "win32"
-      ? 'Start-Sleep -Milliseconds 700; Write-Output "WORKER_SURVIVED"\r'
-      : "sleep 0.7; printf 'WORKER_SURVIVED\\n'\n";
-    await firstManager.write(session.id, delayedOutputCommand);
-
-    await firstManager.close();
-    managers.delete(firstManager);
-
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
 
     const secondManager = new SessionManager(config, { runtimeDir });
     managers.add(secondManager);
     await secondManager.initialize();
 
-    const recovered = secondManager.get(session.id);
-    expect(recovered).toMatchObject({
+    expect(secondManager.get(session.id)).toMatchObject({
       id: session.id,
       pid: session.pid,
       state: "running"
@@ -138,27 +153,48 @@ describe("detached session worker process", () => {
     await secondManager.attach(
       session.id,
       secondSocket as unknown as WebSocket,
+      0
+    );
+    const resumeFrom = maxSeq(secondSocket.messages);
+
+    const delayedOutputCommand = process.platform === "win32"
+      ? 'Start-Sleep -Milliseconds 700; Write-Output "WORKER_SURVIVED"\r'
+      : "sleep 0.7; printf 'WORKER_SURVIVED\\n'\n";
+    await secondManager.write(session.id, delayedOutputCommand);
+
+    await secondManager.close();
+    managers.delete(secondManager);
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+
+    const thirdManager = new SessionManager(config, { runtimeDir });
+    managers.add(thirdManager);
+    await thirdManager.initialize();
+
+    expect(thirdManager.get(session.id)).toMatchObject({
+      id: session.id,
+      pid: session.pid,
+      state: "running"
+    });
+
+    const thirdSocket = new FakeSocket();
+    await thirdManager.attach(
+      session.id,
+      thirdSocket as unknown as WebSocket,
       resumeFrom
     );
 
     await waitFor(() =>
-      secondSocket.messages.some(
+      thirdSocket.messages.some(
         (message) =>
           message.type === "output" &&
           message.data.includes("WORKER_SURVIVED")
       )
     );
 
-    expect(secondSocket.messages.some(
-      (message) =>
-        message.type === "output" &&
-        message.data.includes("WORKER_SURVIVED")
-    )).toBe(true);
-
-    await secondManager.terminate(session.id);
+    await thirdManager.terminate(session.id);
     await waitFor(() =>
-      secondSocket.messages.some((message) => message.type === "exit")
+      thirdSocket.messages.some((message) => message.type === "exit")
     );
     await new Promise((resolve) => setTimeout(resolve, 800));
-  }, 20_000);
+  }, 25_000);
 });
