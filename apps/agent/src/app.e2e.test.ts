@@ -294,7 +294,7 @@ describe("terminal WebSocket integration", () => {
 
     socket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     socket.send(JSON.stringify({ type: "resize", cols: 120, rows: 35 }));
-    socket.send(JSON.stringify({ type: "input", data: "ORDERED\\r" }));
+    socket.send(JSON.stringify({ type: "input", data: "ORDERED\r" }));
 
     await inbox.next((message) => message.type === "hello");
     await inbox.waitForText("ACK:ORDERED");
@@ -321,7 +321,7 @@ describe("terminal WebSocket integration", () => {
     const resumeFrom = firstInbox.latestSeq;
     expect(resumeFrom).toBeGreaterThan(0);
 
-    firstSocket.send(JSON.stringify({ type: "input", data: "LATER\\r" }));
+    firstSocket.send(JSON.stringify({ type: "input", data: "LATER\r" }));
     const firstClosed = waitForClose(firstSocket);
     firstSocket.close(1000, "simulate browser navigation");
     await firstClosed;
@@ -365,7 +365,7 @@ describe("terminal WebSocket integration", () => {
     const staleSeq = firstInbox.latestSeq;
     expect(staleSeq).toBeGreaterThan(0);
 
-    firstSocket.send(JSON.stringify({ type: "input", data: "BURST\\r" }));
+    firstSocket.send(JSON.stringify({ type: "input", data: "BURST\r" }));
     await firstInbox.waitForText("STALE_MARKER");
     const closed = waitForClose(firstSocket);
     firstSocket.close(1000, "force stale resume");
@@ -429,7 +429,7 @@ describe("terminal WebSocket integration", () => {
     // Force the configured cutoff branch deterministically after attachment.
     harness.config.sessions.maxSocketBufferedBytes = -1;
     const slowClosed = waitForClose(slowSocket);
-    slowSocket.send(JSON.stringify({ type: "input", data: "BACKPRESSURE\\r" }));
+    slowSocket.send(JSON.stringify({ type: "input", data: "BACKPRESSURE\r" }));
     await expect(slowClosed).resolves.toMatchObject({
       code: 1013,
       reason: "Client is too slow; reconnect to resume"
@@ -441,7 +441,7 @@ describe("terminal WebSocket integration", () => {
     await waitForOpen(exitSocket);
     exitSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     await exitInbox.next((message) => message.type === "hello");
-    exitSocket.send(JSON.stringify({ type: "input", data: "EXIT\\r" }));
+    exitSocket.send(JSON.stringify({ type: "input", data: "EXIT\r" }));
 
     const exit = await exitInbox.next((message) => message.type === "exit");
     expect(exit).toMatchObject({ type: "exit", exitCode: 7 });
