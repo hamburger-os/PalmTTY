@@ -16,8 +16,12 @@ const TOKEN = "0123456789abcdef0123456789abcdef";
 class DeterministicPty implements PtyHandle {
   private readonly dataListeners = new Set<(data: string) => void>();
   private readonly exitListeners = new Set<(event: { exitCode: number; signal?: number }) => void>();
-  private pending = "";
   private exited = false;
+  readonly events: Array<
+    | { type: "write"; data: string }
+    | { type: "resize"; cols: number; rows: number }
+    | { type: "kill" }
+  > = [];
 
   constructor(readonly pid: number) {}
 
@@ -33,70 +37,51 @@ class DeterministicPty implements PtyHandle {
 
   write(data: string): void {
     if (this.exited) return;
-    this.pending += data;
-    const lines = this.pending.split(/\r\n|\r|\n/);
-    this.pending = lines.pop() ?? "";
-
-    for (const raw of lines) {
-      const command = raw.trim();
-      if (!command) continue;
-      this.handle(command);
-    }
+    this.events.push({ type: "write", data });
   }
 
-  resize(_cols: number, _rows: number): void {
-    // SessionManager owns the public dimensions; this adapter only confirms
-    // that the resize call reaches the PTY boundary without throwing.
+  resize(cols: number, rows: number): void {
+    if (this.exited) return;
+    this.events.push({ type: "resize", cols, rows });
   }
 
   kill(_signal?: string): void {
+    this.events.push({ type: "kill" });
     this.emitExit(0);
   }
 
-  private handle(command: string): void {
-    switch (command) {
-      case "READY":
-        this.emitData("PALMTTY_READY\r\n");
-        return;
-      case "ORDERED":
-        this.emitData("ACK:ORDERED\r\n");
-        return;
-      case "LATER": {
-        const timer = setTimeout(() => this.emitData("LATE_MARKER\r\n"), 150);
-        timer.unref();
-        return;
-      }
-      case "BURST":
-        this.emitData(`${"B".repeat(4096)}STALE_MARKER\r\n`);
-        return;
-      case "BACKPRESSURE":
-        this.emitData("BACKPRESSURE\r\n");
-        return;
-      case "EXIT": {
-        const timer = setTimeout(() => this.emitExit(7), 20);
-        timer.unref();
-        return;
-      }
-      default:
-        this.emitData(`ACK:${command}\r\n`);
-    }
-  }
-
-  private emitData(data: string): void {
+  emitData(data: string): void {
     if (this.exited) return;
     for (const listener of [...this.dataListeners]) listener(data);
   }
 
-  private emitExit(exitCode: number): void {
+  emitExit(exitCode: number): void {
     if (this.exited) return;
     this.exited = true;
     for (const listener of [...this.exitListeners]) listener({ exitCode });
   }
 }
 
-function createPtyFactory(): PtyFactory {
+type PtyHarness = {
+  factory: PtyFactory;
+  latest(): DeterministicPty;
+};
+
+function createPtyHarness(): PtyHarness {
   let nextPid = 40_000;
-  return () => new DeterministicPty(nextPid++);
+  const created: DeterministicPty[] = [];
+  return {
+    factory: () => {
+      const instance = new DeterministicPty(nextPid++);
+      created.push(instance);
+      return instance;
+    },
+    latest: () => {
+      const instance = created.at(-1);
+      if (!instance) throw new Error("No deterministic PTY has been created");
+      return instance;
+    }
+  };
 }
 
 type AppInstance = Awaited<ReturnType<typeof buildApp>>;
@@ -106,6 +91,7 @@ type Harness = {
   config: PalmTTYConfig;
   origin: string;
   wsBase: string;
+  pty: PtyHarness;
 };
 
 const liveApps = new Set<AppInstance>();
@@ -149,7 +135,8 @@ async function startHarness(
   });
   mutate?.(config);
 
-  const app = await buildApp(config, { ptyFactory: createPtyFactory() });
+  const pty = createPtyHarness();
+  const app = await buildApp(config, { ptyFactory: pty.factory });
   liveApps.add(app);
   const address = await app.listen({ host: "127.0.0.1", port: 0 });
   const origin = new URL(address).origin;
@@ -162,7 +149,8 @@ async function startHarness(
     app,
     config,
     origin,
-    wsBase: origin.replace(/^http/, "ws")
+    wsBase: origin.replace(/^http/, "ws"),
+    pty
   };
 }
 
@@ -222,10 +210,6 @@ function socketFor(
   );
 }
 
-function sendTerminalCommand(socket: WebSocket, command: string): void {
-  socket.send(JSON.stringify({ type: "input", data: `${command}\r` }));
-}
-
 function waitForOpen(socket: WebSocket, timeoutMs = 3_000): Promise<void> {
   if (socket.readyState === WebSocket.OPEN) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -281,6 +265,17 @@ async function rejectedUpgradeStatus(
       // Expected after some rejected upgrade paths; the HTTP status is authoritative.
     });
   });
+}
+
+async function waitUntil(
+  predicate: () => boolean | Promise<boolean>,
+  timeoutMs = 3_000
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await predicate())) {
+    if (Date.now() >= deadline) throw new Error("Timed out waiting for condition");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }
 
 class MessageInbox {
@@ -376,6 +371,23 @@ describe("terminal WebSocket integration", () => {
     });
   });
 
+  it("requires resume before input and resize", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    const session = await createSession(harness, cookie);
+    const socket = socketFor(harness, session.id, cookie);
+    const closed = waitForClose(socket);
+    await waitForOpen(socket);
+
+    socket.send(JSON.stringify({ type: "input", data: "blocked" }));
+
+    await expect(closed).resolves.toMatchObject({
+      code: 1008,
+      reason: "Resume handshake required"
+    });
+    expect(harness.pty.latest().events).toEqual([]);
+  });
+
   it("serializes resume, resize, and input frames in connection order", async () => {
     const harness = await startHarness();
     const cookie = await login(harness);
@@ -386,10 +398,15 @@ describe("terminal WebSocket integration", () => {
 
     socket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     socket.send(JSON.stringify({ type: "resize", cols: 120, rows: 35 }));
-    sendTerminalCommand(socket, "ORDERED");
+    socket.send(JSON.stringify({ type: "input", data: "ORDERED" }));
 
     await inbox.next((message) => message.type === "hello");
-    await inbox.waitForText("ACK:ORDERED");
+    await waitUntil(() => harness.pty.latest().events.length >= 2);
+
+    expect(harness.pty.latest().events.slice(0, 2)).toEqual([
+      { type: "resize", cols: 120, rows: 35 },
+      { type: "write", data: "ORDERED" }
+    ]);
 
     const response = await getSession(harness, cookie, session.id);
     expect(response.status).toBe(200);
@@ -410,22 +427,23 @@ describe("terminal WebSocket integration", () => {
     await waitForOpen(firstSocket);
     firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     await firstInbox.next((message) => message.type === "hello");
-    sendTerminalCommand(firstSocket, "READY");
+
+    harness.pty.latest().emitData("PALMTTY_READY\r\n");
     await firstInbox.waitForText("PALMTTY_READY");
     const resumeFrom = firstInbox.latestSeq;
     expect(resumeFrom).toBeGreaterThan(0);
 
-    sendTerminalCommand(firstSocket, "LATER");
     const firstClosed = waitForClose(firstSocket);
     firstSocket.close(1000, "simulate browser navigation");
     await firstClosed;
 
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    const running = await getSession(harness, cookie, session.id);
-    expect(running.status).toBe(200);
-    const runningBody = await running.json() as { session: SessionPublic };
-    expect(runningBody.session.state).toBe("running");
+    harness.pty.latest().emitData("LATE_MARKER\r\n");
+    await waitUntil(async () => {
+      const response = await getSession(harness, cookie, session.id);
+      if (response.status !== 200) return false;
+      const body = await response.json() as { session: SessionPublic };
+      return body.session.state === "running" && body.session.connections === 0;
+    });
 
     const secondSocket = socketFor(harness, session.id, cookie);
     const secondInbox = new MessageInbox(secondSocket);
@@ -436,8 +454,8 @@ describe("terminal WebSocket integration", () => {
     const recovery = await secondInbox.next(
       (message) => message.type === "output" || message.type === "snapshot"
     );
-    expect(recovery.type).toBe("output");
-    await secondInbox.waitForText("LATE_MARKER");
+    expect(recovery).toMatchObject({ type: "output", data: "LATE_MARKER\r\n" });
+    expect(secondInbox.transcript).toContain("LATE_MARKER");
 
     secondSocket.close(1000, "test complete");
   });
@@ -456,13 +474,15 @@ describe("terminal WebSocket integration", () => {
     await waitForOpen(firstSocket);
     firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     await firstInbox.next((message) => message.type === "hello");
-    sendTerminalCommand(firstSocket, "READY");
+
+    harness.pty.latest().emitData("PALMTTY_READY\r\n");
     await firstInbox.waitForText("PALMTTY_READY");
     const staleSeq = firstInbox.latestSeq;
     expect(staleSeq).toBeGreaterThan(0);
 
-    sendTerminalCommand(firstSocket, "BURST");
+    harness.pty.latest().emitData(`${"B".repeat(4096)}STALE_MARKER\r\n`);
     await firstInbox.waitForText("STALE_MARKER");
+
     const closed = waitForClose(firstSocket);
     firstSocket.close(1000, "force stale resume");
     await closed;
@@ -477,6 +497,9 @@ describe("terminal WebSocket integration", () => {
       (message) => message.type === "snapshot" || message.type === "output"
     );
     expect(recovery.type).toBe("snapshot");
+    if (recovery.type === "snapshot") {
+      expect(recovery.data).toContain("STALE_MARKER");
+    }
 
     secondSocket.close(1000, "test complete");
   });
@@ -521,13 +544,11 @@ describe("terminal WebSocket integration", () => {
     await waitForOpen(slowSocket);
     slowSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     await slowInbox.next((message) => message.type === "hello");
-    sendTerminalCommand(slowSocket, "READY");
-    await slowInbox.waitForText("PALMTTY_READY");
 
     // Force the configured cutoff branch deterministically after attachment.
     harness.config.sessions.maxSocketBufferedBytes = -1;
     const slowClosed = waitForClose(slowSocket);
-    sendTerminalCommand(slowSocket, "BACKPRESSURE");
+    harness.pty.latest().emitData("BACKPRESSURE\r\n");
     await expect(slowClosed).resolves.toMatchObject({
       code: 1013,
       reason: "Client is too slow; reconnect to resume"
@@ -539,7 +560,8 @@ describe("terminal WebSocket integration", () => {
     await waitForOpen(exitSocket);
     exitSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
     await exitInbox.next((message) => message.type === "hello");
-    sendTerminalCommand(exitSocket, "EXIT");
+
+    harness.pty.latest().emitExit(7);
 
     const exit = await exitInbox.next((message) => message.type === "exit");
     expect(exit).toMatchObject({ type: "exit", exitCode: 7 });
@@ -549,8 +571,6 @@ describe("terminal WebSocket integration", () => {
     const retainedBody = await retained.json() as { session: SessionPublic };
     expect(retainedBody.session.state).toBe("exited");
 
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    const cleaned = await getSession(harness, cookie, session.id);
-    expect(cleaned.status).toBe(404);
+    await waitUntil(async () => (await getSession(harness, cookie, session.id)).status === 404, 3_000);
   }, 10_000);
 });
