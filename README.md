@@ -1,12 +1,14 @@
 # PalmTTY
 
+[![CI](https://github.com/hamburger-os/PalmTTY/actions/workflows/ci.yml/badge.svg)](https://github.com/hamburger-os/PalmTTY/actions/workflows/ci.yml)
+
 **Your dev shell, in your palm. / 把开发终端放进手掌里。**
 
 PalmTTY is a mobile-first, self-hosted remote development terminal for Windows 11, PowerShell 7, Codex and other terminal-based developer tools.
 
 PalmTTY 是一个面向手机、自托管的远程开发终端，首要支持 Windows 11 + PowerShell 7 + ConPTY，可直接运行 Codex 等 CLI 开发工具。
 
-> Status / 状态: **alpha**. The core terminal, authentication, reconnect and mobile UI are implemented, but real-device hardening is still ongoing.
+> Status / 状态: **alpha**. Windows/Ubuntu CI is green, including a real Windows PowerShell 7/ConPTY Unicode smoke test. Mobile/Codex real-device hardening is still ongoing.
 
 ## What works / 当前能力
 
@@ -81,7 +83,7 @@ PalmTTY is remote shell access. Do **not** expose an unauthenticated Agent port 
 
 推荐顺序：
 
-1. Tailscale/WireGuard 等私有网络；
+1. Tailscale Serve 等“私有组网 + HTTPS”入口；
 2. 或 `HTTPS -> QNAP/Caddy -> PalmTTY`；
 3. PalmTTY 上游端口只留在内网。
 
