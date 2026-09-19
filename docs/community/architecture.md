@@ -49,7 +49,9 @@ On attach:
 - a new/reloaded browser, or a client that fell behind the retained buffer, receives a serialized terminal snapshot;
 - after the boundary is established, live output continues normally.
 
-This prevents browser lifetime from becoming terminal lifetime and avoids unbounded transcript storage.
+Exited sessions are retained for a configurable bounded period (30 minutes by default) and then disposed. Replay history is also byte-bounded, including the case where a single PTY output chunk is larger than the replay budget.
+
+This prevents browser lifetime from becoming terminal lifetime and avoids unbounded transcript or exited-session storage.
 
 ## 中文
 
@@ -99,4 +101,6 @@ Agent 内维护 headless xterm 终端状态镜像。PTY 输出经过同一个有
 - 页面重载、浏览器被系统杀掉、或者落后太多时，直接收到当前终端序列化快照；
 - 完成恢复边界后再继续接收实时输出。
 
-这样既不会把浏览器生命周期等同于终端生命周期，也不会无限保存原始输出。
+已退出的会话只在可配置的有限时间内保留（默认 30 分钟），之后会释放终端镜像、replay 和 metadata。Replay 本身按字节严格限制，即使单次 PTY 输出超过预算也不会永久突破上限。
+
+这样既不会把浏览器生命周期等同于终端生命周期，也不会无限保存原始输出或已退出会话。
