@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { chmod, mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
@@ -138,6 +138,38 @@ export async function listWorkerRecords(runtimeDir: string): Promise<WorkerRecor
     }
   }
   return records;
+}
+
+export async function cleanupDanglingWorkerState(
+  runtimeDir: string,
+  minimumAgeMs = 60_000
+): Promise<void> {
+  const records = await listWorkerRecords(runtimeDir);
+  const liveSessionIds = new Set(records.map((record) => record.sessionId));
+  const liveEndpointIds = new Set(records.map((record) => record.endpointId));
+  const cutoff = Date.now() - minimumAgeMs;
+
+  const secretEntries = await readdir(secretsDir(runtimeDir), { withFileTypes: true });
+  for (const entry of secretEntries) {
+    if (!entry.isFile() || !entry.name.endsWith(".secret")) continue;
+    const sessionId = entry.name.slice(0, -".secret".length);
+    if (liveSessionIds.has(sessionId)) continue;
+    const filePath = path.join(secretsDir(runtimeDir), entry.name);
+    const info = await stat(filePath).catch(() => undefined);
+    if (info && info.mtimeMs <= cutoff) await unlink(filePath).catch(() => undefined);
+  }
+
+  if (process.platform !== "win32") {
+    const socketEntries = await readdir(socketsDir(runtimeDir), { withFileTypes: true });
+    for (const entry of socketEntries) {
+      if (!entry.name.endsWith(".sock")) continue;
+      const endpointId = entry.name.slice(0, -".sock".length);
+      if (liveEndpointIds.has(endpointId)) continue;
+      const filePath = path.join(socketsDir(runtimeDir), entry.name);
+      const info = await stat(filePath).catch(() => undefined);
+      if (info && info.mtimeMs <= cutoff) await unlink(filePath).catch(() => undefined);
+    }
+  }
 }
 
 export async function removeWorkerState(
