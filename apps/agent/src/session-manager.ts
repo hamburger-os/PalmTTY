@@ -210,7 +210,9 @@ export class SessionManager {
         this.send(session, socket, {
           type: "snapshot",
           seq: session.seq,
-          data: session.serializer.serialize()
+          // No PTY output means the mirrored terminal state is provably empty.
+          // Avoid invoking the serializer until there is state to serialize.
+          data: session.seq === 0 ? "" : session.serializer.serialize()
         });
       }
 
