@@ -20,15 +20,18 @@
 - 四层文档体系与 docs-sync Agent Skill；
 - Apache-2.0；当前生产依赖许可证扫描只发现 MIT、ISC、BSD-3-Clause，与项目的 Apache-2.0 分发方式没有发现明显冲突。
 
-## 仓库治理剩余手工项
+## 仓库治理状态
 
-代码仓库内能版本控制的治理文件已经补齐。GitHub Repository Settings 仍需按 [github-governance.md](github-governance.md) 手工应用：
+AI 主维护模式的 `main` Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI、生产依赖安全审计和 CodeQL，主干禁止 force push/删除，只允许 squash，并要求解决 review conversation；人工 approval 与 CODEOWNERS approval 不作为硬门槛。
 
-- `main-protection` Ruleset；
-- Squash-only、Auto-merge、Update branch；
-- Discussions / Wiki 策略；
-- Topics；
-- Private vulnerability reporting、Dependabot alerts、Secret scanning / Push protection（可用时）。
+已启用 Auto-merge、Update branch、自动删除已合并分支、Discussions，并关闭 Wiki、补齐 Topics。
+
+仍建议按 [github-governance.md](github-governance.md) 完成两项 Ruleset 微调：
+
+- 打开 **Require branches to be up to date before merging**；
+- 给 Repository administrators 增加 **Pull requests only** 的紧急恢复 bypass。
+
+另外继续人工确认 Dependency graph、Private vulnerability reporting、Dependabot alerts/security updates、Secret scanning / Push protection 等 GitHub Security Settings。
 
 ## 下一阶段优先级
 
