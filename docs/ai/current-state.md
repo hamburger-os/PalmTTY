@@ -44,7 +44,7 @@ Status: **alpha foundation implemented and passing Windows/Ubuntu CI; open-sourc
 - monotonically increasing output sequence
 - bounded byte replay buffer
 - replay when `lastSeq` is still retained
-- snapshot fallback when state is new/stale
+- snapshot fallback when state is new/stale; a never-written session (`seq = 0`) uses a deterministic empty snapshot without invoking the serializer
 - per-WebSocket `bufferedAmount` backpressure cutoff
 - ordered server pipeline around mirror update, sequence assignment and broadcast
 - per-connection serialized client message handling to remove resume/input/resize races
