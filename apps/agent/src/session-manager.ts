@@ -11,6 +11,7 @@ import { WorkerClient } from "./worker-client.js";
 import type { WorkerBootstrap } from "./worker-protocol.js";
 import { ProcessWorkerSpawner, type WorkerSpawner } from "./worker-spawner.js";
 import {
+  cleanupDanglingWorkerState,
   defaultRuntimeDir,
   ensureRuntimeLayout,
   listWorkerRecords,
@@ -73,6 +74,7 @@ export class SessionManager {
     if (this.initialized) return;
     this.initialized = true;
     await ensureRuntimeLayout(this.runtimeDir);
+    await cleanupDanglingWorkerState(this.runtimeDir);
 
     const records = await listWorkerRecords(this.runtimeDir);
     for (const record of records) {
