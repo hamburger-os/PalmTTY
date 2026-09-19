@@ -99,7 +99,7 @@ type FrameListener = (value: unknown) => void;
 type CloseListener = () => void;
 
 export class FramedJsonSocket {
-  private buffer = Buffer.alloc(0);
+  private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   private readonly frameListeners = new Set<FrameListener>();
   private readonly closeListeners = new Set<CloseListener>();
   private closed = false;
@@ -140,7 +140,7 @@ export class FramedJsonSocket {
     this.socket.end();
   }
 
-  private consume(chunk: Buffer): void {
+  private consume(chunk: Buffer<ArrayBufferLike>): void {
     if (this.closed) return;
     this.buffer = this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk]);
     if (this.buffer.byteLength > MAX_WORKER_FRAME_BYTES + 4) {
