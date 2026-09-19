@@ -24,8 +24,20 @@ function testConfig() {
   });
 }
 
-afterEach(() => {
+const runtimeDirs = new Set<string>();
+
+async function buildTestApp() {
+  const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-app-test-"));
+  runtimeDirs.add(runtimeDir);
+  return buildApp(testConfig(), { sessionManager: { runtimeDir } });
+}
+
+afterEach(async () => {
   delete process.env.PALMTTY_TEST_TOKEN;
+  for (const runtimeDir of runtimeDirs) {
+    await rm(runtimeDir, { recursive: true, force: true });
+  }
+  runtimeDirs.clear();
 });
 
 describe("HTTP security boundary", () => {
