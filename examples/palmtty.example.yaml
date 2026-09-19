@@ -18,6 +18,7 @@ auth:
 
 sessions:
   maxSessions: 8
+  exitedRetentionMinutes: 30
   scrollbackLines: 10000
   replayBytes: 2097152
   maxSocketBufferedBytes: 2097152
