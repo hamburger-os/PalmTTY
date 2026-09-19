@@ -20,10 +20,10 @@ Status: **alpha foundation implemented; CI and real-device hardening are require
 - PowerShell 7 / custom-shell workspace configuration
 - node-pty PTY ownership
 - built-in single-user bootstrap-token login
-- random in-memory login session cookie
+- random in-memory login session cookie with bounded active-session count
 - exact Origin allowlist
 - non-loopback startup safety gate
-- login and session-create fixed-window limits
+- login and session-create fixed-window limits with bounded limiter state
 - workspace ID allowlist
 - bounded client message size and terminal dimensions
 - no intentional terminal I/O logging
@@ -39,6 +39,9 @@ Status: **alpha foundation implemented; CI and real-device hardening are require
 - snapshot fallback when state is new/stale
 - per-WebSocket `bufferedAmount` backpressure cutoff
 - ordered server pipeline around mirror update, sequence assignment and broadcast
+- per-connection serialized client message handling to remove resume/input/resize races
+- application ping/pong heartbeat for half-open mobile connection detection
+- terminal WebSocket closure at login-session expiry
 - bounded exited-session retention with automatic disposal
 
 ### Web/mobile
