@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseConfig } from "@palmtty/config";
 import { buildApp } from "./app.js";
@@ -28,7 +31,7 @@ afterEach(() => {
 describe("HTTP security boundary", () => {
   it("rejects login from an untrusted origin", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
-    const app = await buildApp(testConfig());
+    const app = await buildTestApp();
     const response = await app.inject({
       method: "POST",
       url: "/api/v1/auth/login",
@@ -41,7 +44,7 @@ describe("HTTP security boundary", () => {
 
   it("creates an HttpOnly SameSite login session for a trusted origin", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
-    const app = await buildApp(testConfig());
+    const app = await buildTestApp();
     const login = await app.inject({
       method: "POST",
       url: "/api/v1/auth/login",
