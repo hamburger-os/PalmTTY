@@ -15,18 +15,13 @@ const TOKEN = "0123456789abcdef0123456789abcdef";
 const isWindows = process.platform === "win32";
 
 const shellConfig = isWindows
-  ? {
-      shellPath: "pwsh.exe",
-      args: ["-NoLogo", "-NoProfile"],
-      command: "Write-Output ('PALMTTY_' + 'READY')"
-    }
-  : {
-      shellPath: "/bin/sh",
-      args: ["-i"],
-      command: "printf '%s%s\\n' PALMTTY_ READY"
-    };
+  ? { shellPath: "pwsh.exe", args: ["-NoLogo", "-NoProfile"] }
+  : { shellPath: "/bin/sh", args: ["-i"] };
 
 const commands = {
+  ready: isWindows
+    ? "Write-Output ('PALMTTY_' + 'READY')"
+    : "printf '%s%s\\n' PALMTTY_ READY",
   ordered: isWindows
     ? "Write-Output ('ACK:' + 'ORDERED')"
     : "printf '%s%s\\n' ACK: ORDERED",
@@ -43,7 +38,8 @@ const commands = {
 } as const;
 
 function sendTerminalCommand(socket: WebSocket, command: string): void {
-  socket.send(JSON.stringify({ type: "input", data: `${command}\r` }));
+  const lineEnding = isWindows ? "\r" : "\n";
+  socket.send(JSON.stringify({ type: "input", data: `${command}${lineEnding}` }));
 }
 
 type AppInstance = Awaited<ReturnType<typeof buildApp>>;
@@ -91,8 +87,7 @@ async function startHarness(
       cwd: process.cwd(),
       shell: "custom",
       shellPath: shellConfig.shellPath,
-      args: shellConfig.args,
-      command: shellConfig.command
+      args: shellConfig.args
     }]
   });
   mutate?.(config);
@@ -276,7 +271,11 @@ class MessageInbox {
     while (!this.transcript.includes(marker)) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) throw new Error(`Timed out waiting for terminal text: ${marker}`);
-      await this.next(() => true, remaining);
+      try {
+        await this.next(() => true, remaining);
+      } catch {
+        throw new Error(`Timed out waiting for terminal text: ${marker}`);
+      }
     }
   }
 }
@@ -349,6 +348,8 @@ describe("terminal WebSocket integration", () => {
     const firstInbox = new MessageInbox(firstSocket);
     await waitForOpen(firstSocket);
     firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    await firstInbox.next((message) => message.type === "hello");
+    sendTerminalCommand(firstSocket, commands.ready);
     await firstInbox.waitForText("PALMTTY_READY");
     const resumeFrom = firstInbox.latestSeq;
     expect(resumeFrom).toBeGreaterThan(0);
@@ -456,6 +457,8 @@ describe("terminal WebSocket integration", () => {
     const slowInbox = new MessageInbox(slowSocket);
     await waitForOpen(slowSocket);
     slowSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    await slowInbox.next((message) => message.type === "hello");
+    sendTerminalCommand(slowSocket, commands.ready);
     await slowInbox.waitForText("PALMTTY_READY");
 
     // Force the configured cutoff branch deterministically after attachment.
