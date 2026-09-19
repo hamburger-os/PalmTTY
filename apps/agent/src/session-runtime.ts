@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import type { WorkspaceConfig } from "@palmtty/config";
 import {
   PROTOCOL_VERSION,
@@ -5,10 +6,14 @@ import {
   type SessionPublic,
   type SessionState
 } from "@palmtty/protocol";
-import { SerializeAddon } from "@xterm/addon-serialize";
-import { Terminal as HeadlessTerminal } from "@xterm/headless";
+import type { SerializeAddon as SerializeAddonType } from "@xterm/addon-serialize";
+import type { Terminal as HeadlessTerminalType } from "@xterm/headless";
 import * as pty from "node-pty";
 import { canReplayFrom } from "./reconnect-policy.js";
+
+const require = createRequire(import.meta.url);
+const { Terminal: HeadlessTerminal } = require("@xterm/headless") as typeof import("@xterm/headless");
+const { SerializeAddon } = require("@xterm/addon-serialize") as typeof import("@xterm/addon-serialize");
 
 export type PtyHandle = {
   pid: number;
@@ -61,7 +66,7 @@ export type SessionRuntimeOptions = {
 type MessageListener = (message: ServerMessage) => void;
 type RetireListener = () => void;
 
-function writeMirror(terminal: HeadlessTerminal, data: string): Promise<void> {
+function writeMirror(terminal: HeadlessTerminalType, data: string): Promise<void> {
   return new Promise((resolve) => terminal.write(data, resolve));
 }
 
@@ -76,8 +81,8 @@ export class SessionRuntime {
   private rows: number;
   private exitCode: number | undefined;
   private readonly child: PtyHandle;
-  private readonly mirror: HeadlessTerminal;
-  private readonly serializer: SerializeAddon;
+  private readonly mirror: HeadlessTerminalType;
+  private readonly serializer: SerializeAddonType;
   private seq = 0;
   private history: OutputFrame[] = [];
   private historyBytes = 0;
