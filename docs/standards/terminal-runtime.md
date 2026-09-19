@@ -40,3 +40,5 @@ PalmTTY uses:
 - `@xterm/addon-fit` for browser sizing.
 
 The xterm.js project explicitly lists a server-side headless terminal plus serialize addon as a remote-reconnect use case.
+
+PalmTTY enables `allowProposedApi: true` on the Agent's headless terminal because current `@xterm/addon-serialize` usage with `@xterm/headless` depends on xterm APIs behind that opt-in. This is an upstream integration requirement, not permission for the browser or remote caller to expand shell authority. Re-review this assumption when upgrading xterm major versions.

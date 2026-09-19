@@ -19,10 +19,17 @@ Security and reconnect changes should include or update tests for:
 
 - exact Origin rejection
 - authentication failure
+- required WebSocket subprotocol
+- resume-before-input/resize ordering
 - input/size bounds
-- reconnect sequence behavior
-- snapshot fallback
-- backpressure or bounded history where practical
+- browser disconnect without PTY termination
+- reconnect sequence replay
+- stale-history snapshot fallback
+- auth-session expiry closing established sockets
+- backpressure / slow-client cutoff
+- exit delivery and retained-session cleanup
+
+The Agent suite includes an end-to-end Fastify HTTP/WebSocket + SessionManager harness with a deterministic PTY adapter for these lifecycle boundaries. Windows CI separately keeps the real node-pty + PowerShell 7 / ConPTY Unicode smoke path.
 
 ## Build
 

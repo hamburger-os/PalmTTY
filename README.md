@@ -24,7 +24,7 @@ PalmTTY 是一个面向手机、自托管的远程开发终端，首要支持 Wi
 
 ## Status / 当前状态
 
-PalmTTY is **alpha**. The repository is passing Windows and Ubuntu CI, including a Windows-only smoke test that actually spawns PowerShell 7 through ConPTY, resizes the PTY and round-trips Unicode. Real phone + real workstation + long-running Codex hardening is still ongoing.
+PalmTTY is **alpha**. The repository is passing Windows and Ubuntu CI with end-to-end Fastify HTTP/WebSocket + SessionManager lifecycle coverage through a deterministic PTY adapter, plus a Windows-only smoke test that uses real node-pty to spawn PowerShell 7 through ConPTY, resize the PTY and round-trip Unicode. Real phone + real workstation + long-running Codex hardening is still ongoing.
 
 | Capability | Alpha status |
 |---|---|

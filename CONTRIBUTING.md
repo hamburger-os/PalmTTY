@@ -44,7 +44,7 @@ pnpm build
 
 Repository-wide changes should pass `pnpm check`.
 
-CI repeats the acceptance path on Windows and Ubuntu. Windows CI includes a real PowerShell 7 / ConPTY Unicode smoke test. Pull requests also run Dependency Review and CodeQL.
+CI repeats the acceptance path on Windows and Ubuntu. The Agent suite includes end-to-end Fastify HTTP/WebSocket/SessionManager coverage with a deterministic PTY adapter for authentication, Origin enforcement, ordered resume/input/resize handling, reconnect recovery, backpressure, auth expiry and exited-session cleanup. Windows CI separately runs a real node-pty + PowerShell 7 / ConPTY Unicode smoke test. Pull requests also run the production-dependency vulnerability audit and CodeQL.
 
 影响行为的修改必须按 `.agents/skills/docs-sync/SKILL.md` 同步四层文档。安全、协议、会话生命周期与重连逻辑的改动不能只改代码。
 

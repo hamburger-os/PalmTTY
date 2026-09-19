@@ -22,7 +22,7 @@ pnpm test
 pnpm build
 ```
 
-For a repository-wide change, `pnpm check` runs the same acceptance path. CI installs with `pnpm install --frozen-lockfile` on Windows and Ubuntu; the Windows test suite also performs a real PowerShell 7/ConPTY Unicode smoke test. Update `pnpm-lock.yaml` whenever dependency manifests change.
+For a repository-wide change, `pnpm check` runs the same acceptance path. CI installs with `pnpm install --frozen-lockfile` on Windows and Ubuntu. The Agent test suite exercises the real Fastify HTTP/WebSocket server and SessionManager end to end with a deterministic PTY adapter for authentication, exact Origin enforcement, subprotocol negotiation, ordered resume/resize/input handling, replay/snapshot recovery, auth expiry, slow-client cutoff and exited-session cleanup. Windows CI separately performs a real node-pty + PowerShell 7/ConPTY Unicode smoke test. Update `pnpm-lock.yaml` whenever dependency manifests change.
 
 Any behavior-changing PR must use the documentation-sync workflow in `.agents/skills/docs-sync/SKILL.md`. Security, session lifecycle, reconnect behavior, protocol and configuration changes always require a documentation review.
 
@@ -55,7 +55,7 @@ pnpm test
 pnpm build
 ```
 
-仓库级变更可以直接执行 `pnpm check`。CI 在 Windows 和 Ubuntu 上使用 `pnpm install --frozen-lockfile` 安装依赖；Windows 测试还会真实启动 PowerShell 7/ConPTY 并验证 Unicode 往返。PR 还会执行生产依赖安全审计和 CodeQL；受保护的 `main` 必须通过 PR 和四项自动检查。当前 AI 主维护治理模型有意不强制人工 approval，也不强制 Code Owner approval。修改依赖清单时必须同步更新 `pnpm-lock.yaml`。
+仓库级变更可以直接执行 `pnpm check`。CI 在 Windows 和 Ubuntu 上使用 `pnpm install --frozen-lockfile` 安装依赖。Agent 测试套件会通过真实 Fastify HTTP/WebSocket 服务与 SessionManager、确定性 PTY 适配器，端到端覆盖认证、精确 Origin、子协议、resume/resize/input 顺序、replay/snapshot 恢复、登录会话过期、慢客户端切断和退出会话清理；Windows CI 另行通过真实 node-pty 启动 PowerShell 7/ConPTY 并验证 Unicode 往返。PR 还会执行生产依赖安全审计和 CodeQL；受保护的 `main` 必须通过 PR 和四项自动检查。当前 AI 主维护治理模型有意不强制人工 approval，也不强制 Code Owner approval。修改依赖清单时必须同步更新 `pnpm-lock.yaml`。
 
 任何影响行为的 PR 都必须按 `.agents/skills/docs-sync/SKILL.md` 同步文档。安全、会话生命周期、重连、协议、配置的变更始终需要文档审查。
 
