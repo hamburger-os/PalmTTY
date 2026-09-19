@@ -7,6 +7,7 @@ function authConfig() {
     auth: {
       enabled: true,
       tokenEnv: "TEST_TOKEN",
+      maxLoginSessions: 2,
       sessionTtlMinutes: 5
     },
     workspaces: [{ id: "main", name: "Main", cwd: "C:\\Code" }]
@@ -26,6 +27,22 @@ describe("authentication", () => {
     const auth = new AuthService(authConfig(), { TEST_TOKEN: "0123456789abcdef0123456789abcdef" });
     const session = auth.createLoginSession(1_000);
     expect(auth.isAuthenticated(session, 1_000 + 5 * 60_000 + 1)).toBe(false);
+  });
+
+  it("bounds active login sessions and evicts the oldest", () => {
+    const auth = new AuthService(authConfig(), { TEST_TOKEN: "0123456789abcdef0123456789abcdef" });
+    const first = auth.createLoginSession(1_000);
+    const second = auth.createLoginSession(1_001);
+    const third = auth.createLoginSession(1_002);
+    expect(auth.isAuthenticated(first, 1_003)).toBe(false);
+    expect(auth.isAuthenticated(second, 1_003)).toBe(true);
+    expect(auth.isAuthenticated(third, 1_003)).toBe(true);
+  });
+
+  it("reports remaining login lifetime", () => {
+    const auth = new AuthService(authConfig(), { TEST_TOKEN: "0123456789abcdef0123456789abcdef" });
+    const session = auth.createLoginSession(1_000);
+    expect(auth.remainingSessionMs(session, 1_001)).toBe(5 * 60_000 - 1);
   });
 
   it("refuses short bootstrap secrets", () => {
