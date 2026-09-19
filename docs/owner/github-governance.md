@@ -8,7 +8,7 @@ PalmTTY 后续预计主要由 AI 维护，因此仓库治理采用：
 
 > **AI 自主提交 PR → 四项自动门禁全部通过 → Auto-merge；不要求人工 approval。**
 
-这是当前正式接受的治理模型，不再把人工 Code Owner approval、强制 up-to-date 或管理员 bypass 作为待完成项。
+这是当前正式接受的治理模型，不再把人工 Code Owner approval 或管理员 bypass 作为待完成项；branch up-to-date 已经开启。
 
 ## 当前 Ruleset
 
@@ -24,7 +24,7 @@ PalmTTY 后续预计主要由 AI 维护，因此仓库治理采用：
 - Require conversation resolution：已开启；
 - Allowed merge method：**仅 squash**；
 - Require status checks：已开启；
-- Require branches to be up to date before merging：关闭；
+- Require branches to be up to date before merging：已开启；
 - Require linear history：已开启；
 - Bypass actors：无。
 
@@ -54,13 +54,11 @@ PalmTTY 当前是单维护者、AI 主维护项目。强制人工 approval 会�
 
 ## 当前接受的取舍
 
-### 不强制 branch up to date
+### 强制 branch up to date
 
-当前 `strict_required_status_checks_policy=false`。
+当前 `strict_required_status_checks_policy=true`。
 
-这意味着 PR 的 required checks 不要求一定基于最新 `main` 重新运行。项目接受这个取舍，以减少 AI 并行维护时不必要的重复 CI。
-
-仓库已经开启 “Always suggest updating pull request branches”，AI 在遇到冲突、依赖其他刚合并变更、或高风险改动时仍应主动同步 `main` 再验证。
+PR 在合并前必须基于最新 `main` 重新满足 required checks。这个设置适合 AI 并行维护：仓库已经开启 Update branch，AI 可以自动同步主干并重新跑门禁。
 
 ### 不配置 Ruleset bypass
 
