@@ -400,6 +400,7 @@ export async function runSessionWorkerFromStdin(): Promise<void> {
     }
   });
   await worker.start();
+  process.stdout.write("PALMTTY_WORKER_READY\n");
 
   const shutdown = () => {
     void worker.shutdown({ killPty: true, cleanupState: true }).finally(() => {
