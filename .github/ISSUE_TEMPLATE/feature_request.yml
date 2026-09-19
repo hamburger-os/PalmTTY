@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose a focused product, architecture or developer-experience improvement.
+title: "[Feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or maintainer problem should PalmTTY solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the smallest useful solution.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: security
+    attributes:
+      label: Security / authority impact
+      description: Does this expand remote filesystem, process, network, authentication or secret-handling authority?
+    validations:
+      required: true
+  - type: textarea
+    id: session
+    attributes:
+      label: Session / reconnect impact
+      description: Does this change PTY lifetime, snapshot/replay, buffering or reconnect behavior?
+    validations:
+      required: true

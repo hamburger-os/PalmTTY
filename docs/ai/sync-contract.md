@@ -12,6 +12,7 @@ Use this map after every implementation change.
 | `apps/web` | `web-mobile.md`, possibly `reconnect.md` | architecture/getting-started as needed | xterm upstream only if assumptions changed |
 | deployment/reverse proxy | `deployment.md`, `security.md` | `security.md`, `getting-started.md` | security references |
 | session worker / IPC | `session.md`, `reconnect.md`, `security.md`, `roadmap.md` | `architecture.md`, `security.md` | Windows runtime references |
+| GitHub workflows, dependency policy, release/governance files | `github-governance.md`, `roadmap.md` | `development.md` if contributor-visible | normally none |
 | roadmap/completion status | `roadmap.md` | README if contributor-facing | none |
 
 ## Always update

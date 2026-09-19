@@ -1,0 +1,22 @@
+name: Question / support
+description: Ask about setup, deployment or usage when an existing document does not answer it.
+title: "[Question] "
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
+      description: Link the documentation you followed and describe the result.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows, PowerShell, Node, browser/device and connection path. Redact secrets.
