@@ -11,7 +11,8 @@ import {
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { Terminal as HeadlessTerminal } from "@xterm/headless";
 import * as pty from "node-pty";
-import type WebSocket from "ws";\nimport { canReplayFrom } from "./reconnect-policy.js";
+import type WebSocket from "ws";
+import { canReplayFrom } from "./reconnect-policy.js";
 
 type OutputFrame = {
   seq: number;
