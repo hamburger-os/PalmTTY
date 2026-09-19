@@ -14,6 +14,7 @@ server:
 auth:
   enabled: true
   tokenEnv: PALMTTY_ACCESS_TOKEN
+  maxLoginSessions: 32
   sessionTtlMinutes: 720
 
 sessions:
