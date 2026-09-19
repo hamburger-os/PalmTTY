@@ -17,7 +17,8 @@ function defaultConfigPath(): string {
 
 function configPathFromArgs(): string {
   const index = process.argv.indexOf("--config");
-  if (index >= 0 && process.argv[index + 1]) return path.resolve(process.argv[index + 1]);
+  const explicitPath = index >= 0 ? process.argv[index + 1] : undefined;
+  if (explicitPath) return path.resolve(explicitPath);
   if (process.env.PALMTTY_CONFIG) return path.resolve(process.env.PALMTTY_CONFIG);
   return defaultConfigPath();
 }
