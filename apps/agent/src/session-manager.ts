@@ -14,6 +14,31 @@ import * as pty from "node-pty";
 import type WebSocket from "ws";
 import { canReplayFrom } from "./reconnect-policy.js";
 
+export type PtyHandle = {
+  pid: number;
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  kill(signal?: string): void;
+  onData(listener: (data: string) => void): { dispose(): void };
+  onExit(listener: (event: { exitCode: number; signal?: number }) => void): { dispose(): void };
+};
+
+export type PtySpawnOptions = {
+  name: string;
+  cols: number;
+  rows: number;
+  cwd: string;
+  env: Record<string, string | undefined>;
+};
+
+export type PtyFactory = (
+  file: string,
+  args: string[],
+  options: PtySpawnOptions
+) => PtyHandle;
+
+const defaultPtyFactory: PtyFactory = (file, args, options) => pty.spawn(file, args, options);
+
 type OutputFrame = {
   seq: number;
   data: string;
@@ -29,7 +54,7 @@ type ManagedSession = {
   rows: number;
   pid: number;
   exitCode?: number;
-  pty: pty.IPty;
+  pty: PtyHandle;
   mirror: HeadlessTerminal;
   serializer: SerializeAddon;
   seq: number;
@@ -51,7 +76,10 @@ function writeMirror(terminal: HeadlessTerminal, data: string): Promise<void> {
 export class SessionManager {
   private readonly sessions = new Map<string, ManagedSession>();
 
-  constructor(private readonly config: PalmTTYConfig) {}
+  constructor(
+    private readonly config: PalmTTYConfig,
+    private readonly ptyFactory: PtyFactory = defaultPtyFactory
+  ) {}
 
   list(): SessionPublic[] {
     return [...this.sessions.values()].map((session) => this.toPublic(session));
@@ -83,7 +111,7 @@ export class SessionManager {
       TERM: "xterm-256color"
     };
 
-    const child = pty.spawn(shell, workspace.args, {
+    const child = this.ptyFactory(shell, workspace.args, {
       name: "xterm-256color",
       cols,
       rows,
