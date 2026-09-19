@@ -9,6 +9,7 @@ describe("configuration", () => {
     expect(config.server.host).toBe("127.0.0.1");
     expect(config.auth.enabled).toBe(true);
     expect(config.sessions.maxSessions).toBe(8);
+    expect(config.sessions.exitedRetentionMinutes).toBe(30);
   });
 
   it("rejects duplicate workspace ids", () => {
