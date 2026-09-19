@@ -11,7 +11,7 @@ Status: **alpha foundation implemented and passing Windows/Ubuntu CI; open-sourc
 - committed pnpm lockfile with frozen-lockfile CI installs
 - Windows + Ubuntu CI passing
 - Windows-only ConPTY smoke test that spawns PowerShell 7, resizes the PTY and round-trips Unicode
-- Dependency Review workflow on pull requests
+- production dependency vulnerability audit on pull requests, main and weekly schedule
 - CodeQL JavaScript/TypeScript analysis on pull requests, main and weekly schedule
 - CODEOWNERS, PR template and structured Issue Forms
 - CONTRIBUTING, Code of Conduct, Support, Governance, Changelog and Release process
@@ -78,6 +78,7 @@ Status: **alpha foundation implemented and passing Windows/Ubuntu CI; open-sourc
 - No Git/file preview subsystem yet.
 - Linux/macOS/WSL are not first-class supported hosts yet.
 - GitHub repository Ruleset and repository-level feature/merge/security settings are documented in `docs/owner/github-governance.md` but cannot be applied through the currently available connector API; they remain a maintainer Settings task.
+- GitHub Dependency Review is not enabled because the repository Dependency graph setting is currently off; the portable `pnpm audit --prod` gate is enforced instead until that repository setting is enabled.
 
 ## Required honesty rule
 
