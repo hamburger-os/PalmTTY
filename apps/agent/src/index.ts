@@ -31,6 +31,11 @@ async function validateWorkspaceDirectories(config: Awaited<ReturnType<typeof lo
 }
 
 async function main() {
+  if (process.argv.includes("--session-worker")) {
+    await runSessionWorkerFromStdin();
+    return;
+  }
+
   const configPath = configPathFromArgs();
   const config = await loadConfig(configPath);
   assertSecureExposure(config);
