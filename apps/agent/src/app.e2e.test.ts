@@ -550,6 +550,70 @@ describe("terminal WebSocket integration", () => {
     secondSocket.close(1000, "test complete");
   });
 
+  it("rediscovers the same live worker after the Agent restarts", async () => {
+    const harness = await startHarness();
+    const firstCookie = await login(harness);
+    const session = await createSession(harness, firstCookie);
+
+    const firstSocket = socketFor(harness, session.id, firstCookie);
+    const firstInbox = new MessageInbox(firstSocket);
+    await waitForOpen(firstSocket);
+    firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    await firstInbox.next((message) => message.type === "hello");
+
+    harness.pty.latest().emitData("BEFORE_AGENT_RESTART\r\n");
+    await firstInbox.waitForText("BEFORE_AGENT_RESTART");
+    const resumeFrom = firstInbox.latestSeq;
+    const originalPid = session.pid;
+
+    await harness.app.close();
+    liveApps.delete(harness.app);
+
+    harness.pty.latest().emitData("DURING_AGENT_RESTART\r\n");
+
+    const restartedApp = await buildApp(harness.config, {
+      sessionManager: {
+        runtimeDir: harness.runtimeDir,
+        workerSpawner: harness.workerSpawner
+      }
+    });
+    liveApps.add(restartedApp);
+    const restartedAddress = await restartedApp.listen({ host: "127.0.0.1", port: 0 });
+    const restartedOrigin = new URL(restartedAddress).origin;
+    harness.config.server.port = Number(new URL(restartedOrigin).port);
+    harness.config.server.trustedOrigins = [restartedOrigin];
+
+    const restartedHarness: Harness = {
+      ...harness,
+      app: restartedApp,
+      origin: restartedOrigin,
+      wsBase: restartedOrigin.replace(/^http/, "ws")
+    };
+    const secondCookie = await login(restartedHarness);
+
+    const sessionsResponse = await fetch(`${restartedOrigin}/api/v1/sessions`, {
+      headers: { cookie: secondCookie }
+    });
+    expect(sessionsResponse.status).toBe(200);
+    const sessionsBody = await sessionsResponse.json() as { sessions: SessionPublic[] };
+    expect(sessionsBody.sessions).toContainEqual(expect.objectContaining({
+      id: session.id,
+      pid: originalPid,
+      state: "running"
+    }));
+
+    const secondSocket = socketFor(restartedHarness, session.id, secondCookie);
+    const secondInbox = new MessageInbox(secondSocket);
+    await waitForOpen(secondSocket);
+    secondSocket.send(JSON.stringify({ type: "resume", lastSeq: resumeFrom }));
+
+    await secondInbox.next((message) => message.type === "hello");
+    await secondInbox.waitForText("DURING_AGENT_RESTART");
+    expect(secondInbox.transcript).toContain("DURING_AGENT_RESTART");
+
+    secondSocket.close(1000, "test complete");
+  }, 10_000);
+
   it("actively closes established sockets when authentication expires", async () => {
     const harness = await startHarness();
     const realDateNow = Date.now;
