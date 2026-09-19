@@ -23,7 +23,7 @@ const LoginSchema = z.object({ token: z.string().min(1).max(4096) });
 
 export type BuildAppOptions = {
   webRoot?: string;
-  ptyFactory?: PtyFactory;
+  sessionManager?: SessionManagerOptions;
 };
 
 export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions = {}) {
