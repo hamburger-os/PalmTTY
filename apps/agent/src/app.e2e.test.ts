@@ -394,6 +394,8 @@ describe("terminal WebSocket integration", () => {
     const firstInbox = new MessageInbox(firstSocket);
     await waitForOpen(firstSocket);
     firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    await firstInbox.next((message) => message.type === "hello");
+    sendTerminalCommand(firstSocket, commands.ready);
     await firstInbox.waitForText("PALMTTY_READY");
     const staleSeq = firstInbox.latestSeq;
     expect(staleSeq).toBeGreaterThan(0);
