@@ -37,7 +37,7 @@ const AuthConfigSchema = z.object({
 const SessionConfigSchema = z.object({
   maxSessions: z.number().int().min(1).max(64).default(8),
   exitedRetentionMinutes: z.number().int().min(1).max(1440).default(30),
-  scrollbackLines: z.number().int().min(100).max(100000).default(10000),
+  scrollbackLines: z.number().int().min(100).max(20000).default(10000),
   replayBytes: z.number().int().min(65536).max(64 * 1024 * 1024).default(2 * 1024 * 1024),
   maxSocketBufferedBytes: z.number().int().min(65536).max(64 * 1024 * 1024).default(2 * 1024 * 1024)
 });
