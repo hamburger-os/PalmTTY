@@ -13,17 +13,18 @@ PalmTTY provides shell access with the privileges of the Windows user running th
 - Authentication uses a bootstrap secret from an environment variable. The secret is exchanged only in a POST body and is never placed in a URL.
 - Successful login creates an in-memory random session cookie with `HttpOnly` and `SameSite=Strict`; `Secure` is required for normal non-loopback deployment.
 - Every state-changing HTTP request and terminal WebSocket handshake is checked against an exact trusted Origin.
-- Authentication attempts and session creation are rate-limited in memory.
+- Authentication attempts and session creation are rate-limited in memory; limiter bucket state is itself bounded.
 - Browser requests can select only configured workspace IDs; they cannot submit arbitrary working directories or shell executables.
 - Terminal input, terminal output, access tokens and workspace environment values are excluded from default application logs.
-- WebSocket input size, terminal dimensions, replay memory and socket backpressure are bounded.
+- WebSocket input size, terminal dimensions, replay memory, retained exited sessions, login-session state and socket backpressure are bounded.
+- Established terminal WebSockets are actively closed when their login session reaches its absolute expiry.
 
 ### Recommended deployment
 
 Prefer:
 
 ```text
-phone -> Tailscale/WireGuard -> PalmTTY
+phone -> private overlay + HTTPS (for example Tailscale Serve) -> PalmTTY
 ```
 
 or:
@@ -50,17 +51,18 @@ PalmTTY 会以运行 Agent 的 Windows 用户权限提供 Shell。安全失陷�
 - 认证使用环境变量中的启动 secret。secret 只通过 POST body 传递，绝不放入 URL。
 - 登录成功后生成随机、仅内存保存的会话 Cookie，使用 `HttpOnly` 和 `SameSite=Strict`；正常的非 loopback 部署必须使用 `Secure`。
 - 所有修改状态的 HTTP 请求和终端 WebSocket 握手都执行精确 Origin 校验。
-- 登录尝试与创建会话都有内存限流。
+- 登录尝试与创建会话都有内存限流，限流 bucket 本身也有数量上限。
 - 浏览器只能选择本地配置中存在的 workspace ID，不能远程指定任意目录或 Shell 可执行文件。
 - 默认日志不记录终端输入、终端输出、访问 token 或 workspace 环境变量值。
-- WebSocket 输入大小、终端尺寸、重放缓存以及慢客户端积压都有上限。
+- WebSocket 输入大小、终端尺寸、重放缓存、已退出会话保留、登录会话数量以及慢客户端积压都有上限。
+- 已建立的终端 WebSocket 在登录会话达到绝对过期时间后也会被服务端主动断开。
 
 ### 推荐部署
 
 优先选择：
 
 ```text
-手机 -> Tailscale/WireGuard -> PalmTTY
+手机 -> 私有组网 + HTTPS（例如 Tailscale Serve）-> PalmTTY
 ```
 
 或：
