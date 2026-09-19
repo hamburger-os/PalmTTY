@@ -1,6 +1,6 @@
 # Current implementation state
 
-Status: **alpha foundation implemented on the repository branch; production hardening still required.**
+Status: **alpha foundation implemented; CI and real-device hardening are required before a stable release.**
 
 ## Implemented
 
