@@ -36,7 +36,7 @@ export type SessionManagerOptions = {
 };
 
 const CREATE_CONNECT_DELAYS_MS = [0, 50, 100, 200, 400, 800, 1200, 1600];
-const REDISCOVER_CONNECT_DELAYS_MS = [0, 100, 250, 500, 1000];
+const REDISCOVER_CONNECT_DELAYS_MS = [0, 100, 250, 500, 1000, 2000, 4000];
 const RECONNECT_DELAYS_MS = [100, 250, 500, 1000, 2000];
 
 function sleep(ms: number): Promise<void> {
@@ -59,6 +59,7 @@ export class SessionManager {
   readonly runtimeDir: string;
   private readonly workerSpawner: WorkerSpawner;
   private readonly sessions = new Map<string, ManagedWorker>();
+  private pendingCreates = 0;
   private initialized = false;
   private closing = false;
 
@@ -72,7 +73,6 @@ export class SessionManager {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
-    this.initialized = true;
     await ensureRuntimeLayout(this.runtimeDir);
     await cleanupDanglingWorkerState(this.runtimeDir);
 
@@ -99,6 +99,7 @@ export class SessionManager {
         await removeWorkerState(this.runtimeDir, record);
       }
     }));
+    this.initialized = true;
   }
 
   list(): SessionPublic[] {
@@ -122,15 +123,17 @@ export class SessionManager {
     const active = [...this.sessions.values()].filter(({ session }) =>
       session.state === "running" || session.state === "starting"
     );
-    if (active.length >= this.config.sessions.maxSessions) {
+    if (active.length + this.pendingCreates >= this.config.sessions.maxSessions) {
       throw new Error("Maximum session count reached");
     }
+    this.pendingCreates += 1;
 
-    const workspace = this.config.workspaces.find((item) => item.id === workspaceId);
-    if (!workspace) throw new Error("Unknown workspace");
-    if (!existsSync(workspace.cwd)) throw new Error("Workspace directory is unavailable");
+    try {
+      const workspace = this.config.workspaces.find((item) => item.id === workspaceId);
+      if (!workspace) throw new Error("Unknown workspace");
+      if (!existsSync(workspace.cwd)) throw new Error("Workspace directory is unavailable");
 
-    const id = sessionId();
+      const id = sessionId();
     const endpoint = endpointId();
     const secret = workerSecret();
     const createdAt = new Date().toISOString();
@@ -182,6 +185,9 @@ export class SessionManager {
         endpointId: endpoint
       });
       throw error;
+    }
+    } finally {
+      this.pendingCreates -= 1;
     }
   }
 
