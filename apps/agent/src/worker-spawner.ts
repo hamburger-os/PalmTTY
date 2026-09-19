@@ -18,11 +18,14 @@ function workerInvocation(): string[] {
 
 export class ProcessWorkerSpawner implements WorkerSpawner {
   async spawn(bootstrap: WorkerBootstrap): Promise<void> {
+    const environment = { ...process.env };
+    for (const key of bootstrap.excludedEnvKeys) delete environment[key];
+
     const child = spawn(process.execPath, workerInvocation(), {
       detached: true,
       windowsHide: true,
       stdio: ["pipe", "ignore", "ignore"],
-      env: process.env
+      env: environment
     });
 
     await new Promise<void>((resolve, reject) => {
