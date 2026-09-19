@@ -79,7 +79,7 @@ async function startHarness(
     auth: {
       enabled: true,
       tokenEnv: TOKEN_ENV,
-      sessionTtlMinutes: 60
+      sessionTtlMinutes: 5
     },
     workspaces: [{
       id: "e2e",
@@ -413,11 +413,18 @@ describe("terminal WebSocket integration", () => {
   });
 
   it("actively closes established sockets when authentication expires", async () => {
-    const harness = await startHarness((config) => {
-      // Test-only short lifetime; production configuration enforces a 5-minute minimum.
-      config.auth.sessionTtlMinutes = 0.04;
-    });
-    const cookie = await login(harness);
+    const harness = await startHarness();
+    const realDateNow = Date.now;
+    const loginNow = realDateNow();
+    let cookie: string;
+    try {
+      // Keep the production-valid 5-minute TTL, but create this one login session
+      // as if almost all of that lifetime had already elapsed.
+      Date.now = () => loginNow - (5 * 60_000 - 3_000);
+      cookie = await login(harness);
+    } finally {
+      Date.now = realDateNow;
+    }
     const session = await createSession(harness, cookie);
     const socket = socketFor(harness, session.id, cookie);
     const inbox = new MessageInbox(socket);
