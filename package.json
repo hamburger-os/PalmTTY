@@ -1,0 +1,34 @@
+{
+  "name": "palmtty",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.11.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "dev": "pnpm --filter @palmtty/protocol build && pnpm --filter @palmtty/config build && pnpm --parallel --filter @palmtty/agent --filter @palmtty/web dev",
+    "start": "pnpm --filter @palmtty/agent start",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "docs:check": "node scripts/docs-check.mjs",
+    "lint": "pnpm typecheck && pnpm docs:check",
+    "check": "pnpm lint && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@10.17.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "node-pty"
+    ]
+  }
+}

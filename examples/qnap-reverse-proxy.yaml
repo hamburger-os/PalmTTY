@@ -1,14 +1,13 @@
-# Safe local/development example.
-# Copy to palmtty.local.yaml and change the workspace path.
-# Set PALMTTY_ACCESS_TOKEN before starting PalmTTY.
+# Example for HTTPS reverse proxy access through QNAP/Caddy.
+# Replace the domain and Windows workspace path.
+# Set PALMTTY_ACCESS_TOKEN to a long random secret in the Windows environment.
 
 server:
-  host: 127.0.0.1
+  host: 0.0.0.0
   port: 7688
   trustedOrigins:
-    - http://127.0.0.1:7688
-    - http://127.0.0.1:5173
-  secureCookies: false
+    - https://dev.example.com
+  secureCookies: true
   unsafeAllowInsecureLan: false
 
 auth:
@@ -32,10 +31,3 @@ workspaces:
     args:
       - -NoLogo
     command: codex
-
-  - id: powershell
-    name: PowerShell
-    cwd: C:\\Users\\Public
-    shell: pwsh
-    args:
-      - -NoLogo

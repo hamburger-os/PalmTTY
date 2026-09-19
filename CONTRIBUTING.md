@@ -1,72 +1,40 @@
-# Contributing to PalmTTY
+# Contributing to PalmTTY / 参与 PalmTTY
 
-PalmTTY is early-stage. Contributions are welcome, but the project is deliberately keeping its first milestones narrow.
+PalmTTY welcomes focused contributions that preserve its security and session-continuity boundaries.
 
-## Before opening code
+PalmTTY 欢迎聚焦且可验证的贡献，尤其要保持安全边界和会话连续性设计。
 
-Please read:
+## Read first / 开始之前
 
-- [README.md](README.md)
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- [docs/PROTOCOL.md](docs/PROTOCOL.md)
-- [docs/SECURITY.md](docs/SECURITY.md)
-- [docs/ROADMAP.md](docs/ROADMAP.md)
+- [Community development guide / 社区开发指南](docs/community/development.md)
+- [Architecture / 架构](docs/community/architecture.md)
+- [Security / 安全](docs/community/security.md)
+- [AI invariants](docs/ai/invariants.md)
 
-For architecture-changing work, open or join an issue before a large implementation PR.
+For architecture-changing work, discuss the change before a large PR.
 
-## Priorities
+涉及架构边界的较大改动，请先在 Issue 中讨论。
 
-The current priority order is:
+## Required checks / 必须检查
 
-1. Windows 11 / PowerShell 7 correctness;
-2. reliable session lifecycle;
-3. mobile terminal UX;
-4. security boundaries;
-5. portability.
+```text
+pnpm docs:check
+pnpm typecheck
+pnpm test
+pnpm build
+```
 
-A cross-platform abstraction should not make the initial Windows path harder to reason about.
+Repository-wide changes should pass `pnpm check`.
 
-## Development conventions
+影响行为的修改必须按 `.agents/skills/docs-sync/SKILL.md` 同步四层文档。安全、协议、会话生命周期与重连逻辑的改动不能只改代码。
 
-Planned stack:
+## Project principles / 项目原则
 
-- TypeScript;
-- pnpm workspaces;
-- React/Vite for web;
-- Node.js for the Agent;
-- Zod for shared schemas;
-- Vitest/Playwright for tests.
+- No terminal I/O logging by default. / 默认不记录终端输入输出。
+- No secrets in URLs. / secret 不进入 URL。
+- No silent privilege elevation. / 不静默提权。
+- Remote callers select configured workspaces; they do not gain arbitrary cwd/shell authority. / 远程端只能选择预配置 workspace。
+- Codex and other AI CLIs remain workloads, not PalmTTY protocol dependencies. / AI CLI 是工作负载，不是核心协议依赖。
+- Do not claim Agent-restart persistence until session workers exist and are tested. / 未实现独立 worker 前，不宣称 Agent 重启可恢复会话。
 
-Exact versions will be pinned when M0 is implemented.
-
-## Pull requests
-
-Prefer small PRs that complete one vertical behavior.
-
-A PR should include tests for changed protocol/config/session behavior when practical.
-
-Avoid introducing:
-
-- hidden telemetry;
-- cloud-only dependencies;
-- command logging;
-- credentials in URLs;
-- direct privilege escalation;
-- AI-vendor-specific assumptions in the terminal core.
-
-## Security issues
-
-Do not publish exploit details for an unpatched vulnerability in a public issue. See [docs/SECURITY.md](docs/SECURITY.md).
-
-## Commit style
-
-Conventional-style prefixes are encouraged:
-
-- `feat:`
-- `fix:`
-- `docs:`
-- `test:`
-- `refactor:`
-- `chore:`
-
-They are not a substitute for a clear commit message.
+Contributions are licensed under Apache-2.0.
