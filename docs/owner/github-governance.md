@@ -36,7 +36,7 @@ Required status checks 与当前 workflow Context 一致：
 因此以下配置建议**保持当前状态**：
 
 - Required approvals = **0**；
-- 不强制 Code Owner review；
+- 普通代码不要求人工 review；trust-root 文件建议通过精简 CODEOWNERS + Ruleset Code Owner review 单独保护；
 - 不强制 last-push approval；
 - 不要求 Signed commits；
 - 保持 conversation resolution；
@@ -46,9 +46,30 @@ Required status checks 与当前 workflow Context 一致：
 
 这些设置避免把 AI 日常维护变成人工审批队列，同时仍要求代码、文档、安全审计和 Windows/Ubuntu 验证全部通过。
 
-## 建议补回的两个保护
+## 建议补回的三个保护
 
-### 1. Require branches to be up to date before merging
+### 1. 对 trust root 开启 Code Owner review
+
+仓库已经把 `.github/CODEOWNERS` 缩小为一个很小的 AI trust root，而不是默认拥有所有文件：
+
+- `.github/CODEOWNERS` 自身；
+- `.github/workflows/`；
+- `.github/dependabot.yml`；
+- 根 `package.json`、`pnpm-workspace.yaml`、`tsconfig.base.json`；
+- `scripts/docs-check.mjs`；
+- 各 workspace 的 `package.json`。
+
+建议在 Ruleset 中打开 **Require review from Code Owners**，同时继续保持 Required approvals = 0。
+
+效果是：
+
+- 普通 Agent/Web/协议/文档代码 PR：仍然可以由 AI 自主通过自动门禁后合并；
+- 修改 CI、依赖策略、workspace/test/typecheck/build 入口等“判断 AI 是否合格”的 trust-root 文件：必须由 `@hamburger-os` 人工批准；
+- 不再使用 `* @hamburger-os`，因此不会让所有 PR 都变成人工审批。
+
+这是 AI 主维护模式下最值得保留的一条人工边界，因为 required checks 本身也是仓库代码；如果 AI 能同时修改检查器和被检查代码，就存在“门禁被无意削弱但 context 仍然绿色”的风险。
+
+### 2. Require branches to be up to date before merging
 
 当前 Ruleset 的 `strict_required_status_checks_policy` 为 `false`。
 
@@ -58,7 +79,7 @@ Required status checks 与当前 workflow Context 一致：
 
 对于 AI 主维护项目，这个限制的人工成本较低：仓库已经开启 **Always suggest updating pull request branches**，AI 也可以更新分支后重新等待 CI。
 
-### 2. 保留“人工紧急恢复” bypass
+### 3. 保留“人工紧急恢复” bypass
 
 当前 Ruleset 没有任何 bypass actor，读取结果为 `current_user_can_bypass: never`。
 
@@ -122,7 +143,9 @@ Required status checks 与当前 workflow Context 一致：
 AI 后续修改 Ruleset、workflow、依赖策略或安全门禁时，应遵守：
 
 1. 不删除四条主干 required checks，除非用同等或更强的检查替代；
-2. workflow 名称或 job 名称变化时，同时检查 Ruleset required context 是否仍然匹配；
-3. 修改 workflow 的 PR 必须特别关注“检查是否会因为 YAML/权限错误完全不产生”；
-4. 自动维护不依赖人工 approval，但不能把自动测试、安全检查或文档检查当作可选项；
-5. Ruleset 实际状态变化后，同步更新本文档和 `docs/ai/current-state.md`。
+2. 不扩大 CODEOWNERS trust root 到普通业务代码，也不要让 AI 自动移除 trust-root ownership；
+3. workflow 名称或 job 名称变化时，同时检查 Ruleset required context 是否仍然匹配；
+4. 修改 workflow 的 PR 必须特别关注“检查是否会因为 YAML/权限错误完全不产生”；
+5. 自动维护不依赖普通人工 approval，但 trust-root 改动需要 Code Owner review；
+6. 不能把自动测试、安全检查或文档检查当作可选项；
+7. Ruleset 实际状态变化后，同步更新本文档和 `docs/ai/current-state.md`。
