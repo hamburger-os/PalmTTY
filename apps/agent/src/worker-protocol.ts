@@ -18,6 +18,7 @@ export const WorkerBootstrapSchema = z.object({
   sessionId: z.string().min(16).max(128),
   endpointId: z.string().min(16).max(128),
   secret: z.string().min(32).max(256),
+  excludedEnvKeys: z.array(z.string().min(1).max(256)).max(16),
   createdAt: z.string().datetime(),
   workspace: WorkspaceConfigSchema,
   session: SessionWorkerConfigSchema,
