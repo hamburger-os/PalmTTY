@@ -11,7 +11,7 @@ import {
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { Terminal as HeadlessTerminal } from "@xterm/headless";
 import * as pty from "node-pty";
-import type WebSocket from "ws";
+import type WebSocket from "ws";\nimport { canReplayFrom } from "./reconnect-policy.js";
 
 type OutputFrame = {
   seq: number;
@@ -167,10 +167,7 @@ export class SessionManager {
       });
 
       const firstSeq = session.history[0]?.seq;
-      const canReplay =
-        lastSeq > 0 &&
-        lastSeq <= session.seq &&
-        (lastSeq === session.seq || (firstSeq !== undefined && lastSeq >= firstSeq - 1));
+      const canReplay = canReplayFrom(lastSeq, session.seq, firstSeq);
 
       if (canReplay) {
         for (const frame of session.history) {
