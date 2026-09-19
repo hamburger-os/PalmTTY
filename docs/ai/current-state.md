@@ -1,16 +1,21 @@
 # Current implementation state
 
-Status: **alpha foundation implemented and passing Windows/Ubuntu CI; real mobile/Codex deployment hardening remains before a stable release.**
+Status: **alpha foundation implemented and passing Windows/Ubuntu CI; open-source governance and automated security review are in place, while real mobile/Codex deployment hardening remains before a stable release.**
 
 ## Implemented
 
-### Repository
+### Repository and governance
 
 - pnpm/TypeScript monorepo
 - Agent/Web/protocol/config packages
 - committed pnpm lockfile with frozen-lockfile CI installs
 - Windows + Ubuntu CI passing
 - Windows-only ConPTY smoke test that spawns PowerShell 7, resizes the PTY and round-trips Unicode
+- Dependency Review workflow on pull requests
+- CodeQL JavaScript/TypeScript analysis on pull requests, main and weekly schedule
+- CODEOWNERS, PR template and structured Issue Forms
+- CONTRIBUTING, Code of Conduct, Support, Governance, Changelog and Release process
+- Dependabot groups minor/patch npm updates while leaving major upgrades for deliberate individual review
 - Apache-2.0; production dependency audit currently contains MIT, ISC and BSD-3-Clause licenses
 - four documentation layers
 - `.agents/skills/docs-sync/SKILL.md`
@@ -72,6 +77,7 @@ Status: **alpha foundation implemented and passing Windows/Ubuntu CI; real mobil
 - Windows CI validates ConPTY/PowerShell, but real owner workstation + mobile Safari/Chrome + Codex validation is still required.
 - No Git/file preview subsystem yet.
 - Linux/macOS/WSL are not first-class supported hosts yet.
+- GitHub repository Ruleset and repository-level feature/merge/security settings are documented in `docs/owner/github-governance.md` but cannot be applied through the currently available connector API; they remain a maintainer Settings task.
 
 ## Required honesty rule
 

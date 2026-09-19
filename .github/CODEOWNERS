@@ -1,0 +1,11 @@
+# Default owner
+* @hamburger-os
+
+# Architecture- and security-critical surfaces
+/apps/agent/ @hamburger-os
+/packages/protocol/ @hamburger-os
+/packages/config/ @hamburger-os
+/.github/workflows/ @hamburger-os
+/SECURITY.md @hamburger-os
+/docs/owner/ @hamburger-os
+/docs/ai/ @hamburger-os

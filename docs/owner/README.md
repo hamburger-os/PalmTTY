@@ -12,6 +12,7 @@
 - [security.md](security.md) — 安全模型、认证与公网边界
 - [web-mobile.md](web-mobile.md) — 手机端 Web/PWA 交互
 - [deployment.md](deployment.md) — Windows、QNAP 与反向代理部署
+- [github-governance.md](github-governance.md) — GitHub Ruleset、合并策略、社区治理与仓库设置
 - [roadmap.md](roadmap.md) — 当前完成度与后续阶段
 
 ## 审查原则
@@ -21,6 +22,7 @@
 1. [roadmap.md](roadmap.md) 中当前状态是否变化；
 2. 与改动模块对应的本文档；
 3. [../ai/current-state.md](../ai/current-state.md) 是否与代码状态一致；
-4. 安全或重连相关改动必须同时检查 [security.md](security.md) 和 [reconnect.md](reconnect.md)。
+4. 安全或重连相关改动必须同时检查 [security.md](security.md) 和 [reconnect.md](reconnect.md)；
+5. GitHub 工作流、依赖策略、社区治理或发布流程修改必须检查 [github-governance.md](github-governance.md)。
 
 如果 Owner 文档与代码事实冲突，应视为任务未完成。
