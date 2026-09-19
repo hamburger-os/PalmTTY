@@ -11,6 +11,7 @@ Status: **alpha foundation implemented and passing Windows/Ubuntu CI; open-sourc
 - committed pnpm lockfile with frozen-lockfile CI installs
 - Windows + Ubuntu CI passing
 - Windows-only ConPTY smoke test that spawns PowerShell 7, resizes the PTY and round-trips Unicode
+- end-to-end Fastify HTTP/WebSocket + node-pty integration coverage for the terminal lifecycle
 - production dependency vulnerability audit on pull requests, main and weekly schedule
 - CodeQL JavaScript/TypeScript analysis on pull requests, main and weekly schedule
 - CODEOWNERS, PR template and structured Issue Forms
@@ -49,6 +50,7 @@ Status: **alpha foundation implemented and passing Windows/Ubuntu CI; open-sourc
 - per-connection serialized client message handling to remove resume/input/resize races
 - application ping/pong heartbeat for half-open mobile connection detection
 - terminal WebSocket closure at login-session expiry
+- integration coverage for unauthenticated WebSocket rejection, exact Origin enforcement, required subprotocol, ordered resume/resize/input handling, PTY survival across browser disconnect, retained replay, stale snapshot fallback, slow-client cutoff, auth expiry, exit delivery and retained-session cleanup
 - bounded exited-session retention with automatic disposal
 
 ### Web/mobile
