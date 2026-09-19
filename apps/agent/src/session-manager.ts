@@ -240,6 +240,20 @@ export class SessionManager {
 
     managed.worker.onClose(() => {
       if (this.closing || this.sessions.get(managed.record.sessionId) !== managed) return;
+
+      if (managed.session.state === "exited") {
+        this.sessions.delete(managed.record.sessionId);
+        for (const socket of managed.clients.values()) {
+          try {
+            socket.close(1000, "Exited session retention expired");
+          } catch {
+            // Best effort during normal retired-session cleanup.
+          }
+        }
+        managed.clients.clear();
+        return;
+      }
+
       for (const socket of managed.clients.values()) {
         try {
           socket.close(1012, "Session worker reconnecting");
