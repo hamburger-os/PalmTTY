@@ -11,6 +11,8 @@ import {
 } from "./worker-protocol.js";
 import {
   ensureRuntimeLayout,
+  readWorkerRecord,
+  readWorkerSecret,
   removeWorkerState,
   workerEndpoint,
   writeWorkerRecord,
@@ -25,6 +27,8 @@ const AUTH_TIMEOUT_MS = 3_000;
 const MAX_PENDING_CONNECTIONS = 8;
 const MAX_WORKER_SOCKET_BUFFER_BYTES = 8 * 1024 * 1024;
 const MAX_BOOTSTRAP_BYTES = 1024 * 1024;
+const STATE_WATCHDOG_INTERVAL_MS = 15_000;
+const STATE_WATCHDOG_FAILURES = 2;
 
 export type SessionWorkerServerOptions = {
   ptyFactory?: PtyFactory;
@@ -45,6 +49,8 @@ export class SessionWorkerServer {
   private readonly connections = new Set<FramedJsonSocket>();
   private readonly attachedClients = new Set<string>();
   private commandPipeline: Promise<void> = Promise.resolve();
+  private stateWatchdog: NodeJS.Timeout | undefined;
+  private stateWatchdogFailures = 0;
   private shuttingDown = false;
 
   constructor(
@@ -89,43 +95,49 @@ export class SessionWorkerServer {
   }
 
   async start(): Promise<void> {
-    await ensureRuntimeLayout(this.bootstrap.runtimeDir);
-    await writeWorkerSecret(
-      this.bootstrap.runtimeDir,
-      this.bootstrap.sessionId,
-      this.bootstrap.secret
-    );
+    try {
+      await ensureRuntimeLayout(this.bootstrap.runtimeDir);
+      await writeWorkerSecret(
+        this.bootstrap.runtimeDir,
+        this.bootstrap.sessionId,
+        this.bootstrap.secret
+      );
 
-    const server = net.createServer((socket) => this.accept(socket));
-    this.server = server;
+      const server = net.createServer((socket) => this.accept(socket));
+      this.server = server;
 
-    await new Promise<void>((resolve, reject) => {
-      const onError = (error: Error) => {
-        server.off("listening", onListening);
-        reject(error);
-      };
-      const onListening = () => {
-        server.off("error", onError);
-        resolve();
-      };
-      server.once("error", onError);
-      server.once("listening", onListening);
-      server.listen(this.endpoint);
-    });
+      await new Promise<void>((resolve, reject) => {
+        const onError = (error: Error) => {
+          server.off("listening", onListening);
+          reject(error);
+        };
+        const onListening = () => {
+          server.off("error", onError);
+          resolve();
+        };
+        server.once("error", onError);
+        server.once("listening", onListening);
+        server.listen(this.endpoint);
+      });
 
-    if (process.platform !== "win32") {
-      await chmod(this.endpoint, 0o600);
+      if (process.platform !== "win32") {
+        await chmod(this.endpoint, 0o600);
+      }
+
+      await writeWorkerRecord(this.bootstrap.runtimeDir, {
+        version: 1,
+        sessionId: this.bootstrap.sessionId,
+        workspaceId: this.bootstrap.workspace.id,
+        createdAt: this.bootstrap.createdAt,
+        endpointId: this.bootstrap.endpointId,
+        workerPid: process.pid,
+        shellPid: this.runtime.pid
+      });
+      this.startStateWatchdog();
+    } catch (error) {
+      await this.shutdown({ killPty: true, cleanupState: true });
+      throw error;
     }
-
-    await writeWorkerRecord(this.bootstrap.runtimeDir, {
-      version: 1,
-      sessionId: this.bootstrap.sessionId,
-      workspaceId: this.bootstrap.workspace.id,
-      createdAt: this.bootstrap.createdAt,
-      endpointId: this.bootstrap.endpointId,
-      workerPid: process.pid,
-      shellPid: this.runtime.pid
-    });
   }
 
   async shutdown(options: {
@@ -134,6 +146,7 @@ export class SessionWorkerServer {
   }): Promise<void> {
     if (this.shuttingDown) return;
     this.shuttingDown = true;
+    if (this.stateWatchdog) clearInterval(this.stateWatchdog);
 
     for (const connection of [...this.connections]) connection.destroy();
     this.connections.clear();
@@ -152,6 +165,36 @@ export class SessionWorkerServer {
         sessionId: this.bootstrap.sessionId,
         endpointId: this.bootstrap.endpointId
       });
+    }
+  }
+
+  private startStateWatchdog(): void {
+    this.stateWatchdog = setInterval(() => {
+      void this.verifyPublishedState();
+    }, STATE_WATCHDOG_INTERVAL_MS);
+    this.stateWatchdog.unref();
+  }
+
+  private async verifyPublishedState(): Promise<void> {
+    if (this.shuttingDown) return;
+    try {
+      const [record, secret] = await Promise.all([
+        readWorkerRecord(this.bootstrap.runtimeDir, this.bootstrap.sessionId),
+        readWorkerSecret(this.bootstrap.runtimeDir, this.bootstrap.sessionId)
+      ]);
+      if (
+        record.endpointId !== this.bootstrap.endpointId ||
+        record.workerPid !== process.pid ||
+        !secretsEqual(secret, this.bootstrap.secret)
+      ) {
+        throw new Error("Worker recovery state no longer belongs to this process");
+      }
+      this.stateWatchdogFailures = 0;
+    } catch {
+      this.stateWatchdogFailures += 1;
+      if (this.stateWatchdogFailures < STATE_WATCHDOG_FAILURES) return;
+      await this.shutdown({ killPty: true, cleanupState: false });
+      this.options.onRetired?.();
     }
   }
 
