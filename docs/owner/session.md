@@ -26,6 +26,7 @@ running
 - 并发会话数量由配置限制。
 - 会话 ID 使用随机值，不包含用户名、目录或 PID 等可预测信息。
 - Agent 关闭时会清理自己持有的 PTY。
+- 已退出会话默认保留 30 分钟，供用户查看最后状态和重新附着；到期后释放 headless terminal、replay 数据和会话 metadata，避免长期运行时内存持续增长。
 
 ## Workspace
 
