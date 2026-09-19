@@ -8,6 +8,7 @@ describe("configuration", () => {
     });
     expect(config.server.host).toBe("127.0.0.1");
     expect(config.auth.enabled).toBe(true);
+    expect(config.auth.maxLoginSessions).toBe(32);
     expect(config.sessions.maxSessions).toBe(8);
     expect(config.sessions.exitedRetentionMinutes).toBe(30);
   });
