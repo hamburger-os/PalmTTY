@@ -15,7 +15,7 @@
 - 特殊键栏和长文本 Composer；
 - Windows/Ubuntu 双平台 CI；
 - Windows CI 实际启动 PowerShell 7/ConPTY，并验证 resize 与中文 Unicode 往返；
-- Pull Request Dependency Review 与 CodeQL；
+- Pull Request 生产依赖漏洞审计与 CodeQL；
 - CODEOWNERS、Issue Forms、PR 模板、贡献/行为/支持/治理/发布文档；
 - 四层文档体系与 docs-sync Agent Skill；
 - Apache-2.0；当前生产依赖许可证扫描只发现 MIT、ISC、BSD-3-Clause，与项目的 Apache-2.0 分发方式没有发现明显冲突。
