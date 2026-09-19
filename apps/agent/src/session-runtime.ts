@@ -55,6 +55,7 @@ export type SessionRuntimeOptions = {
   rows: number;
   config: SessionRuntimeConfig;
   ptyFactory?: PtyFactory;
+  excludedEnvKeys?: string[];
 };
 
 type MessageListener = (message: ServerMessage) => void;
@@ -99,6 +100,7 @@ export class SessionRuntime {
       ...options.workspace.env,
       TERM: "xterm-256color"
     };
+    for (const key of options.excludedEnvKeys ?? []) delete environment[key];
 
     const ptyFactory = options.ptyFactory ?? defaultPtyFactory;
     this.child = ptyFactory(shell, options.workspace.args, {
