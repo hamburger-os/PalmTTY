@@ -2,47 +2,84 @@
 
 ## 目标
 
-PalmTTY Agent 是运行在开发电脑上的唯一 Web 服务入口，负责：
+PalmTTY Agent 是开发电脑上的 Web/API 控制面，负责：
 
 - 提供 HTTP 与 WebSocket API；
-- 认证和 Origin 安全检查；
-- 管理本机终端会话；
-- 托管编译后的手机端 PWA；
-- 把浏览器终端连接到本机 PowerShell/ConPTY。
+- 登录认证和 Origin 安全检查；
+- 管理本机 workspace 白名单；
+- 创建、发现并认证独立 Session Worker；
+- 把浏览器 WebSocket 转发到对应 Worker；
+- 托管编译后的手机端 PWA。
+
+Agent 不再拥有 PTY，也不保存 canonical terminal state。
 
 ## 当前架构
 
-Agent 使用 Node.js + Fastify。终端进程通过 node-pty 创建，在 Windows 11 上使用 ConPTY。
-
-```text
+~~~text
 浏览器
-  │
-HTTP / WebSocket
-  │
+  │ HTTPS / WSS
+  ▼
 PalmTTY Agent
-  ├─ Auth
+  ├─ Auth / Origin
   ├─ Workspace 白名单
-  ├─ Session Manager
-  ├─ 终端状态镜像
+  ├─ Worker Registry
   └─ 静态 Web
         │
-     node-pty
+        │ 本机认证 IPC
+        ▼
+  Session Worker（每个 Session 一个）
+  ├─ node-pty / ConPTY
+  ├─ headless xterm
+  ├─ seq + replay
+  └─ exited retention
         │
-      ConPTY
+     PowerShell 7
         │
-   PowerShell 7
-```
+   Codex / Git / ...
+~~~
+
+Windows 使用 Named Pipe；当前其他 CI 平台使用 Unix domain socket。IPC 的控制权限由每个 Session 独立的高熵 secret 认证。
+
+## Agent 生命周期
+
+Agent 正常关闭、升级或异常退出时：
+
+- 浏览器连接会断开；
+- Worker 控制连接会断开；
+- Worker 与 PTY 不退出；
+- 新 Agent 启动后读取 recovery metadata 和私有 secret；
+- 新 Agent 重新认证同一 Worker；
+- 浏览器重新登录并连接原 Session 后，通过原有 replay/snapshot 机制恢复。
+
+登录 Cookie 仍属于 Agent 内存状态，所以 Agent 重启后需要重新登录。终端本身不会因此结束。
+
+## Worker 创建
+
+创建 Session 时 Agent：
+
+1. 从本地 workspace 配置解析 cwd、shell、args、env；
+2. 生成随机 Session ID、IPC endpoint ID 与 256-bit Worker secret；
+3. detached 启动 Worker；
+4. 通过一次性匿名 stdin 发送 bootstrap；
+5. 等待 Worker 完成 IPC 监听、secret/record 持久化并返回 READY；
+6. 认证 Worker 后才向浏览器返回创建成功。
+
+PalmTTY 登录 token 对应的环境变量会从 Worker 环境和最终 PTY 环境中移除。
 
 ## 重要边界
 
-- Agent 默认不应以管理员身份运行。
-- 浏览器只能选择配置好的 workspace，不能远程指定任意目录或 Shell。
-- Agent 不理解 Codex 的内部协议；Codex 只是运行在终端里的普通 CLI。
-- 当前所有 PTY 都由 Agent 进程持有，所以 Agent 重启会结束这些会话。
-- 默认日志不得包含终端输入、输出、token 或 workspace 环境变量。
+- Agent/Worker 默认都不应以管理员身份运行。
+- 浏览器只能选择配置好的 workspace，不能远程指定任意目录、Shell 或环境变量。
+- Agent 不理解 Codex 的内部协议；Codex 只是终端里的普通 CLI。
+- Worker secret 不进入浏览器、命令行、URL、普通日志或 PTY 环境。
+- 持久化 PID 只用于诊断，不允许直接作为 kill authority；PID 可能被系统复用。
+- 默认日志不得包含终端输入、输出、token、Worker secret 或 workspace 环境变量。
 
 ## 你审查时重点看
 
-- 是否有人把文件管理、任意命令 API、提权等能力绕过终端边界直接加进 Agent；
-- 是否把公网安全检查为了“方便调试”而放宽；
-- 是否错误宣称 Agent 重启后终端还能继续存在。
+- 是否重新把 PTY 或 xterm/replay canonical state 放回 Agent；
+- Agent 关闭路径是否误杀 Worker；
+- Worker bootstrap/secret 是否泄漏到 argv、env、URL 或日志；
+- 是否按记录的 PID 直接杀进程；
+- 是否扩大浏览器的 cwd/shell/env 权限；
+- IPC 与浏览器 backpressure 是否仍有硬上限。
