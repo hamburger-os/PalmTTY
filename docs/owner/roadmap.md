@@ -14,6 +14,7 @@
 - 手机端 xterm/PWA 界面；
 - 特殊键栏和长文本 Composer；
 - Windows/Ubuntu 双平台 CI；
+- Agent 端到端集成测试通过真实 Fastify HTTP/WebSocket + node-pty 路径覆盖认证、Origin、子协议、消息顺序、重连 replay/snapshot、登录过期、慢客户端切断、退出与清理；
 - Windows CI 实际启动 PowerShell 7/ConPTY，并验证 resize 与中文 Unicode 往返；
 - Pull Request 生产依赖漏洞审计与 CodeQL；
 - CODEOWNERS、Issue Forms、PR 模板、贡献/行为/支持/治理/发布文档；
@@ -34,7 +35,7 @@ AI 主维护模式的 `main` Ruleset 已启用：PR 必须经过 Windows/Ubuntu 
 
 ### P0：真实设备与长期运行验证
 
-自动化 CI 已验证 Windows PowerShell 7/ConPTY 启动、resize 调用和中文 Unicode 往返。仍需要真实使用场景持续验证：
+自动化 CI 已验证端到端 HTTP/WebSocket/node-pty 生命周期，以及 Windows PowerShell 7/ConPTY 启动、resize 调用和中文 Unicode 往返。P0 的自动协议集成门禁已补齐；仍需要真实使用场景持续验证：
 
 - Codex CLI 长时间交互；
 - iPhone/Android 中文 IME 与语音输入；
