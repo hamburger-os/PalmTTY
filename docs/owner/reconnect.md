@@ -38,7 +38,7 @@ PTY 输出
 
 ### 页面刷新或丢失太多历史
 
-如果浏览器没有旧序号，或者旧序号已经超出 replay buffer，Agent 发送当前 headless terminal 的序列化快照，然后从该序号继续实时输出。
+如果浏览器没有旧序号，或者旧序号已经超出 replay buffer，Agent 发送当前 headless terminal 快照，然后从该序号继续实时输出。若会话尚未产生任何 PTY 输出（`seq = 0`），快照按定义就是空字符串，不需要调用 serializer；已有输出时才序列化 headless terminal。
 
 ## 内存与慢客户端
 
