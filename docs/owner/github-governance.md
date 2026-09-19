@@ -2,7 +2,7 @@
 
 ## 当前目标
 
-PalmTTY 的代码侧已经有 Windows/Ubuntu CI、锁文件、文档契约、Dependency Review 与 CodeQL。GitHub 仓库设置也应当把这些门禁变成默认规则，避免依赖维护者“记得不要直接 push”。
+PalmTTY 的代码侧已经有 Windows/Ubuntu CI、锁文件、文档契约、生产依赖漏洞审计与 CodeQL。GitHub 仓库设置也应当把这些门禁变成默认规则，避免依赖维护者“记得不要直接 push”。
 
 当前 GitHub API 连接显示仓库**没有任何 Ruleset**。下面是建议的唯一主干 Ruleset。
 
@@ -31,7 +31,7 @@ Required status checks 建议在这些 workflow 首次跑完后从 GitHub UI 选
 
 - `CI / check (windows-latest)`
 - `CI / check (ubuntu-latest)`
-- `Dependency Review / dependency-review`
+- `Security Audit / production-dependencies`
 - `CodeQL / codeql (javascript-typescript)`
 
 不建议当前强制 Signed commits：对初期外部贡献门槛较高，可在贡献规模扩大后再评估。
@@ -73,6 +73,7 @@ Required status checks 建议在这些 workflow 首次跑完后从 GitHub UI 选
 
 确认开启：
 
+- Dependency graph（开启后可再增加 GitHub Dependency Review workflow，并将其加入 Required checks）
 - Private vulnerability reporting
 - Dependabot alerts
 - Dependabot security updates
