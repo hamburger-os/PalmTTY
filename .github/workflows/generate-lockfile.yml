@@ -19,11 +19,13 @@ jobs:
         with:
           node-version: "22"
       - run: corepack enable
-      - run: pnpm install --lockfile-only
+      - run: pnpm install
+      - name: Production dependency licenses
+        run: pnpm licenses list --prod --long
       - name: Commit lockfile
         shell: bash
         run: |
-          if git diff --quiet -- pnpm-lock.yaml; then
+          if [ -z "$(git status --porcelain -- pnpm-lock.yaml)" ]; then
             echo "Lockfile already current."
             exit 0
           fi
