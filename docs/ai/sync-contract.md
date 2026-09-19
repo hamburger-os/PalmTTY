@@ -4,14 +4,14 @@ Use this map after every implementation change.
 
 | Code area | Owner docs | Community docs | Standards review |
 |---|---|---|---|
-| `apps/agent/src/session-manager.ts` | `session.md`, `reconnect.md` | `architecture.md` | terminal runtime if upstream assumptions changed |
+| `apps/agent/src/session-manager.ts`, `session-runtime.ts`, `session-worker.ts`, `worker-*.ts` | `session.md`, `reconnect.md`, `security.md` | `architecture.md`, `security.md` | terminal runtime if IPC/runtime assumptions changed |
 | `apps/agent/src/auth.ts`, `security.ts`, security hooks | `security.md` | `security.md` | WebSocket/security references |
 | `apps/agent/src/app.ts` HTTP/WS behavior | `agent.md`, possibly `reconnect.md` | `architecture.md`, `security.md` | RFC/WebSocket if protocol semantics changed |
 | `packages/protocol` | relevant module | `architecture.md` | RFC only for external protocol assumptions |
 | `packages/config` or examples | `agent.md`, `deployment.md`, `security.md` | `getting-started.md`, `security.md` | normally none |
 | `apps/web` | `web-mobile.md`, possibly `reconnect.md` | architecture/getting-started as needed | xterm upstream only if assumptions changed |
 | deployment/reverse proxy | `deployment.md`, `security.md` | `security.md`, `getting-started.md` | security references |
-| session worker / IPC | `session.md`, `reconnect.md`, `security.md`, `roadmap.md` | `architecture.md`, `security.md` | Windows runtime references |
+| session worker lifecycle / IPC / recovery metadata | `session.md`, `reconnect.md`, `security.md`, `roadmap.md` | `architecture.md`, `security.md` | Windows/Node runtime references |
 | GitHub workflows, dependency policy, release/governance files | `github-governance.md`, `roadmap.md` | `development.md` if contributor-visible | normally none |
 | roadmap/completion status | `roadmap.md` | README if contributor-facing | none |
 

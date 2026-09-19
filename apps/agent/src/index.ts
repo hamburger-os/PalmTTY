@@ -4,6 +4,7 @@ import path from "node:path";
 import { loadConfig } from "@palmtty/config";
 import { buildApp } from "./app.js";
 import { assertSecureExposure } from "./security.js";
+import { runSessionWorkerFromStdin } from "./session-worker.js";
 
 function defaultConfigPath(): string {
   if (process.platform === "win32") {
@@ -31,6 +32,11 @@ async function validateWorkspaceDirectories(config: Awaited<ReturnType<typeof lo
 }
 
 async function main() {
+  if (process.argv.includes("--session-worker")) {
+    await runSessionWorkerFromStdin();
+    return;
+  }
+
   const configPath = configPathFromArgs();
   const config = await loadConfig(configPath);
   assertSecureExposure(config);

@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseConfig, type PalmTTYConfig } from "@palmtty/config";
 import {
@@ -8,7 +11,10 @@ import {
 } from "@palmtty/protocol";
 import WebSocket from "ws";
 import { buildApp } from "./app.js";
-import type { PtyFactory, PtyHandle } from "./session-manager.js";
+import { SessionWorkerServer } from "./session-worker.js";
+import type { PtyFactory, PtyHandle } from "./session-runtime.js";
+import type { WorkerBootstrap } from "./worker-protocol.js";
+import type { WorkerSpawner } from "./worker-spawner.js";
 
 const TOKEN_ENV = "PALMTTY_E2E_TOKEN";
 const TOKEN = "0123456789abcdef0123456789abcdef";
@@ -84,6 +90,27 @@ function createPtyHarness(): PtyHarness {
   };
 }
 
+class EmbeddedWorkerSpawner implements WorkerSpawner {
+  private readonly servers: SessionWorkerServer[] = [];
+
+  constructor(readonly pty: PtyHarness) {}
+
+  async spawn(bootstrap: WorkerBootstrap): Promise<void> {
+    const server = new SessionWorkerServer(bootstrap, {
+      ptyFactory: this.pty.factory
+    });
+    await server.start();
+    this.servers.push(server);
+  }
+
+  async closeAll(): Promise<void> {
+    await Promise.all(this.servers.map((server) =>
+      server.shutdown({ killPty: true, cleanupState: true })
+    ));
+    this.servers.length = 0;
+  }
+}
+
 type AppInstance = Awaited<ReturnType<typeof buildApp>>;
 
 type Harness = {
@@ -92,9 +119,13 @@ type Harness = {
   origin: string;
   wsBase: string;
   pty: PtyHarness;
+  runtimeDir: string;
+  workerSpawner: EmbeddedWorkerSpawner;
 };
 
 const liveApps = new Set<AppInstance>();
+const liveSpawners = new Set<EmbeddedWorkerSpawner>();
+const liveRuntimeDirs = new Set<string>();
 
 afterEach(async () => {
   for (const app of liveApps) {
@@ -105,6 +136,16 @@ afterEach(async () => {
     }
   }
   liveApps.clear();
+
+  for (const spawner of liveSpawners) {
+    await spawner.closeAll().catch(() => undefined);
+  }
+  liveSpawners.clear();
+
+  for (const runtimeDir of liveRuntimeDirs) {
+    await rm(runtimeDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+  liveRuntimeDirs.clear();
   delete process.env[TOKEN_ENV];
 });
 
@@ -135,8 +176,14 @@ async function startHarness(
   });
   mutate?.(config);
 
+  const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-e2e-"));
+  liveRuntimeDirs.add(runtimeDir);
   const pty = createPtyHarness();
-  const app = await buildApp(config, { ptyFactory: pty.factory });
+  const workerSpawner = new EmbeddedWorkerSpawner(pty);
+  liveSpawners.add(workerSpawner);
+  const app = await buildApp(config, {
+    sessionManager: { runtimeDir, workerSpawner }
+  });
   liveApps.add(app);
   const address = await app.listen({ host: "127.0.0.1", port: 0 });
   const origin = new URL(address).origin;
@@ -150,7 +197,9 @@ async function startHarness(
     config,
     origin,
     wsBase: origin.replace(/^http/, "ws"),
-    pty
+    pty,
+    runtimeDir,
+    workerSpawner
   };
 }
 
@@ -337,6 +386,33 @@ class MessageInbox {
 }
 
 describe("terminal WebSocket integration", () => {
+  it("enforces maxSessions across concurrent creates", async () => {
+    const harness = await startHarness((config) => {
+      config.sessions.maxSessions = 1;
+    });
+    const cookie = await login(harness);
+
+    const create = () => fetch(`${harness.origin}/api/v1/sessions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie,
+        origin: harness.origin
+      },
+      body: JSON.stringify({ workspaceId: "e2e", cols: 80, rows: 24 })
+    });
+
+    const responses = await Promise.all([create(), create()]);
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+
+    const listed = await fetch(`${harness.origin}/api/v1/sessions`, {
+      headers: { cookie }
+    });
+    const body = await listed.json() as { sessions: SessionPublic[] };
+    expect(body.sessions).toHaveLength(1);
+  });
+
+
   it("enforces authentication, exact Origin, and the PalmTTY subprotocol independently", async () => {
     const harness = await startHarness();
     const cookie = await login(harness);
@@ -503,6 +579,70 @@ describe("terminal WebSocket integration", () => {
 
     secondSocket.close(1000, "test complete");
   });
+
+  it("rediscovers the same live worker after the Agent restarts", async () => {
+    const harness = await startHarness();
+    const firstCookie = await login(harness);
+    const session = await createSession(harness, firstCookie);
+
+    const firstSocket = socketFor(harness, session.id, firstCookie);
+    const firstInbox = new MessageInbox(firstSocket);
+    await waitForOpen(firstSocket);
+    firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    await firstInbox.next((message) => message.type === "hello");
+
+    harness.pty.latest().emitData("BEFORE_AGENT_RESTART\r\n");
+    await firstInbox.waitForText("BEFORE_AGENT_RESTART");
+    const resumeFrom = firstInbox.latestSeq;
+    const originalPid = session.pid;
+
+    await harness.app.close();
+    liveApps.delete(harness.app);
+
+    harness.pty.latest().emitData("DURING_AGENT_RESTART\r\n");
+
+    const restartedApp = await buildApp(harness.config, {
+      sessionManager: {
+        runtimeDir: harness.runtimeDir,
+        workerSpawner: harness.workerSpawner
+      }
+    });
+    liveApps.add(restartedApp);
+    const restartedAddress = await restartedApp.listen({ host: "127.0.0.1", port: 0 });
+    const restartedOrigin = new URL(restartedAddress).origin;
+    harness.config.server.port = Number(new URL(restartedOrigin).port);
+    harness.config.server.trustedOrigins = [restartedOrigin];
+
+    const restartedHarness: Harness = {
+      ...harness,
+      app: restartedApp,
+      origin: restartedOrigin,
+      wsBase: restartedOrigin.replace(/^http/, "ws")
+    };
+    const secondCookie = await login(restartedHarness);
+
+    const sessionsResponse = await fetch(`${restartedOrigin}/api/v1/sessions`, {
+      headers: { cookie: secondCookie }
+    });
+    expect(sessionsResponse.status).toBe(200);
+    const sessionsBody = await sessionsResponse.json() as { sessions: SessionPublic[] };
+    expect(sessionsBody.sessions).toContainEqual(expect.objectContaining({
+      id: session.id,
+      pid: originalPid,
+      state: "running"
+    }));
+
+    const secondSocket = socketFor(restartedHarness, session.id, secondCookie);
+    const secondInbox = new MessageInbox(secondSocket);
+    await waitForOpen(secondSocket);
+    secondSocket.send(JSON.stringify({ type: "resume", lastSeq: resumeFrom }));
+
+    await secondInbox.next((message) => message.type === "hello");
+    await secondInbox.waitForText("DURING_AGENT_RESTART");
+    expect(secondInbox.transcript).toContain("DURING_AGENT_RESTART");
+
+    secondSocket.close(1000, "test complete");
+  }, 10_000);
 
   it("actively closes established sockets when authentication expires", async () => {
     const harness = await startHarness();

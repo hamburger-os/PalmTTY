@@ -24,7 +24,7 @@ PalmTTY 是一个面向手机、自托管的远程开发终端，首要支持 Wi
 
 ## Status / 当前状态
 
-PalmTTY is **alpha**. The repository is passing Windows and Ubuntu CI with end-to-end Fastify HTTP/WebSocket + SessionManager lifecycle coverage through a deterministic PTY adapter, plus a Windows-only smoke test that uses real node-pty to spawn PowerShell 7 through ConPTY, resize the PTY and round-trip Unicode. Real phone + real workstation + long-running Codex hardening is still ongoing.
+PalmTTY is **alpha**. Each terminal now runs in an independent durable Session Worker, so restarting only the HTTP/API Agent does not terminate the live PTY. Windows and Ubuntu CI cover authenticated Worker IPC, Agent restart rediscovery, replay/snapshot recovery and detached-process survival; Windows CI also uses real node-pty + PowerShell 7 / ConPTY for Unicode and resize smoke coverage. Real phone + real workstation + long-running Codex hardening is still ongoing.
 
 | Capability | Alpha status |
 |---|---|
@@ -34,7 +34,7 @@ PalmTTY is **alpha**. The repository is passing Windows and Ubuntu CI with end-t
 | Mobile terminal | xterm.js PWA, special-key bar, multiline composer |
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
 | Internet exposure | HTTPS/private-network deployment only |
-| Agent restart persistence | **Not implemented yet** |
+| Agent restart persistence | Implemented: independent Session Worker + authenticated local rediscovery |
 | Multi-user ACL | **Not implemented** |
 | Tagged release | **Not published yet** |
 
@@ -42,7 +42,7 @@ PalmTTY is **alpha**. The repository is passing Windows and Ubuntu CI with end-t
 
 PalmTTY is intentionally narrower than a browser IDE:
 
-- **Keep the real shell on your workstation.** The Agent owns the PTY; the browser is only a client.
+- **Keep the real shell on your workstation.** A per-session Worker owns the PTY; the Agent and browser are replaceable clients/control planes.
 - **Survive mobile reality.** WebSocket reconnect, bounded replay, snapshot recovery and application heartbeat are built around Wi-Fi/cellular switching and backgrounded tabs.
 - **Keep remote authority explicit.** The browser selects only configured workspaces; it cannot submit arbitrary working directories or shell executables.
 - **Stay AI-vendor-neutral.** Codex, Claude Code, OpenCode and other terminal tools are workloads, not protocol dependencies.
@@ -61,20 +61,21 @@ Private HTTPS entry point
 PalmTTY Agent
  ├─ authentication + exact Origin policy
  ├─ workspace allowlist
- ├─ bounded Session Manager
- ├─ headless xterm snapshot + sequenced replay
+ ├─ Worker registry / WebSocket proxy
  └─ static Web/PWA
-    │
- node-pty
-    │
-  ConPTY
+    │ authenticated local IPC
+    ▼
+Session Worker (one per terminal)
+ ├─ node-pty / ConPTY
+ ├─ headless xterm snapshot
+ └─ bounded sequenced replay
     │
 PowerShell 7
     │
 Codex / Git / npm / dotnet / ...
 ```
 
-A browser disconnect does **not** kill the PTY while the Agent process remains alive. Agent-restart persistence requires the planned independent Session Worker architecture and is deliberately not claimed today.
+A browser disconnect does **not** kill the PTY. Restarting only the PalmTTY Agent also leaves the independent Session Worker and PTY alive; after the Agent returns, sign in again and reconnect to the same Session. PalmTTY does **not** claim persistence across Windows/OS reboot, user logoff, or loss of the Worker process itself.
 
 ## Quick start on Windows 11 / 快速开始
 
@@ -167,7 +168,7 @@ Behavior-changing work must follow [`.agents/skills/docs-sync/SKILL.md`](.agents
 
 ```text
 apps/
-  agent/       Fastify + auth + session manager + node-pty
+  agent/       Fastify control plane + durable per-session Worker runtime + node-pty
   web/         React + xterm.js mobile PWA
 packages/
   protocol/    shared HTTP/WebSocket schemas

@@ -1,345 +1,398 @@
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import type { PalmTTYConfig, WorkspaceConfig } from "@palmtty/config";
+import type { PalmTTYConfig } from "@palmtty/config";
 import {
-  PROTOCOL_VERSION,
-  type ServerMessage,
+  encodeServerMessage,
   type SessionPublic,
-  type SessionState,
-  encodeServerMessage
+  type ServerMessage
 } from "@palmtty/protocol";
-import { SerializeAddon } from "@xterm/addon-serialize";
-import { Terminal as HeadlessTerminal } from "@xterm/headless";
-import * as pty from "node-pty";
 import type WebSocket from "ws";
-import { canReplayFrom } from "./reconnect-policy.js";
+import { WorkerClient } from "./worker-client.js";
+import type { WorkerBootstrap } from "./worker-protocol.js";
+import { ProcessWorkerSpawner, type WorkerSpawner } from "./worker-spawner.js";
+import {
+  cleanupDanglingWorkerState,
+  defaultRuntimeDir,
+  ensureRuntimeLayout,
+  listWorkerRecords,
+  readWorkerRecord,
+  readWorkerSecret,
+  removeWorkerState,
+  type WorkerRecord
+} from "./worker-storage.js";
 
-export type PtyHandle = {
-  pid: number;
-  write(data: string): void;
-  resize(cols: number, rows: number): void;
-  kill(signal?: string): void;
-  onData(listener: (data: string) => void): { dispose(): void };
-  onExit(listener: (event: { exitCode: number; signal?: number }) => void): { dispose(): void };
+type ManagedWorker = {
+  record: WorkerRecord;
+  secret: string;
+  worker: WorkerClient;
+  session: SessionPublic;
+  clients: Map<string, WebSocket>;
+  reconnecting: boolean;
 };
 
-export type PtySpawnOptions = {
-  name: string;
-  cols: number;
-  rows: number;
-  cwd: string;
-  env: Record<string, string | undefined>;
+export type SessionManagerOptions = {
+  runtimeDir?: string;
+  workerSpawner?: WorkerSpawner;
 };
 
-export type PtyFactory = (
-  file: string,
-  args: string[],
-  options: PtySpawnOptions
-) => PtyHandle;
+const CREATE_CONNECT_DELAYS_MS = [0, 50, 100, 200, 400, 800, 1200, 1600];
+const REDISCOVER_CONNECT_DELAYS_MS = [0, 100, 250, 500, 1000, 2000, 4000];
+const RECONNECT_DELAYS_MS = [100, 250, 500, 1000, 2000];
 
-const defaultPtyFactory: PtyFactory = (file, args, options) => pty.spawn(file, args, options);
-
-type OutputFrame = {
-  seq: number;
-  data: string;
-  bytes: number;
-};
-
-type ManagedSession = {
-  id: string;
-  workspace: WorkspaceConfig;
-  state: SessionState;
-  createdAt: string;
-  cols: number;
-  rows: number;
-  pid: number;
-  exitCode?: number;
-  pty: PtyHandle;
-  mirror: HeadlessTerminal;
-  serializer: SerializeAddon;
-  seq: number;
-  history: OutputFrame[];
-  historyBytes: number;
-  clients: Set<WebSocket>;
-  pipeline: Promise<void>;
-  cleanupTimer?: NodeJS.Timeout;
-};
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function sessionId(): string {
   return randomBytes(18).toString("base64url");
 }
 
-function writeMirror(terminal: HeadlessTerminal, data: string): Promise<void> {
-  return new Promise((resolve) => terminal.write(data, resolve));
+function endpointId(): string {
+  return randomBytes(18).toString("base64url");
+}
+
+function workerSecret(): string {
+  return randomBytes(32).toString("base64url");
 }
 
 export class SessionManager {
-  private readonly sessions = new Map<string, ManagedSession>();
+  readonly runtimeDir: string;
+  private readonly workerSpawner: WorkerSpawner;
+  private readonly sessions = new Map<string, ManagedWorker>();
+  private pendingCreates = 0;
+  private initialized = false;
+  private closing = false;
 
   constructor(
     private readonly config: PalmTTYConfig,
-    private readonly ptyFactory: PtyFactory = defaultPtyFactory
-  ) {}
+    options: SessionManagerOptions = {}
+  ) {
+    this.runtimeDir = options.runtimeDir ?? defaultRuntimeDir();
+    this.workerSpawner = options.workerSpawner ?? new ProcessWorkerSpawner();
+  }
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    await ensureRuntimeLayout(this.runtimeDir);
+    await cleanupDanglingWorkerState(this.runtimeDir);
+
+    const records = await listWorkerRecords(this.runtimeDir);
+    await Promise.all(records.map(async (record) => {
+      try {
+        const secret = await readWorkerSecret(this.runtimeDir, record.sessionId);
+        const worker = await this.connectWithRetry(
+          record.endpointId,
+          secret,
+          REDISCOVER_CONNECT_DELAYS_MS
+        );
+        this.install({
+          record,
+          secret,
+          worker,
+          session: worker.session,
+          clients: new Map(),
+          reconnecting: false
+        });
+      } catch {
+        // A stale record is not authority to kill a PID: PIDs can be reused.
+        // Only authenticated IPC can terminate a worker.
+        await removeWorkerState(this.runtimeDir, record);
+      }
+    }));
+    this.initialized = true;
+  }
 
   list(): SessionPublic[] {
-    return [...this.sessions.values()].map((session) => this.toPublic(session));
+    return [...this.sessions.values()]
+      .map((managed) => this.publicSession(managed))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
   get(id: string): SessionPublic | undefined {
-    const session = this.sessions.get(id);
-    return session ? this.toPublic(session) : undefined;
+    const managed = this.sessions.get(id);
+    return managed ? this.publicSession(managed) : undefined;
   }
 
   has(id: string): boolean {
     return this.sessions.has(id);
   }
 
-  create(workspaceId: string, cols: number, rows: number): SessionPublic {
-    const active = [...this.sessions.values()].filter((session) => session.state === "running" || session.state === "starting");
-    if (active.length >= this.config.sessions.maxSessions) {
+  async create(workspaceId: string, cols: number, rows: number): Promise<SessionPublic> {
+    this.requireInitialized();
+
+    const active = [...this.sessions.values()].filter(({ session }) =>
+      session.state === "running" || session.state === "starting"
+    );
+    if (active.length + this.pendingCreates >= this.config.sessions.maxSessions) {
       throw new Error("Maximum session count reached");
     }
+    this.pendingCreates += 1;
 
-    const workspace = this.config.workspaces.find((item) => item.id === workspaceId);
-    if (!workspace) throw new Error("Unknown workspace");
-    if (!existsSync(workspace.cwd)) throw new Error("Workspace directory is unavailable");
+    try {
+      const workspace = this.config.workspaces.find((item) => item.id === workspaceId);
+      if (!workspace) throw new Error("Unknown workspace");
+      if (!existsSync(workspace.cwd)) throw new Error("Workspace directory is unavailable");
 
-    const shell = workspace.shellPath ?? (process.platform === "win32" ? "pwsh.exe" : "pwsh");
-    const environment: Record<string, string | undefined> = {
-      ...process.env,
-      ...workspace.env,
-      TERM: "xterm-256color"
-    };
-
-    const child = this.ptyFactory(shell, workspace.args, {
-      name: "xterm-256color",
-      cols,
-      rows,
-      cwd: workspace.cwd,
-      env: environment
-    });
-
-    const mirror = new HeadlessTerminal({
-      cols,
-      rows,
-      scrollback: this.config.sessions.scrollbackLines,
-      // SerializeAddon relies on xterm APIs gated behind this opt-in.
-      allowProposedApi: true
-    });
-    const serializer = new SerializeAddon();
-    mirror.loadAddon(serializer);
-
-    const session: ManagedSession = {
-      id: sessionId(),
+      const id = sessionId();
+    const endpoint = endpointId();
+    const secret = workerSecret();
+    const createdAt = new Date().toISOString();
+    const bootstrap: WorkerBootstrap = {
+      protocol: 1,
+      runtimeDir: this.runtimeDir,
+      sessionId: id,
+      endpointId: endpoint,
+      secret,
+      excludedEnvKeys: [this.config.auth.tokenEnv],
+      createdAt,
       workspace,
-      state: "running",
-      createdAt: new Date().toISOString(),
+      session: {
+        exitedRetentionMinutes: this.config.sessions.exitedRetentionMinutes,
+        scrollbackLines: this.config.sessions.scrollbackLines,
+        replayBytes: this.config.sessions.replayBytes
+      },
       cols,
-      rows,
-      pid: child.pid,
-      pty: child,
-      mirror,
-      serializer,
-      seq: 0,
-      history: [],
-      historyBytes: 0,
-      clients: new Set(),
-      pipeline: Promise.resolve()
+      rows
     };
 
-    this.sessions.set(session.id, session);
+    await this.workerSpawner.spawn(bootstrap);
+    let worker: WorkerClient | undefined;
+    try {
+      worker = await this.connectWithRetry(
+        endpoint,
+        secret,
+        CREATE_CONNECT_DELAYS_MS
+      );
+      const record = await this.readRecordWithRetry(id);
 
-    child.onData((data) => {
-      void this.enqueue(session, async () => {
-        await writeMirror(session.mirror, data);
-        session.seq += 1;
-        const frame: OutputFrame = {
-          seq: session.seq,
-          data,
-          bytes: Buffer.byteLength(data, "utf8")
-        };
-        session.history.push(frame);
-        session.historyBytes += frame.bytes;
-        this.trimHistory(session);
-        this.broadcast(session, { type: "output", seq: frame.seq, data: frame.data });
+      const managed: ManagedWorker = {
+        record,
+        secret,
+        worker,
+        session: worker.session,
+        clients: new Map(),
+        reconnecting: false
+      };
+      this.install(managed);
+      return this.publicSession(managed);
+    } catch (error) {
+      if (worker) {
+        await worker.terminate().catch(() => undefined);
+        worker.close();
+      }
+      await removeWorkerState(this.runtimeDir, {
+        sessionId: id,
+        endpointId: endpoint
       });
-    });
-
-    child.onExit(({ exitCode }) => {
-      void this.enqueue(session, () => {
-        session.state = "exited";
-        session.exitCode = exitCode;
-        this.broadcast(session, { type: "exit", exitCode });
-        this.scheduleCleanup(session);
-      });
-    });
-
-    if (workspace.command) {
-      const timer = setTimeout(() => {
-        if (session.state === "running") child.write(`${workspace.command}\r`);
-      }, 75);
-      timer.unref();
+      throw error;
     }
-
-    return this.toPublic(session);
+    } finally {
+      this.pendingCreates -= 1;
+    }
   }
 
   async attach(id: string, socket: WebSocket, lastSeq: number): Promise<void> {
-    const session = this.sessions.get(id);
-    if (!session) throw new Error("Unknown session");
-
-    await this.enqueue(session, () => {
-      this.send(session, socket, {
-        type: "hello",
-        protocol: PROTOCOL_VERSION,
-        sessionId: session.id,
-        state: session.state,
-        cols: session.cols,
-        rows: session.rows,
-        latestSeq: session.seq
-      });
-
-      const firstSeq = session.history[0]?.seq;
-      const canReplay = canReplayFrom(lastSeq, session.seq, firstSeq);
-
-      if (canReplay) {
-        for (const frame of session.history) {
-          if (frame.seq > lastSeq) {
-            this.send(session, socket, { type: "output", seq: frame.seq, data: frame.data });
-          }
-        }
-      } else {
-        this.send(session, socket, {
-          type: "snapshot",
-          seq: session.seq,
-          // No PTY output means the mirrored terminal state is provably empty.
-          // Avoid invoking the serializer until there is state to serialize.
-          data: session.seq === 0 ? "" : session.serializer.serialize()
-        });
-      }
-
-      session.clients.add(socket);
-      if (session.state === "exited") {
-        this.send(session, socket, {
-          type: "exit",
-          ...(session.exitCode !== undefined ? { exitCode: session.exitCode } : {})
-        });
-      }
-    });
+    const managed = this.requireManaged(id);
+    const clientId = randomBytes(12).toString("base64url");
+    managed.clients.set(clientId, socket);
+    try {
+      await managed.worker.attach(clientId, lastSeq);
+    } catch (error) {
+      managed.clients.delete(clientId);
+      throw error;
+    }
   }
 
   detach(id: string, socket: WebSocket): void {
-    this.sessions.get(id)?.clients.delete(socket);
+    const managed = this.sessions.get(id);
+    if (!managed) return;
+    for (const [clientId, candidate] of managed.clients) {
+      if (candidate !== socket) continue;
+      managed.clients.delete(clientId);
+      void managed.worker.detach(clientId).catch(() => undefined);
+      break;
+    }
   }
 
-  write(id: string, data: string): void {
-    const session = this.requireRunning(id);
-    session.pty.write(data);
+  async write(id: string, data: string): Promise<void> {
+    await this.requireManaged(id).worker.write(data);
   }
 
   async resize(id: string, cols: number, rows: number): Promise<void> {
-    const session = this.requireRunning(id);
-    await this.enqueue(session, () => {
-      session.pty.resize(cols, rows);
-      session.mirror.resize(cols, rows);
-      session.cols = cols;
-      session.rows = rows;
-    });
+    await this.requireManaged(id).worker.resize(cols, rows);
   }
 
-  terminate(id: string): boolean {
-    const session = this.sessions.get(id);
-    if (!session) return false;
-    if (session.state === "running" || session.state === "starting") {
-      session.pty.kill();
-    }
+  async terminate(id: string): Promise<boolean> {
+    const managed = this.sessions.get(id);
+    if (!managed) return false;
+    await managed.worker.terminate();
     return true;
   }
 
-  close(): void {
-    for (const session of this.sessions.values()) {
-      if (session.state === "running" || session.state === "starting") {
-        try { session.pty.kill(); } catch { /* best effort on shutdown */ }
+  async close(): Promise<void> {
+    if (this.closing) return;
+    this.closing = true;
+    for (const managed of this.sessions.values()) {
+      for (const socket of managed.clients.values()) {
+        try {
+          socket.close(1001, "PalmTTY Agent restarting");
+        } catch {
+          // Best effort during Agent shutdown.
+        }
       }
-      for (const client of session.clients) {
-        try { client.close(1001, "PalmTTY Agent shutting down"); } catch { /* best effort */ }
-      }
-      if (session.cleanupTimer) clearTimeout(session.cleanupTimer);
-      session.mirror.dispose();
+      managed.clients.clear();
+      managed.worker.close();
     }
     this.sessions.clear();
   }
 
-  private requireRunning(id: string): ManagedSession {
-    const session = this.sessions.get(id);
-    if (!session) throw new Error("Unknown session");
-    if (session.state !== "running") throw new Error("Session is not running");
-    return session;
-  }
+  private install(managed: ManagedWorker): void {
+    this.sessions.set(managed.record.sessionId, managed);
 
-  private enqueue(session: ManagedSession, operation: () => void | Promise<void>): Promise<void> {
-    const run = session.pipeline.then(operation, operation);
-    session.pipeline = run.then(() => undefined, () => undefined);
-    return run;
-  }
+    managed.worker.onDeliver((clientId, message) => {
+      this.deliver(managed, clientId, message);
+    });
 
-  private trimHistory(session: ManagedSession): void {
-    while (
-      session.history.length > 0 &&
-      session.historyBytes > this.config.sessions.replayBytes
-    ) {
-      const removed = session.history.shift();
-      if (removed) session.historyBytes -= removed.bytes;
-    }
-  }
+    managed.worker.onStatus((session) => {
+      managed.session = session;
+    });
 
-  private scheduleCleanup(session: ManagedSession): void {
-    if (session.cleanupTimer) clearTimeout(session.cleanupTimer);
-    session.cleanupTimer = setTimeout(() => {
-      const current = this.sessions.get(session.id);
-      if (current !== session || session.state !== "exited") return;
-      for (const client of session.clients) {
-        try { client.close(1000, "Exited session retention expired"); } catch { /* best effort */ }
+    managed.worker.onClose(() => {
+      if (this.closing || this.sessions.get(managed.record.sessionId) !== managed) return;
+
+      if (managed.session.state === "exited") {
+        this.sessions.delete(managed.record.sessionId);
+        for (const socket of managed.clients.values()) {
+          try {
+            socket.close(1000, "Exited session retention expired");
+          } catch {
+            // Best effort during normal retired-session cleanup.
+          }
+        }
+        managed.clients.clear();
+        return;
       }
-      session.clients.clear();
-      session.history = [];
-      session.historyBytes = 0;
-      session.mirror.dispose();
-      this.sessions.delete(session.id);
-    }, this.config.sessions.exitedRetentionMinutes * 60_000);
-    session.cleanupTimer.unref();
+
+      for (const socket of managed.clients.values()) {
+        try {
+          socket.close(1012, "Session worker reconnecting");
+        } catch {
+          // Best effort: browser reconnect logic will retry.
+        }
+      }
+      managed.clients.clear();
+      void this.reconnect(managed);
+    });
   }
 
-  private broadcast(session: ManagedSession, message: ServerMessage): void {
-    for (const socket of [...session.clients]) {
-      this.send(session, socket, message);
-    }
-  }
+  private deliver(
+    managed: ManagedWorker,
+    clientId: string,
+    message: ServerMessage
+  ): void {
+    const socket = managed.clients.get(clientId);
+    if (!socket) return;
 
-  private send(session: ManagedSession, socket: WebSocket, message: ServerMessage): void {
     if (socket.readyState !== 1) {
-      session.clients.delete(socket);
+      managed.clients.delete(clientId);
+      void managed.worker.detach(clientId).catch(() => undefined);
       return;
     }
+
     if (socket.bufferedAmount > this.config.sessions.maxSocketBufferedBytes) {
-      session.clients.delete(socket);
-      socket.close(1013, "Client is too slow; reconnect to resume");
+      managed.clients.delete(clientId);
+      void managed.worker.detach(clientId).catch(() => undefined);
+      try {
+        socket.close(1013, "Client is too slow; reconnect to resume");
+      } catch {
+        // Best effort.
+      }
       return;
     }
+
     socket.send(encodeServerMessage(message));
   }
 
-  private toPublic(session: ManagedSession): SessionPublic {
+  private async reconnect(managed: ManagedWorker): Promise<void> {
+    if (managed.reconnecting || this.closing) return;
+    managed.reconnecting = true;
+
+    try {
+      const worker = await this.connectWithRetry(
+        managed.record.endpointId,
+        managed.secret,
+        RECONNECT_DELAYS_MS
+      );
+      if (this.closing || this.sessions.get(managed.record.sessionId) !== managed) {
+        worker.close();
+        return;
+      }
+      managed.worker = worker;
+      managed.session = worker.session;
+      managed.reconnecting = false;
+      this.install(managed);
+    } catch {
+      managed.reconnecting = false;
+      if (this.sessions.get(managed.record.sessionId) === managed) {
+        this.sessions.delete(managed.record.sessionId);
+      }
+      await removeWorkerState(this.runtimeDir, managed.record);
+    }
+  }
+
+  private async connectWithRetry(
+    endpoint: string,
+    secret: string,
+    delays: number[]
+  ): Promise<WorkerClient> {
+    let lastError: unknown;
+    for (const delay of delays) {
+      if (delay > 0) await sleep(delay);
+      try {
+        return await WorkerClient.connect({
+          runtimeDir: this.runtimeDir,
+          endpointId: endpoint,
+          secret
+        });
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Unable to connect to session worker");
+  }
+
+  private async readRecordWithRetry(id: string): Promise<WorkerRecord> {
+    let lastError: unknown;
+    for (const delay of [0, 25, 50, 100, 200, 400]) {
+      if (delay > 0) await sleep(delay);
+      try {
+        return await readWorkerRecord(this.runtimeDir, id);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Session worker did not publish its metadata");
+  }
+
+  private publicSession(managed: ManagedWorker): SessionPublic {
     return {
-      id: session.id,
-      workspaceId: session.workspace.id,
-      state: session.state,
-      createdAt: session.createdAt,
-      cols: session.cols,
-      rows: session.rows,
-      connections: session.clients.size,
-      pid: session.pid,
-      ...(session.exitCode !== undefined ? { exitCode: session.exitCode } : {})
+      ...managed.session,
+      connections: managed.clients.size
     };
+  }
+
+  private requireManaged(id: string): ManagedWorker {
+    const managed = this.sessions.get(id);
+    if (!managed) throw new Error("Unknown session");
+    if (managed.reconnecting) throw new Error("Session worker is reconnecting");
+    return managed;
+  }
+
+  private requireInitialized(): void {
+    if (!this.initialized) throw new Error("Session manager is not initialized");
   }
 }

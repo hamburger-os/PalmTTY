@@ -2,74 +2,82 @@
 
 ## 风险等级
 
-PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。
+PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。安全失陷应按当前 OS 用户权限被远程接管处理。
 
-一旦 PalmTTY 被未授权访问，攻击者可能获得当前 Windows 用户可访问的源码、Git/SSH 凭据、开发工具和其他文件。因此安全边界必须按“远程 Shell”设计。
+## 外部访问边界
 
-## 当前安全模型
+默认监听 127.0.0.1。非 loopback 正常模式必须同时开启认证、Secure Cookie 和明确 trustedOrigins，否则 Agent 拒绝启动。unsafeAllowInsecureLan 仅作为显式开发逃生口。
 
-### 默认暴露范围
+## 浏览器认证
 
-默认监听 `127.0.0.1`。
+- 启动 secret 从环境变量读取，默认 PALMTTY_ACCESS_TOKEN；
+- 浏览器只通过 POST body 提交，不放 URL；
+- Agent 只保存摘要用于比较；
+- 登录成功后生成随机内存 Session；
+- Cookie 使用 HttpOnly、SameSite=Strict，正常非 loopback 部署要求 Secure；
+- 登录 Session 有绝对过期和数量上限；
+- 已建立 terminal WebSocket 到期后也会被主动关闭；
+- Origin 与认证始终是独立控制。
 
-如果配置为非 loopback 地址，正常模式下必须同时满足：
+登录 Session 不持久化，所以 Agent 重启后需要重新登录。
 
-- 开启认证；
-- 使用 Secure Cookie；
-- 配置明确的 trustedOrigins。
+## Agent↔Worker 本地 IPC
 
-否则 Agent 拒绝启动。
+每个终端 Worker 使用独立 256-bit 随机 secret。
 
-存在 `unsafeAllowInsecureLan` 作为显式开发逃生口，但启用后会产生警告，不能用于公网部署。
+安全规则：
 
-### 登录
+- secret 只通过 Worker 创建时的一次性匿名 stdin bootstrap 传递；
+- secret 不放 argv、URL、浏览器协议或普通日志；
+- PalmTTY 登录 token 对应的环境变量在启动 Worker 前删除，并再次从 PTY 环境删除；
+- Worker 先验证 protocol version + secret，未认证连接不能 attach/input/resize/terminate；
+- 新 Agent 只有持有 recovery secret 才能接管控制连接；
+- Worker secret 在用户 runtime 目录单独保存；
+- Unix 目录/文件使用 0700/0600；
+- Windows 使用当前用户应用数据目录的 OS ACL 作为文件边界，同时仍以 secret 作为 Named Pipe 应用层认证；
+- terminal input 同时受 64 KiB 协议限制；
+- IPC frame 和 socket backlog 均有硬上限。
 
-- 启动 secret 从环境变量读取，默认变量名为 `PALMTTY_ACCESS_TOKEN`；
-- secret 至少 16 个字符；
-- 浏览器通过 POST body 提交，不放 URL；
-- 服务端只保存 secret 的摘要用于比较；
-- 登录成功后生成随机会话 ID；
-- Cookie 使用 `HttpOnly` 与 `SameSite=Strict`；
-- 公网/反代部署要求 `Secure`；
-- 登录会话只保存在内存并有过期时间，同时有最大会话数量上限；超出时淘汰最旧会话。
-- 已建立的终端 WebSocket 也受登录会话绝对过期时间约束，到期后服务端主动断开，不能靠“连接已经建立”绕过登录过期。
+Worker secret 是本地 capability，绝不发送给浏览器。
 
-### Origin
+## Recovery 与 PID 安全
 
-所有修改状态的 HTTP 请求，以及终端 WebSocket 握手，都要求精确 Origin 匹配。
+Worker record 中保存 Worker PID 和 Shell PID 仅用于诊断。
 
-Origin 只是浏览器跨站隔离手段，不能替代认证。
+PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record 不能证明当前 PID 仍属于原 Worker。
 
-### 权限边界
+清理策略：
+
+- Agent 只通过 authenticated IPC 发送终止命令；
+- 无法连接/认证的 stale metadata 直接删除；
+- 老旧 dangling secret/socket 文件按年龄清理；
+- Worker 周期性验证 record + secret；
+- Worker 持续发现自己的 recovery state 被删除或替换时，自我终止 PTY。
+
+## 权限边界
 
 - 浏览器只能选择 workspace ID；
-- 不能远程提交任意工作目录或 Shell 路径；
-- Agent 默认不提权；
-- PTY 子进程继承 Agent 用户权限；
-- 默认日志不记录终端 I/O 或 secret。
+- 不能远程提交任意 cwd、Shell 路径或环境变量；
+- Agent/Worker 默认不提权；
+- PTY 继承普通用户权限；
+- 默认日志不记录 terminal I/O、token、Worker secret 或 workspace env。
 
-### 资源限制
+## 资源限制
 
-- 登录和创建会话有内存限流，限流 bucket 数量本身也有上限；
-- 会话数量有限制；
-- WebSocket 消息大小有限制；
-- 终端尺寸有限制；
-- replay 和慢客户端缓冲有限制。
+- 登录与创建 Session 限流；
+- Session 数量有上限，并发创建也计入上限；
+- browser WebSocket 消息和终端尺寸有上限；
+- replay、scrollback、IPC frame、IPC backlog、browser backpressure 均有限制；
+- exited Worker 有有限 retention。
 
 ## 仍需加强
 
-当前属于可用 Alpha 安全模型，后续可以增加：
-
-- Passkey/WebAuthn；
-- 按设备管理和吊销登录；
-- 更完整的审计事件，但仍不记录终端内容；
-- 独立 session worker 后的本地 IPC 认证；
-- 更完善的可信反向代理配置。
+当前仍是 Alpha 安全模型，后续可以增加 Passkey/WebAuthn、按设备管理和吊销登录、更完整但不记录终端内容的审计事件，以及 Windows Worker runtime 文件 ACL 的专项实机审计。
 
 ## 你审查时重点看
 
-安全代码修改必须回答三个问题：
-
-1. 是否扩大了远程调用者能控制的内容？
-2. 是否增加了 secret/终端内容进入日志或 URL 的可能？
-3. 是否破坏了认证 + Origin + HTTPS 三层边界？
+1. 是否扩大远程调用者能控制的 cwd/shell/env？
+2. 是否让 secret/终端内容进入日志、URL、argv 或浏览器？
+3. 是否破坏认证 + Origin + HTTPS 外部边界？
+4. 是否允许未认证本地 IPC 控制 Worker？
+5. 是否把 persisted PID 当成 kill authority？
