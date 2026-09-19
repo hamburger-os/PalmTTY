@@ -5,7 +5,7 @@
 
 PalmTTY is a single-user, self-hosted control plane for interactive development terminals.
 
-```text
+~~~text
 Mobile browser / PWA
         |
      HTTPS/WSS
@@ -13,96 +13,83 @@ Mobile browser / PWA
 trusted VPN or reverse proxy
         |
 PalmTTY Agent (Fastify)
-   |        |         |
- auth    session   static PWA
-           |
-        node-pty
-           |
-         ConPTY
-           |
-      PowerShell 7
-           |
-  Codex / Git / toolchain
-```
+   |        |        |
+ auth   workspace   static PWA
+            |
+     authenticated local IPC
+            |
+   per-session Worker
+      |           |
+   node-pty   headless xterm
+      |       seq + replay
+    ConPTY
+      |
+ PowerShell 7
+      |
+Codex / Git / toolchain
+~~~
 
 ### Repository components
 
-- `apps/agent`: HTTP/WebSocket server, authentication, security gates, PTY/session ownership and terminal-state mirror.
-- `apps/web`: mobile-first React/xterm interface.
-- `packages/protocol`: executable HTTP/WebSocket schemas shared by Agent and browser.
-- `packages/config`: YAML configuration schema and workspace allowlist.
-- `docs/`: four documentation layers described by the documentation index.
+- apps/agent: HTTP/WebSocket control plane, authentication, security gates, Worker discovery and browser↔Worker proxying.
+- apps/web: mobile-first React/xterm interface.
+- packages/protocol: executable browser protocol schemas.
+- packages/config: YAML configuration schema and workspace allowlist.
+- docs: four documentation layers.
 
-### Session semantics
+### Session ownership
 
-The current architecture is **disconnect-persistent**: closing a tab, changing mobile networks, or reconnecting WebSocket does not kill the PTY while the Agent process remains alive.
+Each Session is owned by one independent detached Worker process. The Worker owns the PTY, headless terminal mirror, monotonically increasing output sequence, bounded replay history and exited-session retention.
 
-It is **not Agent-restart persistent**. Independent session workers are a later architecture milestone.
+The Agent deliberately does not own a second canonical copy of terminal state.
+
+### Persistence semantics
+
+PalmTTY is:
+
+- browser-disconnect persistent;
+- WebSocket-reconnect persistent;
+- Agent-restart persistent.
+
+Restarting or replacing only the PalmTTY Agent disconnects browser/control sockets but does not terminate the Worker or PTY. A new Agent rediscovers the Worker using local recovery metadata and an authenticated per-session secret.
+
+PalmTTY is not persistent across OS reboot, user logoff, or Worker-process loss.
+
+Login sessions remain in Agent memory, so after Agent restart the user signs in again before reattaching the surviving terminal.
+
+### Local Worker IPC
+
+On Windows the Agent and Worker communicate through a named pipe. Current non-Windows CI uses Unix domain sockets.
+
+Every Worker has an independent 256-bit secret. The secret is sent to the Worker once through anonymous stdin at creation time and persisted only in the local runtime recovery area; it never reaches the browser. IPC frames and socket backlog are bounded.
+
+Persisted PIDs are diagnostic metadata only. PalmTTY never treats an old PID as sufficient authority to kill a process.
 
 ### Reconnect model
 
-The Agent owns a headless xterm state mirror. PTY output is serialized through one ordered pipeline, assigned a monotonically increasing sequence, stored in a bounded replay buffer, and then broadcast.
+All PTY output is processed inside the Worker in one ordered pipeline:
 
-On attach:
+1. update headless xterm;
+2. allocate seq;
+3. append to bounded replay;
+4. deliver to the connected Agent/browser when present.
 
-- a live browser with a retained sequence can receive missing replay frames;
-- a new/reloaded browser, or a client that fell behind the retained buffer, receives the current terminal snapshot; before any PTY output (`seq = 0`) that snapshot is deterministically empty, otherwise it is serialized from the headless terminal;
-- after the boundary is established, live output continues normally;
-- an application heartbeat detects half-open mobile connections and forces reconnect when pong responses stop.
-
-Exited sessions are retained for a configurable bounded period (30 minutes by default) and then disposed. Replay history is also byte-bounded, including the case where a single PTY output chunk is larger than the replay budget.
-
-This prevents browser lifetime from becoming terminal lifetime and avoids unbounded transcript or exited-session storage.
+On attach, retained history is replayed when possible. Otherwise the Worker emits a serialized terminal snapshot. Recovery and establishment of the live subscription occur within the same ordered Worker operation, preventing a message gap.
 
 ## 中文
 
 PalmTTY 是一个单用户、自托管的交互式开发终端控制面。
 
-```text
-手机浏览器 / PWA
-        |
-     HTTPS/WSS
-        |
-可信 VPN 或反向代理
-        |
-PalmTTY Agent (Fastify)
-   |        |         |
- 认证     会话管理    静态 PWA
-           |
-        node-pty
-           |
-         ConPTY
-           |
-      PowerShell 7
-           |
- Codex / Git / 开发工具链
-```
+每个 Session 由独立 detached Worker 持有。Worker 是 PTY、headless xterm、输出序号、有限 replay 和退出保留期的唯一 canonical owner；Agent 只负责 Web/API、认证、安全策略、Worker 发现与浏览器代理。
 
-### 仓库组件
+当前持久化语义包括：
 
-- `apps/agent`：HTTP/WebSocket、认证、安全闸门、PTY/会话生命周期以及终端状态镜像。
-- `apps/web`：面向手机的 React/xterm 界面。
-- `packages/protocol`：Agent 与浏览器共享的可执行协议 Schema。
-- `packages/config`：YAML 配置与 workspace 白名单 Schema。
-- `docs/`：四层文档体系。
+- 浏览器断线后终端继续运行；
+- WebSocket 重连后通过 replay/snapshot 恢复；
+- Agent 重启后 Worker/PTY 继续运行，新 Agent 可重新发现同一 Session。
 
-### 会话语义
+不承诺 Windows/主机重启、用户注销或 Worker 本身死亡后的终端持久化。Agent 登录 Session 仍只在内存中，所以 Agent 重启后需要重新登录，再附着原终端。
 
-当前架构实现的是**浏览器断线持久化**：浏览器关闭、手机切换网络、WebSocket 重连都不会在 Agent 仍运行时结束 PTY。
+Windows 本地控制 IPC 使用 Named Pipe；其他当前 CI 平台使用 Unix domain socket。每个 Worker 有独立 256-bit secret，创建时只经匿名 stdin 传入，不发送到浏览器。持久化 PID 只用于诊断，不能作为 kill authority。
 
-当前**不承诺 Agent 重启持久化**。把每个会话拆成独立 worker 属于后续架构阶段。
-
-### 重连模型
-
-Agent 内维护 headless xterm 终端状态镜像。PTY 输出经过同一个有序流水线处理，分配单调递增序号，写入有界 replay buffer，再发送给浏览器。
-
-重新连接时：
-
-- 仍保存旧序号的浏览器可以补发缺失帧；
-- 页面重载、浏览器被系统杀掉、或者落后太多时，直接收到当前终端快照；若尚无任何 PTY 输出（`seq = 0`），快照确定为空，否则从 headless terminal 序列化；
-- 完成恢复边界后再继续接收实时输出；
-- 应用层心跳用于发现手机换网后遗留的半开连接，连续收不到 pong 时主动重连。
-
-已退出的会话只在可配置的有限时间内保留（默认 30 分钟），之后会释放终端镜像、replay 和 metadata。Replay 本身按字节严格限制，即使单次 PTY 输出超过预算也不会永久突破上限。
-
-这样既不会把浏览器生命周期等同于终端生命周期，也不会无限保存原始输出或已退出会话。
+PTY 输出、headless mirror、seq 与 replay 都在 Worker 内按同一有序流水线更新，因此 Agent 不在线期间状态仍连续；浏览器恢复时优先 replay，过旧则 snapshot，恢复边界与实时订阅之间不留消息窗口。
