@@ -1,6 +1,6 @@
 # Current implementation state
 
-Status: **alpha foundation implemented; CI and real-device hardening are required before a stable release.**
+Status: **alpha foundation implemented and passing Windows/Ubuntu CI; real mobile/Codex deployment hardening remains before a stable release.**
 
 ## Implemented
 
@@ -8,7 +8,8 @@ Status: **alpha foundation implemented; CI and real-device hardening are require
 
 - pnpm/TypeScript monorepo
 - Agent/Web/protocol/config packages
-- Windows + Linux CI definition
+- Windows + Ubuntu CI passing
+- Windows-only ConPTY smoke test that spawns PowerShell 7, resizes the PTY and round-trips Unicode
 - Apache-2.0
 - four documentation layers
 - `.agents/skills/docs-sync/SKILL.md`
@@ -67,7 +68,7 @@ Status: **alpha foundation implemented; CI and real-device hardening are require
 - No per-device session administration.
 - No multi-user ACL.
 - Reverse-proxy/Tailscale examples are documentation/configuration, not automated setup.
-- Real Windows 11 + mobile Safari validation is still required after CI confirms compile/test.
+- Windows CI validates ConPTY/PowerShell, but real owner workstation + mobile Safari/Chrome + Codex validation is still required.
 - No Git/file preview subsystem yet.
 - Linux/macOS/WSL are not first-class supported hosts yet.
 
