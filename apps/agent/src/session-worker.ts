@@ -67,7 +67,7 @@ export class SessionWorkerServer {
       rows: bootstrap.rows,
       config: bootstrap.session,
       excludedEnvKeys: bootstrap.excludedEnvKeys,
-      ptyFactory: options.ptyFactory
+      ...(options.ptyFactory ? { ptyFactory: options.ptyFactory } : {})
     });
 
     this.runtime.onMessage((message) => {
