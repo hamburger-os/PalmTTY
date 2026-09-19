@@ -161,13 +161,25 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       }
 
       let attached = false;
+      let messagePipeline = Promise.resolve();
+      const authSessionId = request.cookies[AUTH_COOKIE];
+      const authRemainingMs = auth.enabled ? auth.remainingSessionMs(authSessionId) : undefined;
+      if (auth.enabled && authRemainingMs === undefined) {
+        socket.close(1008, "Authentication expired");
+        return;
+      }
+      const authExpiryTimer = auth.enabled && authRemainingMs !== undefined
+        ? setTimeout(() => socket.close(1008, "Authentication expired"), authRemainingMs)
+        : undefined;
+      authExpiryTimer?.unref();
+
       const resumeTimer = setTimeout(() => {
         if (!attached) socket.close(1008, "Resume handshake required");
       }, 5_000);
       resumeTimer.unref();
 
       socket.on("message", (raw, isBinary) => {
-        void (async () => {
+        const handleMessage = async () => {
           if (isBinary) {
             socket.close(1003, "Binary frames are unsupported");
             return;
@@ -209,11 +221,15 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
               }));
             }
           }
-        })();
+        };
+
+        const run = messagePipeline.then(handleMessage, handleMessage);
+        messagePipeline = run.then(() => undefined, () => undefined);
       });
 
       socket.on("close", () => {
         clearTimeout(resumeTimer);
+        if (authExpiryTimer) clearTimeout(authExpiryTimer);
         sessions.detach(id, socket);
       });
     }
