@@ -386,6 +386,33 @@ class MessageInbox {
 }
 
 describe("terminal WebSocket integration", () => {
+  it("enforces maxSessions across concurrent creates", async () => {
+    const harness = await startHarness((config) => {
+      config.sessions.maxSessions = 1;
+    });
+    const cookie = await login(harness);
+
+    const create = () => fetch(`${harness.origin}/api/v1/sessions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie,
+        origin: harness.origin
+      },
+      body: JSON.stringify({ workspaceId: "e2e", cols: 80, rows: 24 })
+    });
+
+    const responses = await Promise.all([create(), create()]);
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+
+    const listed = await fetch(`${harness.origin}/api/v1/sessions`, {
+      headers: { cookie }
+    });
+    const body = await listed.json() as { sessions: SessionPublic[] };
+    expect(body.sessions).toHaveLength(1);
+  });
+
+
   it("enforces authentication, exact Origin, and the PalmTTY subprotocol independently", async () => {
     const harness = await startHarness();
     const cookie = await login(harness);
