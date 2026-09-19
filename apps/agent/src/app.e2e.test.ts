@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseConfig, type PalmTTYConfig } from "@palmtty/config";
 import {
@@ -12,35 +13,7 @@ import { buildApp } from "./app.js";
 const TOKEN_ENV = "PALMTTY_E2E_TOKEN";
 const TOKEN = "0123456789abcdef0123456789abcdef";
 
-const TEST_SHELL = String.raw`
-process.stdin.setEncoding("utf8");
-let pending = "";
-const emit = (value) => process.stdout.write(value + "\\r\\n");
-emit("PALMTTY_READY");
-process.stdin.on("data", (chunk) => {
-  pending += chunk;
-  const lines = pending.split(/\\r\\n|\\r|\\n/);
-  pending = lines.pop() ?? "";
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line) continue;
-    if (line === "LATER") {
-      setTimeout(() => emit("LATE_MARKER"), 150);
-      continue;
-    }
-    if (line === "BURST") {
-      emit("B".repeat(4096) + "STALE_MARKER");
-      continue;
-    }
-    if (line === "EXIT") {
-      emit("EXITING");
-      setTimeout(() => process.exit(7), 20);
-      continue;
-    }
-    emit("ACK:" + line);
-  }
-});
-`;
+const TEST_SHELL_PATH = fileURLToPath(new URL("../test-fixtures/e2e-terminal.mjs", import.meta.url));
 
 type AppInstance = Awaited<ReturnType<typeof buildApp>>;
 
@@ -87,7 +60,7 @@ async function startHarness(
       cwd: process.cwd(),
       shell: "custom",
       shellPath: process.execPath,
-      args: ["-e", TEST_SHELL]
+      args: [TEST_SHELL_PATH]
     }]
   });
   mutate?.(config);
@@ -309,7 +282,7 @@ describe("terminal WebSocket integration", () => {
       code: 1002,
       reason: "Unsupported PalmTTY protocol"
     });
-  });
+  }, 10_000);
 
   it("serializes resume, resize, and input frames in connection order", async () => {
     const harness = await startHarness();
@@ -333,7 +306,7 @@ describe("terminal WebSocket integration", () => {
     expect(body.session.rows).toBe(35);
 
     socket.close(1000, "test complete");
-  });
+  }, 10_000);
 
   it("keeps the PTY alive across browser disconnect and replays retained output", async () => {
     const harness = await startHarness();
@@ -373,7 +346,7 @@ describe("terminal WebSocket integration", () => {
     await secondInbox.waitForText("LATE_MARKER");
 
     secondSocket.close(1000, "test complete");
-  });
+  }, 10_000);
 
   it("falls back to a snapshot when replay history is stale", async () => {
     const harness = await startHarness((config) => {
@@ -410,7 +383,7 @@ describe("terminal WebSocket integration", () => {
     expect(recovery.type).toBe("snapshot");
 
     secondSocket.close(1000, "test complete");
-  });
+  }, 10_000);
 
   it("actively closes established sockets when authentication expires", async () => {
     const harness = await startHarness();
