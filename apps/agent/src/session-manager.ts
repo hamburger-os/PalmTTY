@@ -122,7 +122,9 @@ export class SessionManager {
     const mirror = new HeadlessTerminal({
       cols,
       rows,
-      scrollback: this.config.sessions.scrollbackLines
+      scrollback: this.config.sessions.scrollbackLines,
+      // SerializeAddon relies on xterm APIs gated behind this opt-in.
+      allowProposedApi: true
     });
     const serializer = new SerializeAddon();
     mirror.loadAddon(serializer);
