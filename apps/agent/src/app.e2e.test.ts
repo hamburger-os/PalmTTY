@@ -11,7 +11,10 @@ import {
 } from "@palmtty/protocol";
 import WebSocket from "ws";
 import { buildApp } from "./app.js";
-import type { PtyFactory, PtyHandle } from "./session-manager.js";
+import { SessionWorkerServer } from "./session-worker.js";
+import type { PtyFactory, PtyHandle } from "./session-runtime.js";
+import type { WorkerBootstrap } from "./worker-protocol.js";
+import type { WorkerSpawner } from "./worker-spawner.js";
 
 const TOKEN_ENV = "PALMTTY_E2E_TOKEN";
 const TOKEN = "0123456789abcdef0123456789abcdef";
