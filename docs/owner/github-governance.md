@@ -1,87 +1,128 @@
 # GitHub 仓库治理与 Ruleset
 
-## 当前目标
+## 当前状态
 
-PalmTTY 的代码侧已经有 Windows/Ubuntu CI、锁文件、文档契约、生产依赖漏洞审计与 CodeQL。GitHub 仓库设置也应当把这些门禁变成默认规则，避免依赖维护者“记得不要直接 push”。
+截至 2026-09-19，PalmTTY 已经启用一个仓库级、作用于默认分支 `main` 的 Active Ruleset，名称为 `main`。
 
-当前 GitHub API 连接显示仓库**没有任何 Ruleset**。下面是建议的唯一主干 Ruleset。
+实际读取到的规则如下：
 
-## 建议 Ruleset：`main-protection`
+- Restrict deletions：已开启；
+- Block force pushes / non-fast-forward updates：已开启；
+- Require a pull request before merging：已开启；
+- Required approvals：**0**；
+- Dismiss stale approvals：关闭；
+- Require Code Owner review：关闭；
+- Require last-push approval：关闭；
+- Require conversation resolution：已开启；
+- Allowed merge method：**仅 squash**；
+- Require status checks：已开启；
+- Require branches to be up to date before merging：**当前关闭**；
+- Require linear history：已开启；
+- Bypass actors：**无**。
 
-- Enforcement status：**Active**
-- Target branches：默认分支 `main`
-- Bypass：仅 Repository admin；建议选择“仅 Pull Request 场景可绕过”一类最小权限模式，作为单维护者在 CI/规则损坏时的逃生口。
-
-### 分支规则
-
-开启：
-
-- Restrict deletions
-- Block force pushes / non-fast-forward updates
-- Require a pull request before merging
-- Required approvals：**1**
-- Dismiss stale approvals when new commits are pushed
-- Require review from Code Owners
-- Require conversation resolution before merging
-- Require status checks to pass
-- Require branches to be up to date before merging
-- Require linear history
-
-Required status checks 建议在这些 workflow 首次跑完后从 GitHub UI 选择实际出现的 Context：
+Required status checks 与当前 workflow Context 一致：
 
 - `CI / check (windows-latest)`
 - `CI / check (ubuntu-latest)`
 - `Security Audit / production-dependencies`
 - `CodeQL / codeql (javascript-typescript)`
 
-不建议当前强制 Signed commits：对初期外部贡献门槛较高，可在贡献规模扩大后再评估。
+## 面向 AI 主维护的判断
 
-## 建议 Repository Settings
+当前设计的核心方向是合理的：
 
-### Pull Requests
+> AI 可以独立提出和合并 PR，但不能绕过自动质量门禁。
 
-- 只保留 **Squash merging**
-- 关闭 Merge commit
-- 关闭 Rebase merge
-- 开启 Auto-merge
-- 开启“Always suggest updating pull request branches”
-- 保持“Automatically delete head branches”开启
+因此以下配置建议**保持当前状态**：
 
-### Features
+- Required approvals = **0**；
+- 不强制 Code Owner review；
+- 不强制 last-push approval；
+- 不要求 Signed commits；
+- 保持 conversation resolution；
+- 保持四条 required checks；
+- 保持 squash-only、linear history；
+- 保持禁止删除 `main` 和 force push。
 
-- 开启 **Discussions**，把使用问题和想法讨论从 Bug Issue 分流
-- 关闭 **Wiki**：项目已有版本化的 `docs/`，避免双重文档源
-- Projects 是否开启按实际路线管理需求决定
+这些设置避免把 AI 日常维护变成人工审批队列，同时仍要求代码、文档、安全审计和 Windows/Ubuntu 验证全部通过。
 
-### About / Discoverability
+## 建议补回的两个保护
 
-建议 Topics：
+### 1. Require branches to be up to date before merging
 
-- `terminal`
-- `remote-development`
-- `self-hosted`
-- `windows`
-- `powershell`
-- `conpty`
-- `xterm`
-- `pwa`
-- `codex`
+当前 Ruleset 的 `strict_required_status_checks_policy` 为 `false`。
 
-在有真实演示站点或文档站之前，Homepage 可以留空。后续应增加 Social preview 图片。
+建议改为 **true**。
 
-### Security
+原因：某个 PR 可能在旧的 `main` 上通过全部检查，随后另一个 PR 先合并改变主干；如果不要求 up to date，第一个 PR 仍可依赖旧结果合并。
 
-确认开启：
+对于 AI 主维护项目，这个限制的人工成本较低：仓库已经开启 **Always suggest updating pull request branches**，AI 也可以更新分支后重新等待 CI。
 
-- Dependency graph（开启后可再增加 GitHub Dependency Review workflow，并将其加入 Required checks）
-- Private vulnerability reporting
-- Dependabot alerts
-- Dependabot security updates
-- Secret scanning（若当前账户/仓库支持）
-- Push protection（若当前账户/仓库支持）
+### 2. 保留“人工紧急恢复” bypass
 
-## 为什么需要人工设置
+当前 Ruleset 没有任何 bypass actor，读取结果为 `current_user_can_bypass: never`。
 
-仓库内文件可以由 PR 审查和版本控制，但 Ruleset、merge 策略、Discussions、Wiki、Topics 与部分 Security 开关属于 GitHub Repository Settings。当前可用 GitHub 连接器只能读取 Ruleset/仓库设置，没有相应的管理写接口，因此不能安全地在本次自动提交中修改这些设置。
+这提供最强的日常约束，但存在治理死锁风险：如果某次 PR 把 workflow YAML、required context 名称或 GitHub Actions 配置改坏，所要求的 status check 可能根本无法产生，此时正常 PR 流程无法修复自己。
 
-完成这些设置后，应再次读取 Ruleset 与仓库元数据，并把本页“建议”改成“已启用”的事实状态。
+建议增加一个非常窄的恢复出口：
+
+- Actor：Repository administrators；
+- Bypass mode：优先选择 **Pull requests only**；
+- 不给普通贡献者、Bot 或 AI App 单独配置 bypass；
+- 只在 Ruleset/CI 自身损坏时人工使用。
+
+这样 AI 默认仍然不能绕过门禁，但项目所有者保留灾难恢复能力。
+
+## Repository Settings 当前状态
+
+已确认：
+
+- Auto-merge：开启；
+- Always suggest updating pull request branches：开启；
+- Automatically delete head branches：开启；
+- Discussions：开启；
+- Wiki：关闭；
+- Topics 已设置：
+  - `terminal`
+  - `remote-development`
+  - `self-hosted`
+  - `windows`
+  - `powershell`
+  - `conpty`
+  - `xterm`
+  - `pwa`
+  - `codex`
+
+仓库全局仍允许 squash / merge commit / rebase merge 三种方式，但 **`main` Ruleset 已把实际允许的 PR merge method 限制为 squash**。因此不必为了 AI 维护特意关闭全局 merge/rebase；主干规则已经提供所需约束。
+
+## Security Settings
+
+当前自动化已经强制：
+
+- CodeQL；
+- `pnpm audit --prod --audit-level high`；
+- frozen lockfile；
+- pinned GitHub Action commit SHA。
+
+此前 GitHub Dependency Review 因仓库 Dependency graph 未开启而无法运行，因此目前使用 portable `pnpm audit` 作为 required check。
+
+仍建议在 GitHub Settings 中人工确认：
+
+- Dependency graph；
+- Private vulnerability reporting；
+- Dependabot alerts；
+- Dependabot security updates；
+- Secret scanning（账户/仓库支持时）；
+- Push protection（账户/仓库支持时）。
+
+启用 Dependency graph 后，可以重新评估是否增加 GitHub Dependency Review；它不是当前 Ruleset 成立的前置条件。
+
+## AI 维护原则
+
+AI 后续修改 Ruleset、workflow、依赖策略或安全门禁时，应遵守：
+
+1. 不删除四条主干 required checks，除非用同等或更强的检查替代；
+2. workflow 名称或 job 名称变化时，同时检查 Ruleset required context 是否仍然匹配；
+3. 修改 workflow 的 PR 必须特别关注“检查是否会因为 YAML/权限错误完全不产生”；
+4. 自动维护不依赖人工 approval，但不能把自动测试、安全检查或文档检查当作可选项；
+5. Ruleset 实际状态变化后，同步更新本文档和 `docs/ai/current-state.md`。
