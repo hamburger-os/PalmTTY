@@ -1,0 +1,24 @@
+# PalmTTY example configuration — draft schema
+
+server:
+  host: 127.0.0.1
+  port: 7688
+  trustedOrigins:
+    - https://dev.example.com
+
+sessions:
+  maxSessions: 8
+  scrollbackLines: 10000
+  idleTimeoutMinutes: 0
+
+workspaces:
+  - id: palmtty
+    name: PalmTTY
+    cwd: D:\\Code\\PalmTTY
+    shell: pwsh
+    command: codex
+
+  - id: powershell
+    name: PowerShell
+    cwd: C:\\Users\\me
+    shell: pwsh
