@@ -124,15 +124,10 @@ export class SessionWorkerServer {
         await chmod(this.endpoint, 0o600);
       }
 
-      await writeWorkerRecord(this.bootstrap.runtimeDir, {
-        version: 1,
-        sessionId: this.bootstrap.sessionId,
-        workspaceId: this.bootstrap.workspace.id,
-        createdAt: this.bootstrap.createdAt,
-        endpointId: this.bootstrap.endpointId,
-        workerPid: process.pid,
-        shellPid: this.runtime.pid
-      });
+      await writeWorkerRecord(
+        this.bootstrap.runtimeDir,
+        this.recoveryRecord()
+      );
       this.startStateWatchdog();
     } catch (error) {
       await this.shutdown({ killPty: true, cleanupState: true });
@@ -177,25 +172,86 @@ export class SessionWorkerServer {
 
   private async verifyPublishedState(): Promise<void> {
     if (this.shuttingDown) return;
+
     try {
-      const [record, secret] = await Promise.all([
-        readWorkerRecord(this.bootstrap.runtimeDir, this.bootstrap.sessionId),
-        readWorkerSecret(this.bootstrap.runtimeDir, this.bootstrap.sessionId)
-      ]);
-      if (
-        record.endpointId !== this.bootstrap.endpointId ||
-        record.workerPid !== process.pid ||
-        !secretsEqual(secret, this.bootstrap.secret)
-      ) {
-        throw new Error("Worker recovery state no longer belongs to this process");
+      let record: Awaited<ReturnType<typeof readWorkerRecord>> | undefined;
+      let secret: string | undefined;
+      let recordMissing = false;
+      let secretMissing = false;
+
+      try {
+        record = await readWorkerRecord(
+          this.bootstrap.runtimeDir,
+          this.bootstrap.sessionId
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") recordMissing = true;
+        else throw error;
       }
+
+      try {
+        secret = await readWorkerSecret(
+          this.bootstrap.runtimeDir,
+          this.bootstrap.sessionId
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") secretMissing = true;
+        else throw error;
+      }
+
+      if (
+        record && (
+          record.endpointId !== this.bootstrap.endpointId ||
+          record.workerPid !== process.pid
+        )
+      ) {
+        throw new Error("Worker recovery record belongs to another process");
+      }
+      if (secret !== undefined && !secretsEqual(secret, this.bootstrap.secret)) {
+        throw new Error("Worker recovery secret was replaced");
+      }
+
+      if (recordMissing || secretMissing) {
+        // Recovery metadata is Worker-owned state. Recreate missing artifacts
+        // instead of turning an Agent cleanup race into terminal termination.
+        await ensureRuntimeLayout(this.bootstrap.runtimeDir);
+        if (secretMissing) {
+          await writeWorkerSecret(
+            this.bootstrap.runtimeDir,
+            this.bootstrap.sessionId,
+            this.bootstrap.secret
+          );
+        }
+        if (recordMissing) {
+          await writeWorkerRecord(
+            this.bootstrap.runtimeDir,
+            this.recoveryRecord()
+          );
+        }
+      }
+
       this.stateWatchdogFailures = 0;
     } catch {
       this.stateWatchdogFailures += 1;
       if (this.stateWatchdogFailures < STATE_WATCHDOG_FAILURES) return;
+
+      // Conflicting/corrupt recovery authority is different from missing state:
+      // fail closed rather than overwrite another process's capability.
       await this.shutdown({ killPty: true, cleanupState: false });
       this.options.onRetired?.();
     }
+  }
+
+  private recoveryRecord() {
+    return {
+      version: 1 as const,
+      sessionId: this.bootstrap.sessionId,
+      workspaceId: this.bootstrap.workspace.id,
+      createdAt: this.bootstrap.createdAt,
+      endpointId: this.bootstrap.endpointId,
+      workerPid: process.pid,
+      shellPid: this.runtime.pid
+    };
   }
 
   private accept(socket: net.Socket): void {
