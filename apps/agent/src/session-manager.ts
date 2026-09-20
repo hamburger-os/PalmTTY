@@ -7,7 +7,7 @@ import {
 } from "@palmtty/protocol";
 import type WebSocket from "ws";
 import { WorkerClient } from "./worker-client.js";
-import type { WorkerBootstrap } from "./worker-protocol.js";
+import { WORKER_PROTOCOL_VERSION, type WorkerBootstrap } from "./worker-protocol.js";
 import { ProcessWorkerSpawner, type WorkerSpawner } from "./worker-spawner.js";
 import {
   cleanupDanglingWorkerState,
@@ -165,7 +165,7 @@ export class SessionManager {
       const secret = workerSecret();
       const createdAt = new Date().toISOString();
       const bootstrap: WorkerBootstrap = {
-        protocol: 1,
+        protocol: WORKER_PROTOCOL_VERSION,
         runtimeDir: this.runtimeDir,
         sessionId: id,
         endpointId: endpoint,
@@ -182,7 +182,7 @@ export class SessionManager {
         rows
       };
 
-      const spawned = await this.workerSpawner.spawn(bootstrap);
+      await this.workerSpawner.spawn(bootstrap);
       let worker: WorkerClient | undefined;
       try {
         worker = await this.connectWithRetry(
@@ -191,6 +191,11 @@ export class SessionManager {
           CREATE_CONNECT_DELAYS_MS
         );
         const record = await this.readRecordWithRetry(id);
+
+        // A Worker becomes durable only after authenticated adoption. Until
+        // this point it owns a short creation lease and will kill its PTY plus
+        // recovery state if the creator disappears.
+        await worker.adopt();
 
         const managed: ManagedWorker = {
           record,
@@ -201,24 +206,14 @@ export class SessionManager {
           reconnecting: false
         };
         this.install(managed);
-
-        // Adoption is complete. From this point the Worker lifetime is
-        // intentionally independent of the creator Agent.
-        spawned.release();
         return this.publicSession(managed);
       } catch (error) {
         if (worker) {
-          await worker.terminate().catch(() => undefined);
+          await worker.abortCreation().catch(() => undefined);
           worker.close();
         }
-
-        // Roll back only through the exact ChildProcess handle returned by this
-        // spawn operation. Persisted PIDs are never used as kill authority.
-        await spawned.abort().catch(() => undefined);
-        await removeWorkerState(this.runtimeDir, {
-          sessionId: id,
-          endpointId: endpoint
-        });
+        // If control never connected, the Worker's unadopted creation lease
+        // performs the same rollback without trusting a persisted PID.
         throw error;
       }
     } finally {
