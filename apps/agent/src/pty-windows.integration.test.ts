@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import * as pty from "node-pty";
+import { resolveExecutable } from "./workspace-runtime.js";
 
 describe("Windows ConPTY smoke test", () => {
   it("spawns PowerShell 7 and round-trips Unicode", async () => {
     if (process.platform !== "win32") return;
 
+    const shell = await resolveExecutable("pwsh.exe", {
+      cwd: process.cwd()
+    });
+
     const output = await new Promise<string>((resolve, reject) => {
       let transcript = "";
-      const terminal = pty.spawn("pwsh.exe", ["-NoLogo", "-NoProfile"], {
+      const terminal = pty.spawn(shell, ["-NoLogo", "-NoProfile"], {
         name: "xterm-256color",
         cols: 80,
         rows: 24,
