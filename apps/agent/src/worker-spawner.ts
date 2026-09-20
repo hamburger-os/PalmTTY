@@ -5,16 +5,10 @@ import type { WorkerBootstrap } from "./worker-protocol.js";
 
 const WORKER_READY_LINE = "PALMTTY_WORKER_READY";
 const WORKER_START_TIMEOUT_MS = 8_000;
-const WORKER_ABORT_TIMEOUT_MS = 3_000;
 const MAX_STARTUP_STDERR_BYTES = 8 * 1024;
 
-export interface SpawnedWorker {
-  release(): void;
-  abort(): Promise<void>;
-}
-
 export interface WorkerSpawner {
-  spawn(bootstrap: WorkerBootstrap): Promise<SpawnedWorker>;
+  spawn(bootstrap: WorkerBootstrap): Promise<void>;
 }
 
 function workerInvocation(): string[] {
@@ -24,10 +18,6 @@ function workerInvocation(): string[] {
   return sourceMode
     ? ["--import", "tsx", entry, "--session-worker"]
     : [entry, "--session-worker"];
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function removeEnvironmentKey(
@@ -45,7 +35,7 @@ function removeEnvironmentKey(
 }
 
 export class ProcessWorkerSpawner implements WorkerSpawner {
-  async spawn(bootstrap: WorkerBootstrap): Promise<SpawnedWorker> {
+  async spawn(bootstrap: WorkerBootstrap): Promise<void> {
     const environment = { ...process.env };
     for (const key of bootstrap.excludedEnvKeys) {
       removeEnvironmentKey(environment, key);
@@ -62,10 +52,6 @@ export class ProcessWorkerSpawner implements WorkerSpawner {
       child.kill();
       throw new Error("Session worker bootstrap channels are unavailable");
     }
-
-    const closed = new Promise<void>((resolve) => {
-      child.once("close", () => resolve());
-    });
 
     let startupStderr = "";
     child.stderr.setEncoding("utf8");
@@ -129,34 +115,13 @@ export class ProcessWorkerSpawner implements WorkerSpawner {
 
     try {
       await Promise.all([bootstrapWritten, ready]);
+      child.unref();
     } catch (error) {
-      try { child.kill(); } catch { /* best effort */ }
-      child.stdout.destroy();
-      child.stderr.destroy();
-      child.unref();
+      try { child.kill(); } catch { /* best effort for a pre-ready child */ }
       throw error;
-    }
-
-    let settled = false;
-    const releaseChannels = () => {
+    } finally {
       child.stdout.destroy();
       child.stderr.destroy();
-      child.unref();
-    };
-
-    return {
-      release(): void {
-        if (settled) return;
-        settled = true;
-        releaseChannels();
-      },
-      async abort(): Promise<void> {
-        if (settled) return;
-        settled = true;
-        try { child.kill(); } catch { /* exact child may already have exited */ }
-        await Promise.race([closed, delay(WORKER_ABORT_TIMEOUT_MS)]);
-        releaseChannels();
-      }
-    };
+    }
   }
 }
