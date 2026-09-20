@@ -6,8 +6,8 @@ import { z } from "zod";
 
 export const RuntimeWorkspaceSchema = z.object({
   id: z.string().min(1).max(64),
-  cwd: z.string().min(1),
-  executable: z.string().min(1),
+  cwd: z.string().min(1).refine(path.isAbsolute, "runtime cwd must be absolute"),
+  executable: z.string().min(1).refine(path.isAbsolute, "runtime executable must be absolute"),
   args: z.array(z.string()).max(32),
   command: z.string().max(8192).optional(),
   env: z.record(z.string(), z.string())
