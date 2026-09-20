@@ -62,9 +62,9 @@ Worker + PTY running
 
 Unix 平台目录/文件使用 0700/0600。Windows 位于当前用户应用数据目录，并且 IPC 仍必须通过 secret 认证。
 
-Agent 启动后并行扫描 record，再用 secret 实际连接并认证 Worker。连接/认证失败的 stale record 会被删除。不会因为 record 里写了某个 PID 就 kill 该 PID。
+Agent 启动后并行扫描 record，再用 secret 实际连接并认证 Worker。连接/认证失败本身不再被当作“Worker 已死”的证明：如果记录的 Worker 进程可以明确判定为不存在，才清理该 recovery state；如果进程仍存活或无法可靠判定，则保留 recovery capability，避免控制面短暂故障间接终止活 PTY。无论如何都不会因为 record 里写了某个 PID 就直接 kill 该 PID。
 
-Worker 也会周期性验证自己的 record + secret 仍然存在且属于自己；恢复能力被删除或替换且持续失败时，Worker 会自我终止，避免长期留下不可恢复的 PTY。
+Recovery metadata 属于 Worker 自己的 canonical lifecycle state。Worker 会周期性验证 record + secret：如果文件只是缺失，会重新发布自己的 record/secret；如果现有 record/secret 与当前 Worker 身份冲突，则连续失败后 fail closed 并终止 PTY，避免覆盖另一份恢复权限。
 
 ## 当前限制
 
@@ -78,6 +78,8 @@ Worker 也会周期性验证自己的 record + secret 仍然存在且属于自�
 ## Workspace
 
 Workspace 是本机配置，不是浏览器动态创建的数据。它定义 ID、显示名称、工作目录、Shell、Shell 参数、可选启动命令和可选环境变量覆盖。
+
+Agent 启动 preflight 会验证所有 workspace 目录，并按最终环境解析 Shell；进入 Worker bootstrap 的不是原始 shell 名称，而是包含绝对 executable 的规范化 runtime spec。这既提高 Windows 可诊断性，也避免 PTY 库内部 PATH 解析差异成为运行时依赖。
 
 浏览器只能提交 workspace ID。
 

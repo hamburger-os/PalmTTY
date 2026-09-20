@@ -29,10 +29,14 @@ const MAX_WORKER_SOCKET_BUFFER_BYTES = 8 * 1024 * 1024;
 const MAX_BOOTSTRAP_BYTES = 1024 * 1024;
 const STATE_WATCHDOG_INTERVAL_MS = 15_000;
 const STATE_WATCHDOG_FAILURES = 2;
+const ADOPTION_TIMEOUT_MS = 15_000;
 
 export type SessionWorkerServerOptions = {
   ptyFactory?: PtyFactory;
   onRetired?: () => void;
+  stateWatchdogIntervalMs?: number;
+  stateWatchdogFailures?: number;
+  adoptionTimeoutMs?: number;
 };
 
 function secretsEqual(actual: string, expected: string): boolean {
@@ -51,6 +55,8 @@ export class SessionWorkerServer {
   private commandPipeline: Promise<void> = Promise.resolve();
   private stateWatchdog: NodeJS.Timeout | undefined;
   private stateWatchdogFailures = 0;
+  private adoptionTimer: NodeJS.Timeout | undefined;
+  private adopted = false;
   private shuttingDown = false;
 
   constructor(
@@ -124,16 +130,12 @@ export class SessionWorkerServer {
         await chmod(this.endpoint, 0o600);
       }
 
-      await writeWorkerRecord(this.bootstrap.runtimeDir, {
-        version: 1,
-        sessionId: this.bootstrap.sessionId,
-        workspaceId: this.bootstrap.workspace.id,
-        createdAt: this.bootstrap.createdAt,
-        endpointId: this.bootstrap.endpointId,
-        workerPid: process.pid,
-        shellPid: this.runtime.pid
-      });
+      await writeWorkerRecord(
+        this.bootstrap.runtimeDir,
+        this.recoveryRecord()
+      );
       this.startStateWatchdog();
+      this.startAdoptionTimer();
     } catch (error) {
       await this.shutdown({ killPty: true, cleanupState: true });
       throw error;
@@ -147,6 +149,7 @@ export class SessionWorkerServer {
     if (this.shuttingDown) return;
     this.shuttingDown = true;
     if (this.stateWatchdog) clearInterval(this.stateWatchdog);
+    if (this.adoptionTimer) clearTimeout(this.adoptionTimer);
 
     for (const connection of [...this.connections]) connection.destroy();
     this.connections.clear();
@@ -171,31 +174,114 @@ export class SessionWorkerServer {
   private startStateWatchdog(): void {
     this.stateWatchdog = setInterval(() => {
       void this.verifyPublishedState();
-    }, STATE_WATCHDOG_INTERVAL_MS);
+    }, this.options.stateWatchdogIntervalMs ?? STATE_WATCHDOG_INTERVAL_MS);
     this.stateWatchdog.unref();
+  }
+
+  private startAdoptionTimer(): void {
+    this.adoptionTimer = setTimeout(() => {
+      if (this.adopted || this.shuttingDown) return;
+      void this.shutdown({ killPty: true, cleanupState: true }).then(() => {
+        this.options.onRetired?.();
+      });
+    }, this.options.adoptionTimeoutMs ?? ADOPTION_TIMEOUT_MS);
+    this.adoptionTimer.unref();
+  }
+
+  private markAdopted(): void {
+    if (this.adopted) return;
+    this.adopted = true;
+    if (this.adoptionTimer) {
+      clearTimeout(this.adoptionTimer);
+      this.adoptionTimer = undefined;
+    }
   }
 
   private async verifyPublishedState(): Promise<void> {
     if (this.shuttingDown) return;
+
     try {
-      const [record, secret] = await Promise.all([
-        readWorkerRecord(this.bootstrap.runtimeDir, this.bootstrap.sessionId),
-        readWorkerSecret(this.bootstrap.runtimeDir, this.bootstrap.sessionId)
-      ]);
-      if (
-        record.endpointId !== this.bootstrap.endpointId ||
-        record.workerPid !== process.pid ||
-        !secretsEqual(secret, this.bootstrap.secret)
-      ) {
-        throw new Error("Worker recovery state no longer belongs to this process");
+      let record: Awaited<ReturnType<typeof readWorkerRecord>> | undefined;
+      let secret: string | undefined;
+      let recordMissing = false;
+      let secretMissing = false;
+
+      try {
+        record = await readWorkerRecord(
+          this.bootstrap.runtimeDir,
+          this.bootstrap.sessionId
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") recordMissing = true;
+        else throw error;
       }
+
+      try {
+        secret = await readWorkerSecret(
+          this.bootstrap.runtimeDir,
+          this.bootstrap.sessionId
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") secretMissing = true;
+        else throw error;
+      }
+
+      if (
+        record && (
+          record.endpointId !== this.bootstrap.endpointId ||
+          record.workerPid !== process.pid
+        )
+      ) {
+        throw new Error("Worker recovery record belongs to another process");
+      }
+      if (secret !== undefined && !secretsEqual(secret, this.bootstrap.secret)) {
+        throw new Error("Worker recovery secret was replaced");
+      }
+
+      if (recordMissing || secretMissing) {
+        // Recovery metadata is Worker-owned state. Recreate missing artifacts
+        // instead of turning an Agent cleanup race into terminal termination.
+        await ensureRuntimeLayout(this.bootstrap.runtimeDir);
+        if (secretMissing) {
+          await writeWorkerSecret(
+            this.bootstrap.runtimeDir,
+            this.bootstrap.sessionId,
+            this.bootstrap.secret
+          );
+        }
+        if (recordMissing) {
+          await writeWorkerRecord(
+            this.bootstrap.runtimeDir,
+            this.recoveryRecord()
+          );
+        }
+      }
+
       this.stateWatchdogFailures = 0;
     } catch {
       this.stateWatchdogFailures += 1;
-      if (this.stateWatchdogFailures < STATE_WATCHDOG_FAILURES) return;
+      if (
+        this.stateWatchdogFailures <
+        (this.options.stateWatchdogFailures ?? STATE_WATCHDOG_FAILURES)
+      ) return;
+
+      // Conflicting/corrupt recovery authority is different from missing state:
+      // fail closed rather than overwrite another process's capability.
       await this.shutdown({ killPty: true, cleanupState: false });
       this.options.onRetired?.();
     }
+  }
+
+  private recoveryRecord() {
+    return {
+      version: 1 as const,
+      sessionId: this.bootstrap.sessionId,
+      workspaceId: this.bootstrap.workspace.id,
+      createdAt: this.bootstrap.createdAt,
+      endpointId: this.bootstrap.endpointId,
+      workerPid: process.pid,
+      shellPid: this.runtime.pid
+    };
   }
 
   private accept(socket: net.Socket): void {
@@ -277,6 +363,28 @@ export class SessionWorkerServer {
 
     try {
       switch (request.type) {
+        case "adopt":
+          this.markAdopted();
+          this.respond(connection, request.requestId, { adopted: true });
+          return;
+
+        case "abort":
+          if (this.adopted) {
+            this.respondError(
+              connection,
+              request.requestId,
+              "Adopted session workers cannot be aborted as creation failures"
+            );
+            return;
+          }
+          this.respond(connection, request.requestId, { aborting: true });
+          setImmediate(() => {
+            void this.shutdown({ killPty: true, cleanupState: true }).then(() => {
+              this.options.onRetired?.();
+            });
+          });
+          return;
+
         case "attach":
           await this.runtime.recover(request.lastSeq, (messages) => {
             for (const message of messages) {

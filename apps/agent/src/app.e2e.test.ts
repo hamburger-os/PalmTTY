@@ -170,7 +170,7 @@ async function startHarness(
       name: "E2E",
       cwd: process.cwd(),
       shell: "custom",
-      shellPath: "deterministic-test-pty",
+      shellPath: process.execPath,
       args: []
     }]
   });

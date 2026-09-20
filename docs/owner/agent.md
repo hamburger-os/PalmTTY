@@ -55,14 +55,17 @@ Agent 正常关闭、升级或异常退出时：
 
 ## Worker 创建
 
+Agent 启动前先执行 runtime preflight：认证环境与外部暴露规则必须有效，所有 workspace 目录必须存在，Shell 必须能解析为绝对可执行路径。解析后的规范化运行规格才会进入 Worker bootstrap，因此 PTY 启动不依赖 node-pty 自己的 PATH 查找。
+
 创建 Session 时 Agent：
 
-1. 从本地 workspace 配置解析 cwd、shell、args、env；
+1. 从已经 preflight 的 workspace runtime spec 取得 cwd、绝对 Shell、args、env；
 2. 生成随机 Session ID、IPC endpoint ID 与 256-bit Worker secret；
-3. detached 启动 Worker；
-4. 通过一次性匿名 stdin 发送 bootstrap；
-5. 等待 Worker 完成 IPC 监听、secret/record 持久化并返回 READY；
-6. 认证 Worker 后才向浏览器返回创建成功。
+3. detached 启动 Worker，并通过一次性匿名 stdin 发送 bootstrap；
+4. Worker 完成 IPC 监听、secret/record 持久化后返回 READY，但此时仍处于“未接管创建租约”；
+5. Agent 通过 Worker protocol + secret 认证，读取 recovery record，再发送显式 `adopt`；
+6. adoption 成功后 Worker 生命周期才正式独立于创建它的 Agent；
+7. 如果 Agent 在 adoption 前失败或消失，Worker 的短创建租约到期后会自行杀 PTY、清理 recovery state 并退出，不依赖持久化 PID 做回滚。
 
 PalmTTY 登录 token 对应的环境变量会从 Worker 环境和最终 PTY 环境中移除。
 
@@ -73,6 +76,7 @@ PalmTTY 登录 token 对应的环境变量会从 Worker 环境和最终 PTY 环�
 - Agent 不理解 Codex 的内部协议；Codex 只是终端里的普通 CLI。
 - Worker secret 不进入浏览器、命令行、URL、普通日志或 PTY 环境。
 - 持久化 PID 只用于诊断，不允许直接作为 kill authority；PID 可能被系统复用。
+- Agent 暂时无法连接 Worker 不是删除其 recovery capability 的充分条件；控制面故障不能被放大成 PTY 生命周期故障。
 - 默认日志不得包含终端输入、输出、token、Worker secret 或 workspace 环境变量。
 
 ## 你审查时重点看

@@ -1,5 +1,4 @@
 import { randomBytes } from "node:crypto";
-import { existsSync } from "node:fs";
 import type { PalmTTYConfig } from "@palmtty/config";
 import {
   encodeServerMessage,
@@ -8,7 +7,7 @@ import {
 } from "@palmtty/protocol";
 import type WebSocket from "ws";
 import { WorkerClient } from "./worker-client.js";
-import type { WorkerBootstrap } from "./worker-protocol.js";
+import { WORKER_PROTOCOL_VERSION, type WorkerBootstrap } from "./worker-protocol.js";
 import { ProcessWorkerSpawner, type WorkerSpawner } from "./worker-spawner.js";
 import {
   cleanupDanglingWorkerState,
@@ -20,6 +19,10 @@ import {
   removeWorkerState,
   type WorkerRecord
 } from "./worker-storage.js";
+import {
+  resolveRuntimeWorkspaces,
+  type RuntimeWorkspace
+} from "./workspace-runtime.js";
 
 type ManagedWorker = {
   record: WorkerRecord;
@@ -33,11 +36,12 @@ type ManagedWorker = {
 export type SessionManagerOptions = {
   runtimeDir?: string;
   workerSpawner?: WorkerSpawner;
+  runtimeWorkspaces?: ReadonlyMap<string, RuntimeWorkspace>;
 };
 
 const CREATE_CONNECT_DELAYS_MS = [0, 50, 100, 200, 400, 800, 1200, 1600];
 const REDISCOVER_CONNECT_DELAYS_MS = [0, 100, 250, 500, 1000, 2000, 4000];
-const RECONNECT_DELAYS_MS = [100, 250, 500, 1000, 2000];
+const RECONNECT_DELAYS_MS = [100, 250, 500, 1000, 2000, 5000];
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,10 +59,21 @@ function workerSecret(): string {
   return randomBytes(32).toString("base64url");
 }
 
+function processDefinitelyDead(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ESRCH";
+  }
+}
+
 export class SessionManager {
   readonly runtimeDir: string;
   private readonly workerSpawner: WorkerSpawner;
+  private readonly preflightWorkspaces: ReadonlyMap<string, RuntimeWorkspace> | undefined;
   private readonly sessions = new Map<string, ManagedWorker>();
+  private workspaces = new Map<string, RuntimeWorkspace>();
   private pendingCreates = 0;
   private initialized = false;
   private closing = false;
@@ -69,10 +84,19 @@ export class SessionManager {
   ) {
     this.runtimeDir = options.runtimeDir ?? defaultRuntimeDir();
     this.workerSpawner = options.workerSpawner ?? new ProcessWorkerSpawner();
+    this.preflightWorkspaces = options.runtimeWorkspaces;
   }
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
+
+    // Resolve every locally configured launch target before opening the control
+    // plane. Workers receive absolute executables and never depend on node-pty's
+    // platform-specific PATH lookup.
+    this.workspaces = this.preflightWorkspaces
+      ? new Map(this.preflightWorkspaces)
+      : await resolveRuntimeWorkspaces(this.config.workspaces);
+
     await ensureRuntimeLayout(this.runtimeDir);
     await cleanupDanglingWorkerState(this.runtimeDir);
 
@@ -94,9 +118,13 @@ export class SessionManager {
           reconnecting: false
         });
       } catch {
-        // A stale record is not authority to kill a PID: PIDs can be reused.
-        // Only authenticated IPC can terminate a worker.
-        await removeWorkerState(this.runtimeDir, record);
+        // Connection failure is not proof that a Worker is dead. In particular,
+        // deleting a live Worker's capability would violate the control-plane /
+        // session-lifetime boundary. Only reclaim state when the recorded
+        // process is definitely absent; a reused/inaccessible PID is preserved.
+        if (processDefinitelyDead(record.workerPid)) {
+          await removeWorkerState(this.runtimeDir, record);
+        }
       }
     }));
     this.initialized = true;
@@ -129,63 +157,65 @@ export class SessionManager {
     this.pendingCreates += 1;
 
     try {
-      const workspace = this.config.workspaces.find((item) => item.id === workspaceId);
+      const workspace = this.workspaces.get(workspaceId);
       if (!workspace) throw new Error("Unknown workspace");
-      if (!existsSync(workspace.cwd)) throw new Error("Workspace directory is unavailable");
 
       const id = sessionId();
-    const endpoint = endpointId();
-    const secret = workerSecret();
-    const createdAt = new Date().toISOString();
-    const bootstrap: WorkerBootstrap = {
-      protocol: 1,
-      runtimeDir: this.runtimeDir,
-      sessionId: id,
-      endpointId: endpoint,
-      secret,
-      excludedEnvKeys: [this.config.auth.tokenEnv],
-      createdAt,
-      workspace,
-      session: {
-        exitedRetentionMinutes: this.config.sessions.exitedRetentionMinutes,
-        scrollbackLines: this.config.sessions.scrollbackLines,
-        replayBytes: this.config.sessions.replayBytes
-      },
-      cols,
-      rows
-    };
-
-    await this.workerSpawner.spawn(bootstrap);
-    let worker: WorkerClient | undefined;
-    try {
-      worker = await this.connectWithRetry(
-        endpoint,
-        secret,
-        CREATE_CONNECT_DELAYS_MS
-      );
-      const record = await this.readRecordWithRetry(id);
-
-      const managed: ManagedWorker = {
-        record,
-        secret,
-        worker,
-        session: worker.session,
-        clients: new Map(),
-        reconnecting: false
-      };
-      this.install(managed);
-      return this.publicSession(managed);
-    } catch (error) {
-      if (worker) {
-        await worker.terminate().catch(() => undefined);
-        worker.close();
-      }
-      await removeWorkerState(this.runtimeDir, {
+      const endpoint = endpointId();
+      const secret = workerSecret();
+      const createdAt = new Date().toISOString();
+      const bootstrap: WorkerBootstrap = {
+        protocol: WORKER_PROTOCOL_VERSION,
+        runtimeDir: this.runtimeDir,
         sessionId: id,
-        endpointId: endpoint
-      });
-      throw error;
-    }
+        endpointId: endpoint,
+        secret,
+        excludedEnvKeys: [this.config.auth.tokenEnv],
+        createdAt,
+        workspace,
+        session: {
+          exitedRetentionMinutes: this.config.sessions.exitedRetentionMinutes,
+          scrollbackLines: this.config.sessions.scrollbackLines,
+          replayBytes: this.config.sessions.replayBytes
+        },
+        cols,
+        rows
+      };
+
+      await this.workerSpawner.spawn(bootstrap);
+      let worker: WorkerClient | undefined;
+      try {
+        worker = await this.connectWithRetry(
+          endpoint,
+          secret,
+          CREATE_CONNECT_DELAYS_MS
+        );
+        const record = await this.readRecordWithRetry(id);
+
+        // A Worker becomes durable only after authenticated adoption. Until
+        // this point it owns a short creation lease and will kill its PTY plus
+        // recovery state if the creator disappears.
+        await worker.adopt();
+
+        const managed: ManagedWorker = {
+          record,
+          secret,
+          worker,
+          session: worker.session,
+          clients: new Map(),
+          reconnecting: false
+        };
+        this.install(managed);
+        return this.publicSession(managed);
+      } catch (error) {
+        if (worker) {
+          await worker.abortCreation().catch(() => undefined);
+          worker.close();
+        }
+        // If control never connected, the Worker's unadopted creation lease
+        // performs the same rollback without trusting a persisted PID.
+        throw error;
+      }
     } finally {
       this.pendingCreates -= 1;
     }
@@ -316,27 +346,53 @@ export class SessionManager {
   private async reconnect(managed: ManagedWorker): Promise<void> {
     if (managed.reconnecting || this.closing) return;
     managed.reconnecting = true;
+    let attempt = 0;
 
     try {
-      const worker = await this.connectWithRetry(
-        managed.record.endpointId,
-        managed.secret,
-        RECONNECT_DELAYS_MS
-      );
-      if (this.closing || this.sessions.get(managed.record.sessionId) !== managed) {
-        worker.close();
-        return;
+      while (
+        !this.closing &&
+        this.sessions.get(managed.record.sessionId) === managed
+      ) {
+        const delay = RECONNECT_DELAYS_MS[
+          Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)
+        ]!;
+        attempt += 1;
+        await sleep(delay);
+
+        try {
+          const worker = await WorkerClient.connect({
+            runtimeDir: this.runtimeDir,
+            endpointId: managed.record.endpointId,
+            secret: managed.secret
+          });
+          if (
+            this.closing ||
+            this.sessions.get(managed.record.sessionId) !== managed
+          ) {
+            worker.close();
+            return;
+          }
+
+          managed.worker = worker;
+          managed.session = worker.session;
+          managed.reconnecting = false;
+          this.install(managed);
+          return;
+        } catch {
+          if (processDefinitelyDead(managed.record.workerPid)) {
+            if (this.sessions.get(managed.record.sessionId) === managed) {
+              this.sessions.delete(managed.record.sessionId);
+            }
+            await removeWorkerState(this.runtimeDir, managed.record);
+            return;
+          }
+          // A live or unverifiable Worker keeps ownership of its recovery
+          // capability. Continue retrying instead of converting a control-plane
+          // outage into terminal loss.
+        }
       }
-      managed.worker = worker;
-      managed.session = worker.session;
+    } finally {
       managed.reconnecting = false;
-      this.install(managed);
-    } catch {
-      managed.reconnecting = false;
-      if (this.sessions.get(managed.record.sessionId) === managed) {
-        this.sessions.delete(managed.record.sessionId);
-      }
-      await removeWorkerState(this.runtimeDir, managed.record);
     }
   }
 

@@ -20,10 +20,26 @@ function workerInvocation(): string[] {
     : [entry, "--session-worker"];
 }
 
+function removeEnvironmentKey(
+  environment: Record<string, string | undefined>,
+  key: string
+): void {
+  if (process.platform !== "win32") {
+    delete environment[key];
+    return;
+  }
+  const lower = key.toLowerCase();
+  for (const existing of Object.keys(environment)) {
+    if (existing.toLowerCase() === lower) delete environment[existing];
+  }
+}
+
 export class ProcessWorkerSpawner implements WorkerSpawner {
   async spawn(bootstrap: WorkerBootstrap): Promise<void> {
     const environment = { ...process.env };
-    for (const key of bootstrap.excludedEnvKeys) delete environment[key];
+    for (const key of bootstrap.excludedEnvKeys) {
+      removeEnvironmentKey(environment, key);
+    }
 
     const child = spawn(process.execPath, workerInvocation(), {
       detached: true,
@@ -101,7 +117,7 @@ export class ProcessWorkerSpawner implements WorkerSpawner {
       await Promise.all([bootstrapWritten, ready]);
       child.unref();
     } catch (error) {
-      try { child.kill(); } catch { /* best effort */ }
+      try { child.kill(); } catch { /* best effort for a pre-ready child */ }
       throw error;
     } finally {
       child.stdout.destroy();

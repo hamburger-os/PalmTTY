@@ -61,12 +61,12 @@ Agent 正常关闭只断开控制连接，不终止 Worker。Agent 异常退出�
 Agent 与 Worker 之间有应用层 ping。控制 IPC 异常关闭时：
 
 - 当前浏览器 terminal socket 以服务恢复语义断开；
-- Agent 在有限退避窗口内重新认证 Worker；
+- Agent 按有上限的退避间隔持续重新认证同一 Worker；
 - 成功后继续保留该 Session；
-- 无法重新认证则移除 recovery metadata；
-- Worker 的自检机制最终终止无法恢复的孤儿会话。
+- 只有能够明确判定记录中的 Worker 进程已经不存在时，才移除该 recovery metadata；
+- IPC 暂时不可达、权限暂时不足或进程身份无法可靠判定时，优先保留 Worker 的恢复能力，而不是把控制面故障转换为 PTY 终止。
 
-Agent 启动时对已有 Worker 的 rediscovery 使用约 8 秒的有限重试窗口，并行处理多个 record，避免系统繁忙造成过早误判，同时不让大量 stale record 串行拖慢启动。
+Agent 启动时对已有 Worker 的 rediscovery 仍使用约 8 秒的有限重试窗口，并行处理多个 record，避免大量不可达 record 串行拖慢启动；窗口结束后未连接但可能仍存活的 record 会被保留，而不是被删除。新 Agent 可在下一次启动重新尝试。Worker 自己周期性验证 recovery state：缺失文件会重新发布，身份冲突则 fail closed。
 
 ## 内存与慢客户端
 

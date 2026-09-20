@@ -14,6 +14,7 @@ PalmTTY provides shell access with the privileges of the OS user running it. Tre
 - Successful login creates an in-memory HttpOnly, SameSite=Strict session cookie; Secure is required for normal non-loopback deployment.
 - Authentication and Origin are separate controls.
 - Browser requests can select only configured workspace IDs; they cannot submit arbitrary cwd, shell executable or environment values.
+- Startup preflight resolves every locally configured shell to an absolute executable before Worker creation; PTY launch does not trust library-specific PATH lookup.
 - Terminal I/O, login tokens, Worker secrets and workspace environment values are excluded from default logs.
 - Login attempts, Session creation, terminal dimensions, input size, replay state, exited-session retention and socket backpressure are bounded.
 
@@ -32,7 +33,7 @@ Each terminal Session runs in an independent detached Worker.
 
 Recovery files are local-user state. Unix runtime directories/files are tightened to 0700/0600. On Windows they live below the current user's application-data location and still require application-layer Worker-secret authentication.
 
-Persisted Worker/Shell PIDs are diagnostic metadata only. PalmTTY does not kill a process merely because a stale record contains its PID; this avoids PID-reuse mistakes.
+Persisted Worker/Shell PIDs are diagnostic metadata only. PalmTTY does not kill a process merely because a stale record contains its PID; this avoids PID-reuse mistakes. Likewise, an IPC connection failure alone does not authorize deletion of potentially-live recovery state. A Worker owns its recovery capability and republishes missing artifacts; conflicting record/secret ownership fails closed. Session creation is transactional: READY does not make a Worker durable. Until the authenticated `adopt` command succeeds, the Worker is under a short creation lease and self-terminates its PTY plus recovery state if the creator disappears. No persisted PID is used as rollback authority.
 
 ### Persistence boundary
 
@@ -57,6 +58,7 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 - 登录 Cookie 使用 HttpOnly、SameSite=Strict；正常非 loopback 部署要求 Secure。
 - 认证与 Origin 是独立控制。
 - 浏览器只能选择预配置 workspace ID，不能提交任意 cwd、Shell 或环境变量。
+- 启动 preflight 会把每个本地配置的 Shell 解析为绝对可执行路径，再创建 Worker；PTY 启动不依赖库内部的 PATH 查找。
 - 默认日志不记录终端 I/O、登录 token、Worker secret 或 workspace 环境变量。
 - 登录、Session 创建、终端尺寸、输入、replay、退出保留和 socket backlog 都有资源上限。
 
@@ -75,7 +77,7 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 
 Recovery 文件属于当前用户本地状态。Unix 使用 0700/0600；Windows 放在当前用户应用数据目录，并继续要求 Worker secret 应用层认证。
 
-Worker/Shell PID 只用于诊断。PalmTTY 不会因为 stale record 记录了某个 PID 就直接 kill 该进程，以避免 PID 复用导致误杀。
+Worker/Shell PID 只用于诊断。PalmTTY 不会因为 stale record 记录了某个 PID 就直接 kill 该进程，以避免 PID 复用导致误杀；同样，IPC 暂时连接失败本身也不构成删除可能仍存活 Worker recovery state 的权限。Recovery capability 由 Worker 自己拥有，缺失文件会由 Worker 重新发布；record/secret 被其他内容替换时则 fail closed。Session 创建采用事务式 adoption：Worker 返回 READY 后仍不算持久会话，只有 authenticated `adopt` 成功后才进入独立持久状态；如果创建者在 adoption 前消失，Worker 会在短创建租约到期后自行终止 PTY 并清理 recovery state，不使用持久化 PID 做回滚。
 
 ### 持久化边界
 

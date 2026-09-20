@@ -27,6 +27,8 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - exact Origin allowlist and non-loopback startup safety gate
 - bounded login/session-create rate limiting
 - workspace ID allowlist
+- fail-fast runtime preflight for auth/security exposure, workspace directories and shell executable resolution
+- normalized per-workspace launch specs with absolute shell executables before Worker bootstrap
 - bounded client message size and terminal dimensions
 - no intentional terminal I/O logging
 - Agent is a replaceable control plane and no longer owns PTYs or canonical terminal state
@@ -43,9 +45,11 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Worker secret and minimal record persisted in a per-user runtime directory
 - Agent startup rediscovers Workers in parallel and authenticates them
 - Agent normal shutdown/restart disconnects control only and does not kill PTYs
-- Worker control heartbeat and bounded reconnect attempts
-- stale records are removed without killing recorded PIDs
-- Worker self-watchdog retires unrecoverable orphan state
+- Worker creation uses an authenticated adoption transaction: READY is not yet durable; an unadopted Worker has a short creation lease and self-cleans its PTY/recovery state if the creator disappears
+- Worker control heartbeat and bounded-delay ongoing reconnect attempts after an adopted control connection drops
+- failed rediscovery alone does not delete potentially-live recovery state; definitely-dead recorded processes can be reclaimed without PID-based killing
+- Worker-owned recovery metadata is republished when missing; conflicting record/secret ownership fails closed
+- stale/dangling artifacts are cleaned without treating persisted PIDs as kill authority
 - login-token environment variable is removed before Worker spawn and from PTY environment
 - terminal input is bounded to the same 64 KiB limit at browser and Worker IPC boundaries
 - concurrent Session creation is counted against maxSessions
@@ -80,7 +84,9 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - exited-session retention/cleanup
 - maxSessions under concurrent creation
 - wrong Worker secret rejection
-- stale recovery metadata cleanup without PID-based kill authority
+- unadopted Worker creation-lease cleanup and adopted Worker survival past that lease
+- preservation of potentially-live recovery metadata when rediscovery cannot prove the Worker is dead
+- Worker self-healing of missing recovery record/secret without weakening conflict detection
 - oversized Worker terminal input rejection
 - detached Worker survival across complete creator Agent process exit
 - real Windows node-pty + PowerShell 7 / ConPTY Unicode smoke test
@@ -108,6 +114,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - No multi-user ACL.
 - Reverse-proxy/Tailscale examples are documentation/configuration, not automated setup.
 - Real owner workstation + mobile Safari/Chrome + long-running Codex validation remains required.
+- Potentially-live but unreachable recovery records are deliberately preserved when process death cannot be proven; this favors terminal survival over aggressive metadata reclamation.
 - No Git/file preview subsystem yet.
 - Linux/macOS/WSL are not first-class supported hosts yet.
 - Windows Worker runtime file ACL behavior relies on the current-user application-data boundary and still merits dedicated real-host review.
