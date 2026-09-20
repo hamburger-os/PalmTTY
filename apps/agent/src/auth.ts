@@ -12,6 +12,19 @@ function digest(value: string): Buffer {
   return createHash("sha256").update(value, "utf8").digest();
 }
 
+export function assertAuthEnvironment(
+  config: PalmTTYConfig["auth"],
+  env: NodeJS.ProcessEnv = process.env
+): void {
+  if (!config.enabled) return;
+  const token = env[config.tokenEnv];
+  if (!token || token.length < 16) {
+    throw new Error(
+      `Authentication is enabled but ${config.tokenEnv} is missing or shorter than the required 16 characters.`
+    );
+  }
+}
+
 export class AuthService {
   private readonly expectedToken?: Buffer;
   private readonly loginSessions = new Map<string, LoginSession>();
@@ -21,12 +34,9 @@ export class AuthService {
     readonly config: PalmTTYConfig["auth"],
     env: NodeJS.ProcessEnv = process.env
   ) {
+    assertAuthEnvironment(config, env);
     if (config.enabled) {
-      const token = env[config.tokenEnv];
-      if (!token || token.length < 16) {
-        throw new Error(`Authentication is enabled but ${config.tokenEnv} is missing or shorter than 16 characters.`);
-      }
-      this.expectedToken = digest(token);
+      this.expectedToken = digest(env[config.tokenEnv]!);
     }
   }
 
