@@ -139,6 +139,59 @@ describe("session worker security boundary", () => {
     authenticated.close();
   });
 
+  it("self-cleans a Worker that is never adopted by its creator", async () => {
+    const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-unadopted-"));
+    runtimeDirs.add(runtimeDir);
+
+    const config = bootstrap(runtimeDir);
+    let retired = false;
+    const server = new SessionWorkerServer(config, {
+      ptyFactory: silentPtyFactory,
+      adoptionTimeoutMs: 25,
+      onRetired: () => { retired = true; }
+    });
+    servers.add(server);
+    await server.start();
+
+    const deadline = Date.now() + 1_000;
+    while (!retired) {
+      if (Date.now() >= deadline) {
+        throw new Error("Timed out waiting for unadopted Worker cleanup");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    await expect(readWorkerRecord(runtimeDir, config.sessionId)).rejects.toThrow();
+    await expect(readWorkerSecret(runtimeDir, config.sessionId)).rejects.toThrow();
+  });
+
+  it("keeps an authenticated adopted Worker alive past the creation lease", async () => {
+    const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-adopted-"));
+    runtimeDirs.add(runtimeDir);
+
+    const config = bootstrap(runtimeDir);
+    const server = new SessionWorkerServer(config, {
+      ptyFactory: silentPtyFactory,
+      adoptionTimeoutMs: 25
+    });
+    servers.add(server);
+    await server.start();
+
+    const client = await WorkerClient.connect({
+      runtimeDir,
+      endpointId: config.endpointId,
+      secret: config.secret
+    });
+    await client.adopt();
+    await new Promise((resolve) => setTimeout(resolve, 75));
+
+    await expect(readWorkerRecord(runtimeDir, config.sessionId)).resolves.toMatchObject({
+      sessionId: config.sessionId,
+      workerPid: process.pid
+    });
+    client.close();
+  });
+
   it("preserves recovery metadata when connection failure does not prove the Worker is dead", async () => {
     const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-stale-"));
     runtimeDirs.add(runtimeDir);
