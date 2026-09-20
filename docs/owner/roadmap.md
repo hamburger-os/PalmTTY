@@ -17,7 +17,7 @@
 - IPC 暂时不可达不会删除可能仍存活 Worker 的 recovery capability；
 - Worker 自动重新发布缺失 recovery state，对冲突 recovery authority fail closed；
 - persisted PID 仅用于诊断/辅助确认进程明确死亡，不作为 kill authority；
-- 未 adoption Worker 通过短创建租约自清理，adoption 后才进入持久 Session；
+- 未 adoption Worker 通过短创建租约自清理；`adopt` 为幂等提交，可跨 IPC 重连安全重试，确认后才进入持久 Session；
 - 单用户 token 登录和 Cookie 会话；
 - Origin、安全启动闸门和基础限流；
 - 手机端 xterm/PWA、特殊键栏与长文本 Composer；
