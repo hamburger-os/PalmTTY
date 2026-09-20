@@ -5,7 +5,6 @@ A coding agent should not declare a repository-wide task complete before the rel
 ## Static/documentation
 
 ~~~text
-pnpm doctor
 pnpm docs:check
 pnpm typecheck
 ~~~
@@ -56,6 +55,16 @@ For broad changes:
 ~~~text
 pnpm check
 ~~~
+
+## Host runtime preflight
+
+On a configured PalmTTY host, before `dev`/`start` or release validation:
+
+~~~text
+pnpm doctor
+~~~
+
+This requires the intended PalmTTY config and authentication environment. It is not a generic CI/contributor prerequisite.
 
 ## Manual Windows validation before a release
 
