@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -38,7 +38,7 @@ describe("workspace runtime resolution", () => {
       }
     });
 
-    expect(path.normalize(resolved)).toBe(path.normalize(executable));
+    expect(path.normalize(resolved)).toBe(path.normalize(await realpath(executable)));
   });
 
   it("fails before PTY creation with an actionable missing-shell error", async () => {
@@ -74,6 +74,6 @@ describe("workspace runtime resolution", () => {
 
     expect(path.isAbsolute(workspace.executable)).toBe(true);
     expect(workspace.id).toBe("node");
-    expect(workspace.cwd).toBe(path.resolve(directory));
+    expect(workspace.cwd).toBe(await realpath(directory));
   });
 });
