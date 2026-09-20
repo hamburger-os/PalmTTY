@@ -20,7 +20,14 @@ function testConfig() {
       tokenEnv: "PALMTTY_TEST_TOKEN",
       sessionTtlMinutes: 60
     },
-    workspaces: [{ id: "main", name: "Main", cwd: "C:\\Code" }]
+    workspaces: [{
+      id: "main",
+      name: "Main",
+      cwd: process.cwd(),
+      shell: "custom",
+      shellPath: process.execPath,
+      args: []
+    }]
   });
 }
 
