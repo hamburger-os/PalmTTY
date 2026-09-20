@@ -63,7 +63,9 @@ On Windows the Agent and Worker communicate through a named pipe. Current non-Wi
 
 Every Worker has an independent 256-bit secret. The secret is sent to the Worker once through anonymous stdin at creation time and persisted only in the local runtime recovery area; it never reaches the browser. IPC frames and socket backlog are bounded.
 
-Persisted PIDs are diagnostic metadata only. PalmTTY never treats an old PID as sufficient authority to kill a process.
+Persisted PIDs are diagnostic metadata only. PalmTTY never treats an old PID as sufficient authority to kill a process. A failed Agent connection is also not proof that a Worker is dead: potentially-live recovery metadata is preserved, and an adopted Worker retries control-plane reconnection instead of converting an IPC outage into PTY loss. Missing Worker-owned recovery files are republished by the Worker; conflicting recovery authority fails closed.
+
+Before a Worker is created, PalmTTY preflights every workspace and resolves the configured shell to an absolute executable path. The Worker bootstrap carries this normalized launch specification rather than relying on node-pty or platform-specific PATH lookup.
 
 ### Reconnect model
 
@@ -90,6 +92,8 @@ PalmTTY 是一个单用户、自托管的交互式开发终端控制面。
 
 不承诺 Windows/主机重启、用户注销或 Worker 本身死亡后的终端持久化。Agent 登录 Session 仍只在内存中，所以 Agent 重启后需要重新登录，再附着原终端。
 
-Windows 本地控制 IPC 使用 Named Pipe；其他当前 CI 平台使用 Unix domain socket。每个 Worker 有独立 256-bit secret，创建时只经匿名 stdin 传入，不发送到浏览器。持久化 PID 只用于诊断，不能作为 kill authority。
+Windows 本地控制 IPC 使用 Named Pipe；其他当前 CI 平台使用 Unix domain socket。每个 Worker 有独立 256-bit secret，创建时只经匿名 stdin 传入，不发送到浏览器。持久化 PID 只用于诊断，不能作为 kill authority。Agent 暂时无法连接 Worker 并不等于 Worker 已死亡，因此不会仅因 IPC 超时删除可能仍存活 Worker 的恢复能力；已接管 Worker 的控制连接会持续退避重连。Worker 自己拥有 recovery metadata，文件缺失时会重新发布；如果发现恢复权限被其他内容替换，则 fail closed。
+
+创建 Worker 前，PalmTTY 会 preflight 所有 workspace，并把 Shell 解析为绝对可执行路径。Worker bootstrap 接收规范化运行规格，不再依赖 node-pty 或平台特有的 PATH 查找行为。
 
 PTY 输出、headless mirror、seq 与 replay 都在 Worker 内按同一有序流水线更新，因此 Agent 不在线期间状态仍连续；浏览器恢复时优先 replay，过旧则 snapshot，恢复边界与实时订阅之间不留消息窗口。
