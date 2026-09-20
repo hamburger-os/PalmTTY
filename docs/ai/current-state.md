@@ -45,7 +45,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Worker secret and minimal record persisted in a per-user runtime directory
 - Agent startup rediscovers Workers in parallel and authenticates them
 - Agent normal shutdown/restart disconnects control only and does not kill PTYs
-- Worker creation keeps the exact spawned ChildProcess handle until authenticated adoption; pre-adoption rollback never trusts persisted PIDs
+- Worker creation uses an authenticated adoption transaction: READY is not yet durable; an unadopted Worker has a short creation lease and self-cleans its PTY/recovery state if the creator disappears
 - Worker control heartbeat and bounded-delay ongoing reconnect attempts after an adopted control connection drops
 - failed rediscovery alone does not delete potentially-live recovery state; definitely-dead recorded processes can be reclaimed without PID-based killing
 - Worker-owned recovery metadata is republished when missing; conflicting record/secret ownership fails closed
@@ -84,6 +84,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - exited-session retention/cleanup
 - maxSessions under concurrent creation
 - wrong Worker secret rejection
+- unadopted Worker creation-lease cleanup and adopted Worker survival past that lease
 - preservation of potentially-live recovery metadata when rediscovery cannot prove the Worker is dead
 - Worker self-healing of missing recovery record/secret without weakening conflict detection
 - oversized Worker terminal input rejection
