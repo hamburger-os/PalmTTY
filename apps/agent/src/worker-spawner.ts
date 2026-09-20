@@ -30,10 +30,26 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function removeEnvironmentKey(
+  environment: Record<string, string | undefined>,
+  key: string
+): void {
+  if (process.platform !== "win32") {
+    delete environment[key];
+    return;
+  }
+  const lower = key.toLowerCase();
+  for (const existing of Object.keys(environment)) {
+    if (existing.toLowerCase() === lower) delete environment[existing];
+  }
+}
+
 export class ProcessWorkerSpawner implements WorkerSpawner {
   async spawn(bootstrap: WorkerBootstrap): Promise<SpawnedWorker> {
     const environment = { ...process.env };
-    for (const key of bootstrap.excludedEnvKeys) delete environment[key];
+    for (const key of bootstrap.excludedEnvKeys) {
+      removeEnvironmentKey(environment, key);
+    }
 
     const child = spawn(process.execPath, workerInvocation(), {
       detached: true,
