@@ -1,8 +1,9 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseConfig, type WorkspaceConfig } from "@palmtty/config";
+import type { RuntimeWorkspace } from "./workspace-runtime.js";
 import { SessionManager } from "./session-manager.js";
 import { SessionWorkerServer } from "./session-worker.js";
 import type { PtyFactory, PtyHandle } from "./session-runtime.js";
@@ -61,7 +62,17 @@ function workspace(): WorkspaceConfig {
     name: "Security",
     cwd: process.cwd(),
     shell: "custom",
-    shellPath: "unused-test-shell",
+    shellPath: process.execPath,
+    args: [],
+    env: {}
+  };
+}
+
+function runtimeWorkspace(): RuntimeWorkspace {
+  return {
+    id: "security",
+    cwd: process.cwd(),
+    executable: process.execPath,
     args: [],
     env: {}
   };
@@ -76,7 +87,7 @@ function bootstrap(runtimeDir: string): WorkerBootstrap {
     secret: "correct-session-secret-0123456789abcdef",
     excludedEnvKeys: ["PALMTTY_TEST_ACCESS_TOKEN"],
     createdAt: new Date().toISOString(),
-    workspace: workspace(),
+    workspace: runtimeWorkspace(),
     session: {
       exitedRetentionMinutes: 30,
       scrollbackLines: 1_000,
@@ -128,18 +139,15 @@ describe("session worker security boundary", () => {
     authenticated.close();
   });
 
-  it("removes stale recovery metadata without treating the recorded PID as kill authority", async () => {
+  it("preserves recovery metadata when connection failure does not prove the Worker is dead", async () => {
     const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-stale-"));
     runtimeDirs.add(runtimeDir);
     await ensureRuntimeLayout(runtimeDir);
 
     const sessionId = "stale-session-0000000001";
     const endpointId = "stale-endpoint-000000001";
-    await writeWorkerSecret(
-      runtimeDir,
-      sessionId,
-      "stale-session-secret-0123456789abcdef"
-    );
+    const secret = "stale-session-secret-0123456789abcdef";
+    await writeWorkerSecret(runtimeDir, sessionId, secret);
     await writeWorkerRecord(runtimeDir, {
       version: 1,
       sessionId,
@@ -160,11 +168,52 @@ describe("session worker security boundary", () => {
     await manager.initialize();
 
     expect(manager.list()).toEqual([]);
-    await expect(readWorkerRecord(runtimeDir, sessionId)).rejects.toThrow();
-    await expect(readWorkerSecret(runtimeDir, sessionId)).rejects.toThrow();
-    expect(workerRecordPath(runtimeDir, sessionId)).not.toBe("");
-    expect(workerSecretPath(runtimeDir, sessionId)).not.toBe("");
+    await expect(readWorkerRecord(runtimeDir, sessionId)).resolves.toMatchObject({
+      sessionId,
+      endpointId,
+      workerPid: process.pid
+    });
+    await expect(readWorkerSecret(runtimeDir, sessionId)).resolves.toBe(secret);
 
     await manager.close();
   }, 8_000);
+
+  it("republishes missing Worker-owned recovery artifacts", async () => {
+    const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-heal-"));
+    runtimeDirs.add(runtimeDir);
+
+    const config = bootstrap(runtimeDir);
+    const server = new SessionWorkerServer(config, {
+      ptyFactory: silentPtyFactory,
+      stateWatchdogIntervalMs: 20,
+      stateWatchdogFailures: 1
+    });
+    servers.add(server);
+    await server.start();
+
+    await Promise.all([
+      unlink(workerRecordPath(runtimeDir, config.sessionId)),
+      unlink(workerSecretPath(runtimeDir, config.sessionId))
+    ]);
+
+    const deadline = Date.now() + 1_000;
+    for (;;) {
+      try {
+        const [record, secret] = await Promise.all([
+          readWorkerRecord(runtimeDir, config.sessionId),
+          readWorkerSecret(runtimeDir, config.sessionId)
+        ]);
+        expect(record).toMatchObject({
+          sessionId: config.sessionId,
+          endpointId: config.endpointId,
+          workerPid: process.pid
+        });
+        expect(secret).toBe(config.secret);
+        break;
+      } catch (error) {
+        if (Date.now() >= deadline) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    }
+  });
 });
