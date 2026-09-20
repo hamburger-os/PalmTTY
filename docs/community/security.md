@@ -33,7 +33,7 @@ Each terminal Session runs in an independent detached Worker.
 
 Recovery files are local-user state. Unix runtime directories/files are tightened to 0700/0600. On Windows they live below the current user's application-data location and still require application-layer Worker-secret authentication.
 
-Persisted Worker/Shell PIDs are diagnostic metadata only. PalmTTY does not kill a process merely because a stale record contains its PID; this avoids PID-reuse mistakes. Likewise, an IPC connection failure alone does not authorize deletion of potentially-live recovery state. A Worker owns its recovery capability and republishes missing artifacts; conflicting record/secret ownership fails closed. Session creation is transactional: READY does not make a Worker durable. Until the authenticated `adopt` command succeeds, the Worker is under a short creation lease and self-terminates its PTY plus recovery state if the creator disappears. No persisted PID is used as rollback authority.
+Persisted Worker/Shell PIDs are diagnostic metadata only. PalmTTY does not kill a process merely because a stale record contains its PID; this avoids PID-reuse mistakes. Likewise, an IPC connection failure alone does not authorize deletion of potentially-live recovery state. A Worker owns its recovery capability and republishes missing artifacts; conflicting record/secret ownership fails closed. Session creation is transactional: READY does not make a Worker durable. The authenticated `adopt` command is idempotent, so a lost response is retried over a fresh IPC connection before creation is considered failed. A Worker that is never adopted remains under a short creation lease and self-terminates its PTY plus recovery state if the creator disappears. No separate abort command or persisted PID is used as rollback authority.
 
 ### Persistence boundary
 
@@ -77,7 +77,7 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 
 Recovery 文件属于当前用户本地状态。Unix 使用 0700/0600；Windows 放在当前用户应用数据目录，并继续要求 Worker secret 应用层认证。
 
-Worker/Shell PID 只用于诊断。PalmTTY 不会因为 stale record 记录了某个 PID 就直接 kill 该进程，以避免 PID 复用导致误杀；同样，IPC 暂时连接失败本身也不构成删除可能仍存活 Worker recovery state 的权限。Recovery capability 由 Worker 自己拥有，缺失文件会由 Worker 重新发布；record/secret 被其他内容替换时则 fail closed。Session 创建采用事务式 adoption：Worker 返回 READY 后仍不算持久会话，只有 authenticated `adopt` 成功后才进入独立持久状态；如果创建者在 adoption 前消失，Worker 会在短创建租约到期后自行终止 PTY 并清理 recovery state，不使用持久化 PID 做回滚。
+Worker/Shell PID 只用于诊断。PalmTTY 不会因为 stale record 记录了某个 PID 就直接 kill 该进程，以避免 PID 复用导致误杀；同样，IPC 暂时连接失败本身也不构成删除可能仍存活 Worker recovery state 的权限。Recovery capability 由 Worker 自己拥有，缺失文件会由 Worker 重新发布；record/secret 被其他内容替换时则 fail closed。Session 创建采用事务式 adoption：Worker 返回 READY 后仍不算持久会话；authenticated `adopt` 是幂等提交操作，响应丢失时会通过新的 IPC 连接安全重试。只有 adoption 得到确认后才返回创建成功；如果 adoption 从未提交且创建者消失，Worker 会在短创建租约到期后自行终止 PTY 并清理 recovery state，不需要独立 abort 命令，也不使用持久化 PID 做回滚。
 
 ### 持久化边界
 
