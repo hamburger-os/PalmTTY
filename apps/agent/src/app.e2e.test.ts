@@ -14,7 +14,7 @@ import { buildApp } from "./app.js";
 import { SessionWorkerServer } from "./session-worker.js";
 import type { PtyFactory, PtyHandle } from "./session-runtime.js";
 import type { WorkerBootstrap } from "./worker-protocol.js";
-import type { SpawnedWorker, WorkerSpawner } from "./worker-spawner.js";
+import type { WorkerSpawner } from "./worker-spawner.js";
 
 const TOKEN_ENV = "PALMTTY_E2E_TOKEN";
 const TOKEN = "0123456789abcdef0123456789abcdef";
@@ -95,18 +95,12 @@ class EmbeddedWorkerSpawner implements WorkerSpawner {
 
   constructor(readonly pty: PtyHarness) {}
 
-  async spawn(bootstrap: WorkerBootstrap): Promise<SpawnedWorker> {
+  async spawn(bootstrap: WorkerBootstrap): Promise<void> {
     const server = new SessionWorkerServer(bootstrap, {
       ptyFactory: this.pty.factory
     });
     await server.start();
     this.servers.push(server);
-    return {
-      release() {},
-      abort: async () => {
-        await server.shutdown({ killPty: true, cleanupState: true });
-      }
-    };
   }
 
   async closeAll(): Promise<void> {
