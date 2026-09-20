@@ -36,6 +36,7 @@ type ManagedWorker = {
 export type SessionManagerOptions = {
   runtimeDir?: string;
   workerSpawner?: WorkerSpawner;
+  runtimeWorkspaces?: ReadonlyMap<string, RuntimeWorkspace>;
 };
 
 const CREATE_CONNECT_DELAYS_MS = [0, 50, 100, 200, 400, 800, 1200, 1600];
@@ -70,6 +71,7 @@ function processDefinitelyDead(pid: number): boolean {
 export class SessionManager {
   readonly runtimeDir: string;
   private readonly workerSpawner: WorkerSpawner;
+  private readonly preflightWorkspaces: ReadonlyMap<string, RuntimeWorkspace> | undefined;
   private readonly sessions = new Map<string, ManagedWorker>();
   private workspaces = new Map<string, RuntimeWorkspace>();
   private pendingCreates = 0;
@@ -82,6 +84,7 @@ export class SessionManager {
   ) {
     this.runtimeDir = options.runtimeDir ?? defaultRuntimeDir();
     this.workerSpawner = options.workerSpawner ?? new ProcessWorkerSpawner();
+    this.preflightWorkspaces = options.runtimeWorkspaces;
   }
 
   async initialize(): Promise<void> {
@@ -90,7 +93,9 @@ export class SessionManager {
     // Resolve every locally configured launch target before opening the control
     // plane. Workers receive absolute executables and never depend on node-pty's
     // platform-specific PATH lookup.
-    this.workspaces = await resolveRuntimeWorkspaces(this.config.workspaces);
+    this.workspaces = this.preflightWorkspaces
+      ? new Map(this.preflightWorkspaces)
+      : await resolveRuntimeWorkspaces(this.config.workspaces);
 
     await ensureRuntimeLayout(this.runtimeDir);
     await cleanupDanglingWorkerState(this.runtimeDir);
