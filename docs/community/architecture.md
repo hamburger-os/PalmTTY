@@ -65,7 +65,7 @@ Every Worker has an independent 256-bit secret. The secret is sent to the Worker
 
 Persisted PIDs are diagnostic metadata only. PalmTTY never treats an old PID as sufficient authority to kill a process. A failed Agent connection is also not proof that a Worker is dead: potentially-live recovery metadata is preserved, and an adopted Worker retries control-plane reconnection instead of converting an IPC outage into PTY loss. Missing Worker-owned recovery files are republished by the Worker; conflicting recovery authority fails closed.
 
-Before a Worker is created, PalmTTY preflights every workspace and resolves the configured shell to an absolute executable path. The Worker bootstrap carries this normalized launch specification rather than relying on node-pty or platform-specific PATH lookup.
+Before a Worker is created, PalmTTY preflights every workspace and resolves the configured shell to an absolute executable path. The Worker bootstrap carries this normalized launch specification rather than relying on node-pty or platform-specific PATH lookup. Worker durability begins at an authenticated, idempotent `adopt` commit: a lost adoption response is retried over fresh IPC, while a never-adopted Worker expires its short creation lease and self-cleans.
 
 ### Reconnect model
 
