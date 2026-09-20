@@ -1,5 +1,4 @@
 import { createRequire } from "node:module";
-import type { WorkspaceConfig } from "@palmtty/config";
 import {
   PROTOCOL_VERSION,
   type ServerMessage,
@@ -10,6 +9,7 @@ import type { SerializeAddon as SerializeAddonType } from "@xterm/addon-serializ
 import type { Terminal as HeadlessTerminalType } from "@xterm/headless";
 import * as pty from "node-pty";
 import { canReplayFrom } from "./reconnect-policy.js";
+import { buildPtyEnvironment, type RuntimeWorkspace } from "./workspace-runtime.js";
 
 const require = createRequire(import.meta.url);
 const { Terminal: HeadlessTerminal } = require("@xterm/headless") as typeof import("@xterm/headless");
@@ -54,7 +54,7 @@ export type SessionRuntimeConfig = {
 
 export type SessionRuntimeOptions = {
   id: string;
-  workspace: WorkspaceConfig;
+  workspace: RuntimeWorkspace;
   createdAt: string;
   cols: number;
   rows: number;
@@ -99,16 +99,13 @@ export class SessionRuntime {
     this.cols = options.cols;
     this.rows = options.rows;
 
-    const shell = options.workspace.shellPath ?? (process.platform === "win32" ? "pwsh.exe" : "pwsh");
-    const environment: Record<string, string | undefined> = {
-      ...process.env,
-      ...options.workspace.env,
-      TERM: "xterm-256color"
-    };
-    for (const key of options.excludedEnvKeys ?? []) delete environment[key];
+    const environment = buildPtyEnvironment(
+      options.workspace,
+      options.excludedEnvKeys
+    );
 
     const ptyFactory = options.ptyFactory ?? defaultPtyFactory;
-    this.child = ptyFactory(shell, options.workspace.args, {
+    this.child = ptyFactory(options.workspace.executable, options.workspace.args, {
       name: "xterm-256color",
       cols: options.cols,
       rows: options.rows,
