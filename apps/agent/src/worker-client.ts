@@ -113,10 +113,6 @@ export class WorkerClient {
     await this.request({ type: "adopt" });
   }
 
-  async abortCreation(): Promise<void> {
-    await this.request({ type: "abort" });
-  }
-
   async attach(clientId: string, lastSeq: number): Promise<void> {
     await this.request({ type: "attach", clientId, lastSeq });
   }

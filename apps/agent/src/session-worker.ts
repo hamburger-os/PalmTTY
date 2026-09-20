@@ -368,23 +368,6 @@ export class SessionWorkerServer {
           this.respond(connection, request.requestId, { adopted: true });
           return;
 
-        case "abort":
-          if (this.adopted) {
-            this.respondError(
-              connection,
-              request.requestId,
-              "Adopted session workers cannot be aborted as creation failures"
-            );
-            return;
-          }
-          this.respond(connection, request.requestId, { aborting: true });
-          setImmediate(() => {
-            void this.shutdown({ killPty: true, cleanupState: true }).then(() => {
-              this.options.onRetired?.();
-            });
-          });
-          return;
-
         case "attach":
           await this.runtime.recover(request.lastSeq, (messages) => {
             for (const message of messages) {

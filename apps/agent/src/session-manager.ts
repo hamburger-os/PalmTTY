@@ -192,28 +192,31 @@ export class SessionManager {
         );
         const record = await this.readRecordWithRetry(id);
 
-        // A Worker becomes durable only after authenticated adoption. Until
-        // this point it owns a short creation lease and will kill its PTY plus
-        // recovery state if the creator disappears.
-        await worker.adopt();
+        // A Worker becomes durable only after authenticated adoption. Adoption
+        // is idempotent, so a lost response can be retried across a fresh IPC
+        // connection without creating an ambiguous commit point.
+        const adoptedWorker = await this.adoptWithRetry(
+          worker,
+          endpoint,
+          secret,
+          CREATE_CONNECT_DELAYS_MS
+        );
 
         const managed: ManagedWorker = {
           record,
           secret,
-          worker,
-          session: worker.session,
+          worker: adoptedWorker,
+          session: adoptedWorker.session,
           clients: new Map(),
           reconnecting: false
         };
         this.install(managed);
         return this.publicSession(managed);
       } catch (error) {
-        if (worker) {
-          await worker.abortCreation().catch(() => undefined);
-          worker.close();
-        }
-        // If control never connected, the Worker's unadopted creation lease
-        // performs the same rollback without trusting a persisted PID.
+        if (worker) worker.close();
+        // If adoption never committed, the Worker's creation lease performs
+        // rollback. If adoption did commit but its response was lost, retrying
+        // the idempotent adopt resolves that state before this path is reached.
         throw error;
       }
     } finally {
@@ -394,6 +397,46 @@ export class SessionManager {
     } finally {
       managed.reconnecting = false;
     }
+  }
+
+  private async adoptWithRetry(
+    initialWorker: WorkerClient,
+    endpoint: string,
+    secret: string,
+    delays: number[]
+  ): Promise<WorkerClient> {
+    let worker = initialWorker;
+    let lastError: unknown;
+
+    for (let index = 0; index < delays.length; index += 1) {
+      if (index > 0) {
+        worker.close();
+        const delay = delays[index] ?? 0;
+        if (delay > 0) await sleep(delay);
+        try {
+          worker = await WorkerClient.connect({
+            runtimeDir: this.runtimeDir,
+            endpointId: endpoint,
+            secret
+          });
+        } catch (error) {
+          lastError = error;
+          continue;
+        }
+      }
+
+      try {
+        await worker.adopt();
+        return worker;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    worker.close();
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Unable to adopt session worker");
   }
 
   private async connectWithRetry(

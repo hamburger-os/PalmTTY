@@ -49,7 +49,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 清理与所有权策略：
 
 - 已接管的 Worker 只通过 authenticated IPC 接受终止命令；
-- Session 创建采用 authenticated adoption transaction：READY 后 Worker 仍受短创建租约约束，只有 `adopt` 成功才进入持久状态；adoption 前创建者消失时由 Worker 自己杀 PTY 并清理 recovery state，不依赖持久化 PID；
+- Session 创建采用 authenticated、幂等的 adoption transaction：READY 后 Worker 仍受短创建租约约束，`adopt` 可在响应丢失后通过新 IPC 连接安全重试；只有 adoption 得到确认才由 Agent 返回创建成功；从未提交 adoption 时由 Worker 自己在租约到期后杀 PTY并清理 recovery state，不需要独立 abort 控制命令，也不依赖持久化 PID；
 - Agent 无法连接/认证 Worker 本身不构成删除 recovery metadata 的权限；只有能明确判定记录中的 Worker 进程不存在时才清理；
 - 老旧 dangling secret/socket 文件仍按年龄清理；
 - Worker 周期性验证自己拥有的 record + secret；缺失文件会由 Worker 重新发布；
