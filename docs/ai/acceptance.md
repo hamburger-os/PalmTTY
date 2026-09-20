@@ -30,7 +30,7 @@ Security, session and reconnect changes should include or update tests for:
 - wrong Worker secret rejection
 - preservation of potentially-live recovery state when Worker death cannot be proven
 - Worker self-healing of missing recovery artifacts and fail-closed handling of conflicting recovery authority
-- unadopted Worker creation-lease cleanup and idempotent adoption across controller reconnects
+- unadopted Worker creation-lease cleanup, idempotent adoption across controller reconnects, and lost-adoption-result recovery
 - detached Worker survival after the creator Agent process exits
 - auth-session expiry closing established sockets
 - backpressure / slow-client cutoff
