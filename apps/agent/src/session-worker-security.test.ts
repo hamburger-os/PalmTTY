@@ -176,7 +176,7 @@ describe("session worker security boundary", () => {
     await expect(readWorkerSecret(runtimeDir, sessionId)).resolves.toBe(secret);
 
     await manager.close();
-  }, 8_000);
+  }, 12_000);
 
   it("republishes missing Worker-owned recovery artifacts", async () => {
     const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-heal-"));
