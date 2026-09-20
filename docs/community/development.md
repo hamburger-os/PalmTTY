@@ -49,7 +49,6 @@ Any behavior-changing PR must use the documentation-sync workflow in `.agents/sk
 执行：
 
 ```powershell
-pnpm doctor
 pnpm docs:check
 pnpm typecheck
 pnpm test
