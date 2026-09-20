@@ -29,12 +29,14 @@ const MAX_WORKER_SOCKET_BUFFER_BYTES = 8 * 1024 * 1024;
 const MAX_BOOTSTRAP_BYTES = 1024 * 1024;
 const STATE_WATCHDOG_INTERVAL_MS = 15_000;
 const STATE_WATCHDOG_FAILURES = 2;
+const ADOPTION_TIMEOUT_MS = 15_000;
 
 export type SessionWorkerServerOptions = {
   ptyFactory?: PtyFactory;
   onRetired?: () => void;
   stateWatchdogIntervalMs?: number;
   stateWatchdogFailures?: number;
+  adoptionTimeoutMs?: number;
 };
 
 function secretsEqual(actual: string, expected: string): boolean {
@@ -53,6 +55,8 @@ export class SessionWorkerServer {
   private commandPipeline: Promise<void> = Promise.resolve();
   private stateWatchdog: NodeJS.Timeout | undefined;
   private stateWatchdogFailures = 0;
+  private adoptionTimer: NodeJS.Timeout | undefined;
+  private adopted = false;
   private shuttingDown = false;
 
   constructor(
@@ -131,6 +135,7 @@ export class SessionWorkerServer {
         this.recoveryRecord()
       );
       this.startStateWatchdog();
+      this.startAdoptionTimer();
     } catch (error) {
       await this.shutdown({ killPty: true, cleanupState: true });
       throw error;
@@ -144,6 +149,7 @@ export class SessionWorkerServer {
     if (this.shuttingDown) return;
     this.shuttingDown = true;
     if (this.stateWatchdog) clearInterval(this.stateWatchdog);
+    if (this.adoptionTimer) clearTimeout(this.adoptionTimer);
 
     for (const connection of [...this.connections]) connection.destroy();
     this.connections.clear();
@@ -170,6 +176,25 @@ export class SessionWorkerServer {
       void this.verifyPublishedState();
     }, this.options.stateWatchdogIntervalMs ?? STATE_WATCHDOG_INTERVAL_MS);
     this.stateWatchdog.unref();
+  }
+
+  private startAdoptionTimer(): void {
+    this.adoptionTimer = setTimeout(() => {
+      if (this.adopted || this.shuttingDown) return;
+      void this.shutdown({ killPty: true, cleanupState: true }).then(() => {
+        this.options.onRetired?.();
+      });
+    }, this.options.adoptionTimeoutMs ?? ADOPTION_TIMEOUT_MS);
+    this.adoptionTimer.unref();
+  }
+
+  private markAdopted(): void {
+    if (this.adopted) return;
+    this.adopted = true;
+    if (this.adoptionTimer) {
+      clearTimeout(this.adoptionTimer);
+      this.adoptionTimer = undefined;
+    }
   }
 
   private async verifyPublishedState(): Promise<void> {
@@ -338,6 +363,28 @@ export class SessionWorkerServer {
 
     try {
       switch (request.type) {
+        case "adopt":
+          this.markAdopted();
+          this.respond(connection, request.requestId, { adopted: true });
+          return;
+
+        case "abort":
+          if (this.adopted) {
+            this.respondError(
+              connection,
+              request.requestId,
+              "Adopted session workers cannot be aborted as creation failures"
+            );
+            return;
+          }
+          this.respond(connection, request.requestId, { aborting: true });
+          setImmediate(() => {
+            void this.shutdown({ killPty: true, cleanupState: true }).then(() => {
+              this.options.onRetired?.();
+            });
+          });
+          return;
+
         case "attach":
           await this.runtime.recover(request.lastSeq, (messages) => {
             for (const message of messages) {
