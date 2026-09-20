@@ -45,7 +45,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Worker secret and minimal record persisted in a per-user runtime directory
 - Agent startup rediscovers Workers in parallel and authenticates them
 - Agent normal shutdown/restart disconnects control only and does not kill PTYs
-- Worker creation uses an authenticated adoption transaction: READY is not yet durable; an unadopted Worker has a short creation lease and self-cleans its PTY/recovery state if the creator disappears
+- Worker creation uses an authenticated idempotent adoption transaction: READY is not yet durable; adoption responses can be retried across a fresh IPC connection, while an unadopted Worker has a short creation lease and self-cleans its PTY/recovery state if the creator disappears
 - Worker control heartbeat and bounded-delay ongoing reconnect attempts after an adopted control connection drops
 - failed rediscovery alone does not delete potentially-live recovery state; definitely-dead recorded processes can be reclaimed without PID-based killing
 - Worker-owned recovery metadata is republished when missing; conflicting record/secret ownership fails closed
