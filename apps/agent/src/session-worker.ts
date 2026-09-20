@@ -33,6 +33,8 @@ const STATE_WATCHDOG_FAILURES = 2;
 export type SessionWorkerServerOptions = {
   ptyFactory?: PtyFactory;
   onRetired?: () => void;
+  stateWatchdogIntervalMs?: number;
+  stateWatchdogFailures?: number;
 };
 
 function secretsEqual(actual: string, expected: string): boolean {
@@ -166,7 +168,7 @@ export class SessionWorkerServer {
   private startStateWatchdog(): void {
     this.stateWatchdog = setInterval(() => {
       void this.verifyPublishedState();
-    }, STATE_WATCHDOG_INTERVAL_MS);
+    }, this.options.stateWatchdogIntervalMs ?? STATE_WATCHDOG_INTERVAL_MS);
     this.stateWatchdog.unref();
   }
 
@@ -233,7 +235,10 @@ export class SessionWorkerServer {
       this.stateWatchdogFailures = 0;
     } catch {
       this.stateWatchdogFailures += 1;
-      if (this.stateWatchdogFailures < STATE_WATCHDOG_FAILURES) return;
+      if (
+        this.stateWatchdogFailures <
+        (this.options.stateWatchdogFailures ?? STATE_WATCHDOG_FAILURES)
+      ) return;
 
       // Conflicting/corrupt recovery authority is different from missing state:
       // fail closed rather than overwrite another process's capability.
