@@ -1,6 +1,6 @@
 import net from "node:net";
 import { z } from "zod";
-import { WorkspaceConfigSchema } from "@palmtty/config";
+import { RuntimeWorkspaceSchema } from "./workspace-runtime.js";
 import { MAX_INPUT_BYTES, ServerMessageSchema, SessionPublicSchema } from "@palmtty/protocol";
 
 export const WORKER_PROTOCOL_VERSION = 1 as const;
@@ -20,7 +20,7 @@ export const WorkerBootstrapSchema = z.object({
   secret: z.string().min(32).max(256),
   excludedEnvKeys: z.array(z.string().min(1).max(256)).max(16),
   createdAt: z.string().datetime(),
-  workspace: WorkspaceConfigSchema,
+  workspace: RuntimeWorkspaceSchema,
   session: SessionWorkerConfigSchema,
   cols: z.number().int().min(2).max(500),
   rows: z.number().int().min(1).max(200)
