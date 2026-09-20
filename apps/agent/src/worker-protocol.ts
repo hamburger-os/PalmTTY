@@ -41,10 +41,6 @@ export const WorkerRequestSchema = z.discriminatedUnion("type", [
     requestId: RequestIdSchema
   }),
   z.object({
-    type: z.literal("abort"),
-    requestId: RequestIdSchema
-  }),
-  z.object({
     type: z.literal("attach"),
     requestId: RequestIdSchema,
     clientId: z.string().min(1).max(128),
