@@ -1,9 +1,8 @@
-import { stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { loadConfig } from "@palmtty/config";
 import { buildApp } from "./app.js";
-import { assertSecureExposure } from "./security.js";
+import { preflightRuntime } from "./preflight.js";
 import { runSessionWorkerFromStdin } from "./session-worker.js";
 
 function defaultConfigPath(): string {
@@ -11,9 +10,19 @@ function defaultConfigPath(): string {
     return path.join(process.env.APPDATA ?? os.homedir(), "PalmTTY", "config.yaml");
   }
   if (process.platform === "darwin") {
-    return path.join(os.homedir(), "Library", "Application Support", "PalmTTY", "config.yaml");
+    return path.join(
+      os.homedir(),
+      "Library",
+      "Application Support",
+      "PalmTTY",
+      "config.yaml"
+    );
   }
-  return path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"), "palmtty", "config.yaml");
+  return path.join(
+    process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"),
+    "palmtty",
+    "config.yaml"
+  );
 }
 
 function configPathFromArgs(): string {
@@ -24,13 +33,6 @@ function configPathFromArgs(): string {
   return defaultConfigPath();
 }
 
-async function validateWorkspaceDirectories(config: Awaited<ReturnType<typeof loadConfig>>) {
-  for (const workspace of config.workspaces) {
-    const info = await stat(workspace.cwd);
-    if (!info.isDirectory()) throw new Error(`Workspace ${workspace.id} is not a directory: ${workspace.cwd}`);
-  }
-}
-
 async function main() {
   if (process.argv.includes("--session-worker")) {
     await runSessionWorkerFromStdin();
@@ -39,19 +41,35 @@ async function main() {
 
   const configPath = configPathFromArgs();
   const config = await loadConfig(configPath);
-  assertSecureExposure(config);
-  await validateWorkspaceDirectories(config);
+  const preflight = await preflightRuntime(config);
 
   if (config.server.unsafeAllowInsecureLan) {
-    console.warn("[PalmTTY] WARNING: unsafeAllowInsecureLan is enabled. Do not expose this configuration to the Internet.");
+    console.warn(
+      "[PalmTTY] WARNING: unsafeAllowInsecureLan is enabled. " +
+      "Do not expose this configuration to the Internet."
+    );
   }
 
-  const app = await buildApp(config);
+  if (process.argv.includes("--preflight")) {
+    console.log(
+      `[PalmTTY] preflight passed for ${preflight.workspaces.size} workspace(s): ${configPath}`
+    );
+    return;
+  }
+
+  const app = await buildApp(config, {
+    sessionManager: {
+      runtimeWorkspaces: preflight.workspaces
+    }
+  });
   await app.listen({ host: config.server.host, port: config.server.port });
   console.log(`[PalmTTY] listening on ${config.server.host}:${config.server.port}`);
 }
 
 main().catch((error) => {
-  console.error("[PalmTTY] startup failed:", error instanceof Error ? error.message : error);
+  console.error(
+    "[PalmTTY] startup failed:",
+    error instanceof Error ? error.message : error
+  );
   process.exitCode = 1;
 });
