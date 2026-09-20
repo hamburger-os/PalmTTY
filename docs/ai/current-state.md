@@ -84,7 +84,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - exited-session retention/cleanup
 - maxSessions under concurrent creation
 - wrong Worker secret rejection
-- unadopted Worker creation-lease cleanup and adopted Worker survival past that lease
+- unadopted Worker creation-lease cleanup, idempotent adoption across reconnects, and recovery when an adoption success result is lost after commit
 - preservation of potentially-live recovery metadata when rediscovery cannot prove the Worker is dead
 - Worker self-healing of missing recovery record/secret without weakening conflict detection
 - oversized Worker terminal input rejection
