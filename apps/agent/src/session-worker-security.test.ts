@@ -8,7 +8,7 @@ import { SessionManager } from "./session-manager.js";
 import { SessionWorkerServer } from "./session-worker.js";
 import type { PtyFactory, PtyHandle } from "./session-runtime.js";
 import { WorkerClient } from "./worker-client.js";
-import { WorkerRequestSchema, type WorkerBootstrap } from "./worker-protocol.js";
+import { WORKER_PROTOCOL_VERSION, WorkerRequestSchema, type WorkerBootstrap } from "./worker-protocol.js";
 import {
   ensureRuntimeLayout,
   readWorkerRecord,
@@ -80,7 +80,7 @@ function runtimeWorkspace(): RuntimeWorkspace {
 
 function bootstrap(runtimeDir: string): WorkerBootstrap {
   return {
-    protocol: 1,
+    protocol: WORKER_PROTOCOL_VERSION,
     runtimeDir,
     sessionId: "security-session-00000001",
     endpointId: "security-endpoint-0000001",
