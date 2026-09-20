@@ -1,7 +1,7 @@
 import { mkdtemp, rm, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseConfig, type WorkspaceConfig } from "@palmtty/config";
 import type { RuntimeWorkspace } from "./workspace-runtime.js";
 import { SessionManager } from "./session-manager.js";
@@ -9,6 +9,7 @@ import { SessionWorkerServer } from "./session-worker.js";
 import type { PtyFactory, PtyHandle } from "./session-runtime.js";
 import { WorkerClient } from "./worker-client.js";
 import { WORKER_PROTOCOL_VERSION, WorkerRequestSchema, type WorkerBootstrap } from "./worker-protocol.js";
+import type { WorkerSpawner } from "./worker-spawner.js";
 import {
   ensureRuntimeLayout,
   readWorkerRecord,
@@ -198,6 +199,56 @@ describe("session worker security boundary", () => {
       workerPid: process.pid
     });
     second.close();
+  });
+
+  it("recovers when the first adoption result is lost after commit", async () => {
+    const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-adopt-retry-"));
+    runtimeDirs.add(runtimeDir);
+
+    const spawner: WorkerSpawner = {
+      async spawn(workerBootstrap) {
+        const server = new SessionWorkerServer(workerBootstrap, {
+          ptyFactory: silentPtyFactory
+        });
+        servers.add(server);
+        await server.start();
+      }
+    };
+    const config = parseConfig({
+      server: { host: "127.0.0.1", port: 7688 },
+      auth: { enabled: false },
+      workspaces: [workspace()]
+    });
+    const manager = new SessionManager(config, {
+      runtimeDir,
+      workerSpawner: spawner
+    });
+    await manager.initialize();
+
+    const realAdopt = WorkerClient.prototype.adopt;
+    let injectLostResult = true;
+    const adoptSpy = vi.spyOn(WorkerClient.prototype, "adopt")
+      .mockImplementation(async function () {
+        await realAdopt.call(this);
+        if (injectLostResult) {
+          injectLostResult = false;
+          throw new Error("simulated lost adoption result");
+        }
+      });
+
+    try {
+      const session = await manager.create("security", 80, 24);
+      expect(injectLostResult).toBe(false);
+      expect(session).toMatchObject({
+        workspaceId: "security",
+        state: "running",
+        pid: 55_555
+      });
+      expect(manager.list()).toHaveLength(1);
+    } finally {
+      adoptSpy.mockRestore();
+      await manager.close();
+    }
   });
 
   it("preserves recovery metadata when connection failure does not prove the Worker is dead", async () => {
