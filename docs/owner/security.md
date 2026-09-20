@@ -29,7 +29,7 @@ PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。安全失
 
 - secret 只通过 Worker 创建时的一次性匿名 stdin bootstrap 传递；
 - secret 不放 argv、URL、浏览器协议或普通日志；
-- PalmTTY 登录 token 对应的环境变量在启动 Worker 前删除，并再次从 PTY 环境删除；
+- PalmTTY 登录 token 对应的环境变量在启动 Worker 前删除，并再次从 PTY 环境删除；Windows 下删除按环境变量名大小写不敏感语义处理；
 - Worker 先验证 protocol version + secret，未认证连接不能 attach/input/resize/terminate；
 - 新 Agent 只有持有 recovery secret 才能接管控制连接；
 - Worker secret 在用户 runtime 目录单独保存；
@@ -46,18 +46,20 @@ Worker record 中保存 Worker PID 和 Shell PID 仅用于诊断。
 
 PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record 不能证明当前 PID 仍属于原 Worker。
 
-清理策略：
+清理与所有权策略：
 
-- Agent 只通过 authenticated IPC 发送终止命令；
-- 无法连接/认证的 stale metadata 直接删除；
-- 老旧 dangling secret/socket 文件按年龄清理；
-- Worker 周期性验证 record + secret；
-- Worker 持续发现自己的 recovery state 被删除或替换时，自我终止 PTY。
+- 已接管的 Worker 只通过 authenticated IPC 接受终止命令；
+- Session 创建尚未 adoption 时，Agent 保留本次 spawn 的精确 ChildProcess 句柄；创建失败可以安全回滚这个精确子进程，而不是依赖持久化 PID；
+- Agent 无法连接/认证 Worker 本身不构成删除 recovery metadata 的权限；只有能明确判定记录中的 Worker 进程不存在时才清理；
+- 老旧 dangling secret/socket 文件仍按年龄清理；
+- Worker 周期性验证自己拥有的 record + secret；缺失文件会由 Worker 重新发布；
+- 如果已有 recovery record/secret 与当前 Worker 身份冲突，Worker fail closed，不覆盖另一份恢复权限。
 
 ## 权限边界
 
 - 浏览器只能选择 workspace ID；
 - 不能远程提交任意 cwd、Shell 路径或环境变量；
+- Agent 启动 preflight 会先验证 workspace 并把 Shell 解析为绝对 executable，Worker 不依赖 PTY 库内部 PATH 查找；
 - Agent/Worker 默认不提权；
 - PTY 继承普通用户权限；
 - 默认日志不记录 terminal I/O、token、Worker secret 或 workspace env。
