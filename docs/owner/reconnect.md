@@ -66,7 +66,7 @@ Agent 与 Worker 之间有应用层 ping。控制 IPC 异常关闭时：
 - 只有能够明确判定记录中的 Worker 进程已经不存在时，才移除该 recovery metadata；
 - IPC 暂时不可达、权限暂时不足或进程身份无法可靠判定时，优先保留 Worker 的恢复能力，而不是把控制面故障转换为 PTY 终止。
 
-Agent 启动时对已有 Worker 的 rediscovery 仍使用约 8 秒的有限重试窗口，并行处理多个 record，避免大量不可达 record 串行拖慢启动；窗口结束后未连接但可能仍存活的 record 会被保留，而不是被删除。新 Agent 可在下一次启动重新尝试。Worker 自己周期性验证 recovery state：缺失文件会重新发布，身份冲突则 fail closed。
+Agent 启动时对已有 Worker 的 rediscovery 仍使用约 8 秒的有限重试窗口，并行处理多个 record，避免大量不可达 record 串行拖慢启动；窗口结束后未连接但可能仍存活的 record 会被保留，而不是被删除。新 Agent 可在下一次启动重新尝试。Session 创建阶段的 `adopt` 采用幂等提交语义：响应丢失时创建端会重新连接同一 Worker 并重复 adopt，避免“API 失败但 Worker 已持久化”的不确定提交窗口。Worker 自己周期性验证 recovery state：缺失文件会重新发布，身份冲突则 fail closed。
 
 ## 内存与慢客户端
 
