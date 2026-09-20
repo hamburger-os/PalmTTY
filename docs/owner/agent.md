@@ -63,9 +63,9 @@ Agent 启动前先执行 runtime preflight：认证环境与外部暴露规则�
 2. 生成随机 Session ID、IPC endpoint ID 与 256-bit Worker secret；
 3. detached 启动 Worker，并通过一次性匿名 stdin 发送 bootstrap；
 4. Worker 完成 IPC 监听、secret/record 持久化后返回 READY，但此时仍处于“未接管创建租约”；
-5. Agent 通过 Worker protocol + secret 认证，读取 recovery record，再发送显式 `adopt`；
-6. adoption 成功后 Worker 生命周期才正式独立于创建它的 Agent；
-7. 如果 Agent 在 adoption 前失败或消失，Worker 的短创建租约到期后会自行杀 PTY、清理 recovery state 并退出，不依赖持久化 PID 做回滚。
+5. Agent 通过 Worker protocol + secret 认证，读取 recovery record，再发送显式 `adopt`；`adopt` 是幂等提交操作，如果响应丢失，Agent 会重新建立 IPC 并重复提交；
+6. adoption 得到确认后 Worker 生命周期才正式独立于创建它的 Agent；
+7. 如果 adoption 从未提交且 Agent 失败或消失，Worker 的短创建租约到期后会自行杀 PTY、清理 recovery state 并退出，不需要额外 abort 命令，也不依赖持久化 PID 做回滚。
 
 PalmTTY 登录 token 对应的环境变量会从 Worker 环境和最终 PTY 环境中移除。
 
