@@ -5,6 +5,7 @@ A coding agent should not declare a repository-wide task complete before the rel
 ## Static/documentation
 
 ~~~text
+pnpm doctor
 pnpm docs:check
 pnpm typecheck
 ~~~
@@ -28,7 +29,9 @@ Security, session and reconnect changes should include or update tests for:
 - Agent restart without PTY termination
 - Worker rediscovery using authenticated local IPC
 - wrong Worker secret rejection
-- stale recovery metadata cleanup without PID-based process killing
+- preservation of potentially-live recovery state when Worker death cannot be proven
+- Worker self-healing of missing recovery artifacts and fail-closed handling of conflicting recovery authority
+- unadopted Worker creation-lease cleanup and adopted Worker survival
 - detached Worker survival after the creator Agent process exits
 - auth-session expiry closing established sockets
 - backpressure / slow-client cutoff
@@ -39,7 +42,8 @@ The Agent suite includes:
 
 - end-to-end Fastify HTTP/WebSocket + Worker IPC coverage with deterministic PTYs;
 - a real detached-process integration test where one Agent process creates a Worker and exits, and another Agent later rediscovers the same live terminal;
-- Windows CI coverage using real node-pty + PowerShell 7 / ConPTY and Unicode.
+- Windows CI coverage using real node-pty + PowerShell 7 / ConPTY and Unicode;
+- workspace-runtime coverage for absolute shell resolution and actionable preflight failures.
 
 ## Build
 
@@ -54,6 +58,8 @@ pnpm check
 ~~~
 
 ## Manual Windows validation before a release
+
+- run `pnpm doctor` with the intended config/token and confirm every workspace resolves its shell successfully;
 
 - start pwsh through PalmTTY;
 - run a Unicode/CJK command;
