@@ -228,7 +228,7 @@ describe("session worker security boundary", () => {
     const realAdopt = WorkerClient.prototype.adopt;
     let injectLostResult = true;
     const adoptSpy = vi.spyOn(WorkerClient.prototype, "adopt")
-      .mockImplementation(async function () {
+      .mockImplementation(async function (this: WorkerClient) {
         await realAdopt.call(this);
         if (injectLostResult) {
           injectLostResult = false;
