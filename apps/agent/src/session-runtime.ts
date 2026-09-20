@@ -72,7 +72,7 @@ function writeMirror(terminal: HeadlessTerminalType, data: string): Promise<void
 
 export class SessionRuntime {
   readonly id: string;
-  readonly workspace: WorkspaceConfig;
+  readonly workspace: RuntimeWorkspace;
   readonly createdAt: string;
   readonly pid: number;
 
