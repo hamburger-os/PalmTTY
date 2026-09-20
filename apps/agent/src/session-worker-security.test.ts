@@ -165,7 +165,7 @@ describe("session worker security boundary", () => {
     await expect(readWorkerSecret(runtimeDir, config.sessionId)).rejects.toThrow();
   });
 
-  it("keeps an authenticated adopted Worker alive past the creation lease", async () => {
+  it("keeps adoption idempotent across controller reconnects", async () => {
     const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-adopted-"));
     runtimeDirs.add(runtimeDir);
 
@@ -177,19 +177,27 @@ describe("session worker security boundary", () => {
     servers.add(server);
     await server.start();
 
-    const client = await WorkerClient.connect({
+    const first = await WorkerClient.connect({
       runtimeDir,
       endpointId: config.endpointId,
       secret: config.secret
     });
-    await client.adopt();
+    await first.adopt();
+    first.close();
+
+    const second = await WorkerClient.connect({
+      runtimeDir,
+      endpointId: config.endpointId,
+      secret: config.secret
+    });
+    await second.adopt();
     await new Promise((resolve) => setTimeout(resolve, 75));
 
     await expect(readWorkerRecord(runtimeDir, config.sessionId)).resolves.toMatchObject({
       sessionId: config.sessionId,
       workerPid: process.pid
     });
-    client.close();
+    second.close();
   });
 
   it("preserves recovery metadata when connection failure does not prove the Worker is dead", async () => {
