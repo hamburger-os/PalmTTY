@@ -8,11 +8,12 @@ PalmTTY provides shell access with the privileges of the OS user running it. Tre
 ### Required boundaries
 
 - Run PalmTTY as a normal user, not Administrator/root.
-- Default to loopback or a private overlay network.
-- Non-loopback normal mode requires authentication, secure cookies and an exact Origin allowlist.
+- Production/normal Agent configuration defaults to loopback or a private overlay network. `pnpm dev` is intentionally different: Vite listens on `0.0.0.0:5173` for private-LAN testing while the Agent stays on its configured endpoint (the example remains loopback).
+- The development launcher dynamically adds only the workstation's detected private/overlay IPv4 `http://<address>:5173` Origins as exact in-memory Origins. It does not persist them, use wildcard Origin matching, or make production Agent startup non-loopback.
+- Non-loopback normal Agent mode requires authentication, secure cookies and an exact Origin allowlist.
 - Browser login uses a bootstrap secret sent only in a POST body, never in a URL.
 - Successful login creates an in-memory HttpOnly, SameSite=Strict session cookie; Secure is required for normal non-loopback deployment.
-- Authentication and Origin are separate controls.
+- Authentication and Origin are separate controls. The LAN Vite proxy does not rewrite an arbitrary browser Origin into a trusted one; requests still have to match the generated exact development Origin and authenticate.
 - Workspace management is an explicit authenticated, exact-Origin-protected mutation surface. The directory picker and terminal-profile discovery endpoint are separate authenticated + exact-Origin bounded inspection APIs. Profile discovery checks only known Host shells and enumerates registered WSL distributions without starting them; it does not expose file contents or arbitrary command execution.
 - The browser may persist cwd/runtime/shell, a bounded workspace environment map, and startup input. Session creation and restart do not accept ad-hoc cwd/shell/environment overrides; they resolve the persisted workspace authority by ID.
 - Workspace create/update validates the selected runtime. Host shells are resolved to absolute executables. On Windows, each new/restarted Host terminal refreshes current Machine/User environment values before applying workspace overrides. WSL launch data is passed as structured argv, and configured workspace variable names are forwarded with `WSLENV`. Session creation/restart validates the stored workspace again before Worker creation.
@@ -55,11 +56,12 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 ### 必须保持的边界
 
 - 以普通用户运行，不默认提权。
-- 默认仅监听 loopback，或通过私有组网访问。
-- 非 loopback 正常模式要求认证、Secure Cookie 和精确 Origin 白名单。
+- 生产/正常 Agent 默认仍只监听 loopback，或通过私有组网访问。`pnpm dev` 是单独的开发拓扑：Vite 默认监听 `0.0.0.0:5173` 供私有 LAN 测试，但 Agent 仍使用配置中的 endpoint（示例仍是 loopback）。
+- 开发启动器只把当前机器检测到的私有/overlay IPv4 对应 `http://<address>:5173` 作为精确 Origin 临时加入内存 allowlist；不持久化、不使用 Origin 通配，也不把 production Agent 改成默认非 loopback。
+- 非 loopback 正常 Agent 模式要求认证、Secure Cookie 和精确 Origin 白名单。
 - 浏览器登录 secret 只通过 POST body 提交，不进入 URL。
 - 登录 Cookie 使用 HttpOnly、SameSite=Strict；正常非 loopback 部署要求 Secure。
-- 认证与 Origin 是独立控制。
+- 认证与 Origin 是独立控制。LAN Vite 代理不会把任意浏览器 Origin 改写成可信 Origin，请求仍必须精确匹配自动生成的 development Origin 并通过认证。
 - Workspace 目录选择器与终端 Profile 发现使用独立的“已认证 + 精确 Origin”有界 API；前者只返回目录名称/路径，后者只探测已知 Host Shell 并枚举已注册 WSL 发行版，不启动发行版，也不提供文件内容或任意命令执行。
 - Workspace 管理是显式的高权限修改面，可以持久化 cwd、运行环境、Shell、有界环境变量与启动输入；真正创建或重启 Session 时不接受临时 cwd/shell/env 覆盖，而是按 workspace ID 解析持久化配置。
 - 新建/修改 workspace 时会验证运行目标；Host Shell 解析为绝对可执行文件。Windows 每个新建/重启终端会重新读取 Machine/User 环境后再应用 Workspace environment；WSL 参数按结构化 argv 传递，并通过 `WSLENV` 转发配置变量名；创建/重启 Session 前还会再次验证持久化 workspace。
