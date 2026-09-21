@@ -41,6 +41,7 @@ Security, session and reconnect changes should include or update tests for:
 - workspace deletion blocked while a Session is active, but allowed after exit even during retention
 - Host runtime executable/cwd validation
 - WSL argv construction without shell-string interpolation and non-Windows rejection
+- Web workspace editor activation remains idempotent under repeated/StrictMode-style effect setup and does not depend on runtime capability probing to open
 
 The Agent suite includes:
 
