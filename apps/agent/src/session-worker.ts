@@ -503,14 +503,26 @@ export async function readWorkerBootstrapFromStdin(): Promise<WorkerBootstrap> {
   );
 }
 
+function traceWindowsSpawn(event: string): void {
+  if (
+    process.platform === "win32" &&
+    process.env.PALMTTY_WINDOWS_SPAWN_TRACE === "1"
+  ) {
+    process.stdout.write(`PALMTTY_WORKER_TRACE ${event}\n`);
+  }
+}
+
 export async function runSessionWorkerFromStdin(): Promise<void> {
   const bootstrap = await readWorkerBootstrapFromStdin();
+  traceWindowsSpawn("pty.spawn.begin");
   const worker = new SessionWorkerServer(bootstrap, {
     onRetired: () => {
       setImmediate(() => process.exit(0));
     }
   });
+  traceWindowsSpawn("pty.spawn.ready");
   await worker.start();
+  traceWindowsSpawn("worker.ipc.ready");
   process.stdout.write("PALMTTY_WORKER_READY\n");
 
   const shutdown = () => {
