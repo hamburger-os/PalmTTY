@@ -8,7 +8,8 @@ import {
 } from "@palmtty/protocol";
 import {
   applyEnvironmentOverrides,
-  readHostEnvironment
+  readHostEnvironment,
+  withoutEnvironmentKeys
 } from "./host-environment.js";
 import { runBoundedProcess } from "./bounded-process.js";
 import { resolveExecutable } from "./workspace-runtime.js";
@@ -37,13 +38,17 @@ async function runGit(
   workspace: WorkspaceDefinition,
   cwd: string,
   args: string[],
-  maxStdoutBytes: number
+  maxStdoutBytes: number,
+  excludedEnvironmentKeys: string[]
 ) {
   if (workspace.runtime.kind === "wsl") {
     if (process.platform !== "win32") {
       throw new Error("WSL Git integration is available only on Windows");
     }
-    const environment = await readHostEnvironment();
+    const environment = withoutEnvironmentKeys(
+      await readHostEnvironment(),
+      excludedEnvironmentKeys
+    );
     const executable = await resolveExecutable("wsl.exe", {
       cwd: process.cwd(),
       env: environment
@@ -69,9 +74,12 @@ async function runGit(
     });
   }
 
-  const hostEnvironment = applyEnvironmentOverrides(
-    await readHostEnvironment(),
-    workspace.environment ?? {}
+  const hostEnvironment = withoutEnvironmentKeys(
+    applyEnvironmentOverrides(
+      await readHostEnvironment(),
+      workspace.environment ?? {}
+    ),
+    excludedEnvironmentKeys
   );
   hostEnvironment.GIT_TERMINAL_PROMPT = "0";
   hostEnvironment.GIT_PAGER = "cat";
@@ -90,13 +98,15 @@ async function runGit(
 }
 
 async function discoverRepositoryRoot(
-  workspace: WorkspaceDefinition
+  workspace: WorkspaceDefinition,
+  excludedEnvironmentKeys: string[]
 ): Promise<string | null> {
   const result = await runGit(
     workspace,
     workspace.cwd,
     ["rev-parse", "--show-toplevel"],
-    32 * 1024
+    32 * 1024,
+    excludedEnvironmentKeys
   );
   if (result.code !== 0 || result.stdoutTruncated) return null;
   const root = result.stdout.toString("utf8").trim();
@@ -217,9 +227,10 @@ function validateGitPath(value: string): string {
 }
 
 export async function getWorkspaceGitStatus(
-  workspace: WorkspaceDefinition
+  workspace: WorkspaceDefinition,
+  excludedEnvironmentKeys: string[] = []
 ): Promise<GitStatusResponse> {
-  const root = await discoverRepositoryRoot(workspace);
+  const root = await discoverRepositoryRoot(workspace, excludedEnvironmentKeys);
   if (!root) {
     return GitStatusResponseSchema.parse({
       available: false,
@@ -234,7 +245,8 @@ export async function getWorkspaceGitStatus(
     workspace,
     root,
     ["status", "--porcelain=v1", "-z", "-b", "--untracked-files=normal"],
-    STATUS_LIMIT_BYTES
+    STATUS_LIMIT_BYTES,
+    excludedEnvironmentKeys
   );
   if (result.code !== 0 && !result.stdoutTruncated) {
     throw new Error(result.stderr.trim() || "Git status failed");
@@ -250,9 +262,10 @@ export async function getWorkspaceGitStatus(
 export async function getWorkspaceGitDiff(
   workspace: WorkspaceDefinition,
   requestedPath: string,
-  staged: boolean
+  staged: boolean,
+  excludedEnvironmentKeys: string[] = []
 ): Promise<GitDiffResponse> {
-  const root = await discoverRepositoryRoot(workspace);
+  const root = await discoverRepositoryRoot(workspace, excludedEnvironmentKeys);
   if (!root) throw new Error("Workspace is not inside a Git repository");
   const gitPath = validateGitPath(requestedPath);
 
@@ -268,7 +281,8 @@ export async function getWorkspaceGitDiff(
       "--",
       gitPath
     ],
-    DIFF_LIMIT_BYTES
+    DIFF_LIMIT_BYTES,
+    excludedEnvironmentKeys
   );
   if (result.code !== 0 && !result.stdoutTruncated) {
     throw new Error(result.stderr.trim() || "Git diff failed");
