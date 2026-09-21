@@ -10,7 +10,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Agent/Web/protocol/config packages
 - committed pnpm lockfile with frozen-lockfile CI installs
 - Windows + Ubuntu CI passing
-- Windows-only ConPTY smoke test that spawns PowerShell 7, resizes the PTY and round-trips Unicode
+- Windows ConPTY smoke coverage that prefers PowerShell 7 locally, falls back to Windows PowerShell for generic host checks, and is forced to PowerShell 7 in repository Windows CI
 - end-to-end Fastify HTTP/WebSocket/Worker IPC lifecycle coverage with deterministic PTY adapters
 - detached-process integration coverage proving a Worker survives the creator Agent process exit and can be rediscovered with replay intact
 - production dependency vulnerability audit and CodeQL
@@ -27,7 +27,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - exact Origin allowlist and non-loopback startup safety gate
 - bounded login/session-create rate limiting
 - workspace ID allowlist
-- fail-fast runtime preflight for auth/security exposure, workspace directories and shell executable resolution
+- fail-fast runtime preflight for auth/security exposure, workspace directories and shell executable resolution, exposed as the unambiguous `pnpm run preflight` package script
 - normalized per-workspace launch specs with absolute shell executables before Worker bootstrap
 - bounded client message size and terminal dimensions
 - no intentional terminal I/O logging
@@ -89,7 +89,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Worker self-healing of missing recovery record/secret without weakening conflict detection
 - oversized Worker terminal input rejection
 - detached Worker survival across complete creator Agent process exit
-- real Windows node-pty + PowerShell 7 / ConPTY Unicode smoke test
+- real Windows node-pty + ConPTY Unicode smoke test with local PowerShell fallback; repository Windows CI explicitly requires PowerShell 7
 
 ### Web/mobile
 
