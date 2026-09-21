@@ -8,7 +8,7 @@ import {
   type WorkspaceFileListResponse,
   type WorkspaceFileReadResponse
 } from "@palmtty/protocol";
-import { readHostEnvironment } from "./host-environment.js";
+import { readHostEnvironment, withoutEnvironmentKeys } from "./host-environment.js";
 import { runBoundedProcess } from "./bounded-process.js";
 import { resolveExecutable } from "./workspace-runtime.js";
 
@@ -173,12 +173,16 @@ async function runWslScript(
   workspace: WorkspaceDefinition,
   script: string,
   args: string[],
-  maxStdoutBytes: number
+  maxStdoutBytes: number,
+  excludedEnvironmentKeys: string[]
 ) {
   if (process.platform !== "win32") {
     throw new Error("WSL workspace browsing is available only on Windows");
   }
-  const environment = await readHostEnvironment();
+  const environment = withoutEnvironmentKeys(
+    await readHostEnvironment(),
+    excludedEnvironmentKeys
+  );
   const executable = await resolveExecutable("wsl.exe", {
     cwd: process.cwd(),
     env: environment
@@ -228,13 +232,15 @@ const WSL_LIST_SCRIPT = [
 
 async function listWslFiles(
   workspace: WorkspaceDefinition,
-  relativePath: string
+  relativePath: string,
+  excludedEnvironmentKeys: string[]
 ): Promise<WorkspaceFileListResponse> {
   const result = await runWslScript(
     workspace,
     WSL_LIST_SCRIPT,
     [workspace.cwd, relativePath],
-    1024 * 1024
+    1024 * 1024,
+    excludedEnvironmentKeys
   );
   if (result.code !== 0 && !result.stdoutTruncated) {
     throw new Error(result.stderr.trim() || "WSL directory listing failed");
@@ -286,13 +292,15 @@ const WSL_READ_SCRIPT = [
 
 async function readWslFile(
   workspace: WorkspaceDefinition,
-  relativePath: string
+  relativePath: string,
+  excludedEnvironmentKeys: string[]
 ): Promise<WorkspaceFileReadResponse> {
   const result = await runWslScript(
     workspace,
     WSL_READ_SCRIPT,
     [workspace.cwd, relativePath],
-    MAX_FILE_BYTES + 64 * 1024
+    MAX_FILE_BYTES + 64 * 1024,
+    excludedEnvironmentKeys
   );
   if (result.code !== 0 && !result.stdoutTruncated) {
     throw new Error(result.stderr.trim() || "WSL file read failed");
@@ -320,21 +328,23 @@ async function readWslFile(
 
 export async function listWorkspaceFiles(
   workspace: WorkspaceDefinition,
-  requestedPath: string
+  requestedPath: string,
+  excludedEnvironmentKeys: string[] = []
 ): Promise<WorkspaceFileListResponse> {
   const relativePath = normalizeWorkspaceRelativePath(requestedPath);
   return workspace.runtime.kind === "wsl"
-    ? listWslFiles(workspace, relativePath)
+    ? listWslFiles(workspace, relativePath, excludedEnvironmentKeys)
     : listHostFiles(workspace, relativePath);
 }
 
 export async function readWorkspaceFile(
   workspace: WorkspaceDefinition,
-  requestedPath: string
+  requestedPath: string,
+  excludedEnvironmentKeys: string[] = []
 ): Promise<WorkspaceFileReadResponse> {
   const relativePath = normalizeWorkspaceRelativePath(requestedPath);
   if (!relativePath) throw new Error("File path is required");
   return workspace.runtime.kind === "wsl"
-    ? readWslFile(workspace, relativePath)
+    ? readWslFile(workspace, relativePath, excludedEnvironmentKeys)
     : readHostFile(workspace, relativePath);
 }
