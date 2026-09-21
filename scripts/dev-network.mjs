@@ -1,14 +1,11 @@
+import { isIP } from "node:net";
+
 export const WEB_PORT = 5173;
 export const DEFAULT_WEB_HOST = "0.0.0.0";
 
 export function isPrivateDevelopmentIpv4(address) {
+  if (isIP(address) !== 4) return false;
   const octets = address.split(".").map(Number);
-  if (
-    octets.length !== 4 ||
-    octets.some((value) => !Number.isInteger(value) || value < 0 || value > 255)
-  ) {
-    return false;
-  }
 
   const [a, b] = octets;
   return (
