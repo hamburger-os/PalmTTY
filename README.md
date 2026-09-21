@@ -37,6 +37,7 @@ PalmTTY is **alpha**. Each terminal now runs in an independent durable Session W
 | Visual themes | Spectrum / Obsidian / Frosted with Quality / Performance rendering modes |
 | Browser or network disconnect | PTY survives while the Agent stays alive |
 | Reconnect | Sequence replay + server-side terminal snapshot fallback |
+| Session lifecycle | Explicit terminate → retained exited state → clear; no ambiguous close/kill control |
 | Mobile terminal | xterm.js PWA, special-key bar, multiline composer |
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
 | Internet exposure | HTTPS/private-network deployment only |
