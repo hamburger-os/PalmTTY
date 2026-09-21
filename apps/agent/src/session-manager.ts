@@ -78,7 +78,7 @@ export class SessionManager {
 
   constructor(
     private readonly config: PalmTTYConfig,
-    options: SessionManagerOptions = {}
+    options: SessionManagerOptions
   ) {
     this.runtimeDir = options.runtimeDir ?? defaultRuntimeDir();
     this.workerSpawner = options.workerSpawner ?? new ProcessWorkerSpawner();
@@ -88,6 +88,7 @@ export class SessionManager {
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
+    await this.workspaceStore.initialize();
     await ensureRuntimeLayout(this.runtimeDir);
     await cleanupDanglingWorkerState(this.runtimeDir);
 
