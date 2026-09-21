@@ -438,6 +438,14 @@ button.icon-button {
   white-space: nowrap;
 }
 
+.workspace-advanced {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
 .field-error {
   color: var(--danger);
   font-size: var(--text-xs);
