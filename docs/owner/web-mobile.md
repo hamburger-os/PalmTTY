@@ -10,6 +10,8 @@
 
 - Workspace 列表与数量；
 - 在网页端创建、编辑、删除持久化 Workspace；
+- “新建工作区”不等待可选运行环境探测即可打开；Host 始终可配置，WSL 选项在能力探测完成后按结果显示；
+- Workspace 对话框由 React 状态控制开关，原生 `dialog` 的激活逻辑可重复执行，兼容开发环境 StrictMode；
 - Host / WSL runtime 选择与运行目标校验；
 - 新建会话；
 - 已运行会话列表；
