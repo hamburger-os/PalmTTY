@@ -26,7 +26,7 @@ import {
 import { AppearanceControls } from "./AppearanceControls.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { useI18n } from "./i18n.js";
-import { TerminalView } from "./TerminalView.js";
+import { SessionWorkbench } from "./SessionWorkbench.js";
 import {
   WorkspaceDialog,
   workspaceRuntimeSummary
@@ -58,7 +58,7 @@ export function App() {
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspacePublic[]>([]);
   const [sessions, setSessions] = useState<SessionPublic[]>([]);
-  const [activeSession, setActiveSession] = useState<string | null>(null);
+  const [activeSession, setActiveSession] = useState<SessionPublic | null>(null);
   const [workspaceEditor, setWorkspaceEditor] = useState<WorkspaceEditor>(null);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
@@ -138,16 +138,20 @@ export function App() {
   }
 
   if (activeSession) {
+    const activeWorkspace = workspaces.find(
+      (workspace) => workspace.id === activeSession.workspaceId
+    );
     return (
-      <TerminalView
-        sessionId={activeSession}
+      <SessionWorkbench
+        sessionId={activeSession.id}
+        workspace={activeWorkspace}
         onBack={() => {
           setActiveSession(null);
           void refreshCatalog();
         }}
         onRestart={async () => {
-          const result = await restartSession(activeSession);
-          setActiveSession(result.session.id);
+          const result = await restartSession(activeSession.id);
+          setActiveSession(result.session);
         }}
       />
     );
@@ -332,7 +336,7 @@ export function App() {
                     setError(null);
                     try {
                       const result = await createSession(workspace.id);
-                      setActiveSession(result.session.id);
+                      setActiveSession(result.session);
                     } catch (cause) {
                       setError(
                         formatError(cause, "session_create_failed", translateError)
@@ -369,7 +373,7 @@ export function App() {
               <div className="session-row glass-card" key={session.id}>
                 <button
                   className="session-main"
-                  onClick={() => setActiveSession(session.id)}
+                  onClick={() => setActiveSession(session)}
                 >
                   <span className={`status-dot ${session.state}`} />
                   <span>
