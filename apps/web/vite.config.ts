@@ -1,7 +1,3 @@
-import {
-  configPathFromEnvironment,
-  loadConfig
-} from "@palmtty/config";
 import { defineConfig } from "vite";
 
 const DEFAULT_AGENT_URL = "http://127.0.0.1:7688";
@@ -16,6 +12,10 @@ function urlHost(host: string): string {
 async function developmentAgentUrl(): Promise<string> {
   if (process.env.PALMTTY_AGENT_URL) return process.env.PALMTTY_AGENT_URL;
 
+  const {
+    configPathFromEnvironment,
+    loadConfig
+  } = await import("@palmtty/config");
   const config = await loadConfig(configPathFromEnvironment());
   return `http://${urlHost(config.server.host)}:${config.server.port}`;
 }
