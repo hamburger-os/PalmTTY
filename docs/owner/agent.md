@@ -72,7 +72,7 @@ Agent 启动前的 runtime preflight 只处理认证环境、外部暴露规则�
 6. adoption 得到确认后 Worker 生命周期才正式独立于创建它的 Agent；
 7. 如果 adoption 从未提交且 Agent 失败或消失，Worker 的短创建租约到期后会自行杀 PTY、清理 recovery state 并退出，不需要额外 abort 命令，也不依赖持久化 PID 做回滚。
 
-PalmTTY 自身控制环境变量（认证 token、配置路径、开发代理/Origin/监听参数与 Windows spawn trace 开关）在 Worker bootstrap 前从规范化 Workspace 环境剔除，并从 Worker 进程环境删除；用户 PTY 只接收清理后的 Workspace 环境。
+`PALMTTY_*` 整个控制环境命名空间以及单独配置的认证 token 环境变量，在 Worker bootstrap 前从规范化 Workspace 环境剔除，并从 Worker 进程环境删除；用户 PTY 只接收清理后的 Workspace 环境。
 
 ## Session 生命周期 API
 
