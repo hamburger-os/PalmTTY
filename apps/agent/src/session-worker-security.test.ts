@@ -229,6 +229,9 @@ describe("session worker security boundary", () => {
     const definition = workspace();
     definition.environment = {
       PALMTTY_TEST_ACCESS_TOKEN: "must-not-cross-bootstrap",
+      PALMTTY_CONFIG: "must-not-cross-bootstrap",
+      PALMTTY_DEV_TRUSTED_ORIGINS: "must-not-cross-bootstrap",
+      PALMTTY_WINDOWS_SPAWN_TRACE: "must-not-cross-bootstrap",
       PALMTTY_VISIBLE: "yes"
     };
     const manager = new SessionManager(config, {
@@ -243,6 +246,17 @@ describe("session worker security boundary", () => {
       expect(capturedBootstrap).toBeDefined();
       expect(capturedBootstrap!.workspace.env.PALMTTY_TEST_ACCESS_TOKEN)
         .toBeUndefined();
+      expect(capturedBootstrap!.workspace.env.PALMTTY_CONFIG).toBeUndefined();
+      expect(capturedBootstrap!.workspace.env.PALMTTY_DEV_TRUSTED_ORIGINS)
+        .toBeUndefined();
+      expect(capturedBootstrap!.workspace.env.PALMTTY_WINDOWS_SPAWN_TRACE)
+        .toBeUndefined();
+      expect(capturedBootstrap!.excludedEnvKeys).toEqual(expect.arrayContaining([
+        "PALMTTY_TEST_ACCESS_TOKEN",
+        "PALMTTY_CONFIG",
+        "PALMTTY_DEV_TRUSTED_ORIGINS",
+        "PALMTTY_WINDOWS_SPAWN_TRACE"
+      ]));
       expect(capturedBootstrap!.workspace.env.PALMTTY_VISIBLE).toBe("yes");
     } finally {
       await manager.close();
