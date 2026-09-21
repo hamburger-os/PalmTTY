@@ -10,6 +10,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Agent/Web/protocol/config packages
 - committed pnpm lockfile with frozen-lockfile CI installs
 - Windows + Ubuntu CI passing
+- root-script syntax checks plus Node built-in tests for private-LAN address/origin discovery
 - Windows ConPTY smoke coverage that prefers PowerShell 7 locally, falls back to Windows PowerShell for generic host checks, and is forced to PowerShell 7 in repository Windows CI
 - end-to-end Fastify HTTP/WebSocket/Worker IPC lifecycle coverage with deterministic PTY adapters
 - detached-process integration coverage proving a Worker survives the creator Agent process exit and can be rediscovered with replay intact
@@ -84,7 +85,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 
 ### Test coverage
 
-- authentication, exact Origin and WebSocket subprotocol
+- authentication, exact Origin and WebSocket subprotocol, including exact dynamically generated private-LAN development Origins and rejection of neighboring/unlisted LAN Origins
 - resume-before-input/resize
 - ordered resize/input
 - browser disconnect + replay
