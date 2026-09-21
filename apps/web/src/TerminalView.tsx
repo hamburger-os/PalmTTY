@@ -346,7 +346,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
         </span>
       </header>
 
-      <div ref={hostRef} className="terminal-host" />
+      <div ref={hostRef} className="terminal-host glass-content" />
 
       <div className="keybar glass-panel" aria-label={t("terminal.specialKeys")}>
         {key("Esc", "\u001b")}
