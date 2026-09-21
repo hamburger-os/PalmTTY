@@ -6,7 +6,7 @@ PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。安全失
 
 ## 外部访问边界
 
-默认监听 127.0.0.1。非 loopback 正常模式必须同时开启认证、Secure Cookie 和明确 trustedOrigins，否则 Agent 拒绝启动。unsafeAllowInsecureLan 仅作为显式开发逃生口。
+生产/正常 Agent 的默认监听仍是 127.0.0.1。非 loopback 正常模式必须同时开启认证、Secure Cookie 和明确 trustedOrigins，否则 Agent 拒绝启动。`pnpm dev` 是单独的开发拓扑：Vite 默认监听 `0.0.0.0:5173` 供私有 LAN 调试，但 Agent 仍使用配置中的 endpoint（示例仍是 loopback）；开发启动器只把实际检测到的私有/overlay IPv4 对应 5173 Origin 作为**精确值**追加到当前 development Agent 内存 allowlist。它不启用 Origin 通配、不写回配置，也不改变生产启动。`unsafeAllowInsecureLan` 仍只作为显式逃生口。
 
 ## 浏览器认证
 
@@ -17,7 +17,7 @@ PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。安全失
 - Cookie 使用 HttpOnly、SameSite=Strict，正常非 loopback 部署要求 Secure；
 - 登录 Session 有绝对过期和数量上限；
 - 已建立 terminal WebSocket 到期后也会被主动关闭；
-- Origin 与认证始终是独立控制。
+- Origin 与认证始终是独立控制；开发 LAN Vite 也必须同时通过登录认证与动态生成的精确 Origin，不能因为流量由本机 Vite 反代就重写/伪造 Origin 绕过校验。
 
 登录 Session 不持久化，所以 Agent 重启后需要重新登录。
 
@@ -65,7 +65,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 - 终端 Profile 发现与目录浏览一样要求认证 + 精确 Origin，并具有独立限流、输出与超时边界；Host 侧只返回已知 Shell Profile，Windows WSL 侧通过 `wsl.exe --list --quiet` 枚举已注册发行版，不进入发行版执行探测脚本，也不提供任意命令执行。
 - Agent/Worker 默认不提权；
 - PTY 继承普通用户权限；
-- 默认日志不记录 terminal I/O、token、Worker secret 或 workspace env。
+- 默认日志不记录 terminal I/O、token、Worker secret 或 workspace env；Windows development spawn trace 只记录 Worker/PTTY 阶段名称和 Session ID，不记录 argv、环境变量值、启动命令或终端内容。
 
 ## 资源限制
 
@@ -83,6 +83,6 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 1. Workspace CRUD、目录浏览与终端 Profile 发现是否仍受认证 + 精确 Origin 保护；Profile 发现是否仍然只是有界枚举而不是通用执行；Session 创建/重启是否仍只消费持久化 Workspace authority，而不是接收临时 cwd/shell/env？
 2. 是否让 secret/终端内容进入日志、URL、argv 或浏览器？
-3. 是否破坏认证 + Origin + HTTPS 外部边界？
+3. 是否破坏认证 + Origin + HTTPS 外部边界？尤其检查 `pnpm dev` 的 LAN 暴露是否仍只动态加入精确私有 Origin，且没有把 production Agent 改成默认非 loopback。
 4. 是否允许未认证本地 IPC 控制 Worker？
 5. 是否把 persisted PID 当成 kill authority？
