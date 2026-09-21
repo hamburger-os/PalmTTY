@@ -144,7 +144,7 @@ export function App() {
     return (
       <SessionWorkbench
         sessionId={activeSession.id}
-        workspace={activeWorkspace}
+        {...(activeWorkspace ? { workspace: activeWorkspace } : {})}
         onBack={() => {
           setActiveSession(null);
           void refreshCatalog();
