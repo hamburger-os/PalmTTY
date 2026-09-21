@@ -13,8 +13,7 @@
 }
 
 .app-shell,
-.center-card,
-.terminal-page {
+.center-card {
   position: relative;
   z-index: 1;
 }
@@ -30,7 +29,6 @@
 }
 
 .topbar,
-.terminal-header,
 .section-heading,
 .workspace-card-heading,
 .dialog-heading,
@@ -581,47 +579,6 @@ button.directory-choose {
   padding: 0 var(--space-5) var(--space-5);
 }
 
-.terminal-page {
-  height: 100dvh;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
-  gap: 6px;
-  padding:
-    max(7px, env(safe-area-inset-top))
-    max(7px, env(safe-area-inset-right))
-    max(7px, env(safe-area-inset-bottom))
-    max(7px, env(safe-area-inset-left));
-  overflow: hidden;
-  background: transparent;
-}
-
-.terminal-header,
-.keybar,
-.composer {
-  border-radius: var(--radius-md);
-}
-
-.terminal-header {
-  min-height: 48px;
-  padding: 7px 9px;
-}
-
-.terminal-header-actions {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: var(--space-2);
-}
-
-.terminal-restart-error {
-  max-width: min(32vw, 220px);
-  overflow: hidden;
-  color: var(--danger);
-  font-size: var(--text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .connection {
   padding: 4px 8px;
   color: var(--text-muted);
@@ -659,6 +616,7 @@ button.directory-choose {
 
 .keybar {
   display: flex;
+  border-radius: var(--radius-md);
   gap: 6px;
   overflow-x: auto;
   padding: 7px 8px;
@@ -682,32 +640,6 @@ button.directory-choose {
   color: var(--text-on-accent);
   background: color-mix(in srgb, var(--spectrum-blue) 58%, var(--control-bg));
   border-color: color-mix(in srgb, var(--spectrum-blue) 70%, transparent);
-}
-
-.composer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2);
-  padding: 8px;
-}
-
-.composer textarea {
-  min-height: 46px;
-  max-height: 120px;
-  resize: none;
-  font-size: 16px;
-}
-
-.composer button {
-  min-width: 72px;
-  font-weight: 700;
-}
-
-@media (min-width: 700px) {
-  .terminal-page {
-    padding-left: max(10px, env(safe-area-inset-left));
-    padding-right: max(10px, env(safe-area-inset-right));
-  }
 }
 
 @media (max-width: 620px) {
@@ -791,24 +723,9 @@ button.directory-choose {
     margin-left: auto;
   }
 
-  .composer {
-    grid-template-columns: minmax(0, 1fr) 68px;
-  }
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
-  .terminal-page {
-    gap: 4px;
-    padding-top: max(4px, env(safe-area-inset-top));
-    padding-bottom: max(4px, env(safe-area-inset-bottom));
-  }
-
-  .terminal-header {
-    min-height: 38px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-  }
-
   .terminal-host {
     padding-top: 4px;
     padding-bottom: 5px;
@@ -823,14 +740,6 @@ button.directory-choose {
     min-height: 34px;
   }
 
-  .composer {
-    padding-top: 5px;
-    padding-bottom: 5px;
-  }
-
-  .composer textarea {
-    min-height: 38px;
-  }
 }
 
 
@@ -942,6 +851,7 @@ button.directory-choose {
 
 .terminal-pane-shell {
   height: 100%;
+  margin-top: 0;
   min-height: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
@@ -995,6 +905,7 @@ button.directory-choose {
 
 .tool-pane {
   height: 100%;
+  margin-top: 0;
   min-height: 0;
   overflow: hidden;
   border-radius: var(--radius-lg);
