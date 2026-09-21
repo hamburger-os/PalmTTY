@@ -2,7 +2,9 @@ import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import type { WorkspaceDefinition } from "@palmtty/protocol";
 import {
+  buildWslLaunchArgs,
   resolveExecutable,
   resolveRuntimeWorkspace
 } from "./workspace-runtime.js";
@@ -24,6 +26,19 @@ async function fakeExecutable(): Promise<{ directory: string; executable: string
   await writeFile(executable, "");
   if (process.platform !== "win32") await chmod(executable, 0o700);
   return { directory, executable };
+}
+
+function hostWorkspace(
+  cwd: string,
+  shell: string,
+  id = "node"
+): WorkspaceDefinition {
+  return {
+    id,
+    name: "Node",
+    cwd,
+    runtime: { kind: "host", shell, args: ["--version"] }
+  };
 }
 
 describe("workspace runtime resolution", () => {
@@ -76,7 +91,7 @@ describe("workspace runtime resolution", () => {
     expect(path.normalize(resolved)).toBe(path.normalize(alias));
   });
 
-  it("keeps an explicit protected package shellPath authoritative", async () => {
+  it("keeps an explicit protected package shell authoritative", async () => {
     if (process.platform !== "win32") return;
 
     const programRoot = await mkdtemp(path.join(os.tmpdir(), "palmtty-programfiles-"));
@@ -134,18 +149,12 @@ describe("workspace runtime resolution", () => {
     );
   });
 
-  it("reports an executable mistakenly configured as cwd as not a directory", async () => {
+  it("reports an executable mistakenly configured as host cwd as not a directory", async () => {
     const { executable } = await fakeExecutable();
 
-    await expect(resolveRuntimeWorkspace({
-      id: "bad-cwd",
-      name: "Bad cwd",
-      cwd: executable,
-      shell: "custom",
-      shellPath: process.execPath,
-      args: [],
-      env: {}
-    })).rejects.toThrow(
+    await expect(resolveRuntimeWorkspace(
+      hostWorkspace(executable, process.execPath, "bad-cwd")
+    )).rejects.toThrow(
       `Workspace "bad-cwd" is not a directory: ${executable}`
     );
   });
@@ -154,35 +163,48 @@ describe("workspace runtime resolution", () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "palmtty-workspace-"));
     tempDirs.add(directory);
 
-    await expect(resolveRuntimeWorkspace({
-      id: "missing-shell",
-      name: "Missing shell",
-      cwd: directory,
-      shell: "custom",
-      shellPath: "definitely-not-a-real-palmtty-shell",
-      args: [],
-      env: {}
-    })).rejects.toThrow(
+    await expect(resolveRuntimeWorkspace(
+      hostWorkspace(directory, "definitely-not-a-real-palmtty-shell", "missing-shell")
+    )).rejects.toThrow(
       'Workspace "missing-shell" is not launchable: Shell executable "definitely-not-a-real-palmtty-shell" was not found.'
     );
   });
 
-  it("normalizes configured shell paths before Worker bootstrap", async () => {
+  it("normalizes configured host shell paths before Worker bootstrap", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "palmtty-workspace-"));
     tempDirs.add(directory);
 
-    const workspace = await resolveRuntimeWorkspace({
-      id: "node",
-      name: "Node",
-      cwd: directory,
-      shell: "custom",
-      shellPath: process.execPath,
-      args: ["--version"],
-      env: {}
-    });
+    const workspace = await resolveRuntimeWorkspace(
+      hostWorkspace(directory, process.execPath)
+    );
 
     expect(path.isAbsolute(workspace.executable)).toBe(true);
     expect(workspace.id).toBe("node");
     expect(workspace.cwd).toBe(await realpath(directory));
+    expect(workspace.env).toEqual({});
+  });
+
+  it("builds WSL launch arguments without shell interpolation", () => {
+    const workspace: WorkspaceDefinition = {
+      id: "ubuntu",
+      name: "Ubuntu",
+      cwd: "/home/dev/project with spaces",
+      runtime: {
+        kind: "wsl",
+        distribution: "Ubuntu-24.04",
+        shell: "/bin/bash",
+        args: ["-l"]
+      }
+    };
+
+    expect(buildWslLaunchArgs(workspace)).toEqual([
+      "--distribution",
+      "Ubuntu-24.04",
+      "--cd",
+      "/home/dev/project with spaces",
+      "--exec",
+      "/bin/bash",
+      "-l"
+    ]);
   });
 });
