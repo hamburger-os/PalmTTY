@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -29,8 +29,9 @@ describe("workspace directory browser", () => {
       path: root
     });
 
-    expect(listing.currentPath).toBe(root);
-    expect(listing.parentPath).toBe(path.dirname(root));
+    const canonicalRoot = await realpath(root);
+    expect(listing.currentPath).toBe(canonicalRoot);
+    expect(listing.parentPath).toBe(path.dirname(canonicalRoot));
     expect(listing.directories.map((entry) => entry.label)).toEqual([
       "alpha",
       "beta"
