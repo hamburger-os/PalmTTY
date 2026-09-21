@@ -22,7 +22,9 @@ Review:
 
 ## Static scan
 
-Use repository search equivalent to:
+Run `pnpm theme:check` first. It enforces the high-confidence repository guardrails for native dialogs, forbidden rendering effects, backdrop ownership, component hard-coded colors, and required theme/surface markers.
+
+Then use repository search equivalent to:
 
 ```bash
 rg 'window\.(alert|confirm|prompt)' apps/web/src
@@ -93,6 +95,7 @@ Write the report in Chinese:
 
 ## 验证
 - pnpm docs:check:
+- pnpm theme:check:
 - pnpm typecheck:
 - pnpm test:
 - pnpm build:
