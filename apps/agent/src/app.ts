@@ -237,7 +237,10 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       return reply.code(201).send({ session });
     } catch (error) {
       request.log.warn({ err: error }, "Session creation failed");
-      return reply.code(409).send({ error: "session_create_failed" });
+      return reply.code(409).send({
+        error: "session_create_failed",
+        message: error instanceof Error ? error.message : "Session creation failed"
+      });
     }
   });
 
