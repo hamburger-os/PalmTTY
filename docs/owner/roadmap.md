@@ -11,7 +11,7 @@
 - Agent 作为可重启 HTTP/WebSocket 控制面；
 - Windows Named Pipe / Unix socket 本地 IPC；
 - 每 Session 256-bit secret、READY + authenticated adoption 创建事务与 Worker-owned recovery metadata；
-- Agent 启动前 fail-fast preflight：认证/安全配置、workspace 目录与 Shell 绝对路径解析；
+- Agent 启动前 fail-fast preflight：认证/安全配置与 TCP 监听端点；Workspace 改为独立持久化目录，在创建/编辑和 Session 启动时验证；
 - Agent 启动并行 rediscovery、认证和有限重试；
 - Agent 正常/异常退出不终止 Worker；
 - IPC 暂时不可达不会删除可能仍存活 Worker 的 recovery capability；
@@ -20,7 +20,9 @@
 - 未 adoption Worker 通过短创建租约自清理；`adopt` 为幂等提交，可跨 IPC 重连安全重试，确认后才进入持久 Session；
 - 单用户 token 登录和 Cookie 会话；
 - Origin、安全启动闸门和基础限流；
-- 手机端 xterm/PWA、特殊键栏与长文本 Composer；
+- 手机端 xterm/PWA、特殊键栏与长文本 Composer，中文/英文界面切换；
+- Web 端持久化 Workspace CRUD，Host / WSL runtime adapter，Session 仍只按 workspace ID 创建；
+- Ubuntu CI 已覆盖 Linux host runtime；Windows CI 保持 PowerShell 7/ConPTY 路径；macOS adapter 已按同一 Host 模型实现但尚无仓库 CI；
 - Windows/Ubuntu 双平台 CI；
 - 真正的 detached-process 集成测试：创建 Worker 的 Agent 进程退出后，另一个 Agent 可找回同一活终端及 replay；
 - Windows CI 实际启动 PowerShell 7/ConPTY，并验证 resize 与中文 Unicode 往返；
@@ -76,7 +78,8 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 - Git 状态/diff；
 - 只读文件预览；
 - 本地服务入口；
-- WSL/Linux/macOS 适配。
+- WSL 实机长期验证与发行版边界测试；
+- 增加 macOS CI / 实机验证后再提升其支持等级。
 
 ### P3：更强持久化（需要重新设计）
 
