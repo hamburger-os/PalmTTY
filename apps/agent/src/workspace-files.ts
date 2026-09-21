@@ -99,9 +99,17 @@ async function listHostFiles(
     }
 
     if (!info.isDirectory() && !info.isFile()) continue;
+    let entryPath: string;
+    try {
+      entryPath = normalizeWorkspaceRelativePath(
+        childRelativePath(relativePath, entry.name)
+      );
+    } catch {
+      continue;
+    }
     entries.push({
       name: entry.name,
-      path: childRelativePath(relativePath, entry.name),
+      path: entryPath,
       kind: info.isDirectory() ? "directory" : "file",
       ...(info.isFile() ? { size: info.size } : {})
     });
@@ -254,9 +262,17 @@ async function listWslFiles(
     const size = records[index + 2];
     if (!name || (type !== "d" && type !== "f")) continue;
     if (entries.length >= MAX_ENTRIES) break;
+    let entryPath: string;
+    try {
+      entryPath = normalizeWorkspaceRelativePath(
+        childRelativePath(relativePath, name)
+      );
+    } catch {
+      continue;
+    }
     entries.push({
       name,
-      path: childRelativePath(relativePath, name),
+      path: entryPath,
       kind: type === "d" ? "directory" : "file",
       ...(type === "f" ? { size: Number.parseInt(size || "0", 10) || 0 } : {})
     });
