@@ -2,7 +2,10 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { browseWorkspaceDirectory } from "./workspace-directory-browser.js";
+import {
+  browseWorkspaceDirectory,
+  buildWslDirectoryBrowseArgs
+} from "./workspace-directory-browser.js";
 
 const tempDirs = new Set<string>();
 
@@ -34,6 +37,15 @@ describe("workspace directory browser", () => {
     ]);
     expect(listing.directories.every((entry) => path.isAbsolute(entry.path)))
       .toBe(true);
+  });
+
+  it("keeps WSL directory paths out of the fixed shell script", () => {
+    const dangerousPath = "/home/dev/project; touch /tmp/pwned";
+    const args = buildWslDirectoryBrowseArgs("Ubuntu-24.04", dangerousPath);
+
+    expect(args.slice(0, 2)).toEqual(["--distribution", "Ubuntu-24.04"]);
+    expect(args.at(-1)).toBe(dangerousPath);
+    expect(args[args.indexOf("-c") + 1]).not.toContain(dangerousPath);
   });
 
   it("rejects a host file path", async () => {
