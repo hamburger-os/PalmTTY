@@ -21,6 +21,7 @@
 - 单用户 token 登录和 Cookie 会话；
 - Origin、安全启动闸门和基础限流；
 - 手机端 xterm/PWA、特殊键栏与长文本 Composer，中文/英文界面切换；
+- PalmTTY 自有的三主题视觉系统（炫彩流光/黑曜石/白霜）、效果/性能两档、reduced-motion 处理与主题审查 skills；
 - Web 端持久化 Workspace CRUD，Host / WSL runtime adapter，Session 仍只按 workspace ID 创建；
 - Ubuntu CI 已覆盖 Linux host runtime；Windows CI 保持 PowerShell 7/ConPTY 路径；macOS adapter 已按同一 Host 模型实现但尚无仓库 CI；
 - Windows/Ubuntu 双平台 CI；
