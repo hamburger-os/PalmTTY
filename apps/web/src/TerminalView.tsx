@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   ServerMessageSchema,
   WS_SUBPROTOCOL,
@@ -31,6 +31,7 @@ function controlCharacter(value: string): string | undefined {
 export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack: () => void }) {
   const { t } = useI18n();
   const { terminalTheme } = useTheme();
+  const translateRef = useRef(t);
   const hostRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -44,6 +45,14 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
   const [composer, setComposer] = useState("");
+
+  useEffect(() => {
+    translateRef.current = t;
+  }, [t]);
+
+  const terminalSurfaceStyle = terminalTheme.background
+    ? ({ "--terminal-background": terminalTheme.background } as CSSProperties)
+    : undefined;
 
   function sendInput(data: string): boolean {
     const socket = socketRef.current;
@@ -240,7 +249,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
           ready = false;
           inputReadyRef.current = false;
           void enqueueTerminalWrite(
-            `\r\n\u001b[90m${t("terminal.sessionExited", {
+            `\r\n\u001b[90m${translateRef.current("terminal.sessionExited", {
               code: message.exitCode === undefined ? "" : ` (${message.exitCode})`
             })}\u001b[0m\r\n`
           );
@@ -310,7 +319,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
       terminal.dispose();
       terminalRef.current = null;
     };
-  }, [sessionId, t]);
+  }, [sessionId]);
 
   useEffect(() => {
     const terminal = terminalRef.current;
@@ -359,7 +368,11 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
         </span>
       </header>
 
-      <div ref={hostRef} className="terminal-host glass-content" />
+      <div
+        ref={hostRef}
+        className="terminal-host terminal-surface"
+        style={terminalSurfaceStyle}
+      />
 
       <div className="keybar glass-panel" aria-label={t("terminal.specialKeys")}>
         {key("Esc", "\u001b")}
