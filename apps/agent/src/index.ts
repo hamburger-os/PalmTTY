@@ -20,7 +20,7 @@ async function main() {
 
   const configPath = configPathFromArgs();
   const config = await loadConfig(configPath);
-  const preflight = await preflightRuntime(config);
+  await preflightRuntime(config);
 
   if (config.server.unsafeAllowInsecureLan) {
     console.warn(
@@ -31,16 +31,12 @@ async function main() {
 
   if (process.argv.includes("--preflight")) {
     console.log(
-      `[PalmTTY] preflight passed for ${preflight.workspaces.size} workspace(s): ${configPath}`
+      `[PalmTTY] preflight passed: ${configPath}`
     );
     return;
   }
 
-  const app = await buildApp(config, {
-    sessionManager: {
-      runtimeWorkspaces: preflight.workspaces
-    }
-  });
+  const app = await buildApp(config);
   try {
     await app.listen({ host: config.server.host, port: config.server.port });
   } catch (error) {
