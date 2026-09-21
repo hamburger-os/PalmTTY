@@ -192,7 +192,7 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
+      <header className="topbar glass-shell">
         <div>
           <div className="eyebrow">{t("app.eyebrow")}</div>
           <h1>PalmTTY</h1>
