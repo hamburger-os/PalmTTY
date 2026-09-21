@@ -185,6 +185,21 @@ const WSL_DIRECTORY_SCRIPT = [
   "done"
 ].join("\n");
 
+export function buildWslDirectoryBrowseArgs(
+  distribution: string | undefined,
+  requestedPath?: string
+): string[] {
+  return [
+    ...(distribution ? ["--distribution", distribution] : []),
+    "--exec",
+    "/bin/sh",
+    "-c",
+    WSL_DIRECTORY_SCRIPT,
+    "palmtty-directory-browser",
+    requestedPath ?? ""
+  ];
+}
+
 async function browseWslDirectory(
   distribution: string | undefined,
   requestedPath?: string
@@ -197,18 +212,10 @@ async function browseWslDirectory(
     cwd: process.cwd(),
     env: process.env
   });
-  const prefix = distribution
-    ? ["--distribution", distribution]
-    : [];
-  const output = await runCapturedProcess(executable, [
-    ...prefix,
-    "--exec",
-    "/bin/sh",
-    "-c",
-    WSL_DIRECTORY_SCRIPT,
-    "palmtty-directory-browser",
-    requestedPath ?? ""
-  ]);
+  const output = await runCapturedProcess(
+    executable,
+    buildWslDirectoryBrowseArgs(distribution, requestedPath)
+  );
   const records = output.split("\0").filter((value) => value.length > 0);
   const currentPath = records[0];
   const home = records[1];
