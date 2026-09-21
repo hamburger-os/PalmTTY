@@ -10,10 +10,11 @@ import type {
   RuntimeCapabilities,
   WorkspacePublic
 } from "@palmtty/protocol";
+import { ensureModalDialogOpen } from "./dialog-controller.js";
 import { useI18n } from "./i18n.js";
 
 type Props = {
-  capabilities: RuntimeCapabilities;
+  capabilities: RuntimeCapabilities | null;
   workspace?: WorkspacePublic;
   busy: boolean;
   error: string | null;
@@ -78,21 +79,19 @@ export function WorkspaceDialog({
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    dialog.showModal();
-    return () => {
-      if (dialog.open) dialog.close();
-    };
+    ensureModalDialogOpen(dialog);
   }, []);
 
   const canChooseWsl =
-    capabilities.runtimes.wsl || workspace?.runtime.kind === "wsl";
+    capabilities?.runtimes.wsl || workspace?.runtime.kind === "wsl";
 
   const shellPlaceholder = useMemo(() => {
     if (kind === "wsl") return t("workspace.shellWsl");
+    if (!capabilities) return t("workspace.shellHostGeneric");
     return capabilities.platform === "win32"
       ? t("workspace.shellHostWindows")
       : t("workspace.shellHostUnix");
-  }, [capabilities.platform, kind, t]);
+  }, [capabilities, kind, t]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -131,13 +130,9 @@ export function WorkspaceDialog({
       className="workspace-dialog"
       aria-labelledby="workspace-dialog-title"
       onCancel={(event) => {
-        if (busy) {
-          event.preventDefault();
-          return;
-        }
-        onClose();
+        event.preventDefault();
+        if (!busy) onClose();
       }}
-      onClose={onClose}
     >
       <form className="workspace-form" onSubmit={(event) => void submit(event)}>
         <div className="dialog-heading">
