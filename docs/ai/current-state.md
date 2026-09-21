@@ -43,7 +43,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - one independent detached Worker process per Session
 - Worker owns node-pty/ConPTY, headless xterm, sequence number, replay history and exited-session retention
 - Windows Named Pipe IPC; Unix-domain-socket IPC on current non-Windows CI hosts
-- Windows PTY creation uses node-pty's bundled ConPTY DLL path; this avoids node-pty 1.1.0's separate console-list helper on explicit kill, which can surface a transient console window and has upstream teardown races; root `pnpm dev` also enables content-free Worker/PTTY phase tracing (`worker.spawn.begin`, `pty.spawn.begin`, `pty.spawn.ready`, `worker.ipc.ready`, `worker.spawn.ready`) so real-host flash reports can be localized without logging argv, environment values or terminal I/O
+- Windows PTY creation uses node-pty's bundled ConPTY DLL path; this avoids node-pty 1.1.0's separate console-list helper on explicit kill, which can surface a transient console window and has upstream teardown races; root `pnpm dev` also enables content-free runtime/Worker/PTTY phase tracing (`runtime.resolve.begin`, `runtime.resolve.ready`, `worker.spawn.begin`, `pty.spawn.begin`, `pty.spawn.ready`, `worker.ipc.ready`, `worker.spawn.ready`) so real-host flash reports can be localized without logging argv, environment values or terminal I/O
 - length-prefixed bounded JSON frames
 - per-session 256-bit Worker secret
 - bootstrap delivered over anonymous stdin, never argv/URL
