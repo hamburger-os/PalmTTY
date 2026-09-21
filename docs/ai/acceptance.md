@@ -36,7 +36,9 @@ Security, session and reconnect changes should include or update tests for:
 - detached Worker survival after the creator Agent process exits
 - auth-session expiry closing established sockets
 - backpressure / slow-client cutoff
-- exit delivery and retained-session cleanup
+- explicit terminate action transitions an active Session through `stopping` to `exited`, repeated terminate is idempotent, and `stopping` still counts as active
+- active/stopping Sessions reject clear/delete, while exited/failed Sessions can be cleared immediately and disappear from the registry
+- exit delivery and retention-expiry cleanup
 - concurrent maxSessions enforcement
 - workspace CRUD requires authentication + exact Origin
 - workspace persistence round-trip and duplicate-ID rejection
@@ -51,7 +53,7 @@ The Agent suite includes:
 
 - end-to-end Fastify HTTP/WebSocket + Worker IPC coverage with deterministic PTYs;
 - a real detached-process integration test where one Agent process creates a Worker and exits, and another Agent later rediscovers the same live terminal;
-- Windows CI coverage using real node-pty + PowerShell 7 / ConPTY and Unicode, while local Windows checks may use Windows PowerShell for generic ConPTY/process coverage;
+- Windows CI coverage using real node-pty + PowerShell 7 / ConPTY and Unicode, including PalmTTY's bundled-ConPTY-DLL path used to avoid node-pty's explicit-kill console-list helper; local Windows checks may use Windows PowerShell for generic ConPTY/process coverage;
 - workspace-runtime coverage for absolute host-shell resolution, current-user WindowsApps alias preference, executable-as-cwd diagnostics, structured WSL argv, and platform gating;
 - workspace-store coverage for versioned persistent CRUD;
 - Worker storage coverage asserting the runtime recovery generation stays aligned with the private Worker IPC protocol generation.
@@ -100,6 +102,8 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 - run a Unicode/CJK command;
 - start Codex CLI;
 - Ctrl+C a foreground command;
+- terminate a running Session from the list and confirm it visibly transitions/finishes without a console-window flash on the Windows desktop;
+- clear the exited Session and confirm the retained card/history disappears immediately;
 - resize the browser;
 - close/reopen the browser view without losing PTY;
 - restart only the PalmTTY Agent, sign in again and return to the same live Session;
