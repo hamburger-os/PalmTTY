@@ -41,31 +41,70 @@ describe("workspace runtime resolution", () => {
     expect(path.normalize(resolved)).toBe(path.normalize(await realpath(executable)));
   });
 
-  it("prefers the current user's WindowsApps execution-alias directory", async () => {
+  it("skips protected package PATH entries and accepts the user App Execution Alias", async () => {
     if (process.platform !== "win32") return;
 
-    const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-localappdata-"));
-    tempDirs.add(root);
-    const windowsApps = path.join(root, "Microsoft", "WindowsApps");
-    const earlier = await mkdtemp(path.join(os.tmpdir(), "palmtty-earlier-path-"));
-    tempDirs.add(earlier);
+    const localRoot = await mkdtemp(path.join(os.tmpdir(), "palmtty-localappdata-"));
+    const programRoot = await mkdtemp(path.join(os.tmpdir(), "palmtty-programfiles-"));
+    tempDirs.add(localRoot);
+    tempDirs.add(programRoot);
+
+    const windowsApps = path.join(localRoot, "Microsoft", "WindowsApps");
+    const protectedPackage = path.join(
+      programRoot,
+      "WindowsApps",
+      "Microsoft.PowerShell_7.6.6.0_x64__test"
+    );
     await mkdir(windowsApps, { recursive: true });
+    await mkdir(protectedPackage, { recursive: true });
 
     const alias = path.join(windowsApps, "pwsh.exe");
-    const earlierExecutable = path.join(earlier, "pwsh.exe");
+    const protectedExecutable = path.join(protectedPackage, "pwsh.exe");
     await writeFile(alias, "");
-    await writeFile(earlierExecutable, "");
+    await writeFile(protectedExecutable, "");
 
     const resolved = await resolveExecutable("pwsh.exe", {
-      cwd: root,
+      cwd: localRoot,
       env: {
-        LOCALAPPDATA: root,
-        PATH: [earlier, windowsApps].join(path.delimiter),
+        LOCALAPPDATA: localRoot,
+        ProgramFiles: programRoot,
+        PATH: [protectedPackage, windowsApps].join(path.delimiter),
         PATHEXT: ".EXE"
       }
     });
 
     expect(path.normalize(resolved)).toBe(path.normalize(alias));
+  });
+
+  it("keeps ordinary PATH precedence ahead of the user WindowsApps alias", async () => {
+    if (process.platform !== "win32") return;
+
+    const localRoot = await mkdtemp(path.join(os.tmpdir(), "palmtty-localappdata-"));
+    const ordinary = await mkdtemp(path.join(os.tmpdir(), "palmtty-ordinary-path-"));
+    tempDirs.add(localRoot);
+    tempDirs.add(ordinary);
+
+    const windowsApps = path.join(localRoot, "Microsoft", "WindowsApps");
+    await mkdir(windowsApps, { recursive: true });
+
+    const alias = path.join(windowsApps, "pwsh.exe");
+    const ordinaryExecutable = path.join(ordinary, "pwsh.exe");
+    await writeFile(alias, "");
+    await writeFile(ordinaryExecutable, "");
+
+    const resolved = await resolveExecutable("pwsh.exe", {
+      cwd: localRoot,
+      env: {
+        LOCALAPPDATA: localRoot,
+        ProgramFiles: "C:\\Program Files",
+        PATH: [ordinary, windowsApps].join(path.delimiter),
+        PATHEXT: ".EXE"
+      }
+    });
+
+    expect(path.normalize(resolved)).toBe(
+      path.normalize(await realpath(ordinaryExecutable))
+    );
   });
 
   it("reports an executable mistakenly configured as cwd as not a directory", async () => {
