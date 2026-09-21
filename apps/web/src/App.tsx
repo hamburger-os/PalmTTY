@@ -64,12 +64,16 @@ export function App() {
   }, []);
 
   const loadAuthenticatedState = useCallback(async () => {
-    const [, runtime] = await Promise.all([
-      refreshCatalog(),
-      runtimeCapabilities()
-    ]);
-    setCapabilities(runtime);
-  }, [refreshCatalog]);
+    void runtimeCapabilities()
+      .then((runtime) => {
+        setCapabilities(runtime);
+      })
+      .catch(() => {
+        setCapabilities(null);
+        setError(translateError("runtime_capabilities_failed"));
+      });
+    await refreshCatalog();
+  }, [refreshCatalog, translateError]);
 
   useEffect(() => {
     void (async () => {
@@ -221,7 +225,6 @@ export function App() {
           </div>
           <button
             className="ghost compact"
-            disabled={!capabilities}
             onClick={() => {
               setWorkspaceError(null);
               setWorkspaceEditor("new");
@@ -333,7 +336,7 @@ export function App() {
         </div>
       </section>
 
-      {workspaceEditor && capabilities && (
+      {workspaceEditor && (
         <WorkspaceDialog
           capabilities={capabilities}
           {...(workspaceEditor === "new"
