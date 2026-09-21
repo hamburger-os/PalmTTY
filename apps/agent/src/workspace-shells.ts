@@ -34,13 +34,6 @@ const UNIX_CANDIDATES: Candidate[] = [
   { id: "sh", label: "POSIX sh", program: "sh" }
 ];
 
-function sameExecutable(left: string, right: string): boolean {
-  if (process.platform === "win32") {
-    return path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase();
-  }
-  return path.resolve(left) === path.resolve(right);
-}
-
 async function detectHostShellProfiles(): Promise<ShellProfile[]> {
   const environment = await readHostEnvironment();
   const cwd = process.cwd();
