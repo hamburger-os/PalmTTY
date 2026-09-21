@@ -33,7 +33,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - host runtime adapter with absolute executable normalization, including current-user Windows App Execution Aliases for Store/MSIX PowerShell; each new/restarted Windows terminal refreshes Machine/User environment variables from Windows before resolving the shell and PATH
 - Windows WSL runtime adapter using structured `wsl.exe` argv for distribution/cwd/shell rather than shell-string interpolation; configured workspace environment variables are forwarded by preserving existing colon-delimited `WSLENV` entries/flags and appending bounded names
 - Linux host runtime exercised by Ubuntu CI; macOS shares the host adapter but is not covered by repository CI
-- root development launcher derives the Agent target from the validated PalmTTY config, injects it into host-independent Vite tooling, and Vite refuses silent dev-port fallback
+- root development launcher derives the Agent target from the validated PalmTTY config, keeps the Agent on its configured endpoint (the example remains loopback), and exposes Vite on `0.0.0.0:5173` by default for private-LAN development; it enumerates current RFC1918/link-local/100.64/10 IPv4 addresses and adds only those exact `http://<address>:5173` Origins to the development Agent in memory, while Vite still refuses silent dev-port fallback; `PALMTTY_WEB_HOST` can override the development listener
 - bounded client message size and terminal dimensions
 - no intentional terminal I/O logging
 - Agent is a replaceable control plane and no longer owns PTYs or canonical terminal state
@@ -43,7 +43,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - one independent detached Worker process per Session
 - Worker owns node-pty/ConPTY, headless xterm, sequence number, replay history and exited-session retention
 - Windows Named Pipe IPC; Unix-domain-socket IPC on current non-Windows CI hosts
-- Windows PTY creation uses node-pty's bundled ConPTY DLL path; this avoids node-pty 1.1.0's separate console-list helper on explicit kill, which can surface a transient console window and has upstream teardown races
+- Windows PTY creation uses node-pty's bundled ConPTY DLL path; this avoids node-pty 1.1.0's separate console-list helper on explicit kill, which can surface a transient console window and has upstream teardown races; root `pnpm dev` also enables content-free Worker/PTTY phase tracing (`worker.spawn.begin`, `pty.spawn.begin`, `pty.spawn.ready`, `worker.ipc.ready`, `worker.spawn.ready`) so real-host flash reports can be localized without logging argv, environment values or terminal I/O
 - length-prefixed bounded JSON frames
 - per-session 256-bit Worker secret
 - bootstrap delivered over anonymous stdin, never argv/URL
@@ -137,7 +137,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - No multi-user ACL.
 - Reverse-proxy/Tailscale examples are documentation/configuration, not automated setup.
 - Real owner workstation + mobile Safari/Chrome + long-running Codex validation remains required.
-- Windows explicit-termination “no visible console flash” remains a real-host visual acceptance check; CI exercises the bundled ConPTY DLL path but cannot assert desktop window visibility.
+- Windows “no visible console flash” remains a real-host visual acceptance check for both PTY creation and explicit termination; CI exercises the bundled ConPTY DLL path but cannot assert desktop window visibility. Development spawn-phase tracing narrows the responsible stage but does not claim to remove an upstream ConPTY/node-pty window if one is still shown.
 - Potentially-live but unreachable recovery records are deliberately preserved when process death cannot be proven; this favors terminal survival over aggressive metadata reclamation.
 - No Git/file preview subsystem yet.
 - WSL support is implemented but still needs real owner-host/long-running validation, including distribution enumeration, default-shell launch semantics, directory selection, and workspace-variable forwarding through `WSLENV`; repository CI does not provide a real WSL environment.
