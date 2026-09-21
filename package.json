@@ -9,8 +9,8 @@
   },
   "scripts": {
     "build": "pnpm -r --if-present build",
-    "doctor": "pnpm --filter @palmtty/protocol build && pnpm --filter @palmtty/config build && pnpm --filter @palmtty/agent doctor",
-    "dev": "pnpm doctor && pnpm --parallel --filter @palmtty/agent --filter @palmtty/web dev",
+    "preflight": "pnpm --filter @palmtty/protocol build && pnpm --filter @palmtty/config build && pnpm --filter @palmtty/agent run preflight",
+    "dev": "pnpm run preflight && pnpm --parallel --filter @palmtty/agent --filter @palmtty/web dev",
     "start": "pnpm --filter @palmtty/agent start",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
