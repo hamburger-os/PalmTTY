@@ -52,18 +52,37 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
 
   const currentLabel = useMemo(() => path || t("files.root"), [path, t]);
 
-  const openFile = (filePath: string) => {
+  useEffect(() => {
+    if (!selectedPath) {
+      setSelected(null);
+      setReading(false);
+      return;
+    }
+
+    let cancelled = false;
     setReading(true);
     setError(null);
-    setSelectedPath(filePath);
-    void readWorkspaceFile(workspaceId, filePath)
-      .then(setSelected)
+    setSelected(null);
+    void readWorkspaceFile(workspaceId, selectedPath)
+      .then((result) => {
+        if (!cancelled) setSelected(result);
+      })
       .catch((cause) => {
+        if (cancelled) return;
         const code = cause instanceof ApiError ? cause.code : "workspace_file_unavailable";
         setError(translateError(code));
-        setSelected(null);
       })
-      .finally(() => setReading(false));
+      .finally(() => {
+        if (!cancelled) setReading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, selectedPath, translateError]);
+
+  const openFile = (filePath: string) => {
+    setSelectedPath(filePath);
   };
 
   return (
