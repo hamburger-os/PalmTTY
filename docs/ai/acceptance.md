@@ -37,16 +37,19 @@ Security, session and reconnect changes should include or update tests for:
 - auth-session expiry closing established sockets
 - backpressure / slow-client cutoff
 - explicit terminate action transitions an active Session through `stopping` to `exited`, repeated terminate is idempotent, and `stopping` still counts as active
+- explicit restart waits for terminal exit, retires the previous retained Session, creates a new Session ID with the previous geometry, and does not accept ad-hoc launch overrides
 - active/stopping Sessions reject clear/delete, while exited/failed Sessions can be cleared immediately and disappear from the registry
 - exit delivery and retention-expiry cleanup
 - concurrent maxSessions enforcement
 - workspace CRUD requires authentication + exact Origin
 - workspace persistence round-trip and duplicate-ID rejection
 - workspace deletion blocked while a Session is active, but allowed after exit even during retention
-- Host runtime executable/cwd validation
-- WSL argv construction without shell-string interpolation and non-Windows rejection
+- Host runtime executable/cwd validation, Windows fresh Machine/User environment rebuilding, and workspace-environment override/exclusion behavior
+- bounded Host/WSL shell-profile detection with exact-Origin authentication and a manual Custom fallback in the Web editor
+- WSL argv construction without shell-string interpolation, workspace variable forwarding through `WSLENV`, and non-Windows rejection
 - Web workspace editor activation remains idempotent under repeated/StrictMode-style effect setup and does not depend on runtime capability probing to open
 - workspace directory browsing requires authentication + exact Origin, returns directories only, and remains bounded
+- workspace environment editing accepts bounded `NAME=value` input, rejects duplicate/reserved names, and persists only through workspace CRUD
 - Host directory picker navigation returns absolute selectable paths without exposing files
 
 The Agent suite includes:
