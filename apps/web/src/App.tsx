@@ -6,6 +6,7 @@ import type {
   WorkspacePublic
 } from "@palmtty/protocol";
 import {
+  ApiError,
   authStatus,
   createSession,
   createWorkspace,
@@ -27,6 +28,19 @@ import {
 
 type AuthState = { enabled: boolean; authenticated: boolean };
 type WorkspaceEditor = WorkspacePublic | "new" | null;
+
+function formatError(
+  cause: unknown,
+  fallback: string,
+  translate: (code: string) => string
+): string {
+  if (cause instanceof ApiError) {
+    const message = translate(cause.code);
+    return cause.detail ? `${message} ${cause.detail}` : message;
+  }
+  if (cause instanceof Error) return translate(cause.message);
+  return translate(fallback);
+}
 
 export function App() {
   const { t, error: translateError, connections } = useI18n();
@@ -64,8 +78,7 @@ export function App() {
         setAuth(status);
         if (status.authenticated) await loadAuthenticatedState();
       } catch (cause) {
-        const code = cause instanceof Error ? cause.message : "startup_failed";
-        setError(translateError(code));
+        setError(formatError(cause, "startup_failed", translateError));
       }
     })();
   }, [loadAuthenticatedState, translateError]);
@@ -100,8 +113,7 @@ export function App() {
             setAuth(status);
             await loadAuthenticatedState();
           } catch (cause) {
-            const code = cause instanceof Error ? cause.message : "login_failed";
-            setError(translateError(code));
+            setError(formatError(cause, "login_failed", translateError));
           }
         }}
         error={error}
@@ -148,8 +160,9 @@ export function App() {
       await refreshCatalog();
       setWorkspaceEditor(null);
     } catch (cause) {
-      const code = cause instanceof Error ? cause.message : "workspace_invalid";
-      setWorkspaceError(translateError(code));
+      setWorkspaceError(
+        formatError(cause, "workspace_invalid", translateError)
+      );
     } finally {
       setWorkspaceBusy(false);
     }
@@ -164,8 +177,9 @@ export function App() {
       await refreshCatalog();
       setWorkspaceEditor(null);
     } catch (cause) {
-      const code = cause instanceof Error ? cause.message : "workspace_invalid";
-      setWorkspaceError(translateError(code));
+      setWorkspaceError(
+        formatError(cause, "workspace_invalid", translateError)
+      );
     } finally {
       setWorkspaceBusy(false);
     }
@@ -258,10 +272,9 @@ export function App() {
                       const result = await createSession(workspace.id);
                       setActiveSession(result.session.id);
                     } catch (cause) {
-                      const code = cause instanceof Error
-                        ? cause.message
-                        : "session_create_failed";
-                      setError(translateError(code));
+                      setError(
+                        formatError(cause, "session_create_failed", translateError)
+                      );
                     }
                   })()}
                 >
