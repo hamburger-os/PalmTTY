@@ -7,6 +7,11 @@ import type {
   WorkspaceDefinition
 } from "@palmtty/protocol";
 import { z } from "zod";
+import {
+  addWslEnvironmentForwarding,
+  applyEnvironmentOverrides,
+  readHostEnvironment
+} from "./host-environment.js";
 
 export const RuntimeWorkspaceSchema = z.object({
   id: z.string().min(1).max(64),
@@ -168,7 +173,9 @@ async function workspaceDirectoryState(
   }
 }
 
-function defaultHostShell(env: NodeJS.ProcessEnv): string {
+function defaultHostShell(
+  env: NodeJS.ProcessEnv | Record<string, string>
+): string {
   if (process.platform === "win32") return "pwsh.exe";
   return env.SHELL?.trim() || "/bin/sh";
 }
@@ -196,12 +203,14 @@ export function buildWslLaunchArgs(workspace: WorkspaceDefinition): string[] {
 async function runProcessProbe(
   executable: string,
   args: string[],
-  timeoutMs = 8_000
+  timeoutMs = 8_000,
+  env?: Record<string, string>
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn(executable, args, {
       stdio: ["ignore", "ignore", "pipe"],
-      windowsHide: true
+      windowsHide: true,
+      ...(env ? { env } : {})
     });
     let stderr = "";
     let settled = false;
@@ -258,12 +267,17 @@ async function resolveHostWorkspace(
   }
 
   const cwd = await realpath(workspace.cwd);
-  const requestedExecutable = workspace.runtime.shell ?? defaultHostShell(process.env);
+  const hostEnvironment = await readHostEnvironment();
+  const environment = applyEnvironmentOverrides(
+    hostEnvironment,
+    workspace.environment ?? {}
+  );
+  const requestedExecutable = workspace.runtime.shell ?? defaultHostShell(environment);
   let executable: string;
   try {
     executable = await resolveExecutable(requestedExecutable, {
       cwd,
-      env: process.env
+      env: environment
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
@@ -276,7 +290,7 @@ async function resolveHostWorkspace(
     executable,
     args: workspace.runtime.args,
     ...(workspace.startupCommand ? { command: workspace.startupCommand } : {}),
-    env: {}
+    env: environment
   });
 }
 
@@ -288,11 +302,12 @@ async function resolveWslWorkspace(
     throw new Error("WSL workspaces are supported only by a Windows PalmTTY Agent");
   }
 
+  const hostEnvironment = await readHostEnvironment();
   let executable: string;
   try {
     executable = await resolveExecutable("wsl.exe", {
       cwd: process.cwd(),
-      env: process.env
+      env: hostEnvironment
     });
   } catch {
     throw new Error(
@@ -315,11 +330,20 @@ async function resolveWslWorkspace(
   ];
 
   try {
-    await runProcessProbe(executable, probe);
+    await runProcessProbe(executable, probe, 8_000, hostEnvironment);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`Workspace "${workspace.id}" is not launchable: ${detail}`);
   }
+
+  const overriddenEnvironment = applyEnvironmentOverrides(
+    hostEnvironment,
+    workspace.environment ?? {}
+  );
+  const environment = addWslEnvironmentForwarding(
+    overriddenEnvironment,
+    Object.keys(workspace.environment ?? {})
+  );
 
   return RuntimeWorkspaceSchema.parse({
     id: workspace.id,
@@ -327,7 +351,7 @@ async function resolveWslWorkspace(
     executable,
     args: buildWslLaunchArgs(workspace),
     ...(workspace.startupCommand ? { command: workspace.startupCommand } : {}),
-    env: {}
+    env: environment
   });
 }
 
@@ -350,11 +374,12 @@ export async function detectRuntimeCapabilities(): Promise<RuntimeCapabilities> 
   let wsl = false;
   if (process.platform === "win32") {
     try {
+      const environment = await readHostEnvironment();
       const executable = await resolveExecutable("wsl.exe", {
         cwd: process.cwd(),
-        env: process.env
+        env: environment
       });
-      await runProcessProbe(executable, ["--status"], 5_000);
+      await runProcessProbe(executable, ["--status"], 5_000, environment);
       wsl = true;
     } catch {
       wsl = false;
@@ -374,7 +399,7 @@ export function buildPtyEnvironment(
   workspace: RuntimeWorkspace,
   excludedEnvKeys: string[] = []
 ): Record<string, string | undefined> {
-  const environment: Record<string, string | undefined> = { ...process.env };
+  const environment: Record<string, string | undefined> = { ...workspace.env };
 
   const deleteKey = (key: string) => {
     if (process.platform !== "win32") {
