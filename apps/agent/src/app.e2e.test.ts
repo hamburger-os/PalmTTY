@@ -741,6 +741,18 @@ describe("terminal WebSocket integration", () => {
     const retainedBody = await retained.json() as { session: SessionPublic };
     expect(retainedBody.session.state).toBe("exited");
 
+    const deleteWorkspace = await fetch(
+      `${harness.origin}/api/v1/workspaces/e2e`,
+      {
+        method: "DELETE",
+        headers: {
+          cookie,
+          origin: harness.origin
+        }
+      }
+    );
+    expect(deleteWorkspace.status).toBe(204);
+
     await waitUntil(async () => (await getSession(harness, cookie, session.id)).status === 404, 3_000);
   }, 10_000);
 });
