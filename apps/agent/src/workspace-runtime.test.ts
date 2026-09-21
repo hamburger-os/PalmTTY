@@ -193,7 +193,8 @@ describe("workspace runtime resolution", () => {
       cwd: "/home/dev/project",
       runtime: {
         kind: "wsl",
-        distribution: "Ubuntu"
+        distribution: "Ubuntu",
+        args: []
       }
     })).rejects.toThrow(
       "WSL workspaces are supported only by a Windows PalmTTY Agent"
