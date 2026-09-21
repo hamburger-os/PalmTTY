@@ -7,6 +7,7 @@ import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
 import type { PalmTTYConfig } from "@palmtty/config";
 import {
+  BrowseDirectoryRequestSchema,
   CreateSessionSchema,
   CreateWorkspaceSchema,
   MAX_MESSAGE_BYTES,
@@ -18,6 +19,7 @@ import {
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import { AUTH_COOKIE, AuthService } from "./auth.js";
+import { browseWorkspaceDirectory } from "./workspace-directory-browser.js";
 import { FixedWindowLimiter, isTrustedOrigin } from "./security.js";
 import { SessionManager, type SessionManagerOptions } from "./session-manager.js";
 import {
@@ -68,6 +70,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   const runtimeCapabilitiesPromise = detectRuntimeCapabilities();
   const createLimiter = new FixedWindowLimiter(20, 60_000);
   const workspaceMutationLimiter = new FixedWindowLimiter(60, 60_000);
+  const directoryBrowseLimiter = new FixedWindowLimiter(120, 60_000);
 
   function authenticated(request: FastifyRequest): boolean {
     return auth.isAuthenticated(request.cookies[AUTH_COOKIE]);
@@ -129,6 +132,30 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   app.get("/api/v1/capabilities", { preHandler: requireAuth }, async () => (
     runtimeCapabilitiesPromise
   ));
+
+  app.post(
+    "/api/v1/workspace-directories/browse",
+    { preHandler: [requireOrigin, requireAuth] },
+    async (request, reply) => {
+      if (!directoryBrowseLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_directory_requests" });
+      }
+      const parsed = BrowseDirectoryRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_directory_request" });
+      }
+      try {
+        return await browseWorkspaceDirectory(parsed.data);
+      } catch (error) {
+        return reply.code(400).send({
+          error: "directory_unavailable",
+          message: error instanceof Error
+            ? error.message
+            : "Directory is unavailable"
+        });
+      }
+    }
+  );
 
   app.get("/api/v1/workspaces", { preHandler: requireAuth }, async () => ({
     workspaces: workspaceStore.list()
