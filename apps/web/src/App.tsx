@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-import type {
-  CreateWorkspaceInput,
-  RuntimeCapabilities,
-  SessionPublic,
-  WorkspacePublic
+import {
+  isActiveSessionState,
+  isTerminalSessionState,
+  type CreateWorkspaceInput,
+  type RuntimeCapabilities,
+  type SessionPublic,
+  type WorkspacePublic
 } from "@palmtty/protocol";
 import {
   ApiError,
   authStatus,
   createSession,
   createWorkspace,
+  deleteSession,
   deleteWorkspace,
   listSessions,
   listWorkspaces,
@@ -20,6 +23,7 @@ import {
   updateWorkspace
 } from "./api.js";
 import { AppearanceControls } from "./AppearanceControls.js";
+import { ConfirmDialog } from "./ConfirmDialog.js";
 import { useI18n } from "./i18n.js";
 import { TerminalView } from "./TerminalView.js";
 import {
@@ -29,6 +33,10 @@ import {
 
 type AuthState = { enabled: boolean; authenticated: boolean };
 type WorkspaceEditor = WorkspacePublic | "new" | null;
+type SessionAction =
+  | { kind: "terminate"; session: SessionPublic }
+  | { kind: "clear"; session: SessionPublic }
+  | null;
 
 function formatError(
   cause: unknown,
@@ -53,6 +61,8 @@ export function App() {
   const [workspaceEditor, setWorkspaceEditor] = useState<WorkspaceEditor>(null);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
+  const [sessionAction, setSessionAction] = useState<SessionAction>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshCatalog = useCallback(async () => {
@@ -142,8 +152,50 @@ export function App() {
     switch (state) {
       case "starting": return t("sessions.state.starting");
       case "running": return t("sessions.state.running");
+      case "stopping": return t("sessions.state.stopping");
       case "exited": return t("sessions.state.exited");
       case "failed": return t("sessions.state.failed");
+    }
+  };
+
+  const sessionDetail = (session: SessionPublic) => {
+    if (isTerminalSessionState(session.state)) {
+      return session.exitCode === undefined
+        ? stateLabel(session.state)
+        : `${stateLabel(session.state)} · ${t("sessions.exitCode", {
+            code: session.exitCode
+          })}`;
+    }
+    return `${stateLabel(session.state)} · ${connections(session.connections)}`;
+  };
+
+  const stopSession = async (session: SessionPublic) => {
+    if (!isActiveSessionState(session.state) || session.state === "stopping") return;
+
+    setSessionBusyId(session.id);
+    setError(null);
+    try {
+      await terminateSession(session.id);
+      await refreshCatalog();
+    } catch (cause) {
+      setError(formatError(cause, "session_action_failed", translateError));
+    } finally {
+      setSessionBusyId(null);
+    }
+  };
+
+  const clearSession = async (session: SessionPublic) => {
+    if (!isTerminalSessionState(session.state)) return;
+
+    setSessionBusyId(session.id);
+    setError(null);
+    try {
+      await deleteSession(session.id);
+      setSessions((current) => current.filter((item) => item.id !== session.id));
+    } catch (cause) {
+      setError(formatError(cause, "session_action_failed", translateError));
+    } finally {
+      setSessionBusyId(null);
     }
   };
 
@@ -305,36 +357,49 @@ export function App() {
           {sessions.length === 0 && (
             <div className="empty">{t("sessions.empty")}</div>
           )}
-          {sessions.map((session) => (
-            <div className="session-row glass-card" key={session.id}>
-              <button
-                className="session-main"
-                onClick={() => setActiveSession(session.id)}
-              >
-                <span className={`status-dot ${session.state}`} />
-                <span>
-                  <strong>
-                    {workspaces.find(
-                      (workspace) => workspace.id === session.workspaceId
-                    )?.name ?? session.workspaceId}
-                  </strong>
-                  <small>
-                    {stateLabel(session.state)} · {connections(session.connections)}
-                  </small>
-                </span>
-              </button>
-              <button
-                className="danger-icon compact"
-                aria-label={t("sessions.terminate")}
-                onClick={() => void (async () => {
-                  await terminateSession(session.id);
-                  await refreshCatalog();
-                })()}
-              >
-                ×
-              </button>
-            </div>
-          ))}
+          {sessions.map((session) => {
+            const active = isActiveSessionState(session.state);
+            const busy = sessionBusyId === session.id;
+            return (
+              <div className="session-row glass-card" key={session.id}>
+                <button
+                  className="session-main"
+                  onClick={() => setActiveSession(session.id)}
+                >
+                  <span className={`status-dot ${session.state}`} />
+                  <span>
+                    <strong>
+                      {workspaces.find(
+                        (workspace) => workspace.id === session.workspaceId
+                      )?.name ?? session.workspaceId}
+                    </strong>
+                    <small>{sessionDetail(session)}</small>
+                  </span>
+                </button>
+                {active ? (
+                  <button
+                    type="button"
+                    className="session-action danger-outline compact"
+                    disabled={sessionBusyId !== null || session.state === "stopping"}
+                    onClick={() => setSessionAction({ kind: "terminate", session })}
+                  >
+                    {busy || session.state === "stopping"
+                      ? t("sessions.terminating")
+                      : t("sessions.terminate")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="session-action danger-outline compact"
+                    disabled={sessionBusyId !== null}
+                    onClick={() => setSessionAction({ kind: "clear", session })}
+                  >
+                    {busy ? t("sessions.clearing") : t("sessions.clear")}
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -348,6 +413,34 @@ export function App() {
           error={workspaceError}
           onClose={closeWorkspaceEditor}
           onSave={saveWorkspace}
+        />
+      )}
+
+      {sessionAction && (
+        <ConfirmDialog
+          title={sessionAction.kind === "terminate"
+            ? t("sessions.terminateTitle")
+            : t("sessions.clearTitle")}
+          message={sessionAction.kind === "terminate"
+            ? t("sessions.terminateConfirm", {
+                count: sessionAction.session.connections
+              })
+            : t("sessions.clearConfirm")}
+          confirmLabel={sessionAction.kind === "terminate"
+            ? t("sessions.terminate")
+            : t("sessions.clear")}
+          danger
+          busy={sessionBusyId === sessionAction.session.id}
+          onCancel={() => setSessionAction(null)}
+          onConfirm={() => {
+            const action = sessionAction;
+            setSessionAction(null);
+            if (action.kind === "terminate") {
+              void stopSession(action.session);
+            } else {
+              void clearSession(action.session);
+            }
+          }}
         />
       )}
     </main>
