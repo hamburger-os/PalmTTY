@@ -13,6 +13,7 @@ import {
 } from "@palmtty/protocol";
 import type WebSocket from "ws";
 import { SessionManager } from "./session-manager.js";
+import { resolveExecutable } from "./workspace-runtime.js";
 
 class FakeSocket {
   readyState = 1;
@@ -46,13 +47,34 @@ afterEach(async () => {
   runtimeDirs.clear();
 });
 
-function testConfig() {
+async function resolveWindowsTestShell(): Promise<string> {
+  const failures: string[] = [];
+  for (const candidate of ["pwsh.exe", "powershell.exe"]) {
+    try {
+      return await resolveExecutable(candidate, { cwd: process.cwd() });
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  throw new Error(
+    "Detached Worker integration test requires PowerShell 7 or Windows PowerShell. " +
+    failures.join(" ")
+  );
+}
+
+function requiredWindowsShellPath(shellPath?: string): string {
+  if (!shellPath) throw new Error("Windows shell path is required");
+  return shellPath;
+}
+
+function testConfig(windowsShellPath?: string) {
   const workspace = process.platform === "win32"
     ? {
         id: "process",
         name: "Process worker",
         cwd: process.cwd(),
-        shell: "pwsh" as const,
+        shell: "custom" as const,
+        shellPath: requiredWindowsShellPath(windowsShellPath),
         args: ["-NoLogo", "-NoProfile"]
       }
     : {
@@ -73,11 +95,20 @@ function testConfig() {
   return config;
 }
 
-async function createFromAgentProcess(runtimeDir: string): Promise<SessionPublic> {
+async function createFromAgentProcess(
+  runtimeDir: string,
+  windowsShellPath?: string
+): Promise<SessionPublic> {
   const fixture = fileURLToPath(new URL("./session-worker-parent.fixture.ts", import.meta.url));
   const child = spawn(
     process.execPath,
-    ["--import", "tsx", fixture, runtimeDir],
+    [
+      "--import",
+      "tsx",
+      fixture,
+      runtimeDir,
+      ...(windowsShellPath ? [windowsShellPath] : [])
+    ],
     {
       cwd: process.cwd(),
       env: process.env,
@@ -132,11 +163,14 @@ describe("detached session worker process", () => {
   it("survives the creator Agent process exit and preserves replay across another restart", async () => {
     const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-process-"));
     runtimeDirs.add(runtimeDir);
-    const config = testConfig();
+    const windowsShellPath = process.platform === "win32"
+      ? await resolveWindowsTestShell()
+      : undefined;
+    const config = testConfig(windowsShellPath);
 
     // This subprocess creates the Worker and then exits completely. The Worker
     // must remain alive as a detached grandchild before this process reconnects.
-    const session = await createFromAgentProcess(runtimeDir);
+    const session = await createFromAgentProcess(runtimeDir, windowsShellPath);
     expect(session.pid).toBeTypeOf("number");
 
     const secondManager = new SessionManager(config, { runtimeDir });

@@ -2,13 +2,31 @@ import { describe, expect, it } from "vitest";
 import * as pty from "node-pty";
 import { resolveExecutable } from "./workspace-runtime.js";
 
+async function resolvePowerShellForConPty(): Promise<string> {
+  const candidates = process.env.PALMTTY_TEST_REQUIRE_PWSH === "1"
+    ? ["pwsh.exe"]
+    : ["pwsh.exe", "powershell.exe"];
+
+  const failures: string[] = [];
+  for (const candidate of candidates) {
+    try {
+      return await resolveExecutable(candidate, { cwd: process.cwd() });
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  throw new Error(
+    "No PowerShell executable is available for the Windows ConPTY smoke test. " +
+    failures.join(" ")
+  );
+}
+
 describe("Windows ConPTY smoke test", () => {
-  it("spawns PowerShell 7 and round-trips Unicode", async () => {
+  it("spawns PowerShell and round-trips Unicode", async () => {
     if (process.platform !== "win32") return;
 
-    const shell = await resolveExecutable("pwsh.exe", {
-      cwd: process.cwd()
-    });
+    const shell = await resolvePowerShellForConPty();
 
     const output = await new Promise<string>((resolve, reject) => {
       let transcript = "";

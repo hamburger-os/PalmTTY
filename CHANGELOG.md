@@ -23,6 +23,11 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - Apache-2.0 licensing.
 - Community governance files, contribution templates and security automation.
 
+### Fixed
+
+- Renamed the host runtime check from `doctor` to `preflight` so pnpm 10's built-in `pnpm doctor` can no longer bypass PalmTTY startup validation; `pnpm dev` now explicitly runs the project preflight first, and preflight reports all detected host configuration failures together.
+- Made generic Windows ConPTY and detached-Worker integration tests portable to hosts without PowerShell 7 while keeping official Windows CI pinned to real PowerShell 7 coverage.
+
 ### Security
 
 - Worker secrets never reach the browser and are excluded from argv/URL/default logs; the login-token environment variable is stripped from Worker/PTTY environments.

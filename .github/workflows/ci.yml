@@ -31,3 +31,5 @@ jobs:
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+        env:
+          PALMTTY_TEST_REQUIRE_PWSH: ${{ runner.os == 'Windows' && '1' || '0' }}

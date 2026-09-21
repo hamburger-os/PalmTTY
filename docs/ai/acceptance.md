@@ -41,7 +41,7 @@ The Agent suite includes:
 
 - end-to-end Fastify HTTP/WebSocket + Worker IPC coverage with deterministic PTYs;
 - a real detached-process integration test where one Agent process creates a Worker and exits, and another Agent later rediscovers the same live terminal;
-- Windows CI coverage using real node-pty + PowerShell 7 / ConPTY and Unicode;
+- Windows CI coverage using real node-pty + PowerShell 7 / ConPTY and Unicode, while local Windows checks may use Windows PowerShell for generic ConPTY/process coverage;
 - workspace-runtime coverage for absolute shell resolution and actionable preflight failures.
 
 ## Build
@@ -61,14 +61,14 @@ pnpm check
 On a configured PalmTTY host, before `dev`/`start` or release validation:
 
 ~~~text
-pnpm doctor
+pnpm run preflight
 ~~~
 
-This requires the intended PalmTTY config and authentication environment. It is not a generic CI/contributor prerequisite.
+This requires the intended PalmTTY config and authentication environment. The preflight should report all detected auth/security/workspace launch failures together so host setup can be corrected in one pass. It is not a generic CI/contributor prerequisite. The explicit `run` form is required because pnpm 10 has its own built-in `doctor` command; PalmTTY deliberately names its host check `preflight` to avoid command dispatch ambiguity.
 
 ## Manual Windows validation before a release
 
-- run `pnpm doctor` with the intended config/token and confirm every workspace resolves its shell successfully;
+- run `pnpm run preflight` with the intended config/token and confirm every workspace resolves its shell successfully;
 
 - start pwsh through PalmTTY;
 - run a Unicode/CJK command;

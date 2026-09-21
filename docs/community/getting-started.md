@@ -19,12 +19,12 @@ pnpm install --frozen-lockfile
 Copy-Item examples/palmtty.example.yaml palmtty.local.yaml
 $env:PALMTTY_CONFIG = "$PWD\palmtty.local.yaml"
 $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
-pnpm doctor
+pnpm run preflight
 pnpm check
 pnpm start
 ```
 
-`PALMTTY_ACCESS_TOKEN` must contain at least 16 characters; use a long random secret for real deployments. `pnpm doctor` validates the auth environment, security exposure, workspace directories, and shell executables. PalmTTY resolves shell executables to absolute paths before Worker creation.
+`PALMTTY_ACCESS_TOKEN` must contain at least 16 characters; use a long random secret for real deployments. `pnpm run preflight` validates the auth environment, security exposure, workspace directories, and shell executables, reporting all detected host-configuration failures in one run. PalmTTY resolves shell executables to absolute paths before Worker creation. Use `pnpm run preflight`, not `pnpm doctor`: pnpm 10 already uses `doctor` for its own package-manager diagnostics.
 
 Then open `http://127.0.0.1:7688` on the same machine.
 
@@ -58,11 +58,12 @@ pnpm install
 Copy-Item examples/palmtty.example.yaml palmtty.local.yaml
 $env:PALMTTY_CONFIG = "$PWD\palmtty.local.yaml"
 $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
+pnpm run preflight
 pnpm check
 pnpm start
 ```
 
-`PALMTTY_ACCESS_TOKEN` 至少需要 16 个字符，实际部署应使用长随机 secret。`pnpm doctor` 会在启动前检查认证环境、安全暴露规则、workspace 目录和 Shell 可执行文件；Shell 会先解析为绝对路径，再交给 Worker 创建 PTY。
+`PALMTTY_ACCESS_TOKEN` 至少需要 16 个字符，实际部署应使用长随机 secret。`pnpm run preflight` 会在启动前检查认证环境、安全暴露规则、workspace 目录和 Shell 可执行文件，并在一次执行中汇总所有发现的宿主配置错误；Shell 会先解析为绝对路径，再交给 Worker 创建 PTY。请使用 `pnpm run preflight`，不要使用 `pnpm doctor`：pnpm 10 已经把 `doctor` 用作包管理器自身的诊断命令。
 
 之后在本机打开 `http://127.0.0.1:7688`。
 
