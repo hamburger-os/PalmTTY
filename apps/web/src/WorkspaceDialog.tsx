@@ -141,7 +141,7 @@ export function WorkspaceDialog({
     <>
     <dialog
       ref={dialogRef}
-      className="workspace-dialog glass-panel"
+      className="workspace-dialog glass-modal"
       aria-labelledby="workspace-dialog-title"
       onCancel={(event) => {
         event.preventDefault();
@@ -149,7 +149,7 @@ export function WorkspaceDialog({
       }}
     >
       <form className="workspace-form" onSubmit={(event) => void submit(event)}>
-        <div className="dialog-heading">
+        <div className="dialog-heading workspace-dialog-header">
           <h2 id="workspace-dialog-title">
             {workspace ? t("workspace.editTitle") : t("workspace.addTitle")}
           </h2>
@@ -164,6 +164,7 @@ export function WorkspaceDialog({
           </button>
         </div>
 
+        <div className="workspace-form-body">
         <label>
           <span>{t("workspace.name")}</span>
           <input
@@ -346,8 +347,9 @@ export function WorkspaceDialog({
         </div>
 
         {error && <div className="error-banner">{error}</div>}
+        </div>
 
-        <div className="dialog-actions">
+        <div className="dialog-actions workspace-dialog-footer">
           {workspace && onDelete ? (
             <button
               type="button"
