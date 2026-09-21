@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 2 as const;
-export const WS_SUBPROTOCOL = "palmtty.v2";
+export const PROTOCOL_VERSION = 3 as const;
+export const WS_SUBPROTOCOL = "palmtty.v3";
 export const MAX_INPUT_BYTES = 64 * 1024;
 export const MAX_MESSAGE_BYTES = 80 * 1024;
 
@@ -98,8 +98,22 @@ export const DirectoryListingSchema = z.object({
 }).strict();
 export type DirectoryListing = z.infer<typeof DirectoryListingSchema>;
 
-export const SessionStateSchema = z.enum(["starting", "running", "exited", "failed"]);
+export const SessionStateSchema = z.enum([
+  "starting",
+  "running",
+  "stopping",
+  "exited",
+  "failed"
+]);
 export type SessionState = z.infer<typeof SessionStateSchema>;
+
+export function isActiveSessionState(state: SessionState): boolean {
+  return state === "starting" || state === "running" || state === "stopping";
+}
+
+export function isTerminalSessionState(state: SessionState): boolean {
+  return state === "exited" || state === "failed";
+}
 
 export const TerminalColumnsSchema = z.number().int().min(2).max(500);
 export const TerminalRowsSchema = z.number().int().min(1).max(200);
