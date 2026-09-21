@@ -459,7 +459,7 @@ export function WorkspaceDialog({
                 setEnvironmentText(event.target.value);
                 setEnvironmentError(null);
               }}
-              placeholder={"HTTPS_PROXY=http://127.0.0.1:10808\\nHTTP_PROXY=http://127.0.0.1:10808"}
+              placeholder={"HTTPS_PROXY=http://127.0.0.1:10808\nHTTP_PROXY=http://127.0.0.1:10808"}
               rows={4}
               maxLength={32768}
               aria-invalid={environmentError ? "true" : undefined}
