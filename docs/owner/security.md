@@ -59,7 +59,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 - Workspace CRUD 是显式高权限配置面，只有认证成功且 Origin 精确匹配的请求可以修改当前用户的持久化 workspace。
 - Workspace 目录选择器也是“认证 + 精确 Origin”保护的显式 API，但只读且只枚举目录名称/绝对路径，不返回文件内容；Host/WSL 浏览均有限流、返回数量上限，WSL 还限制子进程输出与执行时间。
-- Web workspace 可以配置 cwd、runtime、Shell、Shell args、有界 environment 与启动命令。Environment 是当前用户应用数据中的持久化配置，可能敏感但不是 secret vault；默认日志不得记录其值。
+- Web workspace 可以配置 cwd、runtime、Shell、Shell args、有界 environment 与启动命令。Environment 是当前用户应用数据中的持久化配置，可能敏感但不是 secret vault；默认日志不得记录其值。当前认证 token 对应的环境变量名属于保留项，Workspace mutation 会拒绝持久化它；Worker bootstrap 和 PTY 仍继续执行剔除作为纵深防御。
 - Session 创建与重启都只使用已持久化的 workspace authority，不允许用一次 Session 请求临时注入 cwd/shell/env。
 - Workspace 新建/更新会验证运行目标，Session 创建/重启前再次验证；Host Shell 解析为绝对 executable，Windows 新终端先刷新 Machine/User 环境再应用 Workspace environment；WSL 通过结构化 argv 调用 `wsl.exe`，并仅通过 `WSLENV` 名称列表转发 workspace variables，不做用户命令字符串拼接。
 - Shell Profile 探测与目录浏览一样要求认证 + 精确 Origin，并具有独立限流、输出与超时边界；探测只返回已知 Shell 的路径/参数，不提供任意命令执行。
