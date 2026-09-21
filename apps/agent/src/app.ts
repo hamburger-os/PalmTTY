@@ -60,7 +60,6 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
 
   const auth = new AuthService(config.auth);
   const workspaceStore = options.workspaceStore ?? new FileWorkspaceStore();
-  await workspaceStore.initialize();
   const sessions = new SessionManager(config, {
     ...options.sessionManager,
     workspaceStore
@@ -184,7 +183,9 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       });
       try {
         await resolveRuntimeWorkspace(workspace);
-        await workspaceStore.replace(request.params.id, workspace);
+        if (!await workspaceStore.replace(request.params.id, workspace)) {
+          return reply.code(404).send({ error: "workspace_not_found" });
+        }
         return { workspace };
       } catch (error) {
         return reply.code(400).send({
