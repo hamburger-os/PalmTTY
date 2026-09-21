@@ -44,7 +44,10 @@ async function loginCookie(app: Awaited<ReturnType<typeof buildTestApp>>): Promi
     payload: { token: TOKEN }
   });
   expect(login.statusCode).toBe(204);
-  return String(login.headers["set-cookie"]).split(";")[0]!;
+  const setCookie = String(login.headers["set-cookie"]);
+  expect(setCookie).toContain("HttpOnly");
+  expect(setCookie.toLowerCase()).toContain("samesite=strict");
+  return setCookie.split(";")[0]!;
 }
 
 afterEach(async () => {
@@ -81,6 +84,38 @@ describe("HTTP security boundary", () => {
     });
     expect(workspaces.statusCode).toBe(200);
     expect(workspaces.json()).toEqual({ workspaces: [] });
+    await app.close();
+  });
+
+  it("protects workspace mutations with authentication and exact Origin", async () => {
+    process.env.PALMTTY_TEST_TOKEN = TOKEN;
+    const app = await buildTestApp();
+
+    const unauthenticated = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspaces",
+      headers: { origin: ORIGIN },
+      payload: {
+        name: "Blocked",
+        cwd: process.cwd(),
+        runtime: { kind: "host", shell: process.execPath, args: [] }
+      }
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const cookie = await loginCookie(app);
+    const wrongOrigin = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspaces",
+      headers: { cookie, origin: "https://evil.invalid" },
+      payload: {
+        name: "Blocked",
+        cwd: process.cwd(),
+        runtime: { kind: "host", shell: process.execPath, args: [] }
+      }
+    });
+    expect(wrongOrigin.statusCode).toBe(403);
+
     await app.close();
   });
 
