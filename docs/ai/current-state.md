@@ -97,6 +97,8 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 
 ### Web/mobile
 
+- workspace editor opens independently of runtime capability probing; Host creation remains available while optional WSL capability detection is pending or unavailable
+- native workspace dialog activation is idempotent under React StrictMode, with React state remaining the owner of open/close lifecycle
 - token login
 - English / Simplified Chinese UI with persisted browser language preference
 - workspace create/edit/delete UI plus Host/WSL runtime form

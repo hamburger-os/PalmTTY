@@ -65,6 +65,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     workspaceStore
   });
   await sessions.initialize();
+  const runtimeCapabilitiesPromise = detectRuntimeCapabilities();
   const createLimiter = new FixedWindowLimiter(20, 60_000);
   const workspaceMutationLimiter = new FixedWindowLimiter(60, 60_000);
 
@@ -126,7 +127,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   app.get("/api/v1/capabilities", { preHandler: requireAuth }, async () => (
-    detectRuntimeCapabilities()
+    runtimeCapabilitiesPromise
   ));
 
   app.get("/api/v1/workspaces", { preHandler: requireAuth }, async () => ({
