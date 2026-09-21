@@ -21,7 +21,8 @@
 - 新建会话；
 - 已运行会话列表；
 - 会话状态和连接数；运行/终止中的会话显示连接数，已退出会话显示退出码（如果可用）；
-- 会话动作按生命周期分离：运行中的会话显示“终止”，已退出/失败会话显示“清除”；终端页提供经确认的“重启终端”，它会替换 PTY/Session 并重新读取最新 Workspace/宿主环境；不再使用含义模糊的红色 ×；
+- 会话动作按生命周期分离：运行中的会话显示“终止”，已退出/失败会话显示“清除”；会话工作台提供经确认的“重启终端”，它会替换 PTY/Session 并重新读取最新 Workspace/宿主环境；不再使用含义模糊的红色 ×；
+- 会话页面升级为轻量工作台，顶栏提供“终端 / Git / 文件”一级切换；Git 与文件视图使用 Workspace authority，而不是尝试从 PTY 猜测当前 `cd`；
 - 登录/退出；
 - 中文 / English 语言切换并在浏览器本地保存偏好。
 
@@ -40,27 +41,32 @@
 - 主题与性能档仅保存在浏览器本地，属于展示偏好，不进入 Agent 配置、Workspace 或 Session 权限模型；
 - 主题规范唯一来源为 `.agents/skills/palmtty-theme/SKILL.md`，审查流程为 `.agents/skills/palmtty-theme-review/SKILL.md`；本文不复制颜色/材质参数。
 
-终端页提供：
+会话工作台提供：
 
+- “终端 / Git / 文件”三个一级视图，终端始终是核心视图；
+- 切到 Git/文件时 Terminal 组件保持 mounted，xterm、WebSocket、`lastSeq` 与重连循环不被展示状态重建；隐藏时不传播 resize，切回终端再安全 `fit`；
+- Git 视图提供仓库分支、上游、ahead/behind、staged/unstaged/untracked 状态和有界文本 diff；当前刻意只读，不在 UI 中执行 stage/commit/push/pull；
+- 文件视图以持久 Workspace 根目录为边界浏览目录和文件，提供 UTF-8 文本只读预览；二进制文件只显示状态，大文件预览在 512 KiB 截断；
 - xterm.js；
 - 自动重连状态；
 - Esc、Tab、方向键、Ctrl+C、Ctrl+L；
 - 可切换的 Ctrl / Alt 一次性修饰键；
-- 适合粘贴和语音输入的多行 Composer；
+- 适合粘贴、语音输入和 AI Prompt 的按需长文本弹窗；不再常驻聊天式发送栏，从而把垂直空间还给终端；
 - 竖屏/横屏布局；
 - Safe Area 处理；
 - xterm 使用略大的 lineHeight 与终端底部内边距，避免最后一行字形下缘贴住/被底部工具栏视觉遮挡；炫彩流光主题的终端背景采用与页面基底更接近的深色值，避免形成突兀的纯黑视觉孤岛；
 - 首次连接/重连会先 `fit` 得到浏览器实际 rows/cols，并把几何尺寸随 resume 一起提交；snapshot/replay 完成前冻结再次 fit，避免把服务端按旧尺寸序列化的终端状态写进新尺寸 xterm；
-- 恢复期间终端输入与发送按钮保持不可用，Composer 文本不会因为连接尚未就绪而被静默清空；
+- 恢复期间终端输入与长文本发送按钮保持不可用，尚未提交的长文本不会因为连接尚未就绪而被静默清空；
 - PWA manifest。
 
 ## 设计边界
 
-- Composer 最终仍然把文本作为终端输入发送，不建立 Codex 专用 API。
+- 长文本弹窗最终仍然把文本作为终端输入发送，不建立 Codex 专用 API。
 - Workspace 修改走独立持久化 API；Session 创建/重启不接收临时 cwd/shell/env。Shell 探测只是受保护、有界的运行环境读取 API，不是通用命令执行接口。
-- 目录选择器只读取目录名称/路径，不读取文件内容；Host/WSL 浏览都由受保护的 Agent API 完成。
+- 目录选择器仍只读取目录名称/路径，不读取文件内容；会话工作台的文件浏览/预览是另一组独立受保护 API，使用相对 Workspace 路径并在 Agent 端做 canonical/symlink containment 检查，不能复用目录选择器绕开边界。
+- Git 工作台只通过独立的有界 Agent API 读取 status/diff；它不是终端 WebSocket 消息，也不进入 Session Worker。为避免浏览器查看操作触发仓库脚本，Git diff 禁止 external diff/textconv，status 禁用 fsmonitor；辅助子进程会剔除 PalmTTY 登录 token 环境变量。
 - 浏览器丢失状态时以服务端 snapshot 为准。
-- `stopping` Session 可以继续被查看，但终端输入、resize 与 Composer 发送保持禁用，直到 Worker 报告最终退出。
+- `stopping` Session 可以继续被查看，但终端输入、resize 与长文本发送保持禁用，直到 Worker 报告最终退出。
 - Service Worker 不缓存 API 或终端 WebSocket 数据。
 - 终端输出只交给 xterm 渲染，不作为 HTML 注入页面。
 
@@ -68,9 +74,9 @@
 
 - 自定义快捷键；
 - 更好的移动端剪贴板；
-- Git diff/read-only 文件预览；
+- 如果真实使用确有需要，再设计受控 Git 写操作（stage/commit 等）与文件编辑；不能简单把任意 Git/文件写命令暴露成 Web API；
 - Codex 等 AI CLI 的状态提示，但保持 CLI 厂商无关。
 
 ## 你审查时重点看
 
-手机体验优化不能绕开终端协议新增隐式高权限 API；如果需要文件或 Git 能力，应先定义新的只读/受限边界。
+手机体验优化不能绕开终端协议新增隐式高权限 API。Git/文件能力已经通过独立的只读、有界 Workspace API 落地；继续增加写能力时必须单独审查权限、仓库 hooks/filters、symlink/路径逃逸与敏感环境变量继承。
