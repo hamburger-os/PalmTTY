@@ -8,6 +8,7 @@ import {
   type ServerMessage
 } from "@palmtty/protocol";
 import type WebSocket from "ws";
+import { controlEnvironmentKeys } from "./control-environment.js";
 import { WorkerClient } from "./worker-client.js";
 import { WORKER_PROTOCOL_VERSION, type WorkerBootstrap } from "./worker-protocol.js";
 import { ProcessWorkerSpawner, type WorkerSpawner } from "./worker-spawner.js";
@@ -218,7 +219,10 @@ export class SessionManager {
     const endpoint = endpointId();
     const secret = workerSecret();
     const createdAt = new Date().toISOString();
-    const excludedEnvKeys = [this.config.auth.tokenEnv];
+    const excludedEnvKeys = controlEnvironmentKeys(this.config.auth.tokenEnv);
+    const traceWindowsSpawnEnabled =
+      process.platform === "win32" &&
+      process.env.PALMTTY_WINDOWS_SPAWN_TRACE === "1";
     const workerWorkspace: RuntimeWorkspace = {
       ...workspace,
       env: withoutEnvironmentKeys(workspace.env, excludedEnvKeys)
@@ -230,6 +234,7 @@ export class SessionManager {
       endpointId: endpoint,
       secret,
       excludedEnvKeys,
+      ...(traceWindowsSpawnEnabled ? { traceWindowsSpawn: true } : {}),
       createdAt,
       workspace: workerWorkspace,
       session: {
