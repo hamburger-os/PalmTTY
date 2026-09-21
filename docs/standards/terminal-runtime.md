@@ -22,7 +22,7 @@ Authoritative sources:
 
 PowerShell 7 is launched with `pwsh` / `pwsh.exe` and can coexist with Windows PowerShell 5.1. PalmTTY treats PowerShell 7 as the primary Windows shell.
 
-Microsoft documents Microsoft Store/MSIX as a supported PowerShell installation form. Windows App Execution Aliases are special reparse points exposed under the current user's `%LOCALAPPDATA%\\Microsoft\\WindowsApps` directory. Node's upstream Windows filesystem issue #36790 documents that ordinary `stat`/existence traversal can return `EACCES` for these AppExecLink entries even though the alias exists. PalmTTY therefore preserves a current-user WindowsApps alias as an absolute activation path instead of trying to traverse it to the protected package target.
+Microsoft documents Microsoft Store/MSIX as a supported PowerShell installation form. Windows App Execution Aliases are special reparse points exposed under the current user's `%LOCALAPPDATA%\Microsoft\WindowsApps` directory. Node's upstream Windows filesystem issue #36790 documents that ordinary `stat`/existence traversal can return `EACCES` for these AppExecLink entries even though the alias exists. PalmTTY therefore preserves a current-user WindowsApps alias as an absolute activation path instead of trying to traverse it to the protected package target.
 
 Additional references:
 
