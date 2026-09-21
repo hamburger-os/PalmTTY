@@ -30,13 +30,14 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
   const [diff, setDiff] = useState<GitDiffResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [diffLoading, setDiffLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [diffError, setDiffError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setError(null);
+    setStatusError(null);
     void workspaceGitStatus(workspaceId)
       .then((result) => {
         if (cancelled) return;
@@ -50,7 +51,7 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
       .catch((cause) => {
         if (cancelled) return;
         const code = cause instanceof ApiError ? cause.code : "git_unavailable";
-        setError(translateError(code));
+        setStatusError(translateError(code));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -68,7 +69,7 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
     }
     let cancelled = false;
     setDiffLoading(true);
-    setError(null);
+    setDiffError(null);
     void workspaceGitDiff(workspaceId, selection.path, selection.staged)
       .then((result) => {
         if (!cancelled) setDiff(result);
@@ -76,7 +77,7 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
       .catch((cause) => {
         if (cancelled) return;
         const code = cause instanceof ApiError ? cause.code : "git_unavailable";
-        setError(translateError(code));
+        setDiffError(translateError(code));
         setDiff(null);
       })
       .finally(() => {
@@ -153,7 +154,7 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
           </button>
         </div>
 
-        {error && <div className="tool-inline-error">{error}</div>}
+        {statusError && <div className="tool-inline-error">{statusError}</div>}
         {loading ? (
           <div className="tool-empty">{t("git.loading")}</div>
         ) : status && !status.available ? (
@@ -195,7 +196,9 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
             <span>{selection.staged ? t("git.stagedBadge") : t("git.workingTreeBadge")}</span>
           </div>
         )}
-        {!selection ? (
+        {diffError ? (
+          <div className="tool-inline-error">{diffError}</div>
+        ) : !selection ? (
           <div className="tool-empty">{t("git.select")}</div>
         ) : selection.untracked ? (
           <div className="tool-empty">{t("git.untrackedPreview")}</div>
