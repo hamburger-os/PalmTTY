@@ -5,16 +5,31 @@ import type {
   WorkspacePublic
 } from "@palmtty/protocol";
 
+export class ApiError extends Error {
+  constructor(
+    readonly code: string,
+    readonly detail?: string
+  ) {
+    super(code);
+    this.name = "ApiError";
+  }
+}
+
 async function responseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let code = `http_${response.status}`;
+    let detail: string | undefined;
     try {
-      const body = await response.json() as { error?: string };
+      const body = await response.json() as {
+        error?: string;
+        message?: string;
+      };
       if (body.error) code = body.error;
+      if (body.message) detail = body.message;
     } catch {
       // Ignore non-JSON error bodies.
     }
-    throw new Error(code);
+    throw new ApiError(code, detail);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
