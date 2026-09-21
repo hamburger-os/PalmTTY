@@ -62,7 +62,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - Workspace mutation is an explicit authenticated + exact-Origin-protected API; bounded Workspace environment variables are persistent configuration, while Session creation/restart do not accept ad-hoc cwd/shell/env overrides.
 - Directory and terminal-profile inspection APIs require authentication + exact Origin and remain bounded; terminal-profile discovery is limited to known Host shells and registered WSL distributions and does not expose arbitrary command execution.
 - LAN development keeps authentication + exact-Origin enforcement: generated development Origins are concrete in-memory values, never wildcards, are accepted only by the development Agent, and do not alter the configured Agent bind address or production startup policy.
-- Worker secrets never reach the browser and are excluded from argv/URL/default logs; PalmTTY control environment variables (auth token, config path, development proxy/origin/listener controls and spawn tracing) are reserved from Workspace mutation and stripped before Worker bootstrap/from Worker/PTTY environments.
+- Worker secrets never reach the browser and are excluded from argv/URL/default logs; the `PALMTTY_*` control namespace plus any separately configured login-token variable is reserved from Workspace mutation and stripped before Worker bootstrap/from Worker/PTTY environments.
 - Stale Worker records are cleaned without PID-based process killing, avoiding PID-reuse hazards.
 - Worker IPC terminal input and frames/backpressure are bounded.
 - Session lifecycle mutations have a dedicated rate limit; retained-session retirement is authenticated Worker IPC and is rejected while the Session is active/stopping.
