@@ -16,7 +16,7 @@ Mobile-first · self-hosted · Windows-first · Host + WSL runtimes · xterm.js
 </div>
 
 > [!WARNING]
-> PalmTTY exposes an interactive shell with the privileges of the Windows user running the Agent. Treat compromise as workstation compromise. Use a private HTTPS entry point or an authenticated HTTPS reverse proxy; do not expose an unauthenticated Agent port to the Internet.
+> PalmTTY exposes an interactive shell with the privileges of the OS user running the Agent. Treat compromise as workstation compromise. Use a private HTTPS entry point or an authenticated HTTPS reverse proxy; do not expose an unauthenticated Agent port to the Internet.
 
 PalmTTY is a mobile-first, self-hosted remote development terminal. Windows 11 remains the primary host target, with native host shells and WSL workspaces; the same host-runtime path is exercised on Ubuntu CI and is designed for Linux/macOS hosts. Codex, Git and other terminal tools remain ordinary shell workloads.
 
