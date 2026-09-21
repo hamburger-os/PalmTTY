@@ -205,11 +205,11 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
               sessionExitedRef.current
             ) return;
             attempt = 0;
-            ready = true;
-            inputReadyRef.current = true;
+            ready = message.state === "running";
+            inputReadyRef.current = ready;
             lastPongAt = Date.now();
-            setConnection("connected");
-            scheduleResize();
+            setConnection(ready ? "connected" : "closed");
+            if (ready) scheduleResize();
           });
           return;
         }
