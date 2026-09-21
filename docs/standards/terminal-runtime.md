@@ -63,7 +63,7 @@ PalmTTY intentionally does not use a persisted PID as process identity. A recove
 
 Authoritative sources:
 
-- https://learn.microsoft.com/windows-server/networking/technologies/netsh/netsh-interface-portproxy
+- https://learn.microsoft.com/windows-server/administration/windows-commands/netsh-interface
 - https://learn.microsoft.com/troubleshoot/windows-server/networking/error-10013-wsaeacces-is-returned
 
 Windows exposes TCP excluded-port ranges through `netsh interface ipv4/ipv6 show excludedportrange`. Microsoft documents WSAEACCES/10013 as a possible bind failure for excluded ports. PalmTTY does not assume every Windows `EACCES` has that single cause: preflight probes the configured Agent endpoint and reports excluded/reserved ranges, exclusive listeners, and local policy as diagnostic possibilities.
