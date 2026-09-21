@@ -16,6 +16,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - English and Simplified Chinese Web UI with persisted language preference.
 - PalmTTY-owned Spectrum / Obsidian / Frosted visual themes, Quality / Performance rendering modes, reduced-motion handling, semantic liquid-glass surfaces, and matching theme/review Agent Skills.
 - Runtime-aware remote directory picker for Host/WSL workspaces, plus shell-argument examples and one-click startup presets for common terminal coding agents.
+- Explicit Session lifecycle actions: terminate active Sessions through `stopping → exited`, retain exited terminal state for review, and clear retained Sessions independently.
 
 - Windows-first PowerShell 7 terminal sessions through node-pty / ConPTY.
 - Mobile React + xterm.js PWA with special-key controls and multiline composer.
@@ -37,10 +38,12 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - Fixed the workspace editor so it opens immediately even while runtime capability detection is still pending; modal activation is idempotent under React StrictMode, and capability probing is reused for the lifetime of the Agent process.
 - Increased xterm line height and terminal bottom spacing so the final rendered row is not visually clipped against the mobile controls.
 - Added Agent TCP endpoint bind probing to host preflight, with actionable Windows `EACCES/WSAEACCES` diagnostics; the root development launcher now derives and injects Vite's proxy target from the same PalmTTY config, while Vite uses strict port 5173 and stays host-config independent during test/build.
-- Isolated Worker recovery state into `runtime-v3`, matching private Worker IPC protocol generation 3 so new Agents do not rediscover previous-generation Worker state.
+- Isolated Worker recovery state into `runtime-v4`, matching private Worker IPC protocol generation 4 so new Agents do not rediscover previous-generation Worker state.
 - Recognize current-user Windows App Execution Aliases during shell resolution so Store/MSIX-installed PowerShell 7 is not misreported as missing; prefer the user activation alias over protected package PATH entries and report executable paths mistakenly used as workspace `cwd` as not-a-directory configuration errors.
 - Renamed the host runtime check from `doctor` to `preflight` so pnpm 10's built-in `pnpm doctor` can no longer bypass PalmTTY startup validation; `pnpm dev` now explicitly runs the project preflight first, and preflight reports all detected host configuration failures together.
 - Made generic Windows ConPTY and detached-Worker integration tests portable to hosts without PowerShell 7 while keeping official Windows CI pinned to real PowerShell 7 coverage.
+- Replaced the ambiguous red Session × with explicit “Terminate” and “Clear” actions, added a real `stopping` state, and made retained-session deletion immediate instead of waiting for the retention timer.
+- Switched PalmTTY's Windows PTY path to node-pty's bundled ConPTY DLL backend so explicit termination avoids node-pty 1.1.0's console-list helper, reducing the observed teardown console-window flash and avoiding that helper's upstream race path.
 
 ### Security
 
@@ -49,6 +52,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - Worker secrets never reach the browser and are excluded from argv/URL/default logs; the login-token environment variable is stripped from Worker/PTTY environments.
 - Stale Worker records are cleaned without PID-based process killing, avoiding PID-reuse hazards.
 - Worker IPC terminal input and frames/backpressure are bounded.
+- Session lifecycle mutations have a dedicated rate limit; retained-session retirement is authenticated Worker IPC and is rejected while the Session is active/stopping.
 
 - Application heartbeat detects half-open mobile WebSocket connections.
 - Established terminal WebSockets expire with the login session.
