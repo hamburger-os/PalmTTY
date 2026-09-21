@@ -111,7 +111,7 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 - run a Unicode/CJK command;
 - start Codex CLI;
 - Ctrl+C a foreground command;
-- create/restart and terminate a running Session while watching the development `windows spawn trace`; if a console window still flashes, record whether it occurs between `worker.spawn.begin`, `pty.spawn.begin`, `pty.spawn.ready`, `worker.ipc.ready`, and `worker.spawn.ready` rather than claiming the flash is fixed without desktop evidence;
+- create/restart and terminate a running Session while watching the development `windows spawn trace`; if a console window still flashes, record whether it occurs between `runtime.resolve.begin`, `runtime.resolve.ready`, `worker.spawn.begin`, `pty.spawn.begin`, `pty.spawn.ready`, `worker.ipc.ready`, and `worker.spawn.ready` rather than claiming the flash is fixed without desktop evidence;
 - clear the exited Session and confirm the retained card/history disappears immediately;
 - resize the browser;
 - close/reopen the browser view without losing PTY;
