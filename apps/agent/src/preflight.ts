@@ -25,9 +25,11 @@ export async function preflightRuntime(
 ): Promise<RuntimePreflight> {
   const issues: string[] = [];
 
+  let exposureAllowed = true;
   try {
     assertSecureExposure(config);
   } catch (error) {
+    exposureAllowed = false;
     issues.push(errorMessage(error));
   }
 
@@ -37,10 +39,12 @@ export async function preflightRuntime(
     issues.push(errorMessage(error));
   }
 
-  try {
-    await (options.serverProbe ?? probeServerEndpoint)(config.server);
-  } catch (error) {
-    issues.push(errorMessage(error));
+  if (exposureAllowed) {
+    try {
+      await (options.serverProbe ?? probeServerEndpoint)(config.server);
+    } catch (error) {
+      issues.push(errorMessage(error));
+    }
   }
 
   const workspaceResults = await Promise.allSettled(
