@@ -29,6 +29,9 @@
   --space-5: 20px;
   --space-6: 24px;
 
+  --touch-target: 44px;
+  --touch-target-compact: 36px;
+
   --transition-fast: 140ms ease;
   --transition-control: 220ms cubic-bezier(.2, .8, .2, 1);
 
@@ -91,11 +94,13 @@ html[data-theme="spectrum"] {
   --bg-base: #15181d;
   --theme-shell-veil: linear-gradient(135deg, rgba(6,9,13,.07), rgba(3,6,9,.025));
   --theme-panel-veil: linear-gradient(135deg, rgba(6,9,13,.04), rgba(3,6,9,.014));
+  --theme-modal-veil: linear-gradient(135deg, rgba(13,18,24,.90), rgba(7,11,16,.84));
   --theme-content-veil: linear-gradient(180deg, rgba(5,8,12,.28), rgba(2,5,8,.36));
   --theme-control-veil: rgba(4,7,10,.54);
 
   --flat-shell: rgba(34,36,40,.90);
   --flat-panel: rgba(31,33,37,.84);
+  --flat-modal: rgba(20,24,29,.97);
   --flat-content: rgba(24,27,31,.90);
   --flat-control: rgba(26,29,33,.94);
 
@@ -108,13 +113,14 @@ html[data-theme="spectrum"] {
   --border-strong: rgba(255,255,255,.22);
   --border-highlight: rgba(255,255,255,.30);
   --shadow: 0 10px 30px rgba(0,0,0,.13), inset 0 1px 0 rgba(255,255,255,.17);
+  --modal-shadow: 0 28px 80px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.18);
   --content-shadow: inset 0 1px 0 rgba(255,255,255,.06), inset 0 -1px 0 rgba(0,0,0,.10);
 
   --control-bg: rgba(255,255,255,.065);
   --control-hover: rgba(255,255,255,.115);
   --input-bg: rgba(2,5,8,.42);
   --input-focus: color-mix(in srgb, var(--spectrum-blue) 60%, transparent);
-  --overlay: rgba(0,0,0,.36);
+  --overlay: rgba(0,0,0,.58);
 
   --success: #34d399;
   --warning: #e7b13a;
@@ -127,11 +133,13 @@ html[data-theme="obsidian"] {
   --bg-base: #020304;
   --theme-shell-veil: linear-gradient(135deg, rgba(0,0,0,.60), rgba(0,0,0,.50));
   --theme-panel-veil: linear-gradient(135deg, rgba(0,0,0,.55), rgba(0,0,0,.45));
+  --theme-modal-veil: linear-gradient(135deg, rgba(0,0,0,.91), rgba(0,0,0,.86));
   --theme-content-veil: linear-gradient(180deg, rgba(0,0,0,.76), rgba(0,0,0,.84));
   --theme-control-veil: rgba(0,0,0,.87);
 
   --flat-shell: rgba(0,0,0,.95);
   --flat-panel: rgba(0,0,0,.91);
+  --flat-modal: rgba(0,0,0,.98);
   --flat-content: rgba(0,0,0,.94);
   --flat-control: rgba(0,0,0,.97);
 
@@ -144,13 +152,14 @@ html[data-theme="obsidian"] {
   --border-strong: rgba(255,255,255,.18);
   --border-highlight: rgba(255,255,255,.25);
   --shadow: 0 12px 34px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.14);
+  --modal-shadow: 0 30px 84px rgba(0,0,0,.56), inset 0 1px 0 rgba(255,255,255,.14);
   --content-shadow: inset 0 1px 0 rgba(255,255,255,.045), inset 0 -1px 0 rgba(0,0,0,.20);
 
   --control-bg: rgba(255,255,255,.055);
   --control-hover: rgba(255,255,255,.10);
   --input-bg: rgba(0,0,0,.60);
   --input-focus: color-mix(in srgb, var(--spectrum-blue) 56%, transparent);
-  --overlay: rgba(0,0,0,.62);
+  --overlay: rgba(0,0,0,.72);
 
   --success: #35d69a;
   --warning: #e6b039;
@@ -164,11 +173,13 @@ html[data-theme="frosted"] {
   --bg-base: #dfe8f1;
   --theme-shell-veil: linear-gradient(135deg, rgba(255,255,255,.68), rgba(244,248,252,.54));
   --theme-panel-veil: linear-gradient(135deg, rgba(255,255,255,.58), rgba(244,248,252,.46));
+  --theme-modal-veil: linear-gradient(135deg, rgba(255,255,255,.94), rgba(238,244,250,.88));
   --theme-content-veil: linear-gradient(180deg, rgba(255,255,255,.75), rgba(239,245,250,.72));
   --theme-control-veil: rgba(255,255,255,.80);
 
   --flat-shell: rgba(248,250,252,.96);
   --flat-panel: rgba(244,248,252,.93);
+  --flat-modal: rgba(250,252,254,.99);
   --flat-content: rgba(250,252,254,.96);
   --flat-control: rgba(255,255,255,.98);
 
@@ -181,13 +192,14 @@ html[data-theme="frosted"] {
   --border-strong: rgba(69,88,109,.30);
   --border-highlight: rgba(255,255,255,.92);
   --shadow: 0 10px 30px rgba(55,75,96,.12), inset 0 1px 0 rgba(255,255,255,.90);
+  --modal-shadow: 0 28px 76px rgba(39,57,76,.24), inset 0 1px 0 rgba(255,255,255,.94);
   --content-shadow: inset 0 1px 0 rgba(255,255,255,.76), inset 0 -1px 0 rgba(54,74,96,.08);
 
   --control-bg: rgba(255,255,255,.55);
   --control-hover: rgba(255,255,255,.82);
   --input-bg: rgba(255,255,255,.72);
   --input-focus: color-mix(in srgb, var(--spectrum-blue) 54%, transparent);
-  --overlay: rgba(33,52,72,.18);
+  --overlay: rgba(27,43,60,.34);
 
   --success: #168a50;
   --warning: #a36c00;
@@ -317,6 +329,24 @@ button:disabled {
   box-shadow: var(--shadow);
 }
 
+.glass-modal {
+  position: relative;
+  background:
+    var(--specular-panel),
+    var(--theme-modal-veil),
+    var(--clear-panel);
+  border: 1px solid var(--border-strong);
+  border-top-color: var(--border-highlight);
+  box-shadow: var(--modal-shadow);
+}
+
+.terminal-surface {
+  position: relative;
+  background: var(--terminal-background, var(--flat-content));
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--border-highlight) 18%, transparent);
+}
+
 .glass-content {
   background:
     var(--theme-content-veil),
@@ -341,6 +371,11 @@ html[data-performance="performance"] .glass-shell {
 html[data-performance="performance"] .glass-panel,
 html[data-performance="performance"] .glass-card {
   background: var(--flat-panel);
+  box-shadow: none;
+}
+
+html[data-performance="performance"] .glass-modal {
+  background: var(--flat-modal);
   box-shadow: none;
 }
 
