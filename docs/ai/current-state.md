@@ -27,7 +27,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - random in-memory login session cookie with bounded active-session count
 - exact Origin allowlist and non-loopback startup safety gate
 - bounded login/session-create rate limiting
-- Session creation/restart remain workspace-authority operations; Web workspace mutation may persist a bounded environment map except the configured login-token variable, while Session requests cannot inject ad-hoc cwd/shell/environment overrides
+- Session creation/restart remain workspace-authority operations; Web workspace mutation may persist a bounded environment map except PalmTTY control variables (configured/default login token, config path, dev proxy/origin/listener controls and spawn-trace control), while Session requests cannot inject ad-hoc cwd/shell/environment overrides
 - runtime preflight for auth/security exposure and configured Agent TCP bindability, exposed as the unambiguous `pnpm run preflight` package script
 - workspace create/update plus Session creation both validate runtime launch targets
 - authenticated + exact-Origin runtime-aware directory browsing for workspace selection plus unified terminal-profile discovery; directory responses expose directories only, while terminal profiles enumerate known Host shells and registered WSL distributions without starting the distributions; both surfaces are bounded and rate-limited
@@ -57,7 +57,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - failed rediscovery alone does not delete potentially-live recovery state; definitely-dead recorded processes can be reclaimed without PID-based killing
 - Worker-owned recovery metadata is republished when missing; conflicting record/secret ownership fails closed
 - stale/dangling artifacts are cleaned without treating persisted PIDs as kill authority
-- login-token environment variable is removed before Worker bootstrap, from the Worker process environment, and again from the PTY environment
+- PalmTTY control environment variables are removed from the normalized Workspace before Worker bootstrap and from the Worker process environment; the configured/default login-token variables are included in that reserved set, preventing development-control state or auth material from leaking into the user shell
 - terminal input is bounded to the same 64 KiB limit at browser and Worker IPC boundaries
 - concurrent Session creation is counted against maxSessions
 
