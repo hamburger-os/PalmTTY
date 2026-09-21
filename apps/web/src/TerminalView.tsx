@@ -57,6 +57,7 @@ export function TerminalView({
   const [composer, setComposer] = useState("");
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [restarting, setRestarting] = useState(false);
+  const [restartError, setRestartError] = useState<string | null>(null);
 
   useEffect(() => {
     translateRef.current = t;
@@ -391,6 +392,8 @@ export function TerminalView({
         </div>
       </header>
 
+      {restartError && <div className="error-banner terminal-error">{restartError}</div>}
+
       <div
         ref={hostRef}
         className="terminal-host terminal-surface"
@@ -453,8 +456,11 @@ export function TerminalView({
           onCancel={() => setRestartConfirmOpen(false)}
           onConfirm={() => {
             setRestartConfirmOpen(false);
+            setRestartError(null);
             setRestarting(true);
-            void onRestart().finally(() => setRestarting(false));
+            void onRestart()
+              .catch(() => setRestartError(t("errors.session_restart_failed")))
+              .finally(() => setRestarting(false));
           }}
         />
       )}
