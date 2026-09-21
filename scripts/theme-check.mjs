@@ -1,0 +1,104 @@
+import { readdir, readFile } from "node:fs/promises";
+import path from "node:path";
+
+const root = process.cwd();
+const webSource = path.join(root, "apps", "web", "src");
+const failures = [];
+
+async function sourceFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await sourceFiles(fullPath));
+      continue;
+    }
+    if (/\.(?:css|ts|tsx)$/.test(entry.name)) files.push(fullPath);
+  }
+  return files;
+}
+
+function relative(file) {
+  return path.relative(root, file).replaceAll(path.sep, "/");
+}
+
+function report(file, lineNumber, rule, line) {
+  failures.push(`${relative(file)}:${lineNumber} [${rule}] ${line.trim()}`);
+}
+
+for (const file of await sourceFiles(webSource)) {
+  const rel = relative(file);
+  const themeOwned = rel === "apps/web/src/theme.css" || rel === "apps/web/src/theme.tsx";
+  const cssThemeOwner = rel === "apps/web/src/theme.css";
+  const lines = (await readFile(file, "utf8")).replaceAll("\r\n", "\n").split("\n");
+
+  lines.forEach((line, index) => {
+    const lineNumber = index + 1;
+
+    if (/window\.(?:alert|confirm|prompt)\s*\(/.test(line)) {
+      report(file, lineNumber, "native-dialog", line);
+    }
+    if (/(^|[;{]\s*)filter:\s*blur\s*\(/.test(line)) {
+      report(file, lineNumber, "filter-blur", line);
+    }
+    if (/mix-blend-mode\s*:/.test(line)) {
+      report(file, lineNumber, "mix-blend-mode", line);
+    }
+    if (/will-change\s*:/.test(line)) {
+      report(file, lineNumber, "will-change", line);
+    }
+    if (/transition\s*:\s*all(?:\s|;|$)/.test(line)) {
+      report(file, lineNumber, "transition-all", line);
+    }
+    if (/backdrop-filter\s*:/.test(line) && !cssThemeOwner) {
+      report(file, lineNumber, "backdrop-owner", line);
+    }
+    if (!themeOwned && /#[0-9a-fA-F]{3,8}\b|rgba?\s*\(/.test(line)) {
+      report(file, lineNumber, "hard-coded-color", line);
+    }
+  });
+}
+
+const themeCssPath = path.join(webSource, "theme.css");
+const themeTsPath = path.join(webSource, "theme.tsx");
+const themeCss = await readFile(themeCssPath, "utf8");
+const themeTs = await readFile(themeTsPath, "utf8");
+
+for (const marker of [
+  'html[data-theme="spectrum"]',
+  'html[data-theme="obsidian"]',
+  'html[data-theme="frosted"]',
+  'html[data-performance="performance"]',
+  '.glass-shell',
+  '.glass-panel',
+  '.glass-content',
+  '.glass-control',
+  '.glass-card'
+]) {
+  if (!themeCss.includes(marker)) {
+    failures.push(`apps/web/src/theme.css [required-marker] missing ${marker}`);
+  }
+}
+
+for (const marker of [
+  '"spectrum"',
+  '"obsidian"',
+  '"frosted"',
+  '"quality"',
+  '"performance"',
+  'palmtty.theme',
+  'palmtty.visual-performance'
+]) {
+  if (!themeTs.includes(marker)) {
+    failures.push(`apps/web/src/theme.tsx [required-marker] missing ${marker}`);
+  }
+}
+
+if (failures.length) {
+  console.error("Theme contract check failed:");
+  for (const failure of failures) console.error(`- ${failure}`);
+  process.exit(1);
+}
+
+console.log("Theme contract check passed.");
