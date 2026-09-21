@@ -106,7 +106,7 @@ pnpm start
 
 Open `http://127.0.0.1:7688` and sign in with the access token.
 
-`pnpm run preflight` validates the authentication environment, security exposure rules, workspace directories, and shell executables before the Agent starts. Shells are resolved to absolute executable paths before Worker creation, so the PTY runtime does not depend on library-specific PATH lookup.
+`pnpm run preflight` validates the authentication environment, security exposure rules, workspace directories, and shell executables before the Agent starts, and reports all detected host-configuration failures together. Shells are resolved to absolute executable paths before Worker creation, so the PTY runtime does not depend on library-specific PATH lookup.
 
 For development, run `pnpm dev`. It invokes PalmTTY's `preflight` package script explicitly before Vite and the Agent are launched, so a bad token, workspace, or shell fails once with an actionable startup error instead of leaving the frontend proxy retrying a dead Agent. The script is intentionally not named `doctor` because pnpm 10 already owns `pnpm doctor` as a package-manager diagnostic command. The example development configuration already includes the Vite origin required by the exact Origin check.
 
