@@ -51,7 +51,7 @@ Worker + PTY running
 
 ## Recovery metadata
 
-每个 Worker 在用户 runtime 目录保存最小恢复状态：
+每个 Worker 在与私有 Worker IPC generation 对齐的用户 runtime 目录保存最小恢复状态。当前 `WORKER_PROTOCOL_VERSION = 2` 使用 `runtime-v2`；升级内部 Worker 协议 generation 时必须同步切换 runtime generation，不读取上一代 recovery state。
 
 - Session ID；
 - endpoint ID；
