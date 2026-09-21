@@ -16,7 +16,8 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "docs:check": "node scripts/docs-check.mjs",
     "theme:check": "node scripts/theme-check.mjs",
-    "lint": "pnpm typecheck && pnpm docs:check && pnpm theme:check",
+    "scripts:check": "node --check scripts/dev.mjs && node --check scripts/docs-check.mjs && node --check scripts/theme-check.mjs",
+    "lint": "pnpm typecheck && pnpm scripts:check && pnpm docs:check && pnpm theme:check",
     "check": "pnpm lint && pnpm test && pnpm build"
   },
   "devDependencies": {
