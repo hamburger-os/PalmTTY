@@ -31,7 +31,7 @@ describe("runtime preflight", () => {
 
     let failure: unknown;
     try {
-      await preflightRuntime(config);
+      await preflightRuntime(config, { serverProbe: async () => undefined });
     } catch (error) {
       failure = error;
     }
@@ -59,7 +59,7 @@ describe("runtime preflight", () => {
       ]
     });
 
-    const result = await preflightRuntime(config);
+    const result = await preflightRuntime(config, { serverProbe: async () => undefined });
     const workspace = result.workspaces.get("node");
     expect(workspace?.id).toBe("node");
     expect(workspace?.executable).toBeTypeOf("string");
