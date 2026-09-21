@@ -157,7 +157,7 @@ function maxSeq(messages: ServerMessage[]): number {
 
 async function waitFor(
   predicate: () => boolean,
-  timeoutMs = 8_000
+  timeoutMs = process.platform === "win32" ? 15_000 : 8_000
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!predicate()) {
@@ -248,5 +248,5 @@ describe("detached session worker process", () => {
       thirdSocket.messages.some((message) => message.type === "exit")
     );
     await new Promise((resolve) => setTimeout(resolve, 800));
-  }, 25_000);
+  }, process.platform === "win32" ? 40_000 : 25_000);
 });

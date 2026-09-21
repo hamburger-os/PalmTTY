@@ -155,6 +155,100 @@ export const DirectoryListingSchema = z.object({
 }).strict();
 export type DirectoryListing = z.infer<typeof DirectoryListingSchema>;
 
+export const WorkspaceRelativePathSchema = z.string()
+  .max(4096)
+  .refine((value) => !value.includes("\0"), "path must not contain NUL")
+  .refine((value) => !value.includes("\\"), "workspace paths use forward slashes")
+  .refine(
+    (value) => !value.startsWith("/") && !/^[A-Za-z]:/.test(value),
+    "workspace path must be relative"
+  )
+  .refine((value) => {
+    if (value === "") return true;
+    const parts = value.split("/");
+    return parts.every(
+      (part) => part.length > 0 && part !== ".." && part !== "."
+    );
+  }, "workspace path must use canonical segments");
+
+export const WorkspaceFileListRequestSchema = z.object({
+  path: WorkspaceRelativePathSchema.default("")
+}).strict();
+export type WorkspaceFileListRequest = z.infer<typeof WorkspaceFileListRequestSchema>;
+
+export const WorkspaceFileEntrySchema = z.object({
+  name: z.string().min(1).max(1024),
+  path: WorkspaceRelativePathSchema,
+  kind: z.enum(["file", "directory"]),
+  size: z.number().int().nonnegative().optional()
+}).strict();
+export type WorkspaceFileEntry = z.infer<typeof WorkspaceFileEntrySchema>;
+
+export const WorkspaceFileListResponseSchema = z.object({
+  path: WorkspaceRelativePathSchema,
+  parentPath: WorkspaceRelativePathSchema.nullable(),
+  entries: z.array(WorkspaceFileEntrySchema).max(512),
+  truncated: z.boolean()
+}).strict();
+export type WorkspaceFileListResponse = z.infer<typeof WorkspaceFileListResponseSchema>;
+
+export const WorkspaceFileReadRequestSchema = z.object({
+  path: WorkspaceRelativePathSchema.refine(
+    (value) => value.length > 0,
+    "file path is required"
+  )
+}).strict();
+export type WorkspaceFileReadRequest = z.infer<typeof WorkspaceFileReadRequestSchema>;
+
+export const WorkspaceFileReadResponseSchema = z.object({
+  path: WorkspaceRelativePathSchema,
+  size: z.number().int().nonnegative(),
+  binary: z.boolean(),
+  content: z.string(),
+  truncated: z.boolean()
+}).strict();
+export type WorkspaceFileReadResponse = z.infer<typeof WorkspaceFileReadResponseSchema>;
+
+export const GitStatusEntrySchema = z.object({
+  path: z.string().min(1).max(4096),
+  originalPath: z.string().min(1).max(4096).optional(),
+  index: z.string().length(1),
+  worktree: z.string().length(1),
+  staged: z.boolean(),
+  unstaged: z.boolean(),
+  untracked: z.boolean()
+}).strict();
+export type GitStatusEntry = z.infer<typeof GitStatusEntrySchema>;
+
+export const GitStatusResponseSchema = z.object({
+  available: z.boolean(),
+  root: z.string().max(4096).optional(),
+  branch: z.string().max(512).optional(),
+  upstream: z.string().max(512).optional(),
+  ahead: z.number().int().nonnegative(),
+  behind: z.number().int().nonnegative(),
+  entries: z.array(GitStatusEntrySchema).max(2048),
+  truncated: z.boolean()
+}).strict();
+export type GitStatusResponse = z.infer<typeof GitStatusResponseSchema>;
+
+export const GitDiffRequestSchema = z.object({
+  path: WorkspaceRelativePathSchema.refine(
+    (value) => value.length > 0,
+    "Git path is required"
+  ),
+  staged: z.boolean().default(false)
+}).strict();
+export type GitDiffRequest = z.infer<typeof GitDiffRequestSchema>;
+
+export const GitDiffResponseSchema = z.object({
+  path: z.string().min(1).max(4096),
+  staged: z.boolean(),
+  diff: z.string().max(1024 * 1024),
+  truncated: z.boolean()
+}).strict();
+export type GitDiffResponse = z.infer<typeof GitDiffResponseSchema>;
+
 export const SessionStateSchema = z.enum([
   "starting",
   "running",

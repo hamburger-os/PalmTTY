@@ -34,6 +34,7 @@ Any behavior-changing PR must use the documentation-sync workflow in `.agents/sk
 - Do not add terminal I/O logging for debugging.
 - Treat workspace CRUD as a high-trust remote mutation surface; keep authentication, exact Origin checks, persistence validation and Session creation/restart bound to persisted workspace authority rather than per-Session overrides. Terminal-profile discovery must remain bounded enumeration: known Host shells plus registered WSL distributions, not arbitrary command execution.
 - Workspace environment is intentionally supported but bounded and persisted; do not broaden it into arbitrary process execution or a secret-management feature without an architecture/security review.
+- Keep Session workbench tools separate from terminal transport. Files remain Workspace-root-scoped and read-only; Git remains bounded/read-only status+diff until write semantics, repository hooks/filters and confirmation behavior receive a separate security design.
 - Distinguish implemented platform adapters from platforms actually exercised in CI.
 
 ## 中文
@@ -69,4 +70,5 @@ pnpm build
 - 不要为了调试增加终端 I/O 日志。
 - Workspace CRUD 属于高信任远程修改面，必须保持认证、精确 Origin、持久化验证以及“Session 创建/重启只消费持久化 Workspace authority”的边界。终端 Profile 发现必须继续只是“已知 Host Shell + 已注册 WSL 发行版”的有界枚举，不能退化成任意命令执行。
 - Workspace environment 已作为有界持久化配置开放；如果要继续扩大到任意进程执行或密钥管理，必须先进行架构与安全审查。
+- Session Workbench 工具必须与终端 transport 分离。Files 保持 Workspace 根目录范围内的只读能力；Git 在写语义、仓库 hooks/filters 与确认模型经过独立安全设计前，只保持有界、只读的 status+diff。
 - 必须区分“已经实现的平台适配器”与“已进入 CI 实机路径的平台”。

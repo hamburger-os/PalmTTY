@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   BrowseDirectoryRequestSchema,
   CreateSessionSchema,
+  GitDiffRequestSchema,
+  WorkspaceFileListRequestSchema,
+  WorkspaceFileReadRequestSchema,
   DetectTerminalProfilesRequestSchema,
   TerminalProfileSchema,
   CreateWorkspaceSchema,
@@ -86,6 +89,29 @@ describe("protocol", () => {
       distribution: "Ubuntu-24.04",
       path: "/home/dev"
     });
+  });
+
+  it("keeps workbench file and Git paths bounded", () => {
+    expect(WorkspaceFileListRequestSchema.parse({})).toEqual({ path: "" });
+    expect(WorkspaceFileListRequestSchema.parse({ path: "apps/web/src" })).toEqual({
+      path: "apps/web/src"
+    });
+    expect(WorkspaceFileReadRequestSchema.parse({ path: "README.md" })).toEqual({
+      path: "README.md"
+    });
+    expect(() => WorkspaceFileListRequestSchema.parse({ path: "../secret" })).toThrow();
+    expect(() => WorkspaceFileListRequestSchema.parse({ path: "/etc" })).toThrow();
+    expect(() => WorkspaceFileListRequestSchema.parse({ path: "C:/Windows" })).toThrow();
+    expect(() => WorkspaceFileListRequestSchema.parse({ path: "src\\index.ts" })).toThrow();
+    expect(() => WorkspaceFileListRequestSchema.parse({ path: "src//index.ts" })).toThrow();
+    expect(() => WorkspaceFileReadRequestSchema.parse({ path: "" })).toThrow();
+
+    expect(GitDiffRequestSchema.parse({ path: "apps/web/src/App.tsx" })).toEqual({
+      path: "apps/web/src/App.tsx",
+      staged: false
+    });
+    expect(() => GitDiffRequestSchema.parse({ path: "../outside" })).toThrow();
+    expect(() => GitDiffRequestSchema.parse({ path: "src\\index.ts" })).toThrow();
   });
 
   it("requires a WSL shell when shell arguments are configured", () => {

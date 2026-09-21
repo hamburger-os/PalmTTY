@@ -2,9 +2,13 @@ import type {
   BrowseDirectoryRequest,
   CreateWorkspaceInput,
   DirectoryListing,
+  GitDiffResponse,
+  GitStatusResponse,
   RuntimeCapabilities,
   SessionPublic,
   TerminalProfile,
+  WorkspaceFileListResponse,
+  WorkspaceFileReadResponse,
   WorkspacePublic
 } from "@palmtty/protocol";
 
@@ -88,6 +92,64 @@ export async function browseWorkspaceDirectory(
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(input)
+    }
+  ));
+}
+
+export async function listWorkspaceFiles(
+  workspaceId: string,
+  path: string
+) {
+  return responseJson<WorkspaceFileListResponse>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/files/list`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path })
+    }
+  ));
+}
+
+export async function readWorkspaceFile(
+  workspaceId: string,
+  path: string
+) {
+  return responseJson<WorkspaceFileReadResponse>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/files/read`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path })
+    }
+  ));
+}
+
+export async function workspaceGitStatus(workspaceId: string) {
+  return responseJson<GitStatusResponse>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/git/status`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    }
+  ));
+}
+
+export async function workspaceGitDiff(
+  workspaceId: string,
+  path: string,
+  staged: boolean
+) {
+  return responseJson<GitDiffResponse>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/git/diff`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path, staged })
     }
   ));
 }

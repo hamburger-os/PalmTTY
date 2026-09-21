@@ -31,6 +31,8 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - runtime preflight for auth/security exposure and configured Agent TCP bindability, exposed as the unambiguous `pnpm run preflight` package script
 - workspace create/update plus Session creation both validate runtime launch targets
 - authenticated + exact-Origin runtime-aware directory browsing for workspace selection plus unified terminal-profile discovery; directory responses expose directories only, while terminal profiles enumerate known Host shells and registered WSL distributions without starting the distributions; both surfaces are bounded and rate-limited
+- authenticated + exact-Origin Session-workbench file APIs scoped to the persisted Workspace root: bounded directory/file enumeration, symlink containment checks, UTF-8 text preview capped at 512 KiB, binary detection, and structured Host/WSL implementations
+- authenticated + exact-Origin read-only Git integration for the repository containing the Workspace cwd: bounded branch/upstream/ahead-behind/status and textual staged/working-tree diff, with external diff/textconv and fsmonitor execution disabled; the reserved `PALMTTY_*` control namespace plus any separately configured login-token variable is removed from helper subprocesses
 - host runtime adapter with absolute executable normalization, including current-user Windows App Execution Aliases for Store/MSIX PowerShell; each new/restarted Windows terminal refreshes Machine/User environment variables from Windows before resolving the shell and PATH
 - Windows WSL runtime adapter using structured `wsl.exe` argv for distribution/cwd/shell rather than shell-string interpolation; configured workspace environment variables are forwarded by preserving existing colon-delimited `WSLENV` entries/flags and appending bounded names
 - Linux host runtime exercised by Ubuntu CI; macOS shares the host adapter but is not covered by repository CI
@@ -116,15 +118,18 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Host/WSL remote directory picker that selects directories on the Agent runtime rather than the browser device
 - workspace dialog uses a dedicated readability-first modal surface with a fixed header/footer and one scrollable form body; the bounded directory list may scroll independently; installed Host shells and registered WSL distributions appear in one terminal-profile selector with an explicit Custom fallback; Host/WSL working-directory drafts are kept separate; workspace environment variables use structured `NAME=value` editing with balanced outer quote normalization; startup commands are multiline and retain presets for Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, and Aider
 - workspace launcher
-- Session list with explicit text actions: active Sessions use “Terminate”, retained exited/failed Sessions use “Clear”; the terminal header also exposes an explicit confirmed “Restart terminal” replacement action; the ambiguous red × control is removed
+- Session list with explicit text actions: active Sessions use “Terminate”, retained exited/failed Sessions use “Clear”; the Session workbench exposes an explicit confirmed “Restart terminal” replacement action; the ambiguous red × control is removed
+- Session view is now a lightweight workbench with Terminal / Git / Files tabs; the terminal component stays mounted while switching views so xterm/WebSocket/replay state is not recreated by presentation navigation
+- Git pane shows repository branch/tracking state, staged/unstaged/untracked changes and bounded textual diffs; it is intentionally read-only in this phase so UI inspection cannot trigger repository hooks/filters or hidden Git mutations
+- Files pane provides workspace-root-scoped directory navigation plus bounded read-only UTF-8 preview with binary/truncation states; it is a viewer, not a browser IDE/editor
 - stopping Sessions remain non-interactive in the terminal view
 - xterm.js terminal uses one theme-owned opaque viewport surface: the host gutter receives the active xterm background from the same theme value, while theme updates apply in place without recreating the terminal or reconnecting the Session; locale/presentation updates are isolated from the transport lifecycle
 - reconnect loop with retained lastSeq
 - gap detection forces snapshot recovery
-- browser terminal writes are serialized during recovery, fitting is frozen until recovery completes, and terminal/composer input is blocked rather than discarded while disconnected or recovering
+- browser terminal writes are serialized during recovery, fitting is frozen until recovery completes, and terminal input is blocked rather than discarded while disconnected or recovering; switching to Git/Files suppresses resize propagation and switching back performs a safe refit without recreating transport state
 - Esc/Tab/arrows/Ctrl+C/Ctrl+L
 - one-shot Ctrl/Alt modifier
-- multiline composer
+- on-demand long-text dialog for pasted blocks, voice input and AI prompts; the always-visible chat-like composer has been removed
 - responsive/safe-area layout
 - terminal line-height and bottom spacing tuned so the last rendered row is not clipped by the lower controls
 - PWA manifest and non-caching service worker
@@ -140,7 +145,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Real owner workstation + mobile Safari/Chrome + long-running Codex validation remains required.
 - Windows “no visible console flash” remains a real-host visual acceptance check for both PTY creation and explicit termination; CI exercises the bundled ConPTY DLL path but cannot assert desktop window visibility. Development spawn-phase tracing narrows the responsible stage but does not claim to remove an upstream ConPTY/node-pty window if one is still shown.
 - Potentially-live but unreachable recovery records are deliberately preserved when process death cannot be proven; this favors terminal survival over aggressive metadata reclamation.
-- No Git/file preview subsystem yet.
+- Git and file workbench surfaces are read-only: no stage/unstage/commit/push/pull and no browser file editing yet.
 - WSL support is implemented but still needs real owner-host/long-running validation, including distribution enumeration, default-shell launch semantics, directory selection, and workspace-variable forwarding through `WSLENV`; repository CI does not provide a real WSL environment.
 - Linux host runtime is exercised on Ubuntu CI. macOS uses the same host adapter but remains unverified because there is no macOS CI job.
 - Windows Worker runtime file ACL behavior relies on the current-user application-data boundary and still merits dedicated real-host review.

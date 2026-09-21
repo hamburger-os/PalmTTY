@@ -20,7 +20,7 @@ import {
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import { AUTH_COOKIE, AuthService } from "./auth.js";
-import { isReservedControlEnvironmentKey } from "./control-environment.js";
+import { controlEnvironmentKeys, isReservedControlEnvironmentKey } from "./control-environment.js";
 import { browseWorkspaceDirectory } from "./workspace-directory-browser.js";
 import { detectTerminalProfiles } from "./terminal-profiles.js";
 import { FixedWindowLimiter, isTrustedOrigin } from "./security.js";
@@ -33,6 +33,7 @@ import {
   FileWorkspaceStore,
   type WorkspaceStore
 } from "./workspace-store.js";
+import { registerWorkspaceToolRoutes } from "./workspace-tool-routes.js";
 
 const LoginSchema = z.object({ token: z.string().min(1).max(4096) });
 
@@ -194,6 +195,13 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       }
     }
   );
+
+  registerWorkspaceToolRoutes(app, {
+    workspaceStore,
+    requireAuth,
+    requireOrigin,
+    sensitiveEnvironmentKeys: controlEnvironmentKeys(config.auth.tokenEnv)
+  });
 
   app.get("/api/v1/workspaces", { preHandler: requireAuth }, async () => ({
     workspaces: workspaceStore.list()

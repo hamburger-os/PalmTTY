@@ -7,6 +7,7 @@ PalmTTY is a single-user, self-hosted control plane for interactive development 
 
 ~~~text
 Mobile browser / PWA
+  | Terminal | Git | Files
         |
      HTTPS/WSS
         |
@@ -33,7 +34,7 @@ PalmTTY Agent (Fastify)
 ### Repository components
 
 - apps/agent: HTTP/WebSocket control plane, authentication, security gates, Worker discovery and browser↔Worker proxying.
-- apps/web: mobile-first React/xterm interface. Its visual theme/performance preference is browser-local presentation state; it does not enter Agent, Workspace or Session authority.
+- apps/web: mobile-first React/xterm Session workbench with Terminal / Git / Files panes. Its visual theme/performance preference and selected pane are browser-local presentation state; they do not enter Agent, Workspace or Session authority.
 - packages/protocol: executable browser protocol schemas.
 - packages/config: operator YAML schema for server/auth/session policy.
 - Agent workspace store: versioned per-user persistent workspace catalog, separate from operator YAML.
@@ -67,7 +68,7 @@ Every Worker has an independent 256-bit secret. The secret is sent to the Worker
 
 Persisted PIDs are diagnostic metadata only. PalmTTY never treats an old PID as sufficient authority to kill a process. A failed Agent connection is also not proof that a Worker is dead: potentially-live recovery metadata is preserved, and an adopted Worker retries control-plane reconnection instead of converting an IPC outage into PTY loss. Missing Worker-owned recovery files are republished by the Worker; conflicting recovery authority fails closed.
 
-Workspace definitions are persistent Agent-owned state managed through authenticated, exact-Origin-protected HTTP endpoints. The Web editor has bounded runtime inspection for directory browsing and unified terminal profiles; Host profiles are limited to known shells, while Windows WSL profiles are discovered by enumerating registered distributions without starting them. Neither surface is a general file/command API. Workspace definitions may include a bounded environment map and multiline startup input. Session creation/restart do not accept ad-hoc cwd/shell/environment overrides; they resolve persisted workspace authority by ID. On Windows, every new/restarted Host terminal refreshes Machine/User environment variables before resolving PATH and applying workspace overrides. WSL runtimes resolve `wsl.exe`, pass distribution/cwd/shell as structured argv, and forward configured workspace variable names through `WSLENV`. The Worker bootstrap carries only the normalized launch specification. Worker durability begins at an authenticated, idempotent `adopt` commit: a lost adoption response is retried over fresh IPC, while a never-adopted Worker expires its short creation lease and self-cleans.
+Workspace definitions are persistent Agent-owned state managed through authenticated, exact-Origin-protected HTTP endpoints. The Session workbench keeps terminal transport separate from Workspace inspection: switching to Git or Files does not unmount/reconnect xterm, and the Agent exposes dedicated bounded read-only HTTP APIs rather than extending the terminal WebSocket protocol. File listing/preview accepts canonical Workspace-relative paths, enforces canonical/symlink containment within the persisted Workspace root, caps listings at 512 entries and UTF-8 previews at 512 KiB, and reports binary/truncated content explicitly. Git integration resolves the repository containing the persisted Workspace cwd and exposes only branch/tracking/status plus bounded staged/working-tree text diff; external diff/textconv and fsmonitor execution are disabled, and helper subprocesses exclude the configured PalmTTY login-token environment key.  The Web editor has bounded runtime inspection for directory browsing and unified terminal profiles; Host profiles are limited to known shells, while Windows WSL profiles are discovered by enumerating registered distributions without starting them. Neither surface is a general file/command API. Workspace definitions may include a bounded environment map and multiline startup input. Session creation/restart do not accept ad-hoc cwd/shell/environment overrides; they resolve persisted workspace authority by ID. On Windows, every new/restarted Host terminal refreshes Machine/User environment variables before resolving PATH and applying workspace overrides. WSL runtimes resolve `wsl.exe`, pass distribution/cwd/shell as structured argv, and forward configured workspace variable names through `WSLENV`. The Worker bootstrap carries only the normalized launch specification. Worker durability begins at an authenticated, idempotent `adopt` commit: a lost adoption response is retried over fresh IPC, while a never-adopted Worker expires its short creation lease and self-cleans.
 
 ### Reconnect model
 
@@ -98,6 +99,6 @@ Session 生命周期动作明确分离：“终止”把活动会话推进为 `s
 
 Windows 本地控制 IPC 使用 Named Pipe；其他当前 CI 平台使用 Unix domain socket。每个 Worker 有独立 256-bit secret，创建时只经匿名 stdin 传入，不发送到浏览器。持久化 PID 只用于诊断，不能作为 kill authority。Agent 暂时无法连接 Worker 并不等于 Worker 已死亡，因此不会仅因 IPC 超时删除可能仍存活 Worker 的恢复能力；已接管 Worker 的控制连接会持续退避重连。Worker 自己拥有 recovery metadata，文件缺失时会重新发布；如果发现恢复权限被其他内容替换，则 fail closed。
 
-Workspace 现在是 Agent 持有的独立持久化状态，通过“认证 + 精确 Origin”保护的 HTTP API 在网页端创建、编辑和删除；编辑器提供有边界的目录浏览与统一终端 Profile 发现：Host 侧只探测已知 Shell，Windows WSL 侧只枚举已注册发行版而不启动发行版；这些接口不读取文件内容，也不是通用命令执行接口。Workspace 可以持久化有界 environment 和多行启动输入；创建/重启 Session 时不允许临时注入 cwd/shell/env，而是按 workspace ID 重新解析持久化定义。Windows Host 新终端会重新读取 Machine/User 环境与最新 PATH 后再叠加 Workspace environment；WSL 把发行版、cwd、Shell 作为结构化 argv 传递，并通过 `WSLENV` 转发配置变量名。Worker bootstrap 只接收规范化后的运行规格。
+Workspace 现在是 Agent 持有的独立持久化状态，通过“认证 + 精确 Origin”保护的 HTTP API 在网页端创建、编辑和删除。Session 页面使用“终端 / Git / 文件”轻量工作台；切换 Git/文件不会卸载或重连 xterm，Git/Files 也不会塞进终端 WebSocket，而是走独立、有界、只读的 Workspace HTTP API。Files 只接受规范化 Workspace 相对路径，Host/WSL 都会做 canonical/symlink 根目录约束，目录最多 512 项，UTF-8 文本预览最多 512 KiB，并明确标记二进制/截断状态。Git 只读取包含 Workspace cwd 的仓库 branch/tracking/status 和 staged/working-tree 文本 diff，禁用 external diff/textconv/fsmonitor，并从辅助子进程环境剔除配置的 PalmTTY 登录 token。编辑器提供有边界的目录浏览与统一终端 Profile 发现：Host 侧只探测已知 Shell，Windows WSL 侧只枚举已注册发行版而不启动发行版；这些接口不读取文件内容，也不是通用命令执行接口。Workspace 可以持久化有界 environment 和多行启动输入；创建/重启 Session 时不允许临时注入 cwd/shell/env，而是按 workspace ID 重新解析持久化定义。Windows Host 新终端会重新读取 Machine/User 环境与最新 PATH 后再叠加 Workspace environment；WSL 把发行版、cwd、Shell 作为结构化 argv 传递，并通过 `WSLENV` 转发配置变量名。Worker bootstrap 只接收规范化后的运行规格。
 
 PTY 输出、headless mirror、seq 与 replay 都在 Worker 内按同一有序流水线更新，因此 Agent 不在线期间状态仍连续。浏览器恢复时把已 fit 的 rows/cols 与 lastSeq 一起提交；Worker 先把 canonical PTY/headless mirror 调整到该 geometry，尺寸未变且历史仍可用时才 replay，尺寸变化或历史过旧时使用新 geometry 下的 snapshot。恢复帧之后的 `hello` 表示恢复完成，恢复边界与实时订阅之间不留消息窗口。

@@ -10,6 +10,7 @@ Use this map after every implementation change.
 | `packages/protocol` | relevant module | `architecture.md` | RFC only for external protocol assumptions |
 | `packages/config` or examples | `agent.md`, `deployment.md`, `security.md` | `getting-started.md`, `security.md` | normally none |
 | workspace store/runtime adapters/API | `agent.md`, `session.md`, `security.md`, `roadmap.md` | `architecture.md`, `getting-started.md`, `security.md` | OS/runtime references when assumptions change |
+| workspace workbench file/Git APIs (`workspace-files.ts`, `workspace-git.ts`, `workspace-tool-routes.ts`) | `web-mobile.md`, `security.md`, `roadmap.md` | `architecture.md`, `development.md`, `security.md` | Git/runtime references only when external assumptions change |
 | `apps/web` | `web-mobile.md`, possibly `reconnect.md` | architecture/getting-started as needed | xterm upstream only if assumptions changed; visual/theme changes also follow `.agents/skills/palmtty-theme/SKILL.md` and its review skill |
 | deployment/reverse proxy | `deployment.md`, `security.md` | `security.md`, `getting-started.md` | security references |
 | session worker lifecycle / IPC / recovery metadata | `session.md`, `reconnect.md`, `security.md`, `roadmap.md` | `architecture.md`, `security.md` | Windows/Node runtime references |

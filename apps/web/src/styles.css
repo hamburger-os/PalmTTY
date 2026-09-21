@@ -13,8 +13,7 @@
 }
 
 .app-shell,
-.center-card,
-.terminal-page {
+.center-card {
   position: relative;
   z-index: 1;
 }
@@ -30,7 +29,6 @@
 }
 
 .topbar,
-.terminal-header,
 .section-heading,
 .workspace-card-heading,
 .dialog-heading,
@@ -581,47 +579,6 @@ button.directory-choose {
   padding: 0 var(--space-5) var(--space-5);
 }
 
-.terminal-page {
-  height: 100dvh;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
-  gap: 6px;
-  padding:
-    max(7px, env(safe-area-inset-top))
-    max(7px, env(safe-area-inset-right))
-    max(7px, env(safe-area-inset-bottom))
-    max(7px, env(safe-area-inset-left));
-  overflow: hidden;
-  background: transparent;
-}
-
-.terminal-header,
-.keybar,
-.composer {
-  border-radius: var(--radius-md);
-}
-
-.terminal-header {
-  min-height: 48px;
-  padding: 7px 9px;
-}
-
-.terminal-header-actions {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: var(--space-2);
-}
-
-.terminal-restart-error {
-  max-width: min(32vw, 220px);
-  overflow: hidden;
-  color: var(--danger);
-  font-size: var(--text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .connection {
   padding: 4px 8px;
   color: var(--text-muted);
@@ -659,6 +616,7 @@ button.directory-choose {
 
 .keybar {
   display: flex;
+  border-radius: var(--radius-md);
   gap: 6px;
   overflow-x: auto;
   padding: 7px 8px;
@@ -682,32 +640,6 @@ button.directory-choose {
   color: var(--text-on-accent);
   background: color-mix(in srgb, var(--spectrum-blue) 58%, var(--control-bg));
   border-color: color-mix(in srgb, var(--spectrum-blue) 70%, transparent);
-}
-
-.composer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2);
-  padding: 8px;
-}
-
-.composer textarea {
-  min-height: 46px;
-  max-height: 120px;
-  resize: none;
-  font-size: 16px;
-}
-
-.composer button {
-  min-width: 72px;
-  font-weight: 700;
-}
-
-@media (min-width: 700px) {
-  .terminal-page {
-    padding-left: max(10px, env(safe-area-inset-left));
-    padding-right: max(10px, env(safe-area-inset-right));
-  }
 }
 
 @media (max-width: 620px) {
@@ -791,24 +723,9 @@ button.directory-choose {
     margin-left: auto;
   }
 
-  .composer {
-    grid-template-columns: minmax(0, 1fr) 68px;
-  }
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
-  .terminal-page {
-    gap: 4px;
-    padding-top: max(4px, env(safe-area-inset-top));
-    padding-bottom: max(4px, env(safe-area-inset-bottom));
-  }
-
-  .terminal-header {
-    min-height: 38px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-  }
-
   .terminal-host {
     padding-top: 4px;
     padding-bottom: 5px;
@@ -823,12 +740,499 @@ button.directory-choose {
     min-height: 34px;
   }
 
-  .composer {
-    padding-top: 5px;
-    padding-bottom: 5px;
+}
+
+
+/* Session workbench */
+.workbench-page {
+  position: relative;
+  z-index: 1;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
+  padding:
+    max(7px, env(safe-area-inset-top))
+    max(7px, env(safe-area-inset-right))
+    max(7px, env(safe-area-inset-bottom))
+    max(7px, env(safe-area-inset-left));
+  overflow: hidden;
+}
+
+.workbench-header {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+}
+
+.workbench-leading,
+.workbench-actions,
+.workbench-tabs,
+.tool-pane-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.workbench-leading,
+.workbench-actions {
+  min-width: 0;
+}
+
+.workbench-name {
+  max-width: min(26vw, 260px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbench-tabs {
+  min-width: 0;
+  justify-self: center;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--control-bg);
+}
+
+.workbench-tabs button {
+  min-height: var(--touch-target-compact);
+  padding: 6px 12px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--text-sm);
+}
+
+.workbench-tabs button:hover:not(:disabled) {
+  transform: none;
+}
+
+.workbench-tabs button.selected {
+  color: var(--text-primary);
+  background: var(--control-hover);
+  border-color: var(--border-strong);
+}
+
+.workbench-actions {
+  justify-self: end;
+}
+
+.workbench-error {
+  max-width: min(24vw, 220px);
+  overflow: hidden;
+  color: var(--danger);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbench-content {
+  position: relative;
+  min-height: 0;
+}
+
+.workbench-pane {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.workbench-pane.is-active {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.terminal-pane-shell {
+  height: 100%;
+  margin-top: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.terminal-pane-shell .terminal-host {
+  height: 100%;
+}
+
+.long-input-dialog {
+  width: min(680px, calc(100% - 24px));
+  padding: 0;
+  color: var(--text-primary);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.long-input-dialog::backdrop {
+  background: var(--overlay);
+}
+
+.long-input-body {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-3);
+}
+
+.long-input-body h2,
+.long-input-body p {
+  margin: 0;
+}
+
+.long-input-body p {
+  color: var(--text-secondary);
+}
+
+.long-input-body textarea {
+  min-height: min(34dvh, 260px);
+  resize: vertical;
+  font-size: 16px;
+  font-family: var(--font-mono);
+}
+
+.long-input-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.tool-pane {
+  height: 100%;
+  margin-top: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.files-pane,
+.git-pane {
+  display: grid;
+  grid-template-columns: minmax(240px, 330px) minmax(0, 1fr);
+}
+
+.file-browser,
+.file-preview,
+.git-sidebar,
+.git-diff {
+  min-width: 0;
+  min-height: 0;
+}
+
+.file-browser,
+.git-sidebar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-right: 1px solid var(--border);
+}
+
+.file-preview,
+.git-diff {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.tool-pane-toolbar {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tool-pane-title {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.tool-pane-path,
+.git-branch,
+.tool-pane-toolbar > span,
+.tool-hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.tool-pane-path,
+.git-branch {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-list,
+.git-groups,
+.git-change-list {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.file-list,
+.git-change-list {
+  display: grid;
+  align-content: start;
+}
+
+.file-row,
+.git-change-row {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  display: grid;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.file-row {
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  padding: 7px 10px;
+}
+
+.git-change-row {
+  grid-template-columns: 24px minmax(0, 1fr);
+  padding: 7px 10px;
+}
+
+.file-row:hover:not(:disabled),
+.git-change-row:hover:not(:disabled),
+.file-row.selected,
+.git-change-row.selected {
+  background: var(--control-hover);
+  transform: none;
+}
+
+.file-row-kind,
+.git-status-code {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  text-align: center;
+}
+
+.file-row-name,
+.git-change-path,
+.file-preview-toolbar strong,
+.git-diff-toolbar strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-row-size {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.file-preview-content,
+.git-diff-content {
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-4);
+  overflow: auto;
+  overscroll-behavior: contain;
+  color: var(--text-primary);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+.file-preview-content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.git-diff-content {
+  white-space: pre;
+}
+
+.tool-empty {
+  align-self: center;
+  justify-self: center;
+  max-width: 420px;
+  padding: var(--space-5);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.tool-inline-error {
+  margin: var(--space-3);
+  padding: 9px 10px;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.tool-hint {
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.git-sidebar {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.git-tracking,
+.git-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.git-tracking {
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  border-bottom: 1px solid var(--border);
+}
+
+.git-groups {
+  display: block;
+}
+
+.git-group-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 7px 10px;
+  color: var(--text-secondary);
+  background: var(--flat-content);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-xs);
+}
+
+.git-change-path {
+  display: grid;
+  gap: 1px;
+}
+
+.git-change-path small {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-preview-back,
+.git-preview-back {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) and (min-width: 700px) {
+  .terminal-pane-shell {
+    grid-template-rows: minmax(0, 1fr);
   }
 
-  .composer textarea {
-    min-height: 38px;
+  .terminal-pane-shell .keybar {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .workbench-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "leading actions"
+      "tabs tabs";
+    gap: 5px var(--space-2);
+  }
+
+  .workbench-leading {
+    grid-area: leading;
+  }
+
+  .workbench-tabs {
+    grid-area: tabs;
+    width: 100%;
+  }
+
+  .workbench-tabs button {
+    flex: 1;
+  }
+
+  .workbench-actions {
+    grid-area: actions;
+  }
+
+  .workbench-name {
+    max-width: 34vw;
+  }
+
+  .workbench-error {
+    display: none;
+  }
+
+  .files-pane,
+  .git-pane {
+    grid-template-columns: 1fr;
+  }
+
+  .file-browser,
+  .git-sidebar {
+    border-right: 0;
+  }
+
+  .file-preview,
+  .git-diff {
+    display: none;
+  }
+
+  .files-pane.has-preview .file-browser,
+  .git-pane.has-preview .git-sidebar {
+    display: none;
+  }
+
+  .files-pane.has-preview .file-preview,
+  .git-pane.has-preview .git-diff {
+    display: grid;
+  }
+
+  .file-preview-back,
+  .git-preview-back {
+    display: inline-flex;
+  }
+
+  .file-preview-toolbar,
+  .git-diff-toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .workbench-page {
+    gap: 4px;
+    padding-top: max(4px, env(safe-area-inset-top));
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+  }
+
+  .workbench-header {
+    min-height: 40px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .terminal-pane-shell {
+    gap: 4px;
   }
 }
