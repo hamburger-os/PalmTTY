@@ -224,7 +224,7 @@ export function WorkspaceDialog({
           return;
         }
 
-        if (!workspace) {
+        if (!workspace && profileChoice === "detecting") {
           const recommended = detected.find((profile) => profile.recommended);
           if (recommended) {
             applyProfile(recommended);
