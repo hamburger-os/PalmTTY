@@ -58,6 +58,8 @@ Agent 正常关闭、升级或异常退出时：
 
 目录浏览与 Workspace 持久化分离：浏览接口只返回目录，不返回文件内容；Host 默认从当前用户 home 开始并可浏览可访问盘符，WSL 使用固定 shell 脚本并把用户路径作为独立 argv 传入，不拼接到命令字符串。目录结果最多返回 512 项，WSL 子进程另有输出大小与超时上限，并对浏览请求单独限流。
 
+`pnpm dev` 会在 preflight 成功后由根启动器为当前私有 LAN 地址生成 5173 的精确 development Origins，并只在 `--development` Agent 中合并；Agent 自身监听地址仍完全来自正式 config，不因 Vite 的 LAN 监听而改成非 loopback。Windows development 还默认开启不含命令/环境内容的 Worker/PTTY spawn phase trace，用于定位真实桌面上仍可能出现的短暂 console flash。
+
 Agent 启动前的 runtime preflight 只处理认证环境、外部暴露规则和 Agent TCP host/port 可绑定性，不再遍历 workspace。Workspace 是独立的 per-user 持久化状态；新建/修改时通过认证 + 精确 Origin 保护的 API 验证，创建 Session 时再次验证。Agent 启动后异步探测一次 runtime capabilities 并在本进程生命周期内复用结果，避免每次 Web 查询都重复启动 WSL 探测进程；该探测不是创建 Host workspace 的前置条件。Host runtime 会把 Shell 解析为绝对启动路径；Windows 当前用户 `%LOCALAPPDATA%\Microsoft\WindowsApps` 下的 App Execution Alias 有专门处理。每次创建或重启 Windows 终端时还会重新读取 Machine/User 环境，重新组合最新 PATH，再叠加 Workspace 的有界环境变量，所以安装 CLI 后不需要重启整个 Agent 才能让新 PTY 看见新的 PATH。WSL runtime 只在 Windows Agent 上启用，解析 `wsl.exe`，并把发行版、Linux cwd、Shell/args 作为结构化参数传入；Workspace 环境变量通过 `WSLENV` 名称列表转发。只有规范化后的运行规格才进入 Worker bootstrap。
 
 创建 Session 时 Agent：
