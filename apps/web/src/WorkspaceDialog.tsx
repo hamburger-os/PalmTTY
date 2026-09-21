@@ -256,9 +256,10 @@ export function WorkspaceDialog({
           <small>{t("workspace.shellOptional")}</small>
         </label>
 
-        <label>
-          <span>{t("workspace.shellArgs")}</span>
+        <div className="workspace-field">
+          <label htmlFor="workspace-shell-args">{t("workspace.shellArgs")}</label>
           <textarea
+            id="workspace-shell-args"
             value={shellArgs}
             onChange={(event) => setShellArgs(event.target.value)}
             placeholder={t("workspace.shellArgsPlaceholder")}
@@ -293,11 +294,12 @@ export function WorkspaceDialog({
               </button>
             )}
           </div>
-        </label>
+        </div>
 
-        <label>
-          <span>{t("workspace.startupCommand")}</span>
+        <div className="workspace-field">
+          <label htmlFor="workspace-startup-command">{t("workspace.startupCommand")}</label>
           <input
+            id="workspace-startup-command"
             value={startupCommand}
             onChange={(event) => setStartupCommand(event.target.value)}
             placeholder={t("workspace.startupPlaceholder")}
@@ -327,7 +329,7 @@ export function WorkspaceDialog({
               </button>
             )}
           </div>
-        </label>
+        </div>
 
         {error && <div className="error-banner">{error}</div>}
 
