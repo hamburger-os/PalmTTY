@@ -33,7 +33,7 @@ PalmTTY Agent (Fastify)
 ### Repository components
 
 - apps/agent: HTTP/WebSocket control plane, authentication, security gates, Worker discovery and browser↔Worker proxying.
-- apps/web: mobile-first React/xterm interface.
+- apps/web: mobile-first React/xterm interface. Its visual theme/performance preference is browser-local presentation state; it does not enter Agent, Workspace or Session authority.
 - packages/protocol: executable browser protocol schemas.
 - packages/config: operator YAML schema for server/auth/session policy.
 - Agent workspace store: versioned per-user persistent workspace catalog, separate from operator YAML.
@@ -82,7 +82,7 @@ On attach, the browser sends its fitted rows/columns together with `lastSeq`. Th
 
 ## 中文
 
-PalmTTY 是一个单用户、自托管的交互式开发终端控制面。
+PalmTTY 是一个单用户、自托管的交互式开发终端控制面。Web 端主题与视觉性能档只属于浏览器本地展示状态，不进入 Agent、Workspace 或 Session 权限/持久化模型。
 
 每个 Session 由独立 detached Worker 持有。Worker 是 PTY、headless xterm、输出序号、有限 replay 和退出保留期的唯一 canonical owner；Agent 只负责 Web/API、认证、安全策略、Worker 发现与浏览器代理。
 
