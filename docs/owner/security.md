@@ -30,7 +30,7 @@ PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。安全失
 - secret 只通过 Worker 创建时的一次性匿名 stdin bootstrap 传递；
 - secret 不放 argv、URL、浏览器协议或普通日志；
 - PalmTTY 登录 token 对应的环境变量在启动 Worker 前删除，并再次从 PTY 环境删除；Windows 下删除按环境变量名大小写不敏感语义处理；
-- Worker 先验证 protocol version + secret，未认证连接不能 attach/input/resize/terminate；
+- Worker 先验证 protocol version + secret，未认证连接不能 attach/input/resize/terminate/retire；
 - 新 Agent 只有持有 recovery secret 才能接管控制连接；
 - Worker secret 在用户 runtime 目录单独保存；
 - Unix 目录/文件使用 0700/0600；
@@ -48,7 +48,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 清理与所有权策略：
 
-- 已接管的 Worker 只通过 authenticated IPC 接受终止命令；
+- 已接管的 Worker 只通过 authenticated IPC 接受终止与 retained-session retirement 命令；`retire` 只允许在 `exited/failed` 状态执行，Agent 不能绕过 Worker 直接删除 recovery state；
 - Session 创建采用 authenticated、幂等的 adoption transaction：READY 后 Worker 仍受短创建租约约束，`adopt` 可在响应丢失后通过新 IPC 连接安全重试；只有 adoption 得到确认才由 Agent 返回创建成功；从未提交 adoption 时由 Worker 自己在租约到期后杀 PTY并清理 recovery state，不需要独立 abort 控制命令，也不依赖持久化 PID；
 - Agent 无法连接/认证 Worker 本身不构成删除 recovery metadata 的权限；只有能明确判定记录中的 Worker 进程不存在时才清理；
 - 老旧 dangling secret/socket 文件仍按年龄清理；
@@ -68,7 +68,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 ## 资源限制
 
-- 登录、创建 Session 与目录浏览分别限流；
+- 登录、创建 Session、Session lifecycle mutation 与目录浏览分别限流；
 - Session 数量有上限，并发创建也计入上限；
 - browser WebSocket 消息和终端尺寸有上限；
 - replay、scrollback、IPC frame、IPC backlog、browser backpressure 均有限制；
