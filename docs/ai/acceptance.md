@@ -51,6 +51,9 @@ Security, session and reconnect changes should include or update tests for:
 - workspace directory browsing requires authentication + exact Origin, returns directories only, and remains bounded
 - workspace environment editing accepts bounded `NAME=value` input, rejects duplicate/reserved/unbalanced-quote input, normalizes balanced outer quotes, and persists only through workspace CRUD
 - Host directory picker navigation returns absolute selectable paths without exposing files
+- Session workbench tab changes keep the terminal/xterm/WebSocket mounted, do not reset `lastSeq`, and do not emit hidden-pane geometry changes; returning to Terminal performs a safe refit
+- workspace file list/read APIs require authentication + exact Origin, use canonical relative paths, reject traversal/symlink escape, cap listings at 512 entries, cap text preview at 512 KiB, and report binary/truncated previews explicitly
+- workspace Git status/diff APIs require authentication + exact Origin, handle non-repositories without failing the Agent, bound output, reject path traversal, disable external diff/textconv/fsmonitor execution, and do not inherit configured PalmTTY auth-token environment keys
 
 The Agent suite includes:
 
