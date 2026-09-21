@@ -48,6 +48,15 @@ const REDISCOVER_CONNECT_DELAYS_MS = [0, 100, 250, 500, 1000, 2000, 4000];
 const RECONNECT_DELAYS_MS = [100, 250, 500, 1000, 2000, 5000];
 const RESTART_EXIT_TIMEOUT_MS = 10_000;
 
+function traceWindowsSpawn(scope: string, event: string): void {
+  if (
+    process.platform === "win32" &&
+    process.env.PALMTTY_WINDOWS_SPAWN_TRACE === "1"
+  ) {
+    console.info(`[PalmTTY] windows spawn trace ${scope}: ${event}`);
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -162,7 +171,9 @@ export class SessionManager {
 
     const release = this.reserveCreate(workspaceId);
     try {
+      traceWindowsSpawn(`workspace:${workspaceId}`, "runtime.resolve.begin");
       const workspace = await resolveRuntimeWorkspace(definition);
+      traceWindowsSpawn(`workspace:${workspaceId}`, "runtime.resolve.ready");
       return await this.spawnSession(workspace, cols, rows);
     } finally {
       release();
@@ -347,7 +358,9 @@ export class SessionManager {
       // Validate and resolve the replacement before destroying the current PTY.
       // This keeps an exited retained Session available when its workspace was
       // deleted or its launch target became invalid.
+      traceWindowsSpawn(`workspace:${workspaceId}`, "runtime.resolve.begin");
       const replacement = await resolveRuntimeWorkspace(definition);
+      traceWindowsSpawn(`workspace:${workspaceId}`, "runtime.resolve.ready");
 
       if (isActiveSessionState(managed.session.state)) {
         await managed.worker.terminate();
