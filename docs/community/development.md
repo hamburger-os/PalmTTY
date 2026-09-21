@@ -53,6 +53,7 @@ Any behavior-changing PR must use the documentation-sync workflow in `.agents/sk
 ```powershell
 pnpm docs:check
 pnpm typecheck
+pnpm scripts:check
 pnpm test
 pnpm build
 ```
