@@ -69,6 +69,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   await sessions.initialize();
   const runtimeCapabilitiesPromise = detectRuntimeCapabilities();
   const createLimiter = new FixedWindowLimiter(20, 60_000);
+  const sessionMutationLimiter = new FixedWindowLimiter(60, 60_000);
   const workspaceMutationLimiter = new FixedWindowLimiter(60, 60_000);
   const directoryBrowseLimiter = new FixedWindowLimiter(120, 60_000);
 
@@ -272,12 +273,39 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     }
   });
 
-  app.delete<{ Params: { id: string } }>("/api/v1/sessions/:id", { preHandler: [requireOrigin, requireAuth] }, async (request, reply) => {
-    if (!await sessions.terminate(request.params.id)) {
-      return reply.code(404).send({ error: "session_not_found" });
+  app.post<{ Params: { id: string } }>(
+    "/api/v1/sessions/:id/terminate",
+    { preHandler: [requireOrigin, requireAuth] },
+    async (request, reply) => {
+      if (!sessionMutationLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_session_requests" });
+      }
+      const session = await sessions.terminate(request.params.id);
+      if (!session) {
+        return reply.code(404).send({ error: "session_not_found" });
+      }
+      const terminal = session.state === "exited" || session.state === "failed";
+      return reply.code(terminal ? 200 : 202).send({ session });
     }
-    return reply.code(204).send();
-  });
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    "/api/v1/sessions/:id",
+    { preHandler: [requireOrigin, requireAuth] },
+    async (request, reply) => {
+      if (!sessionMutationLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_session_requests" });
+      }
+      const result = await sessions.remove(request.params.id);
+      if (result === "not_found") {
+        return reply.code(404).send({ error: "session_not_found" });
+      }
+      if (result === "active") {
+        return reply.code(409).send({ error: "session_not_stopped" });
+      }
+      return reply.code(204).send();
+    }
+  );
 
   app.get<{ Params: { id: string } }>(
     "/api/v1/sessions/:id/terminal",

@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import type { PalmTTYConfig } from "@palmtty/config";
 import {
   encodeServerMessage,
+  isActiveSessionState,
+  isTerminalSessionState,
   type SessionPublic,
   type ServerMessage
 } from "@palmtty/protocol";
@@ -142,7 +144,7 @@ export class SessionManager {
     return [...this.sessions.values()].some(
       ({ session }) =>
         session.workspaceId === workspaceId &&
-        (session.state === "starting" || session.state === "running")
+        isActiveSessionState(session.state)
     );
   }
 
@@ -153,7 +155,7 @@ export class SessionManager {
     if (!definition) throw new Error("Unknown workspace");
 
     const active = [...this.sessions.values()].filter(({ session }) =>
-      session.state === "running" || session.state === "starting"
+      isActiveSessionState(session.state)
     );
     if (active.length + this.pendingCreates >= this.config.sessions.maxSessions) {
       throw new Error("Maximum session count reached");
@@ -271,11 +273,33 @@ export class SessionManager {
     await this.requireManaged(id).worker.resize(cols, rows);
   }
 
-  async terminate(id: string): Promise<boolean> {
+  async terminate(id: string): Promise<SessionPublic | undefined> {
     const managed = this.sessions.get(id);
-    if (!managed) return false;
+    if (!managed) return undefined;
     await managed.worker.terminate();
-    return true;
+    return this.publicSession(managed);
+  }
+
+  async remove(id: string): Promise<"removed" | "not_found" | "active"> {
+    const managed = this.sessions.get(id);
+    if (!managed) return "not_found";
+    if (isActiveSessionState(managed.session.state)) return "active";
+
+    await managed.worker.retire();
+
+    if (this.sessions.get(id) === managed) {
+      this.sessions.delete(id);
+    }
+    for (const socket of managed.clients.values()) {
+      try {
+        socket.close(1000, "Session removed");
+      } catch {
+        // Best effort during explicit retained-session cleanup.
+      }
+    }
+    managed.clients.clear();
+    managed.worker.close();
+    return "removed";
   }
 
   async close(): Promise<void> {
@@ -309,7 +333,7 @@ export class SessionManager {
     managed.worker.onClose(() => {
       if (this.closing || this.sessions.get(managed.record.sessionId) !== managed) return;
 
-      if (managed.session.state === "exited") {
+      if (isTerminalSessionState(managed.session.state)) {
         this.sessions.delete(managed.record.sessionId);
         for (const socket of managed.clients.values()) {
           try {

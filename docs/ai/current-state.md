@@ -43,11 +43,12 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - one independent detached Worker process per Session
 - Worker owns node-pty/ConPTY, headless xterm, sequence number, replay history and exited-session retention
 - Windows Named Pipe IPC; Unix-domain-socket IPC on current non-Windows CI hosts
+- Windows PTY creation uses node-pty's bundled ConPTY DLL path; this avoids node-pty 1.1.0's separate console-list helper on explicit kill, which can surface a transient console window and has upstream teardown races
 - length-prefixed bounded JSON frames
 - per-session 256-bit Worker secret
 - bootstrap delivered over anonymous stdin, never argv/URL
 - startup READY handshake: Session creation succeeds only after the Worker has published recovery state and is listening
-- Worker secret and minimal record persisted in a per-user runtime directory isolated by private Worker IPC generation; protocol v3 uses `runtime-v3`
+- Worker secret and minimal record persisted in a per-user runtime directory isolated by private Worker IPC generation; protocol v4 uses `runtime-v4`
 - Agent startup rediscovers Workers in parallel and authenticates them
 - Agent normal shutdown/restart disconnects control only and does not kill PTYs
 - Worker creation uses an authenticated idempotent adoption transaction: READY is not yet durable; adoption responses can be retried across a fresh IPC connection, while an unadopted Worker has a short creation lease and self-cleans its PTY/recovery state if the creator disappears
@@ -76,6 +77,8 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - ordered browser client message handling
 - browser application ping/pong heartbeat
 - terminal WebSocket closure at login-session expiry
+- explicit Session lifecycle: `running → stopping → exited` for termination, with idempotent terminate requests
+- retained-session removal is separate from termination; only exited/failed Sessions can be cleared immediately, and the Worker owns final terminal/recovery-state disposal
 - bounded exited-session retention with Worker self-disposal
 
 ### Test coverage
@@ -88,6 +91,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Agent restart rediscovery
 - slow-client cutoff
 - auth expiry
+- explicit terminate/stopping/exit transition, idempotent termination, active-session clear rejection, and immediate retained-session removal
 - exited-session retention/cleanup
 - maxSessions under concurrent creation
 - wrong Worker secret rejection
@@ -108,7 +112,8 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Host/WSL remote directory picker that selects directories on the Agent runtime rather than the browser device
 - single-scroll workspace dialog layout, shell-argument example chips, and startup-command presets for Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, and Aider
 - workspace launcher
-- running-session list
+- Session list with explicit text actions: active Sessions use “Terminate”, retained exited/failed Sessions use “Clear”; the ambiguous red × control is removed
+- stopping Sessions remain non-interactive in the terminal view
 - xterm.js terminal
 - reconnect loop with retained lastSeq
 - gap detection forces snapshot recovery
@@ -129,6 +134,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - No multi-user ACL.
 - Reverse-proxy/Tailscale examples are documentation/configuration, not automated setup.
 - Real owner workstation + mobile Safari/Chrome + long-running Codex validation remains required.
+- Windows explicit-termination “no visible console flash” remains a real-host visual acceptance check; CI exercises the bundled ConPTY DLL path but cannot assert desktop window visibility.
 - Potentially-live but unreachable recovery records are deliberately preserved when process death cannot be proven; this favors terminal survival over aggressive metadata reclamation.
 - No Git/file preview subsystem yet.
 - WSL support is implemented but still needs real owner-host/long-running validation; repository CI does not provide a real WSL environment.

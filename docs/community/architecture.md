@@ -43,7 +43,7 @@ PalmTTY Agent (Fastify)
 
 Each Session is owned by one independent detached Worker process. The Worker owns the PTY, headless terminal mirror, monotonically increasing output sequence, bounded replay history and exited-session retention.
 
-The Agent deliberately does not own a second canonical copy of terminal state.
+Session lifecycle actions are explicit. Termination is an action that moves an active Session through `stopping` to `exited` and keeps its retained terminal state available. Deletion is a separate operation allowed only for `exited/failed` Sessions; it asks the Worker to retire immediately and release terminal/recovery state. The Agent deliberately does not own a second canonical copy of terminal state or delete Worker recovery files behind the Worker's back.
 
 ### Persistence semantics
 
@@ -63,7 +63,7 @@ Login sessions remain in Agent memory, so after Agent restart the user signs in 
 
 On Windows the Agent and Worker communicate through a named pipe. Current non-Windows CI uses Unix domain sockets.
 
-Every Worker has an independent 256-bit secret. The secret is sent to the Worker once through anonymous stdin at creation time and persisted only in the local runtime recovery area; it never reaches the browser. Recovery state is isolated by private Worker IPC generation; the current protocol v3 uses a `runtime-v3` directory and does not rediscover previous-generation runtime state. IPC frames and socket backlog are bounded.
+Every Worker has an independent 256-bit secret. The secret is sent to the Worker once through anonymous stdin at creation time and persisted only in the local runtime recovery area; it never reaches the browser. Recovery state is isolated by private Worker IPC generation; the current protocol v4 uses a `runtime-v4` directory and does not rediscover previous-generation runtime state. IPC frames and socket backlog are bounded.
 
 Persisted PIDs are diagnostic metadata only. PalmTTY never treats an old PID as sufficient authority to kill a process. A failed Agent connection is also not proof that a Worker is dead: potentially-live recovery metadata is preserved, and an adopted Worker retries control-plane reconnection instead of converting an IPC outage into PTY loss. Missing Worker-owned recovery files are republished by the Worker; conflicting recovery authority fails closed.
 
@@ -85,6 +85,8 @@ On attach, the browser sends its fitted rows/columns together with `lastSeq`. Th
 PalmTTY 是一个单用户、自托管的交互式开发终端控制面。
 
 每个 Session 由独立 detached Worker 持有。Worker 是 PTY、headless xterm、输出序号、有限 replay 和退出保留期的唯一 canonical owner；Agent 只负责 Web/API、认证、安全策略、Worker 发现与浏览器代理。
+
+Session 生命周期动作明确分离：“终止”把活动会话推进为 `stopping → exited`，退出后的终端状态仍在 retention 内可查看；“清除”只允许用于 `exited/failed` 会话，并由 Worker 立即释放 terminal/replay/recovery state 后退出。Agent 不直接删 Worker 的恢复文件来伪造删除。
 
 当前持久化语义包括：
 

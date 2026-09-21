@@ -5,6 +5,8 @@ import {
   CreateWorkspaceSchema,
   MAX_INPUT_BYTES,
   WorkspaceDefinitionSchema,
+  isActiveSessionState,
+  isTerminalSessionState,
   parseClientMessage
 } from "./index.js";
 
@@ -58,6 +60,16 @@ describe("protocol", () => {
       cwd: "/home/dev/project",
       runtime: { kind: "wsl", args: ["-l"] }
     })).toThrow();
+  });
+
+  it("classifies active and terminal session states", () => {
+    expect(isActiveSessionState("starting")).toBe(true);
+    expect(isActiveSessionState("running")).toBe(true);
+    expect(isActiveSessionState("stopping")).toBe(true);
+    expect(isActiveSessionState("exited")).toBe(false);
+    expect(isTerminalSessionState("exited")).toBe(true);
+    expect(isTerminalSessionState("failed")).toBe(true);
+    expect(isTerminalSessionState("stopping")).toBe(false);
   });
 
   it("rejects oversized terminal dimensions", () => {

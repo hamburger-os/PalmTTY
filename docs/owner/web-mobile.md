@@ -19,8 +19,8 @@
 - 启动命令下提供常用终端 Agent 快捷项，目前包括 Codex、Claude Code、Antigravity、Gemini CLI、OpenCode、Aider，点击只填写命令，不负责安装工具；
 - 新建会话；
 - 已运行会话列表；
-- 会话状态和连接数；
-- 重新进入或终止会话；
+- 会话状态和连接数；运行/终止中的会话显示连接数，已退出会话显示退出码（如果可用）；
+- 会话动作按生命周期分离：运行中的会话显示“终止”，已退出/失败会话显示“清除”；终止只结束 PTY，清除才立即删除 retention 中的终端历史与 Worker 状态；不再使用含义模糊的红色 ×；
 - 登录/退出；
 - 中文 / English 语言切换并在浏览器本地保存偏好。
 
@@ -44,6 +44,7 @@
 - Workspace 修改走独立持久化 API；Session 创建不接收临时 cwd/shell/env。
 - 目录选择器只读取目录名称/路径，不读取文件内容；Host/WSL 浏览都由受保护的 Agent API 完成。
 - 浏览器丢失状态时以服务端 snapshot 为准。
+- `stopping` Session 可以继续被查看，但终端输入、resize 与 Composer 发送保持禁用，直到 Worker 报告最终退出。
 - Service Worker 不缓存 API 或终端 WebSocket 数据。
 - 终端输出只交给 xterm 渲染，不作为 HTML 注入页面。
 
