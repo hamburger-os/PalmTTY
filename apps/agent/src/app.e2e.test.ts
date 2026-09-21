@@ -476,6 +476,49 @@ describe("terminal WebSocket integration", () => {
     });
   });
 
+  it("protects shell profile detection with authentication and exact Origin", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    const endpoint = `${harness.origin}/api/v1/shell-profiles`;
+
+    const unauthenticated = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: harness.origin
+      },
+      body: JSON.stringify({ kind: "host" })
+    });
+    expect(unauthenticated.status).toBe(401);
+
+    const wrongOrigin = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie,
+        origin: "https://evil.invalid"
+      },
+      body: JSON.stringify({ kind: "host" })
+    });
+    expect(wrongOrigin.status).toBe(403);
+
+    const accepted = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie,
+        origin: harness.origin
+      },
+      body: JSON.stringify({ kind: "host" })
+    });
+    expect(accepted.status).toBe(200);
+    const body = await accepted.json() as {
+      profiles: Array<{ shell: string; recommended: boolean }>;
+    };
+    expect(body.profiles.length).toBeGreaterThan(0);
+    expect(body.profiles.some((profile) => profile.recommended)).toBe(true);
+  });
+
   it("requires resume before input and resize", async () => {
     const harness = await startHarness();
     const cookie = await login(harness);
