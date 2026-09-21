@@ -119,6 +119,7 @@ async function buildHarness() {
     },
     auth: { enabled: false }
   });
+  config.sessions.maxSessions = 1;
 
   const app = await buildApp(config, {
     sessionManager: { runtimeDir, workerSpawner: spawner },
@@ -159,6 +160,14 @@ describe("session lifecycle API", () => {
     expect(prematureClear.statusCode).toBe(409);
     expect(prematureClear.json()).toEqual({ error: "session_not_stopped" });
 
+    const rejectedOrigin = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${session.id}/terminate`,
+      headers: { origin: "https://evil.invalid" }
+    });
+    expect(rejectedOrigin.statusCode).toBe(403);
+    expect(spawner.pty.killCount).toBe(0);
+
     const terminated = await app.inject({
       method: "POST",
       url: `/api/v1/sessions/${session.id}/terminate`,
@@ -186,6 +195,24 @@ describe("session lifecycle API", () => {
       headers: { origin: ORIGIN }
     });
     expect(clearWhileStopping.statusCode).toBe(409);
+
+    const deleteWorkspaceWhileStopping = await app.inject({
+      method: "DELETE",
+      url: "/api/v1/workspaces/lifecycle",
+      headers: { origin: ORIGIN }
+    });
+    expect(deleteWorkspaceWhileStopping.statusCode).toBe(409);
+    expect(deleteWorkspaceWhileStopping.json()).toEqual({
+      error: "workspace_in_use"
+    });
+
+    const secondWhileStopping = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions",
+      headers: { origin: ORIGIN },
+      payload: { workspaceId: "lifecycle", cols: 80, rows: 24 }
+    });
+    expect(secondWhileStopping.statusCode).toBe(409);
 
     spawner.pty.emitExit(0);
     await waitUntil(async () => {
