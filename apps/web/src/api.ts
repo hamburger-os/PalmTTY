@@ -138,8 +138,21 @@ export async function createSession(workspaceId: string) {
 }
 
 export async function terminateSession(id: string) {
-  return responseJson<void>(await fetch(`/api/v1/sessions/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    credentials: "same-origin"
-  }));
+  return responseJson<{ session: SessionPublic }>(await fetch(
+    `/api/v1/sessions/${encodeURIComponent(id)}/terminate`,
+    {
+      method: "POST",
+      credentials: "same-origin"
+    }
+  ));
+}
+
+export async function deleteSession(id: string) {
+  return responseJson<void>(await fetch(
+    `/api/v1/sessions/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+      credentials: "same-origin"
+    }
+  ));
 }
