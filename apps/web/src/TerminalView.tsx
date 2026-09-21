@@ -8,7 +8,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { useI18n } from "./i18n.js";
 
-type ConnectionState = "connecting" | "connected" | "reconnecting" | "closed";
+type ConnectionState = "connecting" | "connected" | "reconnecting" | "stopping" | "closed";
 
 function websocketUrl(sessionId: string) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -208,7 +208,15 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
             ready = message.state === "running";
             inputReadyRef.current = ready;
             lastPongAt = Date.now();
-            setConnection(ready ? "connected" : "closed");
+            setConnection(
+              message.state === "running"
+                ? "connected"
+                : message.state === "stopping"
+                  ? "stopping"
+                  : message.state === "starting"
+                    ? "connecting"
+                    : "closed"
+            );
             if (ready) scheduleResize();
           });
           return;
