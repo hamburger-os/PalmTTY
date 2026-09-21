@@ -76,6 +76,33 @@ describe("workspace runtime resolution", () => {
     expect(path.normalize(resolved)).toBe(path.normalize(alias));
   });
 
+  it("keeps an explicit protected package shellPath authoritative", async () => {
+    if (process.platform !== "win32") return;
+
+    const programRoot = await mkdtemp(path.join(os.tmpdir(), "palmtty-programfiles-"));
+    tempDirs.add(programRoot);
+    const protectedPackage = path.join(
+      programRoot,
+      "WindowsApps",
+      "Microsoft.PowerShell_7.6.6.0_x64__test"
+    );
+    await mkdir(protectedPackage, { recursive: true });
+    const explicitExecutable = path.join(protectedPackage, "pwsh.exe");
+    await writeFile(explicitExecutable, "");
+
+    const resolved = await resolveExecutable(explicitExecutable, {
+      cwd: programRoot,
+      env: {
+        ProgramFiles: programRoot,
+        PATH: ""
+      }
+    });
+
+    expect(path.normalize(resolved)).toBe(
+      path.normalize(await realpath(explicitExecutable))
+    );
+  });
+
   it("keeps ordinary PATH precedence ahead of the user WindowsApps alias", async () => {
     if (process.platform !== "win32") return;
 
