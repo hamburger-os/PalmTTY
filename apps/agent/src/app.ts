@@ -201,7 +201,8 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   registerWorkspaceToolRoutes(app, {
     workspaceStore,
     requireAuth,
-    requireOrigin
+    requireOrigin,
+    sensitiveEnvironmentKeys: [config.auth.tokenEnv]
   });
 
   app.get("/api/v1/workspaces", { preHandler: requireAuth }, async () => ({
