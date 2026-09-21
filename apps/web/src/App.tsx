@@ -18,6 +18,7 @@ import {
   listWorkspaces,
   login,
   logout,
+  restartSession,
   runtimeCapabilities,
   terminateSession,
   updateWorkspace
@@ -143,6 +144,10 @@ export function App() {
         onBack={() => {
           setActiveSession(null);
           void refreshCatalog();
+        }}
+        onRestart={async () => {
+          const result = await restartSession(activeSession);
+          setActiveSession(result.session.id);
         }}
       />
     );
