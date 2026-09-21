@@ -38,7 +38,7 @@ Security, session and reconnect changes should include or update tests for:
 - concurrent maxSessions enforcement
 - workspace CRUD requires authentication + exact Origin
 - workspace persistence round-trip and duplicate-ID rejection
-- workspace deletion blocked while a Session is active/retained
+- workspace deletion blocked while a Session is active, but allowed after exit even during retention
 - Host runtime executable/cwd validation
 - WSL argv construction without shell-string interpolation and non-Windows rejection
 
