@@ -19,6 +19,7 @@ import {
   terminateSession,
   updateWorkspace
 } from "./api.js";
+import { AppearanceControls } from "./AppearanceControls.js";
 import { useI18n } from "./i18n.js";
 import { TerminalView } from "./TerminalView.js";
 import {
@@ -98,8 +99,8 @@ export function App() {
 
   if (auth === null) {
     return (
-      <main className="center-card">
-        <div className="login-toolbar"><LanguageSwitcher /></div>
+      <main className="center-card glass-shell">
+        <div className="login-toolbar"><AppearanceControls compact /><LanguageSwitcher /></div>
         <h1>PalmTTY</h1>
         <p>{t("auth.connecting")}</p>
       </main>
@@ -197,6 +198,7 @@ export function App() {
           <h1>PalmTTY</h1>
         </div>
         <div className="topbar-actions">
+          <AppearanceControls compact />
           <LanguageSwitcher />
           {auth.enabled && (
             <button
@@ -224,7 +226,7 @@ export function App() {
             <span>{workspaces.length}</span>
           </div>
           <button
-            className="ghost compact"
+            className="prism-primary compact"
             onClick={() => {
               setWorkspaceError(null);
               setWorkspaceEditor("new");
@@ -235,11 +237,11 @@ export function App() {
         </div>
 
         {workspaces.length === 0 ? (
-          <div className="empty workspace-empty">{t("workspaces.empty")}</div>
+          <div className="empty workspace-empty glass-content">{t("workspaces.empty")}</div>
         ) : (
           <div className="card-grid">
             {workspaces.map((workspace) => (
-              <article key={workspace.id} className="workspace-card">
+              <article key={workspace.id} className="workspace-card glass-card">
                 <div className="workspace-card-heading">
                   <strong>{workspace.name}</strong>
                   <button
@@ -268,7 +270,7 @@ export function App() {
                 )}
                 <button
                   type="button"
-                  className="workspace-launch"
+                  className="workspace-launch prism-primary"
                   onClick={() => void (async () => {
                     setError(null);
                     try {
@@ -304,7 +306,7 @@ export function App() {
             <div className="empty">{t("sessions.empty")}</div>
           )}
           {sessions.map((session) => (
-            <div className="session-row" key={session.id}>
+            <div className="session-row glass-card" key={session.id}>
               <button
                 className="session-main"
                 onClick={() => setActiveSession(session.id)}
@@ -322,7 +324,7 @@ export function App() {
                 </span>
               </button>
               <button
-                className="danger compact"
+                className="danger-icon compact"
                 aria-label={t("sessions.terminate")}
                 onClick={() => void (async () => {
                   await terminateSession(session.id);
@@ -359,6 +361,7 @@ function LanguageSwitcher() {
       <span className="sr-only">{t("app.language")}</span>
       <select
         aria-label={t("app.language")}
+        className="glass-input glass-select language-select"
         value={locale}
         onChange={(event) => setLocale(event.target.value as "en" | "zh-CN")}
       >
@@ -381,7 +384,7 @@ function Login({
   const [busy, setBusy] = useState(false);
 
   return (
-    <main className="center-card">
+    <main className="center-card glass-shell">
       <div className="login-toolbar"><LanguageSwitcher /></div>
       <div className="palm-mark">⌁</div>
       <h1>PalmTTY</h1>
@@ -393,13 +396,14 @@ function Login({
       }}>
         <input
           type="password"
+          className="glass-input"
           autoComplete="current-password"
           value={token}
           onChange={(event) => setToken(event.target.value)}
           placeholder={t("auth.token")}
           autoFocus
         />
-        <button type="submit" disabled={busy || token.length === 0}>
+        <button className="prism-primary" type="submit" disabled={busy || token.length === 0}>
           {busy ? t("auth.signingIn") : t("auth.signIn")}
         </button>
       </form>
