@@ -42,7 +42,8 @@ The Agent suite includes:
 - end-to-end Fastify HTTP/WebSocket + Worker IPC coverage with deterministic PTYs;
 - a real detached-process integration test where one Agent process creates a Worker and exits, and another Agent later rediscovers the same live terminal;
 - Windows CI coverage using real node-pty + PowerShell 7 / ConPTY and Unicode, while local Windows checks may use Windows PowerShell for generic ConPTY/process coverage;
-- workspace-runtime coverage for absolute shell resolution, current-user WindowsApps alias preference, executable-as-cwd diagnostics, and actionable preflight failures.
+- workspace-runtime coverage for absolute shell resolution, current-user WindowsApps alias preference, executable-as-cwd diagnostics, and actionable preflight failures;
+- Worker storage coverage asserting the runtime recovery generation stays aligned with the private Worker IPC protocol generation.
 
 ## Build
 
