@@ -2,6 +2,7 @@ import path from "node:path";
 import { configPathFromEnvironment, loadConfig } from "@palmtty/config";
 import { buildApp } from "./app.js";
 import { preflightRuntime } from "./preflight.js";
+import { describeServerBindError } from "./server-endpoint.js";
 import { runSessionWorkerFromStdin } from "./session-worker.js";
 
 function configPathFromArgs(): string {
@@ -40,7 +41,15 @@ async function main() {
       runtimeWorkspaces: preflight.workspaces
     }
   });
-  await app.listen({ host: config.server.host, port: config.server.port });
+  try {
+    await app.listen({ host: config.server.host, port: config.server.port });
+  } catch (error) {
+    await app.close().catch(() => undefined);
+    throw new Error(
+      describeServerBindError(config.server, error),
+      { cause: error }
+    );
+  }
   console.log(`[PalmTTY] listening on ${config.server.host}:${config.server.port}`);
 }
 
