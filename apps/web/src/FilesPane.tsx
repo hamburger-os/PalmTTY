@@ -25,13 +25,14 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reading, setReading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setError(null);
+    setListError(null);
     void listWorkspaceFiles(workspaceId, path)
       .then((result) => {
         if (cancelled) return;
@@ -40,7 +41,7 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
       .catch((cause) => {
         if (cancelled) return;
         const code = cause instanceof ApiError ? cause.code : "workspace_file_unavailable";
-        setError(translateError(code));
+        setListError(translateError(code));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -61,7 +62,7 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
 
     let cancelled = false;
     setReading(true);
-    setError(null);
+    setPreviewError(null);
     setSelected(null);
     void readWorkspaceFile(workspaceId, selectedPath)
       .then((result) => {
@@ -70,7 +71,7 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
       .catch((cause) => {
         if (cancelled) return;
         const code = cause instanceof ApiError ? cause.code : "workspace_file_unavailable";
-        setError(translateError(code));
+        setPreviewError(translateError(code));
       })
       .finally(() => {
         if (!cancelled) setReading(false);
@@ -118,7 +119,7 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
           </div>
         </div>
 
-        {error && <div className="tool-inline-error">{error}</div>}
+        {listError && <div className="tool-inline-error">{listError}</div>}
         {loading ? (
           <div className="tool-empty">{t("files.loading")}</div>
         ) : listing && listing.entries.length > 0 ? (
@@ -173,7 +174,9 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
             {selected && <span>{displaySize(selected.size)}</span>}
           </div>
         )}
-        {reading ? (
+        {previewError ? (
+          <div className="tool-inline-error">{previewError}</div>
+        ) : reading ? (
           <div className="tool-empty">{t("files.reading")}</div>
         ) : !selectedPath ? (
           <div className="tool-empty">{t("files.select")}</div>
