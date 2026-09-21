@@ -1,27 +1,29 @@
-export const PALMTTY_CONTROL_ENV_KEYS = [
-  "PALMTTY_ACCESS_TOKEN",
-  "PALMTTY_CONFIG",
-  "PALMTTY_AGENT_URL",
-  "PALMTTY_WEB_HOST",
-  "PALMTTY_DEV_TRUSTED_ORIGINS",
-  "PALMTTY_WINDOWS_SPAWN_TRACE"
-] as const;
-
-function environmentKeyEquals(
-  left: string,
-  right: string,
+function normalizedKey(
+  key: string,
   platform: NodeJS.Platform
-): boolean {
-  return platform === "win32"
-    ? left.toLowerCase() === right.toLowerCase()
-    : left === right;
+): string {
+  return platform === "win32" ? key.toUpperCase() : key;
 }
 
-export function controlEnvironmentKeys(tokenEnv: string): string[] {
-  return [...new Set([
-    tokenEnv,
-    ...PALMTTY_CONTROL_ENV_KEYS
-  ])];
+function isPalmTTYNamespaceKey(
+  key: string,
+  platform: NodeJS.Platform
+): boolean {
+  return normalizedKey(key, platform).startsWith("PALMTTY_");
+}
+
+export function controlEnvironmentKeys(
+  tokenEnv: string,
+  environment: NodeJS.ProcessEnv | Record<string, string> = process.env,
+  platform: NodeJS.Platform = process.platform
+): string[] {
+  const result = new Set<string>([tokenEnv]);
+
+  for (const key of Object.keys(environment)) {
+    if (isPalmTTYNamespaceKey(key, platform)) result.add(key);
+  }
+
+  return [...result];
 }
 
 export function isReservedControlEnvironmentKey(
@@ -29,7 +31,8 @@ export function isReservedControlEnvironmentKey(
   tokenEnv: string,
   platform: NodeJS.Platform = process.platform
 ): boolean {
-  return controlEnvironmentKeys(tokenEnv).some((reserved) => (
-    environmentKeyEquals(key, reserved, platform)
-  ));
+  return (
+    normalizedKey(key, platform) === normalizedKey(tokenEnv, platform) ||
+    isPalmTTYNamespaceKey(key, platform)
+  );
 }
