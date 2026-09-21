@@ -184,6 +184,22 @@ describe("workspace runtime resolution", () => {
     expect(workspace.env).toEqual({});
   });
 
+  it("rejects WSL runtime on non-Windows hosts", async () => {
+    if (process.platform === "win32") return;
+
+    await expect(resolveRuntimeWorkspace({
+      id: "wsl-only",
+      name: "WSL only",
+      cwd: "/home/dev/project",
+      runtime: {
+        kind: "wsl",
+        distribution: "Ubuntu"
+      }
+    })).rejects.toThrow(
+      "WSL workspaces are supported only by a Windows PalmTTY Agent"
+    );
+  });
+
   it("builds WSL launch arguments without shell interpolation", () => {
     const workspace: WorkspaceDefinition = {
       id: "ubuntu",
