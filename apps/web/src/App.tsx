@@ -162,7 +162,9 @@ export function App() {
 
   const stopSession = async (session: SessionPublic) => {
     if (!isActiveSessionState(session.state) || session.state === "stopping") return;
-    if (!window.confirm(t("sessions.terminateConfirm"))) return;
+    if (!window.confirm(t("sessions.terminateConfirm", {
+      count: session.connections
+    }))) return;
 
     setSessionBusyId(session.id);
     setError(null);
