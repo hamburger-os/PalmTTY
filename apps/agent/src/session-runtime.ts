@@ -38,7 +38,13 @@ export type PtyFactory = (
   options: PtySpawnOptions
 ) => PtyHandle;
 
-export const defaultPtyFactory: PtyFactory = (file, args, options) => pty.spawn(file, args, options);
+export const defaultPtyFactory: PtyFactory = (file, args, options) => pty.spawn(
+  file,
+  args,
+  process.platform === "win32"
+    ? { ...options, useConptyDll: true }
+    : options
+);
 
 type OutputFrame = {
   seq: number;
@@ -265,8 +271,18 @@ export class SessionRuntime {
 
   async terminate(): Promise<void> {
     await this.enqueue(() => {
-      if (this.state === "running" || this.state === "starting") {
+      if (this.state === "stopping" || this.state === "exited" || this.state === "failed") {
+        return;
+      }
+      if (this.state !== "running" && this.state !== "starting") return;
+
+      const previousState = this.state;
+      this.state = "stopping";
+      try {
         this.child.kill();
+      } catch (error) {
+        this.state = previousState;
+        throw error;
       }
     });
   }
@@ -275,7 +291,10 @@ export class SessionRuntime {
     if (this.disposed) return;
     this.disposed = true;
     if (this.cleanupTimer) clearTimeout(this.cleanupTimer);
-    if (killPty && (this.state === "running" || this.state === "starting")) {
+    if (
+      killPty &&
+      (this.state === "running" || this.state === "starting" || this.state === "stopping")
+    ) {
       try {
         this.child.kill();
       } catch {
