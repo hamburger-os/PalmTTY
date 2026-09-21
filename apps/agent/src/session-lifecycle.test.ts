@@ -9,6 +9,10 @@ import { SessionWorkerServer } from "./session-worker.js";
 import type { PtyFactory, PtyHandle } from "./session-runtime.js";
 import type { WorkerBootstrap } from "./worker-protocol.js";
 import type { WorkerSpawner } from "./worker-spawner.js";
+import {
+  readWorkerRecord,
+  readWorkerSecret
+} from "./worker-storage.js";
 import { MemoryWorkspaceStore } from "./workspace-store.js";
 
 const ORIGIN = "http://127.0.0.1:7688";
@@ -131,12 +135,12 @@ async function buildHarness() {
   });
   apps.add(app);
 
-  return { app, spawner };
+  return { app, spawner, runtimeDir };
 }
 
 describe("session lifecycle API", () => {
   it("separates termination from retained-session removal", async () => {
-    const { app, spawner } = await buildHarness();
+    const { app, spawner, runtimeDir } = await buildHarness();
 
     const created = await app.inject({
       method: "POST",
@@ -205,5 +209,13 @@ describe("session lifecycle API", () => {
       url: `/api/v1/sessions/${session.id}`
     });
     expect(gone.statusCode).toBe(404);
+
+    await waitUntil(async () => {
+      const [record, secret] = await Promise.allSettled([
+        readWorkerRecord(runtimeDir, session.id),
+        readWorkerSecret(runtimeDir, session.id)
+      ]);
+      return record.status === "rejected" && secret.status === "rejected";
+    });
   });
 });
