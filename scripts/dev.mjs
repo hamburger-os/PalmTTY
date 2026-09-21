@@ -1,15 +1,9 @@
 import { spawn } from "node:child_process";
 import {
   configPathFromEnvironment,
-  loadConfig
+  loadConfig,
+  localAgentUrl
 } from "../packages/config/dist/index.js";
-
-function urlHost(host) {
-  const normalized = host.trim().replace(/^\[|\]$/g, "");
-  if (normalized === "0.0.0.0") return "127.0.0.1";
-  if (normalized === "::") return "[::1]";
-  return normalized.includes(":") ? `[${normalized}]` : normalized;
-}
 
 async function agentUrl() {
   if (process.env.PALMTTY_AGENT_URL) {
@@ -17,7 +11,7 @@ async function agentUrl() {
   }
 
   const config = await loadConfig(configPathFromEnvironment());
-  return `http://${urlHost(config.server.host)}:${config.server.port}`;
+  return localAgentUrl(config);
 }
 
 async function main() {
