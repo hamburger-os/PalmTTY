@@ -55,7 +55,7 @@ Agent 正常关闭、升级或异常退出时：
 
 ## Worker 创建
 
-Agent 启动前的 runtime preflight 只处理认证环境、外部暴露规则和 Agent TCP host/port 可绑定性，不再遍历 workspace。Workspace 是独立的 per-user 持久化状态；新建/修改时通过认证 + 精确 Origin 保护的 API 验证，创建 Session 时再次验证。Host runtime 会把 Shell 解析为绝对启动路径；Windows 当前用户 `%LOCALAPPDATA%\Microsoft\WindowsApps` 下的 App Execution Alias 有专门处理。WSL runtime 只在 Windows Agent 上启用，解析 `wsl.exe`，并把发行版、Linux cwd、Shell/args 作为结构化参数传入。只有规范化后的运行规格才进入 Worker bootstrap。
+Agent 启动前的 runtime preflight 只处理认证环境、外部暴露规则和 Agent TCP host/port 可绑定性，不再遍历 workspace。Workspace 是独立的 per-user 持久化状态；新建/修改时通过认证 + 精确 Origin 保护的 API 验证，创建 Session 时再次验证。Agent 启动后异步探测一次 runtime capabilities 并在本进程生命周期内复用结果，避免每次 Web 查询都重复启动 WSL 探测进程；该探测不是创建 Host workspace 的前置条件。Host runtime 会把 Shell 解析为绝对启动路径；Windows 当前用户 `%LOCALAPPDATA%\Microsoft\WindowsApps` 下的 App Execution Alias 有专门处理。WSL runtime 只在 Windows Agent 上启用，解析 `wsl.exe`，并把发行版、Linux cwd、Shell/args 作为结构化参数传入。只有规范化后的运行规格才进入 Worker bootstrap。
 
 创建 Session 时 Agent：
 
