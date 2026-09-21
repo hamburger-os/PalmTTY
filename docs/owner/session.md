@@ -43,7 +43,7 @@ Worker + PTY running
                               └────> Worker 自清理并退出┘
 ~~~
 
-当前会话实现浏览器断线持久化和 Agent 重启持久化。产品动作严格区分“终止”和“清除”：终止只结束 PTY/进程并进入 `stopping → exited`，退出后的 snapshot/replay 仍按 retention 保留；清除只允许用于 `exited/failed` Session，并要求 Worker 立即释放 terminal state、recovery metadata 后退出。HTTP API 因此使用独立的 terminate action，而 `DELETE /api/v1/sessions/:id` 只表示删除已经停止的 retained Session。
+当前会话实现浏览器断线持久化和 Agent 重启持久化。产品动作严格区分“终止”“重启”和“清除”：终止只结束 PTY/进程并进入 `stopping → exited`，退出后的 snapshot/replay 仍按 retention 保留；重启会等待旧 PTY 退出、retire 旧 retained Session，再按同一 Workspace 创建一个新的 Session，因此 Session ID 与终端历史都会更换；清除只允许用于 `exited/failed` Session，并要求 Worker 立即释放 terminal state、recovery metadata 后退出。
 
 明确不承诺：
 
@@ -81,13 +81,13 @@ Recovery metadata 属于 Worker 自己的 canonical lifecycle state。Worker 会
 
 Workspace 不再写入 `palmtty.local.yaml`，而是 Agent 当前用户应用数据目录中的版本化持久化状态。Web UI 可以通过受认证 + 精确 Origin 保护的 API 创建、编辑和删除 workspace；Session 创建协议仍只提交 workspace ID。
 
-Workspace 定义包含显示名称、工作目录、runtime、Shell、Shell args 与可选启动命令。Web 模型不开放 env 覆盖。Host runtime 在创建/修改与启动 Session 时验证本机目录和 Shell，并把 Shell 解析成绝对 executable。Windows WSL runtime 使用 `wsl.exe`，把 distribution、Linux cwd、Shell/args 作为结构化 argv 交给 PTY，不通过字符串插值拼命令。
+Workspace 定义包含显示名称、工作目录、runtime、Shell、Shell args、有界环境变量与可选多行启动命令。Host runtime 在创建/修改与启动 Session 时验证本机目录和 Shell，并把 Shell 解析成绝对 executable；Windows 新 Session/重启还会重新读取当前 Machine/User 环境后再应用 Workspace 环境变量。Windows WSL runtime 使用 `wsl.exe`，把 distribution、Linux cwd、Shell/args 作为结构化 argv 交给 PTY，不通过字符串插值拼命令，并通过 `WSLENV` 转发 Workspace 环境变量名。
 
 正在创建或运行中的 Session 会阻止删除对应 workspace；Session 退出后即使仍处于 retention，也可以删除 launch template，已退出 Session 继续由 Worker 自己完成 retention/清理。编辑只影响后续新建 Session，已经运行的 Worker 保留创建时的规范化运行规格。
 
 ## 你审查时重点看
 
-Workspace CRUD 属于明确的高权限配置操作。允许网页管理 cwd/Shell 是这次有意扩大后的产品边界，但不能继续退化成 Session 创建接口直接接受任意 cwd/shell/env；env 仍不属于 Web workspace 模型。
+Workspace CRUD 属于明确的高权限配置操作。网页可以管理 cwd/Shell/有界 environment，这是有意的持久化配置边界；不能继续退化成 Session 创建或重启接口直接接受任意 cwd/shell/env。环境变量值可能敏感，默认日志不得记录，也不应把 Workspace 当作密钥保险箱。
 
 任何把 canonical terminal state 从 Worker 复制回 Agent 的设计，都需要重新论证 Agent 重启一致性。
 
