@@ -9,6 +9,7 @@ import type { PalmTTYConfig } from "@palmtty/config";
 import {
   BrowseDirectoryRequestSchema,
   CreateSessionSchema,
+  DetectShellProfilesRequestSchema,
   CreateWorkspaceSchema,
   MAX_MESSAGE_BYTES,
   WS_SUBPROTOCOL,
@@ -20,6 +21,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import { AUTH_COOKIE, AuthService } from "./auth.js";
 import { browseWorkspaceDirectory } from "./workspace-directory-browser.js";
+import { detectShellProfiles } from "./workspace-shells.js";
 import { FixedWindowLimiter, isTrustedOrigin } from "./security.js";
 import { SessionManager, type SessionManagerOptions } from "./session-manager.js";
 import {
@@ -72,9 +74,22 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   const sessionMutationLimiter = new FixedWindowLimiter(60, 60_000);
   const workspaceMutationLimiter = new FixedWindowLimiter(60, 60_000);
   const directoryBrowseLimiter = new FixedWindowLimiter(120, 60_000);
+  const shellProbeLimiter = new FixedWindowLimiter(60, 60_000);
 
   function authenticated(request: FastifyRequest): boolean {
     return auth.isAuthenticated(request.cookies[AUTH_COOKIE]);
+  }
+
+  function workspaceUsesReservedEnvironment(
+    environment: Record<string, string> | undefined
+  ): boolean {
+    if (!environment) return false;
+    const reserved = config.auth.tokenEnv;
+    return Object.keys(environment).some((key) => (
+      process.platform === "win32"
+        ? key.toLowerCase() === reserved.toLowerCase()
+        : key === reserved
+    ));
   }
 
   async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
@@ -135,6 +150,30 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   ));
 
   app.post(
+    "/api/v1/shell-profiles",
+    { preHandler: [requireOrigin, requireAuth] },
+    async (request, reply) => {
+      if (!shellProbeLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_shell_profile_requests" });
+      }
+      const parsed = DetectShellProfilesRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_shell_profile_request" });
+      }
+      try {
+        return { profiles: await detectShellProfiles(parsed.data) };
+      } catch (error) {
+        return reply.code(400).send({
+          error: "shell_profile_detection_failed",
+          message: error instanceof Error
+            ? error.message
+            : "Shell detection failed"
+        });
+      }
+    }
+  );
+
+  app.post(
     "/api/v1/workspace-directories/browse",
     { preHandler: [requireOrigin, requireAuth] },
     async (request, reply) => {
@@ -173,6 +212,12 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       if (!parsed.success) {
         return reply.code(400).send({ error: "invalid_workspace_request" });
       }
+      if (workspaceUsesReservedEnvironment(parsed.data.environment)) {
+        return reply.code(400).send({
+          error: "workspace_invalid",
+          message: `Environment variable "${config.auth.tokenEnv}" is reserved by PalmTTY authentication`
+        });
+      }
 
       const workspace = WorkspaceDefinitionSchema.parse({
         id: randomUUID(),
@@ -204,6 +249,12 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       const parsed = CreateWorkspaceSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: "invalid_workspace_request" });
+      }
+      if (workspaceUsesReservedEnvironment(parsed.data.environment)) {
+        return reply.code(400).send({
+          error: "workspace_invalid",
+          message: `Environment variable "${config.auth.tokenEnv}" is reserved by PalmTTY authentication`
+        });
       }
 
       const workspace = WorkspaceDefinitionSchema.parse({
@@ -286,6 +337,29 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       }
       const terminal = session.state === "exited" || session.state === "failed";
       return reply.code(terminal ? 200 : 202).send({ session });
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/v1/sessions/:id/restart",
+    { preHandler: [requireOrigin, requireAuth] },
+    async (request, reply) => {
+      if (!sessionMutationLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_session_requests" });
+      }
+      try {
+        const session = await sessions.restart(request.params.id);
+        if (!session) {
+          return reply.code(404).send({ error: "session_not_found" });
+        }
+        return reply.code(201).send({ session });
+      } catch (error) {
+        request.log.warn({ err: error }, "Session restart failed");
+        return reply.code(409).send({
+          error: "session_restart_failed",
+          message: error instanceof Error ? error.message : "Session restart failed"
+        });
+      }
     }
   );
 

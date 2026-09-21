@@ -162,6 +162,43 @@ describe("HTTP security boundary", () => {
     await app.close();
   });
 
+  it("rejects the configured login-token variable from workspace environment", async () => {
+    process.env.PALMTTY_TEST_TOKEN = TOKEN;
+    const app = await buildTestApp();
+    const cookie = await loginCookie(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspaces",
+      headers: { cookie, origin: ORIGIN },
+      payload: {
+        name: "Reserved",
+        cwd: process.cwd(),
+        runtime: {
+          kind: "host",
+          shell: process.execPath,
+          args: []
+        },
+        environment: {
+          PALMTTY_TEST_TOKEN: "must-not-be-persisted"
+        }
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "workspace_invalid"
+    });
+
+    const listed = await app.inject({
+      method: "GET",
+      url: "/api/v1/workspaces",
+      headers: { cookie }
+    });
+    expect(listed.json()).toEqual({ workspaces: [] });
+    await app.close();
+  });
+
   it("creates, updates, and deletes a validated host workspace", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
     const app = await buildTestApp();
@@ -179,10 +216,16 @@ describe("HTTP security boundary", () => {
           kind: "host",
           shell: process.execPath,
           args: []
+        },
+        environment: {
+          HTTPS_PROXY: "http://127.0.0.1:10808"
         }
       }
     });
     expect(created.statusCode).toBe(201);
+    expect(created.json().workspace.environment).toEqual({
+      HTTPS_PROXY: "http://127.0.0.1:10808"
+    });
     const id = created.json().workspace.id as string;
 
     const updated = await app.inject({

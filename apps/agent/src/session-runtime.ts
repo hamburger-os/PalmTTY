@@ -157,9 +157,13 @@ export class SessionRuntime {
     });
 
     if (options.workspace.command) {
+      const startupInput = options.workspace.command
+        .replace(/\r\n?/g, "\n")
+        .replace(/\n+$/g, "")
+        .replace(/\n/g, "\r");
       const timer = setTimeout(() => {
-        if (!this.disposed && this.state === "running") {
-          void this.write(`${options.workspace.command}\r`);
+        if (!this.disposed && this.state === "running" && startupInput) {
+          void this.write(`${startupInput}\r`);
         }
       }, 75);
       timer.unref();

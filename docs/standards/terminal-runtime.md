@@ -24,6 +24,14 @@ PowerShell 7 is launched with `pwsh` / `pwsh.exe` and can coexist with Windows P
 
 Microsoft documents Microsoft Store/MSIX as a supported PowerShell installation form. Windows App Execution Aliases are special reparse points exposed under the current user's `%LOCALAPPDATA%\Microsoft\WindowsApps` directory. Node's upstream Windows filesystem issue #36790 documents that ordinary `stat`/existence traversal can return `EACCES` for these AppExecLink entries even though the alias exists. PalmTTY therefore preserves a current-user WindowsApps alias as an absolute activation path instead of trying to traverse it to the protected package target.
 
+### Windows environment refresh
+
+Authoritative source:
+
+- https://learn.microsoft.com/dotnet/api/system.environment.getenvironmentvariables
+
+.NET documents that `Environment.GetEnvironmentVariables(EnvironmentVariableTarget.User)` and `Machine` read the Windows operating-system registry sources rather than the already-created process block. PalmTTY uses the inbox Windows PowerShell host only as a bounded bridge to those APIs when constructing a new Windows terminal environment. This allows a newly created/restarted PTY to observe current User/Machine environment values while the long-running Node Agent retains process-local PalmTTY settings.
+
 Additional references:
 
 - https://learn.microsoft.com/windows/msix/psf/create-shortcut-with-script-package-support-framework
@@ -36,7 +44,11 @@ Authoritative sources:
 - https://learn.microsoft.com/windows/wsl/basic-commands
 - https://learn.microsoft.com/windows/wsl/filesystems
 
-PalmTTY's WSL runtime is a Windows-host adapter around `wsl.exe`. It passes distribution selection, Linux working directory and an optional executable as distinct argv values. It does not construct one interpolated shell command for launch. The selected Linux path and optional shell are validated through WSL before the workspace is persisted and again before Session creation. Repository CI does not currently provide a real WSL environment, so WSL remains an implemented adapter with real-host validation still required.
+PalmTTY's WSL runtime is a Windows-host adapter around `wsl.exe`. It passes distribution selection, Linux working directory and an optional executable as distinct argv values. It does not construct one interpolated shell command for launch. The selected Linux path and optional shell are validated through WSL before the workspace is persisted and again before Session creation/restart.
+
+Microsoft documents `WSLENV` as a **colon-delimited** list of variable names; each entry may carry slash flags such as `/p`, `/l`, `/u`, or `/w`. PalmTTY preserves existing entries/flags and appends configured Workspace variable names as additional colon-delimited entries when launching WSL. Workspace values are already expressed for the target Linux environment, so PalmTTY does not add path-translation flags implicitly.
+
+Repository CI does not currently provide a real WSL environment, so WSL remains an implemented adapter with real-host validation still required.
 
 ## node-pty
 

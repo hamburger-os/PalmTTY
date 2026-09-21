@@ -29,11 +29,11 @@ Open the configured Agent URL, sign in, and create the first workspace in the We
 
 ### Runtime choices
 
-- **Host**: launches a shell directly on the Agent OS. On Windows, an empty shell field defaults to `pwsh.exe`; on Unix-like hosts it defaults to `$SHELL` or `/bin/sh`.
-- **WSL**: available from a Windows Agent when `wsl.exe` is usable. The workspace directory and optional shell are Linux paths inside the selected distribution.
-- Workspace creation/update validates the directory/runtime/shell before persistence. Session creation validates again before Worker bootstrap.
-- Shell arguments are explicit values, not an interpolated command string. Startup command remains optional terminal input sent after the shell starts.
-- The Web workspace model intentionally does not expose arbitrary environment-variable injection.
+- **Host**: launches a shell directly on the Agent OS. The editor detects installed shell profiles; on Windows PowerShell 7 is preferred when available, with Windows PowerShell/Command Prompt or Custom as explicit alternatives.
+- **WSL**: available from a Windows Agent when `wsl.exe` is usable. The editor can detect shells inside the selected distribution; workspace directory paths remain Linux paths.
+- Workspace creation/update validates the directory/runtime/shell before persistence. Session creation and explicit terminal restart validate again before Worker bootstrap.
+- Workspace environment uses one `NAME=value` entry per line and is applied before the shell starts. On Windows, each new/restarted terminal also refreshes the current Machine/User environment and PATH, so CLIs installed after the PalmTTY Agent started can be discovered by a new PTY. WSL workspace variables are forwarded through `WSLENV`.
+- Shell arguments remain explicit argv values. Startup command is optional multiline terminal input sent after the shell starts. Workspace environment is persistent local configuration, not a secret vault.
 
 If Windows reports `EACCES/WSAEACCES` while probing the Agent port, distinguish an existing listener from a reserved/excluded port:
 
@@ -84,11 +84,11 @@ pnpm start
 
 ### 运行环境
 
-- **宿主机（Host）**：直接在 Agent 所在 OS 启动 Shell。Windows 留空 Shell 时默认 `pwsh.exe`；类 Unix 宿主默认使用 `$SHELL`，否则退回 `/bin/sh`。
-- **WSL**：Windows Agent 检测到可用 `wsl.exe` 时可选。工作目录和可选 Shell 都填写发行版内部的 Linux 路径。
-- 新建/修改工作区时会验证目录、运行环境和 Shell；创建 Session 前还会再次验证。
-- Shell 参数按独立参数传递，不拼接成命令字符串；启动命令仍是 Shell 启动后写入终端的可选输入。
-- Web 工作区模型刻意不开放任意环境变量注入。
+- **宿主机（Host）**：直接在 Agent 所在 OS 启动 Shell。编辑器会自动检测已安装 Shell；Windows 优先推荐 PowerShell 7，也可以直接选择 Windows PowerShell、命令提示符或“自定义”。
+- **WSL**：Windows Agent 检测到可用 `wsl.exe` 时可选；编辑器可以检测所选发行版内部已安装的 Shell，工作目录仍使用 Linux 路径。
+- 新建/修改工作区时会验证目录、运行环境和 Shell；创建 Session 与显式“重启终端”前还会再次验证。
+- 工作区环境变量使用每行一个 `NAME=value`，在 Shell 启动前应用。Windows 每次新建/重启终端还会重新读取当前 Machine/User 环境与 PATH，因此 Agent 启动后新安装到用户 PATH 的 CLI 可被新 PTY 看见；WSL 通过 `WSLENV` 转发配置变量。
+- Shell 参数继续按独立 argv 传递；启动命令支持多行，在 Shell 启动后发送。Workspace environment 是本机持久化配置，不是密钥保险箱。
 
 如果 Windows 在探测 Agent 端口时报告 `EACCES/WSAEACCES`，先区分普通监听进程与 Windows 排除/保留端口：
 

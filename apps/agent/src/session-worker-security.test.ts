@@ -204,6 +204,51 @@ describe("session worker security boundary", () => {
     second.close();
   });
 
+  it("strips the configured login token from Worker bootstrap environment", async () => {
+    const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-env-"));
+    runtimeDirs.add(runtimeDir);
+
+    let capturedBootstrap: WorkerBootstrap | undefined;
+    const spawner: WorkerSpawner = {
+      async spawn(workerBootstrap) {
+        capturedBootstrap = workerBootstrap;
+        const server = new SessionWorkerServer(workerBootstrap, {
+          ptyFactory: silentPtyFactory
+        });
+        servers.add(server);
+        await server.start();
+      }
+    };
+    const config = parseConfig({
+      server: { host: "127.0.0.1", port: 7688 },
+      auth: {
+        enabled: false,
+        tokenEnv: "PALMTTY_TEST_ACCESS_TOKEN"
+      }
+    });
+    const definition = workspace();
+    definition.environment = {
+      PALMTTY_TEST_ACCESS_TOKEN: "must-not-cross-bootstrap",
+      PALMTTY_VISIBLE: "yes"
+    };
+    const manager = new SessionManager(config, {
+      runtimeDir,
+      workerSpawner: spawner,
+      workspaceStore: new MemoryWorkspaceStore([definition])
+    });
+    await manager.initialize();
+
+    try {
+      await manager.create("security", 80, 24);
+      expect(capturedBootstrap).toBeDefined();
+      expect(capturedBootstrap!.workspace.env.PALMTTY_TEST_ACCESS_TOKEN)
+        .toBeUndefined();
+      expect(capturedBootstrap!.workspace.env.PALMTTY_VISIBLE).toBe("yes");
+    } finally {
+      await manager.close();
+    }
+  });
+
   it("recovers when the first adoption result is lost after commit", async () => {
     const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-adopt-retry-"));
     runtimeDirs.add(runtimeDir);

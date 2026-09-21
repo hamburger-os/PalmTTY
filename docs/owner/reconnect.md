@@ -59,6 +59,10 @@ Agent 正常关闭只断开控制连接，不终止 Worker。Agent 异常退出�
 
 浏览器登录 session 目前只在 Agent 内存中，因此 Agent 重启后用户需要重新登录；重新登录后可 attach 原 Session。
 
+## 显式“重启终端”不是重连
+
+浏览器重连、页面刷新和 Agent 重启都必须尽量附着**同一个** Worker/PTY/Session，并保留原 canonical terminal state。终端页的“重启终端”则是用户明确触发的破坏性替换动作：Agent 先解析并验证最新 Workspace 与宿主环境，只有 replacement 可启动时才终止旧 PTY；旧 Session 退出并 retirement 后再创建新的 Session ID。它不会被网络重连或 Agent 恢复流程隐式触发。
+
 ## Agent↔Worker 控制连接恢复
 
 Agent 与 Worker 之间有应用层 ping。控制 IPC 异常关闭时：

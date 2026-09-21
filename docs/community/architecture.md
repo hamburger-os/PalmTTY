@@ -43,7 +43,7 @@ PalmTTY Agent (Fastify)
 
 Each Session is owned by one independent detached Worker process. The Worker owns the PTY, headless terminal mirror, monotonically increasing output sequence, bounded replay history and exited-session retention.
 
-Session lifecycle actions are explicit. Termination is an action that moves an active Session through `stopping` to `exited` and keeps its retained terminal state available. Deletion is a separate operation allowed only for `exited/failed` Sessions; it asks the Worker to retire immediately and release terminal/recovery state. The Agent deliberately does not own a second canonical copy of terminal state or delete Worker recovery files behind the Worker's back.
+Session lifecycle actions are explicit. Termination moves an active Session through `stopping` to `exited` and keeps its retained terminal state available. Restart is a replacement operation: it waits for the old PTY to exit, retires the retained Session, then creates a new Session ID from the same persisted workspace and previous terminal geometry. Deletion is separate and allowed only for `exited/failed` Sessions; it asks the Worker to retire immediately and release terminal/recovery state. The Agent deliberately does not own a second canonical copy of terminal state or delete Worker recovery files behind the Worker's back.
 
 ### Persistence semantics
 
@@ -67,7 +67,7 @@ Every Worker has an independent 256-bit secret. The secret is sent to the Worker
 
 Persisted PIDs are diagnostic metadata only. PalmTTY never treats an old PID as sufficient authority to kill a process. A failed Agent connection is also not proof that a Worker is dead: potentially-live recovery metadata is preserved, and an adopted Worker retries control-plane reconnection instead of converting an IPC outage into PTY loss. Missing Worker-owned recovery files are republished by the Worker; conflicting recovery authority fails closed.
 
-Workspace definitions are persistent Agent-owned state managed through authenticated, exact-Origin-protected HTTP endpoints. The Web editor also has a bounded, read-only directory browser for the selected Host or WSL runtime; it returns directory names/paths only and does not expose file contents. A Session request still supplies only a workspace ID. The runtime adapter validates the selected workspace when it is created/updated and again before a Worker is created. Host runtimes resolve a shell to an absolute executable; WSL runtimes resolve `wsl.exe` on Windows and pass distribution/cwd/shell as structured argv rather than shell-interpolated text. The Worker bootstrap carries only the normalized launch specification. Worker durability begins at an authenticated, idempotent `adopt` commit: a lost adoption response is retried over fresh IPC, while a never-adopted Worker expires its short creation lease and self-cleans.
+Workspace definitions are persistent Agent-owned state managed through authenticated, exact-Origin-protected HTTP endpoints. The Web editor has bounded runtime inspection for directory browsing and installed shell profiles; neither is a general file/command API. Workspace definitions may include a bounded environment map and multiline startup input. Session creation/restart do not accept ad-hoc cwd/shell/environment overrides; they resolve persisted workspace authority by ID. On Windows, every new/restarted Host terminal refreshes Machine/User environment variables before resolving PATH and applying workspace overrides. WSL runtimes resolve `wsl.exe`, pass distribution/cwd/shell as structured argv, and forward configured workspace variable names through `WSLENV`. The Worker bootstrap carries only the normalized launch specification. Worker durability begins at an authenticated, idempotent `adopt` commit: a lost adoption response is retried over fresh IPC, while a never-adopted Worker expires its short creation lease and self-cleans.
 
 ### Reconnect model
 
@@ -86,7 +86,7 @@ PalmTTY 是一个单用户、自托管的交互式开发终端控制面。Web �
 
 每个 Session 由独立 detached Worker 持有。Worker 是 PTY、headless xterm、输出序号、有限 replay 和退出保留期的唯一 canonical owner；Agent 只负责 Web/API、认证、安全策略、Worker 发现与浏览器代理。
 
-Session 生命周期动作明确分离：“终止”把活动会话推进为 `stopping → exited`，退出后的终端状态仍在 retention 内可查看；“清除”只允许用于 `exited/failed` 会话，并由 Worker 立即释放 terminal/replay/recovery state 后退出。Agent 不直接删 Worker 的恢复文件来伪造删除。
+Session 生命周期动作明确分离：“终止”把活动会话推进为 `stopping → exited`，退出后的终端状态仍在 retention 内可查看；“重启”会等待旧 PTY 退出并 retire 旧 Session，再按同一 Workspace 与原终端几何创建新的 Session ID；“清除”只允许用于 `exited/failed` 会话，并由 Worker 立即释放 terminal/replay/recovery state 后退出。Agent 不直接删 Worker 的恢复文件来伪造删除。
 
 当前持久化语义包括：
 
@@ -98,6 +98,6 @@ Session 生命周期动作明确分离：“终止”把活动会话推进为 `s
 
 Windows 本地控制 IPC 使用 Named Pipe；其他当前 CI 平台使用 Unix domain socket。每个 Worker 有独立 256-bit secret，创建时只经匿名 stdin 传入，不发送到浏览器。持久化 PID 只用于诊断，不能作为 kill authority。Agent 暂时无法连接 Worker 并不等于 Worker 已死亡，因此不会仅因 IPC 超时删除可能仍存活 Worker 的恢复能力；已接管 Worker 的控制连接会持续退避重连。Worker 自己拥有 recovery metadata，文件缺失时会重新发布；如果发现恢复权限被其他内容替换，则 fail closed。
 
-Workspace 现在是 Agent 持有的独立持久化状态，通过“认证 + 精确 Origin”保护的 HTTP API 在网页端创建、编辑和删除；编辑器另有一个有边界的只读目录浏览 API，可浏览所选 Host/WSL 运行环境，只返回目录名称/路径，不读取文件内容；创建 Session 时仍只提交 workspace ID。工作区新建/修改时会先验证，创建 Worker 前再次验证。Host 运行时把 Shell 解析成绝对可执行路径；Windows 上的 WSL 运行时解析 `wsl.exe`，并把发行版、cwd、Shell 作为结构化 argv 传递，不做字符串命令拼接。Worker bootstrap 只接收规范化后的运行规格。
+Workspace 现在是 Agent 持有的独立持久化状态，通过“认证 + 精确 Origin”保护的 HTTP API 在网页端创建、编辑和删除；编辑器提供有边界的目录浏览与已安装 Shell 探测，不读取文件内容，也不是通用命令执行接口。Workspace 可以持久化有界 environment 和多行启动输入；创建/重启 Session 时不允许临时注入 cwd/shell/env，而是按 workspace ID 重新解析持久化定义。Windows Host 新终端会重新读取 Machine/User 环境与最新 PATH 后再叠加 Workspace environment；WSL 把发行版、cwd、Shell 作为结构化 argv 传递，并通过 `WSLENV` 转发配置变量名。Worker bootstrap 只接收规范化后的运行规格。
 
 PTY 输出、headless mirror、seq 与 replay 都在 Worker 内按同一有序流水线更新，因此 Agent 不在线期间状态仍连续。浏览器恢复时把已 fit 的 rows/cols 与 lastSeq 一起提交；Worker 先把 canonical PTY/headless mirror 调整到该 geometry，尺寸未变且历史仍可用时才 replay，尺寸变化或历史过旧时使用新 geometry 下的 snapshot。恢复帧之后的 `hello` 表示恢复完成，恢复边界与实时订阅之间不留消息窗口。

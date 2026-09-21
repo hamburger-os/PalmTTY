@@ -7,7 +7,7 @@ PalmTTY Agent 是开发电脑上的 Web/API 控制面，负责：
 - 提供 HTTP 与 WebSocket API；
 - 登录认证和 Origin 安全检查；
 - 管理当前用户的持久化 workspace 目录与运行时验证；
-- 为 Workspace 编辑器提供受认证 + 精确 Origin 保护的只读目录浏览；
+- 为 Workspace 编辑器提供受认证 + 精确 Origin 保护的只读目录浏览与有界 Shell 探测；
 - 创建、发现并认证独立 Session Worker；
 - 把浏览器 WebSocket 转发到对应 Worker；
 - 托管编译后的手机端 PWA。
@@ -58,7 +58,7 @@ Agent 正常关闭、升级或异常退出时：
 
 目录浏览与 Workspace 持久化分离：浏览接口只返回目录，不返回文件内容；Host 默认从当前用户 home 开始并可浏览可访问盘符，WSL 使用固定 shell 脚本并把用户路径作为独立 argv 传入，不拼接到命令字符串。目录结果最多返回 512 项，WSL 子进程另有输出大小与超时上限，并对浏览请求单独限流。
 
-Agent 启动前的 runtime preflight 只处理认证环境、外部暴露规则和 Agent TCP host/port 可绑定性，不再遍历 workspace。Workspace 是独立的 per-user 持久化状态；新建/修改时通过认证 + 精确 Origin 保护的 API 验证，创建 Session 时再次验证。Agent 启动后异步探测一次 runtime capabilities 并在本进程生命周期内复用结果，避免每次 Web 查询都重复启动 WSL 探测进程；该探测不是创建 Host workspace 的前置条件。Host runtime 会把 Shell 解析为绝对启动路径；Windows 当前用户 `%LOCALAPPDATA%\Microsoft\WindowsApps` 下的 App Execution Alias 有专门处理。WSL runtime 只在 Windows Agent 上启用，解析 `wsl.exe`，并把发行版、Linux cwd、Shell/args 作为结构化参数传入。只有规范化后的运行规格才进入 Worker bootstrap。
+Agent 启动前的 runtime preflight 只处理认证环境、外部暴露规则和 Agent TCP host/port 可绑定性，不再遍历 workspace。Workspace 是独立的 per-user 持久化状态；新建/修改时通过认证 + 精确 Origin 保护的 API 验证，创建 Session 时再次验证。Agent 启动后异步探测一次 runtime capabilities 并在本进程生命周期内复用结果，避免每次 Web 查询都重复启动 WSL 探测进程；该探测不是创建 Host workspace 的前置条件。Host runtime 会把 Shell 解析为绝对启动路径；Windows 当前用户 `%LOCALAPPDATA%\Microsoft\WindowsApps` 下的 App Execution Alias 有专门处理。每次创建或重启 Windows 终端时还会重新读取 Machine/User 环境，重新组合最新 PATH，再叠加 Workspace 的有界环境变量，所以安装 CLI 后不需要重启整个 Agent 才能让新 PTY 看见新的 PATH。WSL runtime 只在 Windows Agent 上启用，解析 `wsl.exe`，并把发行版、Linux cwd、Shell/args 作为结构化参数传入；Workspace 环境变量通过 `WSLENV` 名称列表转发。只有规范化后的运行规格才进入 Worker bootstrap。
 
 创建 Session 时 Agent：
 
@@ -77,6 +77,7 @@ PalmTTY 登录 token 对应的环境变量会从 Worker 环境和最终 PTY 环�
 Session 创建仍是 `POST /api/v1/sessions`。生命周期修改不再复用一个含义模糊的 DELETE：
 
 - `POST /api/v1/sessions/:id/terminate`：请求 Worker 终止 PTY，状态先进入 `stopping`，最终由 PTY exit 事件推进为 `exited`；重复调用是幂等的。
+- `POST /api/v1/sessions/:id/restart`：终止当前 PTY，等待进入 terminal state，再 retirement 旧 Session，并按同一 workspace ID 与原 rows/cols 创建一个新的 Session。它会产生新的 Session ID/终端历史，并重新解析最新 Workspace 与宿主环境。
 - `DELETE /api/v1/sessions/:id`：只删除已经 `exited/failed` 的 retained Session。活动或 `stopping` Session 返回冲突；成功时由 Worker 通过 authenticated IPC 执行 retirement 和 recovery-state 清理。
 - Session lifecycle mutation 使用独立限流，不与创建或 workspace mutation 共用计数器。
 
@@ -85,7 +86,7 @@ Session 创建仍是 `POST /api/v1/sessions`。生命周期修改不再复用一
 ## 重要边界
 
 - Agent/Worker 默认都不应以管理员身份运行。
-- 浏览器可以显式管理持久化 workspace 的 cwd/runtime/Shell/启动命令，但该能力必须经过认证与精确 Origin；Session 创建接口本身仍只接受 workspace ID，Web 模型不开放任意 env 注入。
+- 浏览器可以显式管理持久化 workspace 的 cwd/runtime/Shell、有界环境变量与启动命令，但该能力必须经过认证与精确 Origin；Session 创建/重启接口本身不接受临时 cwd/shell/env 覆盖。Workspace 环境变量是本机持久化配置，不是 secret vault。
 - Agent 不理解 Codex 的内部协议；Codex 只是终端里的普通 CLI。
 - Worker secret 不进入浏览器、命令行、URL、普通日志或 PTY 环境。
 - 持久化 PID 只用于诊断，不允许直接作为 kill authority；PID 可能被系统复用。

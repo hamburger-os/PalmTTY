@@ -26,12 +26,12 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - random in-memory login session cookie with bounded active-session count
 - exact Origin allowlist and non-loopback startup safety gate
 - bounded login/session-create rate limiting
-- Session creation remains workspace-ID-only; Web workspace mutation does not expose environment-variable injection
+- Session creation/restart remain workspace-authority operations; Web workspace mutation may persist a bounded environment map except the configured login-token variable, while Session requests cannot inject ad-hoc cwd/shell/environment overrides
 - runtime preflight for auth/security exposure and configured Agent TCP bindability, exposed as the unambiguous `pnpm run preflight` package script
 - workspace create/update plus Session creation both validate runtime launch targets
 - authenticated + exact-Origin runtime-aware directory browsing for workspace selection; responses expose directories only and are bounded by request rate, 512 returned entries, subprocess output, and timeout
-- host runtime adapter with absolute executable normalization, including current-user Windows App Execution Aliases for Store/MSIX PowerShell
-- Windows WSL runtime adapter using structured `wsl.exe` argv for distribution/cwd/shell rather than shell-string interpolation
+- host runtime adapter with absolute executable normalization, including current-user Windows App Execution Aliases for Store/MSIX PowerShell; each new/restarted Windows terminal refreshes Machine/User environment variables from Windows before resolving the shell and PATH
+- Windows WSL runtime adapter using structured `wsl.exe` argv for distribution/cwd/shell rather than shell-string interpolation; configured workspace environment variables are forwarded by preserving existing colon-delimited `WSLENV` entries/flags and appending bounded names
 - Linux host runtime exercised by Ubuntu CI; macOS shares the host adapter but is not covered by repository CI
 - root development launcher derives the Agent target from the validated PalmTTY config, injects it into host-independent Vite tooling, and Vite refuses silent dev-port fallback
 - bounded client message size and terminal dimensions
@@ -56,7 +56,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - failed rediscovery alone does not delete potentially-live recovery state; definitely-dead recorded processes can be reclaimed without PID-based killing
 - Worker-owned recovery metadata is republished when missing; conflicting record/secret ownership fails closed
 - stale/dangling artifacts are cleaned without treating persisted PIDs as kill authority
-- login-token environment variable is removed before Worker spawn and from PTY environment
+- login-token environment variable is removed before Worker bootstrap, from the Worker process environment, and again from the PTY environment
 - terminal input is bounded to the same 64 KiB limit at browser and Worker IPC boundaries
 - concurrent Session creation is counted against maxSessions
 
@@ -79,6 +79,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - terminal WebSocket closure at login-session expiry
 - explicit Session lifecycle: `running → stopping → exited` for termination, with idempotent terminate requests
 - retained-session removal is separate from termination; only exited/failed Sessions can be cleared immediately, and the Worker owns final terminal/recovery-state disposal
+- explicit terminal restart reserves replacement capacity, resolves and validates the latest persisted workspace before touching the current PTY, then terminates, retires and replaces the Session while preserving terminal geometry; restart intentionally creates a new Session ID/history
 - bounded exited-session retention with Worker self-disposal
 
 ### Test coverage
@@ -91,7 +92,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Agent restart rediscovery
 - slow-client cutoff
 - auth expiry
-- explicit terminate/stopping/exit transition, idempotent termination, active-session clear rejection, and immediate retained-session removal
+- explicit terminate/stopping/exit transition, idempotent termination, active-session clear rejection, immediate retained-session removal, and restart-as-replacement lifecycle
 - exited-session retention/cleanup
 - maxSessions under concurrent creation
 - wrong Worker secret rejection
@@ -112,9 +113,9 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - PalmTTY-owned semantic glass surface system and four-color ambient field; visual rules live in `.agents/skills/palmtty-theme/SKILL.md` rather than component-local palettes, with dedicated modal and terminal surface ownership instead of stacking generic glass under those regions
 - workspace create/edit/delete UI plus Host/WSL runtime form
 - Host/WSL remote directory picker that selects directories on the Agent runtime rather than the browser device
-- workspace dialog uses a dedicated readability-first modal surface with a fixed header/footer and one scrollable form body; the bounded directory list may scroll independently; shell-argument example chips and startup-command presets cover Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, and Aider
+- workspace dialog uses a dedicated readability-first modal surface with a fixed header/footer and one scrollable form body; the bounded directory list may scroll independently; installed Host/WSL shells are detected into a profile selector with an explicit Custom fallback; workspace environment variables use structured `NAME=value` editing; startup commands are multiline and retain presets for Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, and Aider
 - workspace launcher
-- Session list with explicit text actions: active Sessions use “Terminate”, retained exited/failed Sessions use “Clear”; the ambiguous red × control is removed
+- Session list with explicit text actions: active Sessions use “Terminate”, retained exited/failed Sessions use “Clear”; the terminal header also exposes an explicit confirmed “Restart terminal” replacement action; the ambiguous red × control is removed
 - stopping Sessions remain non-interactive in the terminal view
 - xterm.js terminal uses one theme-owned opaque viewport surface: the host gutter receives the active xterm background from the same theme value, while theme updates apply in place without recreating the terminal or reconnecting the Session; locale/presentation updates are isolated from the transport lifecycle
 - reconnect loop with retained lastSeq
@@ -139,7 +140,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Windows explicit-termination “no visible console flash” remains a real-host visual acceptance check; CI exercises the bundled ConPTY DLL path but cannot assert desktop window visibility.
 - Potentially-live but unreachable recovery records are deliberately preserved when process death cannot be proven; this favors terminal survival over aggressive metadata reclamation.
 - No Git/file preview subsystem yet.
-- WSL support is implemented but still needs real owner-host/long-running validation; repository CI does not provide a real WSL environment.
+- WSL support is implemented but still needs real owner-host/long-running validation, including shell-profile detection and workspace-variable forwarding through `WSLENV`; repository CI does not provide a real WSL environment.
 - Linux host runtime is exercised on Ubuntu CI. macOS uses the same host adapter but remains unverified because there is no macOS CI job.
 - Windows Worker runtime file ACL behavior relies on the current-user application-data boundary and still merits dedicated real-host review.
 - The current xterm 6 package is loaded through an isolated CommonJS boundary in the Node Worker because the published headless package is not reliably consumable through native Node ESM named exports; re-review this when upgrading xterm.

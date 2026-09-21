@@ -42,11 +42,51 @@ export const WorkspaceRuntimeSchema = z.discriminatedUnion("kind", [
 ]);
 export type WorkspaceRuntime = z.infer<typeof WorkspaceRuntimeSchema>;
 
+const WorkspaceEnvironmentKeySchema = z.string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
+
+export const WorkspaceEnvironmentSchema = z.record(
+  WorkspaceEnvironmentKeySchema,
+  z.string().max(8192)
+).superRefine((environment, ctx) => {
+  const keys = Object.keys(environment);
+  if (keys.length > 64) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Workspace environment is limited to 64 variables"
+    });
+  }
+
+  const normalized = new Set<string>();
+  for (const key of keys) {
+    const canonical = key.toLowerCase();
+    if (normalized.has(canonical)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [key],
+        message: "Environment variable names must be unique ignoring case"
+      });
+    }
+    normalized.add(canonical);
+    if (canonical === "term") {
+      ctx.addIssue({
+        code: "custom",
+        path: [key],
+        message: "TERM is managed by PalmTTY"
+      });
+    }
+  }
+});
+export type WorkspaceEnvironment = z.infer<typeof WorkspaceEnvironmentSchema>;
+
 export const WorkspaceDefinitionSchema = z.object({
   id: WorkspaceIdSchema,
   name: z.string().trim().min(1).max(100),
   cwd: z.string().trim().min(1).max(4096),
   runtime: WorkspaceRuntimeSchema,
+  environment: WorkspaceEnvironmentSchema.optional(),
   startupCommand: z.string().max(8192).optional()
 }).strict();
 export type WorkspaceDefinition = z.infer<typeof WorkspaceDefinitionSchema>;
@@ -65,6 +105,34 @@ export const RuntimeCapabilitiesSchema = z.object({
   }).strict()
 }).strict();
 export type RuntimeCapabilities = z.infer<typeof RuntimeCapabilitiesSchema>;
+
+const HostShellProfilesRequestSchema = z.object({
+  kind: z.literal("host")
+}).strict();
+
+const WslShellProfilesRequestSchema = z.object({
+  kind: z.literal("wsl"),
+  distribution: z.string().trim().min(1).max(128).optional()
+}).strict();
+
+export const DetectShellProfilesRequestSchema = z.discriminatedUnion("kind", [
+  HostShellProfilesRequestSchema,
+  WslShellProfilesRequestSchema
+]);
+export type DetectShellProfilesRequest = z.infer<typeof DetectShellProfilesRequestSchema>;
+
+export const ShellProfileSchema = z.object({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(128),
+  shell: z.string().min(1).max(4096),
+  args: z.array(z.string().max(4096)).max(32),
+  recommended: z.boolean()
+}).strict();
+export type ShellProfile = z.infer<typeof ShellProfileSchema>;
+
+export const ShellProfilesResponseSchema = z.object({
+  profiles: z.array(ShellProfileSchema).max(32)
+}).strict();
 
 const BrowseHostDirectorySchema = z.object({
   kind: z.literal("host"),

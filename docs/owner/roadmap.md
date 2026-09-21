@@ -20,9 +20,9 @@
 - 未 adoption Worker 通过短创建租约自清理；`adopt` 为幂等提交，可跨 IPC 重连安全重试，确认后才进入持久 Session；
 - 单用户 token 登录和 Cookie 会话；
 - Origin、安全启动闸门和基础限流；
-- 手机端 xterm/PWA、特殊键栏与长文本 Composer，中文/英文界面切换；
+- 手机端 xterm/PWA、特殊键栏与长文本 Composer，中文/英文界面切换，并提供明确的终端替换重启动作；
 - PalmTTY 自有的三主题视觉系统（炫彩流光/黑曜石/白霜）、效果/性能两档、reduced-motion 处理与主题审查 skills；
-- Web 端持久化 Workspace CRUD，Host / WSL runtime adapter，Session 仍只按 workspace ID 创建；
+- Web 端持久化 Workspace CRUD，Host / WSL runtime adapter；工作区支持自动 Shell Profile 探测、有界环境变量与多行启动输入，Session 创建/重启仍只消费持久化 workspace authority；
 - Ubuntu CI 已覆盖 Linux host runtime；Windows CI 保持 PowerShell 7/ConPTY 路径；macOS adapter 已按同一 Host 模型实现但尚无仓库 CI；
 - Windows/Ubuntu 双平台 CI；
 - 真正的 detached-process 集成测试：创建 Worker 的 Agent 进程退出后，另一个 Agent 可找回同一活终端及 replay；
@@ -64,7 +64,9 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 - Agent 升级/重启期间的真实手机恢复；
 - QNAP/Caddy/Tailscale 私有 HTTPS 入口；
 - 长时间运行后的内存、Worker 和 recovery-state 清理；
-- Windows runtime 文件 ACL 实机检查。
+- Windows runtime 文件 ACL 实机检查；
+- Windows 新安装 CLI 后通过“重启终端”刷新 Machine/User PATH 的真实宿主验证；
+- WSL Shell Profile 探测与 `WSLENV` Workspace 环境转发的真实发行版验证。
 
 ### P1：安全增强
 

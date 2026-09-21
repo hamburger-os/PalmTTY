@@ -21,7 +21,11 @@ import {
   removeWorkerState,
   type WorkerRecord
 } from "./worker-storage.js";
-import { resolveRuntimeWorkspace } from "./workspace-runtime.js";
+import { withoutEnvironmentKeys } from "./host-environment.js";
+import {
+  resolveRuntimeWorkspace,
+  type RuntimeWorkspace
+} from "./workspace-runtime.js";
 import type { WorkspaceStore } from "./workspace-store.js";
 
 type ManagedWorker = {
@@ -42,6 +46,7 @@ export type SessionManagerOptions = {
 const CREATE_CONNECT_DELAYS_MS = [0, 50, 100, 200, 400, 800, 1200, 1600];
 const REDISCOVER_CONNECT_DELAYS_MS = [0, 100, 250, 500, 1000, 2000, 4000];
 const RECONNECT_DELAYS_MS = [100, 250, 500, 1000, 2000, 5000];
+const RESTART_EXIT_TIMEOUT_MS = 10_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -74,6 +79,7 @@ export class SessionManager {
   private readonly workspaceStore: WorkspaceStore;
   private readonly sessions = new Map<string, ManagedWorker>();
   private readonly pendingByWorkspace = new Map<string, number>();
+  private readonly restartInFlight = new Map<string, Promise<SessionPublic>>();
   private pendingCreates = 0;
   private initialized = false;
   private closing = false;
@@ -154,85 +160,112 @@ export class SessionManager {
     const definition = this.workspaceStore.get(workspaceId);
     if (!definition) throw new Error("Unknown workspace");
 
-    const active = [...this.sessions.values()].filter(({ session }) =>
+    const release = this.reserveCreate(workspaceId);
+    try {
+      const workspace = await resolveRuntimeWorkspace(definition);
+      return await this.spawnSession(workspace, cols, rows);
+    } finally {
+      release();
+    }
+  }
+
+  private reserveCreate(
+    workspaceId: string,
+    replacingSessionId?: string
+  ): () => void {
+    const active = [...this.sessions.values()].filter(({ record, session }) =>
+      record.sessionId !== replacingSessionId &&
       isActiveSessionState(session.state)
     );
     if (active.length + this.pendingCreates >= this.config.sessions.maxSessions) {
       throw new Error("Maximum session count reached");
     }
+
     this.pendingCreates += 1;
     this.pendingByWorkspace.set(
       workspaceId,
       (this.pendingByWorkspace.get(workspaceId) ?? 0) + 1
     );
 
-    try {
-      const workspace = await resolveRuntimeWorkspace(definition);
-
-      const id = sessionId();
-      const endpoint = endpointId();
-      const secret = workerSecret();
-      const createdAt = new Date().toISOString();
-      const bootstrap: WorkerBootstrap = {
-        protocol: WORKER_PROTOCOL_VERSION,
-        runtimeDir: this.runtimeDir,
-        sessionId: id,
-        endpointId: endpoint,
-        secret,
-        excludedEnvKeys: [this.config.auth.tokenEnv],
-        createdAt,
-        workspace,
-        session: {
-          exitedRetentionMinutes: this.config.sessions.exitedRetentionMinutes,
-          scrollbackLines: this.config.sessions.scrollbackLines,
-          replayBytes: this.config.sessions.replayBytes
-        },
-        cols,
-        rows
-      };
-
-      await this.workerSpawner.spawn(bootstrap);
-      let worker: WorkerClient | undefined;
-      try {
-        worker = await this.connectWithRetry(
-          endpoint,
-          secret,
-          CREATE_CONNECT_DELAYS_MS
-        );
-        const record = await this.readRecordWithRetry(id);
-
-        // A Worker becomes durable only after authenticated adoption. Adoption
-        // is idempotent, so a lost response can be retried across a fresh IPC
-        // connection without creating an ambiguous commit point.
-        const adoptedWorker = await this.adoptWithRetry(
-          worker,
-          endpoint,
-          secret,
-          CREATE_CONNECT_DELAYS_MS
-        );
-
-        const managed: ManagedWorker = {
-          record,
-          secret,
-          worker: adoptedWorker,
-          session: adoptedWorker.session,
-          clients: new Map(),
-          reconnecting: false
-        };
-        this.install(managed);
-        return this.publicSession(managed);
-      } catch (error) {
-        if (worker) worker.close();
-        // If adoption never committed, the Worker's creation lease performs
-        // rollback. If adoption did commit but its response was lost, retrying
-        // the idempotent adopt resolves that state before this path is reached.
-        throw error;
-      }
-    } finally {
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
       this.pendingCreates -= 1;
       const remaining = (this.pendingByWorkspace.get(workspaceId) ?? 1) - 1;
       if (remaining <= 0) this.pendingByWorkspace.delete(workspaceId);
       else this.pendingByWorkspace.set(workspaceId, remaining);
+    };
+  }
+
+  private async spawnSession(
+    workspace: RuntimeWorkspace,
+    cols: number,
+    rows: number
+  ): Promise<SessionPublic> {
+    const id = sessionId();
+    const endpoint = endpointId();
+    const secret = workerSecret();
+    const createdAt = new Date().toISOString();
+    const excludedEnvKeys = [this.config.auth.tokenEnv];
+    const workerWorkspace: RuntimeWorkspace = {
+      ...workspace,
+      env: withoutEnvironmentKeys(workspace.env, excludedEnvKeys)
+    };
+    const bootstrap: WorkerBootstrap = {
+      protocol: WORKER_PROTOCOL_VERSION,
+      runtimeDir: this.runtimeDir,
+      sessionId: id,
+      endpointId: endpoint,
+      secret,
+      excludedEnvKeys,
+      createdAt,
+      workspace: workerWorkspace,
+      session: {
+        exitedRetentionMinutes: this.config.sessions.exitedRetentionMinutes,
+        scrollbackLines: this.config.sessions.scrollbackLines,
+        replayBytes: this.config.sessions.replayBytes
+      },
+      cols,
+      rows
+    };
+
+    await this.workerSpawner.spawn(bootstrap);
+    let worker: WorkerClient | undefined;
+    try {
+      worker = await this.connectWithRetry(
+        endpoint,
+        secret,
+        CREATE_CONNECT_DELAYS_MS
+      );
+      const record = await this.readRecordWithRetry(id);
+
+      // A Worker becomes durable only after authenticated adoption. Adoption
+      // is idempotent, so a lost response can be retried across a fresh IPC
+      // connection without creating an ambiguous commit point.
+      const adoptedWorker = await this.adoptWithRetry(
+        worker,
+        endpoint,
+        secret,
+        CREATE_CONNECT_DELAYS_MS
+      );
+
+      const managed: ManagedWorker = {
+        record,
+        secret,
+        worker: adoptedWorker,
+        session: adoptedWorker.session,
+        clients: new Map(),
+        reconnecting: false
+      };
+      this.install(managed);
+      return this.publicSession(managed);
+    } catch (error) {
+      if (worker) worker.close();
+      // If adoption never committed, the Worker's creation lease performs
+      // rollback. If adoption did commit but its response was lost, retrying
+      // the idempotent adopt resolves that state before this path is reached.
+      throw error;
     }
   }
 
@@ -278,6 +311,69 @@ export class SessionManager {
     if (!managed) return undefined;
     await managed.worker.terminate();
     return this.publicSession(managed);
+  }
+
+  async restart(id: string): Promise<SessionPublic | undefined> {
+    const existing = this.restartInFlight.get(id);
+    if (existing) return existing;
+
+    const managed = this.sessions.get(id);
+    if (!managed) return undefined;
+
+    const run = this.restartManaged(id, managed);
+    this.restartInFlight.set(id, run);
+    try {
+      return await run;
+    } finally {
+      if (this.restartInFlight.get(id) === run) {
+        this.restartInFlight.delete(id);
+      }
+    }
+  }
+
+  private async restartManaged(
+    id: string,
+    managed: ManagedWorker
+  ): Promise<SessionPublic> {
+    const { workspaceId, cols, rows } = managed.session;
+    const release = this.reserveCreate(workspaceId, id);
+
+    try {
+      const definition = this.workspaceStore.get(workspaceId);
+      if (!definition) {
+        throw new Error("Workspace no longer exists");
+      }
+
+      // Validate and resolve the replacement before destroying the current PTY.
+      // This keeps an exited retained Session available when its workspace was
+      // deleted or its launch target became invalid.
+      const replacement = await resolveRuntimeWorkspace(definition);
+
+      if (isActiveSessionState(managed.session.state)) {
+        await managed.worker.terminate();
+        const deadline = Date.now() + RESTART_EXIT_TIMEOUT_MS;
+        while (
+          this.sessions.get(id) === managed &&
+          isActiveSessionState(managed.session.state)
+        ) {
+          if (Date.now() >= deadline) {
+            throw new Error("Timed out waiting for the terminal to exit during restart");
+          }
+          await sleep(50);
+        }
+      }
+
+      if (this.sessions.get(id) === managed) {
+        const removed = await this.remove(id);
+        if (removed === "active") {
+          throw new Error("Terminal remained active during restart");
+        }
+      }
+
+      return await this.spawnSession(replacement, cols, rows);
+    } finally {
+      release();
+    }
   }
 
   async remove(id: string): Promise<"removed" | "not_found" | "active"> {

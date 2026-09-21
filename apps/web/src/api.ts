@@ -1,9 +1,11 @@
 import type {
   BrowseDirectoryRequest,
   CreateWorkspaceInput,
+  DetectShellProfilesRequest,
   DirectoryListing,
   RuntimeCapabilities,
   SessionPublic,
+  ShellProfile,
   WorkspacePublic
 } from "@palmtty/protocol";
 
@@ -63,6 +65,20 @@ export async function runtimeCapabilities() {
   return responseJson<RuntimeCapabilities>(
     await fetch("/api/v1/capabilities", { credentials: "same-origin" })
   );
+}
+
+export async function detectShellProfiles(
+  input: DetectShellProfilesRequest
+) {
+  return responseJson<{ profiles: ShellProfile[] }>(await fetch(
+    "/api/v1/shell-profiles",
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input)
+    }
+  ));
 }
 
 export async function browseWorkspaceDirectory(
@@ -140,6 +156,16 @@ export async function createSession(workspaceId: string) {
 export async function terminateSession(id: string) {
   return responseJson<{ session: SessionPublic }>(await fetch(
     `/api/v1/sessions/${encodeURIComponent(id)}/terminate`,
+    {
+      method: "POST",
+      credentials: "same-origin"
+    }
+  ));
+}
+
+export async function restartSession(id: string) {
+  return responseJson<{ session: SessionPublic }>(await fetch(
+    `/api/v1/sessions/${encodeURIComponent(id)}/restart`,
     {
       method: "POST",
       credentials: "same-origin"

@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { WorkspaceDefinition } from "@palmtty/protocol";
 import {
+  buildPtyEnvironment,
   buildWslLaunchArgs,
   resolveExecutable,
   resolveRuntimeWorkspace
@@ -174,14 +175,33 @@ describe("workspace runtime resolution", () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "palmtty-workspace-"));
     tempDirs.add(directory);
 
-    const workspace = await resolveRuntimeWorkspace(
-      hostWorkspace(directory, process.execPath)
-    );
+    const definition = hostWorkspace(directory, process.execPath);
+    definition.environment = {
+      PALMTTY_TEST_ENVIRONMENT: "fresh"
+    };
+    const workspace = await resolveRuntimeWorkspace(definition);
 
     expect(path.isAbsolute(workspace.executable)).toBe(true);
     expect(workspace.id).toBe("node");
     expect(workspace.cwd).toBe(await realpath(directory));
-    expect(workspace.env).toEqual({});
+    expect(workspace.env.PALMTTY_TEST_ENVIRONMENT).toBe("fresh");
+  });
+
+  it("builds the PTY environment from the resolved snapshot and removes secrets", () => {
+    const environment = buildPtyEnvironment({
+      id: "env",
+      cwd: process.cwd(),
+      executable: process.execPath,
+      args: [],
+      env: {
+        PALMTTY_VISIBLE: "yes",
+        PALMTTY_TEST_ACCESS_TOKEN: "secret"
+      }
+    }, ["PALMTTY_TEST_ACCESS_TOKEN"]);
+
+    expect(environment.PALMTTY_VISIBLE).toBe("yes");
+    expect(environment.PALMTTY_TEST_ACCESS_TOKEN).toBeUndefined();
+    expect(environment.TERM).toBe("xterm-256color");
   });
 
   it("rejects WSL runtime on non-Windows hosts", async () => {
