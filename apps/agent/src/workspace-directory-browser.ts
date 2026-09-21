@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readdir, realpath, stat } from "node:fs/promises";
+import { opendir, realpath, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -76,11 +76,11 @@ async function browseHostDirectory(
     throw new Error("Selected host path is not a directory");
   }
 
-  const entries = await readdir(currentPath, { withFileTypes: true });
+  const directory = await opendir(currentPath);
   const directories: DirectoryLocation[] = [];
   let truncated = false;
 
-  for (const entry of entries) {
+  for await (const entry of directory) {
     const candidate = path.join(currentPath, entry.name);
     let isDirectory = entry.isDirectory();
     if (!isDirectory && entry.isSymbolicLink()) {
