@@ -84,7 +84,7 @@ export const BrowseDirectoryRequestSchema = z.discriminatedUnion("kind", [
 export type BrowseDirectoryRequest = z.infer<typeof BrowseDirectoryRequestSchema>;
 
 export const DirectoryLocationSchema = z.object({
-  label: z.string().min(1).max(128),
+  label: z.string().min(1).max(512),
   path: z.string().min(1).max(4096)
 }).strict();
 export type DirectoryLocation = z.infer<typeof DirectoryLocationSchema>;
