@@ -164,9 +164,12 @@ export const WorkspaceRelativePathSchema = z.string()
     "workspace path must be relative"
   )
   .refine((value) => {
+    if (value === "") return true;
     const parts = value.split("/");
-    return !parts.includes("..") && !parts.includes(".");
-  }, "workspace path must not contain dot segments");
+    return parts.every(
+      (part) => part.length > 0 && part !== ".." && part !== "."
+    );
+  }, "workspace path must use canonical segments");
 
 export const WorkspaceFileListRequestSchema = z.object({
   path: WorkspaceRelativePathSchema.default("")
@@ -230,7 +233,10 @@ export const GitStatusResponseSchema = z.object({
 export type GitStatusResponse = z.infer<typeof GitStatusResponseSchema>;
 
 export const GitDiffRequestSchema = z.object({
-  path: z.string().min(1).max(4096),
+  path: WorkspaceRelativePathSchema.refine(
+    (value) => value.length > 0,
+    "Git path is required"
+  ),
   staged: z.boolean().default(false)
 }).strict();
 export type GitDiffRequest = z.infer<typeof GitDiffRequestSchema>;
