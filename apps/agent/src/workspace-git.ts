@@ -40,7 +40,7 @@ const GIT_REPOSITORY_ENV_KEYS = [
 ];
 
 function gitHostEnvironment(
-  source: NodeJS.ProcessEnv | Record<string, string>,
+  source: Record<string, string>,
   excludedEnvironmentKeys: string[]
 ): Record<string, string> {
   const environment = withoutEnvironmentKeys(source, [
