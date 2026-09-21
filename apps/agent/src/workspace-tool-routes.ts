@@ -91,9 +91,9 @@ export function registerWorkspaceToolRoutes(
     }
   );
 
-  app.get<{ Params: { id: string } }>(
+  app.post<{ Params: { id: string } }>(
     "/api/v1/workspaces/:id/git/status",
-    { preHandler: options.requireAuth },
+    { preHandler: [options.requireOrigin, options.requireAuth] },
     async (request, reply) => {
       if (!readLimiter.allow(request.ip)) {
         return reply.code(429).send({ error: "too_many_workspace_tool_requests" });
