@@ -199,7 +199,7 @@ section {
 .workspace-launch {
   margin-top: auto;
   align-self: stretch;
-  min-height: 42px;
+  min-height: var(--touch-target);
   font-weight: 700;
 }
 
@@ -531,7 +531,7 @@ button.directory-row:hover:not(:disabled) {
 
 button.directory-choose {
   justify-self: end;
-  min-height: 40px;
+  min-height: var(--touch-target);
 }
 
 .dialog-actions {
