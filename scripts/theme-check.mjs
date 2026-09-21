@@ -65,9 +65,32 @@ const themeTsPath = path.join(webSource, "theme.tsx");
 const themeCss = await readFile(themeCssPath, "utf8");
 const themeTs = await readFile(themeTsPath, "utf8");
 const terminalViewPath = path.join(webSource, "TerminalView.tsx");
+const sessionWorkbenchPath = path.join(webSource, "SessionWorkbench.tsx");
 const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
+const sessionWorkbench = await readFile(sessionWorkbenchPath, "utf8");
 const workspaceDialog = await readFile(workspaceDialogPath, "utf8");
+
+for (const marker of [
+  '<TerminalView',
+  'active={pane === "terminal"}',
+  'workbench-pane',
+  'pane === "git"',
+  'pane === "files"'
+]) {
+  if (!sessionWorkbench.includes(marker)) {
+    failures.push(`apps/web/src/SessionWorkbench.tsx [workbench-lifecycle-contract] missing ${marker}`);
+  }
+}
+
+for (const forbidden of [
+  'pane === "terminal" && (',
+  'pane === "terminal" ? <TerminalView'
+]) {
+  if (sessionWorkbench.includes(forbidden)) {
+    failures.push(`apps/web/src/SessionWorkbench.tsx [workbench-lifecycle-contract] forbidden ${forbidden}`);
+  }
+}
 
 for (const marker of [
   'className="terminal-host terminal-surface"',
