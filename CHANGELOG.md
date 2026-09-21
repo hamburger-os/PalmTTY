@@ -32,7 +32,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 ### Fixed
 
 - Normalize balanced outer single/double quotes in Web Workspace environment values, so proxy entries copied as `HTTP_PROXY="http://127.0.0.1:10808"` reach child processes as `http://127.0.0.1:10808` instead of a URL containing literal quote characters; reject unmatched outer quotes.
-- Enumerate WSL distributions with `wsl.exe --list --quiet` for terminal profiles instead of starting a distro and probing its shells, removing the cold-start-dependent first-scan failure mode.
+- Enumerate WSL distributions with `wsl.exe --list --quiet` for terminal profiles instead of starting a distro and probing its shells, removing the cold-start-dependent first-scan failure mode; hide Docker Desktop and Rancher Desktop utility distributions from the user-facing profile list.
 - Keep Host and WSL working-directory drafts separate in the Workspace editor so a Windows path is not silently reused as a WSL cwd.
 - Refresh Windows Machine/User environment values for every new/restarted Host terminal so CLIs installed into the user PATH after Agent startup become available without restarting PalmTTY.
 - Preserve existing `WSLENV` entries/flags while forwarding Workspace variables with the documented colon-delimited syntax.
