@@ -131,22 +131,23 @@ async function buildHarness() {
   });
   config.sessions.maxSessions = 1;
 
+  const workspaceStore = new MemoryWorkspaceStore([{
+    id: "lifecycle",
+    name: "Lifecycle",
+    cwd: process.cwd(),
+    runtime: {
+      kind: "host",
+      shell: process.execPath,
+      args: []
+    }
+  }]);
   const app = await buildApp(config, {
     sessionManager: { runtimeDir, workerSpawner: spawner },
-    workspaceStore: new MemoryWorkspaceStore([{
-      id: "lifecycle",
-      name: "Lifecycle",
-      cwd: process.cwd(),
-      runtime: {
-        kind: "host",
-        shell: process.execPath,
-        args: []
-      }
-    }])
+    workspaceStore
   });
   apps.add(app);
 
-  return { app, spawner, runtimeDir };
+  return { app, spawner, runtimeDir, workspaceStore };
 }
 
 describe("session lifecycle API", () => {
@@ -254,6 +255,45 @@ describe("session lifecycle API", () => {
       ]);
       return record.status === "rejected" && secret.status === "rejected";
     });
+  });
+
+  it("validates the replacement before terminating the current PTY", async () => {
+    const { app, spawner, workspaceStore } = await buildHarness();
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions",
+      headers: { origin: ORIGIN },
+      payload: { workspaceId: "lifecycle", cols: 80, rows: 24 }
+    });
+    expect(created.statusCode).toBe(201);
+    const original = created.json().session as SessionPublic;
+
+    await workspaceStore.replace("lifecycle", {
+      id: "lifecycle",
+      name: "Lifecycle",
+      cwd: process.cwd(),
+      runtime: {
+        kind: "host",
+        shell: "definitely-not-a-real-palmtty-shell",
+        args: []
+      }
+    });
+
+    const restarted = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${original.id}/restart`,
+      headers: { origin: ORIGIN }
+    });
+    expect(restarted.statusCode).toBe(409);
+    expect(spawner.pty.killCount).toBe(0);
+
+    const stillRunning = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${original.id}`
+    });
+    expect(stillRunning.statusCode).toBe(200);
+    expect(stillRunning.json().session.state).toBe("running");
   });
 
   it("restarts by replacing the PTY with a new session", async () => {
