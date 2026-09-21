@@ -64,6 +64,40 @@ const themeCssPath = path.join(webSource, "theme.css");
 const themeTsPath = path.join(webSource, "theme.tsx");
 const themeCss = await readFile(themeCssPath, "utf8");
 const themeTs = await readFile(themeTsPath, "utf8");
+const terminalViewPath = path.join(webSource, "TerminalView.tsx");
+const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
+const terminalView = await readFile(terminalViewPath, "utf8");
+const workspaceDialog = await readFile(workspaceDialogPath, "utf8");
+
+for (const marker of [
+  'className="terminal-host terminal-surface"',
+  '"--terminal-background"',
+  'terminalThemeRef.current',
+  '}, [sessionId]);'
+]) {
+  if (!terminalView.includes(marker)) {
+    failures.push(`apps/web/src/TerminalView.tsx [terminal-surface-contract] missing ${marker}`);
+  }
+}
+
+for (const forbidden of [
+  'terminal-host glass-content',
+  '}, [sessionId, t]);'
+]) {
+  if (terminalView.includes(forbidden)) {
+    failures.push(`apps/web/src/TerminalView.tsx [terminal-lifecycle-contract] forbidden ${forbidden}`);
+  }
+}
+
+for (const marker of [
+  'className="workspace-dialog glass-modal"',
+  'className="workspace-form-body"',
+  'workspace-dialog-footer'
+]) {
+  if (!workspaceDialog.includes(marker)) {
+    failures.push(`apps/web/src/WorkspaceDialog.tsx [workspace-modal-contract] missing ${marker}`);
+  }
+}
 
 for (const marker of [
   'html[data-theme="spectrum"]',
@@ -71,7 +105,9 @@ for (const marker of [
   'html[data-theme="frosted"]',
   'html[data-performance="performance"]',
   '.glass-shell',
+  '.glass-modal',
   '.glass-panel',
+  '.terminal-surface',
   '.glass-content',
   '.glass-control',
   '.glass-card'
