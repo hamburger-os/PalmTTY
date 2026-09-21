@@ -6,11 +6,11 @@ import {
 } from "@palmtty/protocol";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
-import { ConfirmDialog } from "./ConfirmDialog.js";
+import { ensureModalDialogOpen } from "./dialog-controller.js";
 import { useI18n } from "./i18n.js";
 import { useTheme } from "./theme.js";
 
-type ConnectionState =
+export type ConnectionState =
   | "connecting"
   | "connected"
   | "reconnecting"
@@ -29,22 +29,84 @@ function controlCharacter(value: string): string | undefined {
   return undefined;
 }
 
+function LongInputDialog({
+  connected,
+  onCancel,
+  onSend
+}: {
+  connected: boolean;
+  onCancel(): void;
+  onSend(data: string): void;
+}) {
+  const { t } = useI18n();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [value, setValue] = useState("");
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    ensureModalDialogOpen(dialog);
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="long-input-dialog glass-modal"
+      aria-labelledby="long-input-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onCancel();
+      }}
+    >
+      <div className="long-input-body">
+        <h2 id="long-input-title">{t("terminal.longInputTitle")}</h2>
+        <p>{t("terminal.longInputHelp")}</p>
+        <textarea
+          ref={textareaRef}
+          className="glass-input"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder={t("terminal.composer")}
+          rows={8}
+        />
+      </div>
+      <div className="long-input-actions">
+        <button type="button" className="ghost" onClick={onCancel}>
+          {t("common.cancel")}
+        </button>
+        <button
+          type="button"
+          className="prism-primary"
+          disabled={!connected || value.length === 0}
+          onClick={() => onSend(value)}
+        >
+          {t("terminal.send")}
+        </button>
+      </div>
+    </dialog>
+  );
+}
+
 export function TerminalView({
   sessionId,
-  onBack,
-  onRestart
+  active,
+  onConnectionChange
 }: {
   sessionId: string;
-  onBack: () => void;
-  onRestart: () => Promise<void>;
+  active: boolean;
+  onConnectionChange(connection: ConnectionState): void;
 }) {
   const { t } = useI18n();
   const { terminalTheme } = useTheme();
   const translateRef = useRef(t);
   const terminalThemeRef = useRef(terminalTheme);
+  const activeRef = useRef(active);
   const hostRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
+  const refitRef = useRef<(() => void) | null>(null);
   const lastSeqRef = useRef(0);
   const intentionalCloseRef = useRef(false);
   const sessionExitedRef = useRef(false);
@@ -54,14 +116,22 @@ export function TerminalView({
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
-  const [composer, setComposer] = useState("");
-  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
-  const [restarting, setRestarting] = useState(false);
-  const [restartError, setRestartError] = useState<string | null>(null);
+  const [longInputOpen, setLongInputOpen] = useState(false);
 
   useEffect(() => {
     translateRef.current = t;
   }, [t]);
+
+  useEffect(() => {
+    onConnectionChange(connection);
+  }, [connection, onConnectionChange]);
+
+  useEffect(() => {
+    activeRef.current = active;
+    if (!active) return;
+    const frame = window.requestAnimationFrame(() => refitRef.current?.());
+    return () => window.cancelAnimationFrame(frame);
+  }, [active]);
 
   useEffect(() => {
     terminalThemeRef.current = terminalTheme;
@@ -148,7 +218,7 @@ export function TerminalView({
     };
 
     const sendCurrentResize = () => {
-      if (!ready) return;
+      if (!ready || !activeRef.current) return;
       fit.fit();
 
       const cols = terminal.cols;
@@ -163,12 +233,13 @@ export function TerminalView({
     };
 
     const scheduleResize = () => {
-      if (resizeFrame !== undefined) return;
+      if (!activeRef.current || resizeFrame !== undefined) return;
       resizeFrame = window.requestAnimationFrame(() => {
         resizeFrame = undefined;
         sendCurrentResize();
       });
     };
+    refitRef.current = scheduleResize;
 
     const connect = () => {
       if (intentionalCloseRef.current) return;
@@ -181,10 +252,6 @@ export function TerminalView({
 
       socket.addEventListener("open", () => {
         if (socketRef.current !== socket) return;
-
-        // Recovery snapshots are geometry-sensitive. Fit exactly once before
-        // resume, then keep that local geometry stable until hello marks the
-        // recovery boundary complete.
         fit.fit();
         lastSentCols = terminal.cols;
         lastSentRows = terminal.rows;
@@ -230,9 +297,6 @@ export function TerminalView({
             return;
           }
 
-          // Capture the recovery render barrier before live output can extend
-          // the write pipeline. Input is enabled only after snapshot/replay
-          // parsing is complete in the browser terminal.
           const recoveryRendered = terminalWritePipeline;
           void recoveryRendered.then(() => {
             if (
@@ -307,9 +371,7 @@ export function TerminalView({
     };
 
     const observer = new ResizeObserver(() => {
-      // Do not mutate the browser terminal geometry during snapshot/replay.
-      // hello will schedule a fresh fit once recovery is complete.
-      if (ready) scheduleResize();
+      if (ready && activeRef.current) scheduleResize();
     });
     observer.observe(host);
 
@@ -328,6 +390,7 @@ export function TerminalView({
     return () => {
       intentionalCloseRef.current = true;
       inputReadyRef.current = false;
+      refitRef.current = null;
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
       if (heartbeatTimer !== undefined) window.clearInterval(heartbeatTimer);
       if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
@@ -372,31 +435,7 @@ export function TerminalView({
   );
 
   return (
-    <main className="terminal-page">
-      <header className="terminal-header glass-panel">
-        <button className="ghost compact" onClick={onBack} disabled={restarting}>
-          ← {t("terminal.back")}
-        </button>
-        <div className="terminal-header-actions">
-          {restartError && (
-            <span className="terminal-restart-error" title={restartError}>
-              {restartError}
-            </span>
-          )}
-          <button
-            type="button"
-            className="ghost compact"
-            disabled={restarting || connection === "stopping"}
-            onClick={() => setRestartConfirmOpen(true)}
-          >
-            {restarting ? t("terminal.restarting") : t("terminal.restart")}
-          </button>
-          <span className={`connection ${connection}`}>
-            {t(`terminal.connection.${connection}`)}
-          </span>
-        </div>
-      </header>
-
+    <section className="terminal-pane-shell">
       <div
         ref={hostRef}
         className="terminal-host terminal-surface"
@@ -426,47 +465,26 @@ export function TerminalView({
         {key("→", "\u001b[C")}
         {key("Ctrl+C", "\u0003")}
         {key("Ctrl+L", "\u000c")}
+        <button
+          type="button"
+          disabled={connection !== "connected"}
+          onClick={() => setLongInputOpen(true)}
+        >
+          {t("terminal.longInput")}
+        </button>
       </div>
 
-      <form className="composer glass-panel" onSubmit={(event) => {
-        event.preventDefault();
-        if (!composer || !sendInput(composer + "\r")) return;
-        setComposer("");
-        terminalRef.current?.focus();
-      }}>
-        <textarea
-          className="glass-input"
-          value={composer}
-          onChange={(event) => setComposer(event.target.value)}
-          placeholder={t("terminal.composer")}
-          rows={2}
-        />
-        <button
-          type="submit"
-          className="prism-primary"
-          disabled={!composer || connection !== "connected"}
-        >
-          {t("terminal.send")}
-        </button>
-      </form>
-
-      {restartConfirmOpen && (
-        <ConfirmDialog
-          title={t("terminal.restartTitle")}
-          message={t("terminal.restartConfirm")}
-          confirmLabel={t("terminal.restart")}
-          busy={restarting}
-          onCancel={() => setRestartConfirmOpen(false)}
-          onConfirm={() => {
-            setRestartConfirmOpen(false);
-            setRestartError(null);
-            setRestarting(true);
-            void onRestart()
-              .catch(() => setRestartError(t("errors.session_restart_failed")))
-              .finally(() => setRestarting(false));
+      {longInputOpen && (
+        <LongInputDialog
+          connected={connection === "connected"}
+          onCancel={() => setLongInputOpen(false)}
+          onSend={(data) => {
+            if (!sendInput(data + "\r")) return;
+            setLongInputOpen(false);
+            terminalRef.current?.focus();
           }}
         />
       )}
-    </main>
+    </section>
   );
 }
