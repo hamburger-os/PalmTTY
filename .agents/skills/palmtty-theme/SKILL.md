@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -54,9 +54,11 @@ All themes share the same clear/specular glass tokens. Theme identity comes from
 
 Surface tiers:
 
-- `.glass-shell`: small application shells, top bars, login cards and compact dialogs. Quality mode may use bounded backdrop sampling.
-- `.glass-panel`: structural controls such as terminal header, key bar, composer shell and large/full-height editors. No large-area backdrop blur.
-- `.glass-content`: primary content such as the terminal viewport and stable read areas. No backdrop blur.
+- `.glass-shell`: small application shells, top bars and login cards. Quality mode may use bounded backdrop sampling.
+- `.glass-modal`: modal dialogs that must visually isolate form/readability content from the ambient field. It uses a stronger theme veil and shadow, never large-area backdrop blur.
+- `.glass-panel`: structural controls such as terminal header, key bar and composer shell. No large-area backdrop blur.
+- `.terminal-surface`: the single terminal viewport owner. Its opaque background must come from the same active xterm theme background value; do not place `.glass-content` behind xterm.
+- `.glass-content`: stable non-terminal read areas and empty states. No backdrop blur.
 - `.glass-control`: dense nested controls such as the directory picker. No backdrop blur.
 - `.glass-card`: workspace/session cards derived from the same physics.
 
@@ -118,13 +120,15 @@ Inputs/selects use the shared `.glass-input` contract. Native select popup rende
 
 Product UI must not use browser `alert()`, `confirm()`, or `prompt()`. Binary confirmation uses the shared themed `ConfirmDialog`, with the safe action focused first for destructive flows.
 
+Long workspace/editor modals use a fixed header, one scrollable body, and a fixed footer. The modal itself must not become a second competing scroll owner. Bounded nested data regions such as the directory list may scroll independently.
+
 Interactive geometry must remain stable on hover/selected states. Avoid scale/translate where it causes layout or pointer-target instability.
 
 ## 8. Terminal integration
 
 The terminal is a content surface, not a second application shell.
 
-The xterm palette is owned by `theme.tsx`. Changing theme must update `terminal.options.theme` in-place and must not:
+The xterm palette is owned by `theme.tsx`. The terminal host receives the active xterm background through a CSS custom property so the host gutter and xterm canvas are one visual surface; the business component must not duplicate terminal color values. Changing theme must update `terminal.options.theme` in-place and must not:
 
 - recreate xterm;
 - close/reopen WebSocket;
@@ -132,9 +136,9 @@ The xterm palette is owned by `theme.tsx`. Changing theme must update `terminal.
 - trigger snapshot/replay;
 - alter canonical Worker geometry.
 
-Theme work must preserve the reconnect/recovery invariants in `docs/ai/invariants.md`.
+Theme work must preserve the reconnect/recovery invariants in `docs/ai/invariants.md`. Presentation state such as theme or locale must not be a dependency of the xterm/WebSocket transport lifecycle.
 
-Terminal text contrast wins over decorative transparency.
+Terminal text contrast wins over decorative transparency. The terminal viewport stays opaque and theme-aligned rather than making xterm transparent merely to expose the ambient field.
 
 ## 9. Mobile-first constraints
 
@@ -143,8 +147,8 @@ PalmTTY is primarily operated from a phone.
 - Preserve safe-area insets.
 - Keep terminal viewport ownership simple: one content surface around xterm.
 - Controls must remain reachable in portrait and short landscape layouts.
-- Workspace dialogs keep one intentional vertical scroll owner; nested data regions may scroll only when bounded.
-- Touch targets for high-frequency actions should remain comfortably usable.
+- Workspace dialogs keep one intentional body scroll owner with header/footer actions always reachable; nested data regions may scroll only when bounded.
+- High-frequency touch targets use the shared 44px target where space allows; compact secondary controls use the shared compact target rather than ad-hoc geometry.
 - Avoid desktop-only hover as the only affordance.
 - Avoid decorative rendering work that competes with xterm output/reconnect rendering.
 
