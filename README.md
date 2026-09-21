@@ -18,9 +18,9 @@ Mobile-first · self-hosted · Windows-first · Host + WSL runtimes · xterm.js
 > [!WARNING]
 > PalmTTY exposes an interactive shell with the privileges of the OS user running the Agent. Treat compromise as workstation compromise. Use a private HTTPS entry point or an authenticated HTTPS reverse proxy; do not expose an unauthenticated Agent port to the Internet.
 
-PalmTTY is a mobile-first, self-hosted remote development terminal. Windows 11 remains the primary host target, with native host shells and WSL workspaces; the same host-runtime path is exercised on Ubuntu CI and is designed for Linux/macOS hosts. Codex, Git and other terminal tools remain ordinary shell workloads.
+PalmTTY is a mobile-first, self-hosted remote development workbench centered on a durable terminal. Windows 11 remains the primary host target, with native host shells and WSL workspaces; the same host-runtime path is exercised on Ubuntu CI and is designed for Linux/macOS hosts. Each Session workbench keeps the terminal alive while exposing bounded read-only Git status/diff and workspace file browsing/preview alongside it. Codex and other terminal agents remain ordinary shell workloads.
 
-PalmTTY 是一个面向手机、自托管的远程开发终端。Windows 11 仍是首要宿主平台，同时支持宿主机 Shell 与 WSL 工作区；同一套宿主运行时也在 Ubuntu CI 中验证，并按 Linux/macOS 宿主扩展设计。Codex、Git 等工具仍只是普通终端工作负载。
+PalmTTY 是一个以持久终端为核心、面向手机、自托管的远程开发工作台。Windows 11 仍是首要宿主平台，同时支持宿主机 Shell 与 WSL 工作区；同一套宿主运行时也在 Ubuntu CI 中验证，并按 Linux/macOS 宿主扩展设计。每个 Session 工作台在保持终端连接的同时提供有界、只读的 Git 状态/diff 与工作区文件浏览/预览。Codex 等终端 Agent 仍只是普通 Shell 工作负载。
 
 ## Status / 当前状态
 
@@ -38,7 +38,8 @@ PalmTTY is **alpha**. Each terminal now runs in an independent durable Session W
 | Browser or network disconnect | PTY survives while the Agent stays alive |
 | Reconnect | Sequence replay + server-side terminal snapshot fallback |
 | Session lifecycle | Explicit terminate / restart-as-replacement / retained clear; no ambiguous close/kill control |
-| Mobile terminal | xterm.js PWA, special-key bar, multiline composer |
+| Session workbench | Terminal / Git / Files tabs; terminal stays mounted while switching views |
+| Mobile terminal | xterm.js PWA, touch special-key bar, on-demand long-text input |
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
 | Internet exposure | HTTPS/private-network deployment only |
 | Agent restart persistence | Implemented: independent Session Worker + authenticated local rediscovery |
@@ -59,6 +60,9 @@ PalmTTY is intentionally narrower than a browser IDE:
 
 ```text
 Phone / PWA
+ ├─ Terminal pane (WSS → Session Worker)
+ ├─ Git pane (bounded read-only HTTP API)
+ └─ Files pane (workspace-scoped read-only HTTP API)
     │ HTTPS / WSS
     ▼
 Private HTTPS entry point
