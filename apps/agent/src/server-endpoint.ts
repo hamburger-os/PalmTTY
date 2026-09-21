@@ -44,7 +44,8 @@ export function describeServerBindError(
       "The port may be in a Windows excluded/reserved TCP range, held by an " +
       "exclusive listener, or blocked by local policy. Check " +
       `Get-NetTCPConnection -LocalPort ${endpoint.port} -ErrorAction SilentlyContinue ` +
-      "and netsh interface ipv4 show excludedportrange protocol=tcp; " +
+      `and netsh interface ${endpoint.host.includes(":") ? "ipv6" : "ipv4"} ` +
+      "show excludedportrange protocol=tcp; " +
       "then choose a different server.port if necessary."
     );
   }
@@ -65,8 +66,6 @@ export async function probeServerEndpoint(
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const server = net.createServer();
-    server.unref();
-
     const onError = (error: Error) => {
       reject(new Error(describeServerBindError(endpoint, error), { cause: error }));
     };
