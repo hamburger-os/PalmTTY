@@ -19,6 +19,7 @@ export function DirectoryPicker({
   onClose
 }: Props) {
   const { t, error: translateError } = useI18n();
+  const [startingPath] = useState(() => initialPath?.trim() || undefined);
   const [listing, setListing] = useState<DirectoryListing | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,8 +83,8 @@ export function DirectoryPicker({
   }, [distribution, formatError, kind, t]);
 
   useEffect(() => {
-    void browse(initialPath?.trim() || undefined, true);
-  }, [browse, initialPath]);
+    void browse(startingPath, true);
+  }, [browse, startingPath]);
 
   return (
     <div className="directory-picker" aria-label={t("workspace.directoryPicker")}>
