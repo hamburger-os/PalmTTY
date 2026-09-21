@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -39,6 +39,49 @@ describe("workspace runtime resolution", () => {
     });
 
     expect(path.normalize(resolved)).toBe(path.normalize(await realpath(executable)));
+  });
+
+  it("prefers the current user's WindowsApps execution-alias directory", async () => {
+    if (process.platform !== "win32") return;
+
+    const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-localappdata-"));
+    tempDirs.add(root);
+    const windowsApps = path.join(root, "Microsoft", "WindowsApps");
+    const earlier = await mkdtemp(path.join(os.tmpdir(), "palmtty-earlier-path-"));
+    tempDirs.add(earlier);
+    await mkdir(windowsApps, { recursive: true });
+
+    const alias = path.join(windowsApps, "pwsh.exe");
+    const earlierExecutable = path.join(earlier, "pwsh.exe");
+    await writeFile(alias, "");
+    await writeFile(earlierExecutable, "");
+
+    const resolved = await resolveExecutable("pwsh.exe", {
+      cwd: root,
+      env: {
+        LOCALAPPDATA: root,
+        PATH: [earlier, windowsApps].join(path.delimiter),
+        PATHEXT: ".EXE"
+      }
+    });
+
+    expect(path.normalize(resolved)).toBe(path.normalize(alias));
+  });
+
+  it("reports an executable mistakenly configured as cwd as not a directory", async () => {
+    const { executable } = await fakeExecutable();
+
+    await expect(resolveRuntimeWorkspace({
+      id: "bad-cwd",
+      name: "Bad cwd",
+      cwd: executable,
+      shell: "custom",
+      shellPath: process.execPath,
+      args: [],
+      env: {}
+    })).rejects.toThrow(
+      `Workspace "bad-cwd" is not a directory: ${executable}`
+    );
   });
 
   it("fails before PTY creation with an actionable missing-shell error", async () => {
