@@ -25,6 +25,7 @@ export const WorkerBootstrapSchema = z.object({
   endpointId: z.string().min(16).max(128),
   secret: z.string().min(32).max(256),
   excludedEnvKeys: z.array(z.string().min(1).max(256)).max(16),
+  traceWindowsSpawn: z.boolean().optional(),
   createdAt: z.string().datetime(),
   workspace: RuntimeWorkspaceSchema,
   session: SessionWorkerConfigSchema,
