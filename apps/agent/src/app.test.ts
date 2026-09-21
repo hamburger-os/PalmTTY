@@ -122,6 +122,14 @@ describe("HTTP security boundary", () => {
   it("protects and serves bounded host directory browsing", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
     const app = await buildTestApp();
+    const unauthenticated = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspace-directories/browse",
+      headers: { origin: ORIGIN },
+      payload: { kind: "host", path: process.cwd() }
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
     const cookie = await loginCookie(app);
     const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-browse-api-"));
     runtimeDirs.add(root);
