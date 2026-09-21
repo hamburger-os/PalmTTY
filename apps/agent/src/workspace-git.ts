@@ -7,7 +7,6 @@ import {
   type WorkspaceDefinition
 } from "@palmtty/protocol";
 import {
-  applyEnvironmentOverrides,
   readHostEnvironment,
   withoutEnvironmentKeys
 } from "./host-environment.js";
@@ -24,6 +23,40 @@ const GIT_BASE_ARGS = [
   "-c", "core.pager=cat",
   "-c", "core.fsmonitor=false"
 ];
+
+const GIT_REPOSITORY_ENV_KEYS = [
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_COMMON_DIR",
+  "GIT_INDEX_FILE",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_CEILING_DIRECTORIES",
+  "GIT_CONFIG",
+  "GIT_CONFIG_SYSTEM",
+  "GIT_CONFIG_GLOBAL",
+  "GIT_CONFIG_NOSYSTEM",
+  "GIT_CONFIG_COUNT"
+];
+
+function gitHostEnvironment(
+  source: NodeJS.ProcessEnv | Record<string, string>,
+  excludedEnvironmentKeys: string[]
+): Record<string, string> {
+  const environment = withoutEnvironmentKeys(source, [
+    ...excludedEnvironmentKeys,
+    ...GIT_REPOSITORY_ENV_KEYS
+  ]);
+  for (const key of Object.keys(environment)) {
+    if (/^GIT_CONFIG_(?:KEY|VALUE)_\d+$/i.test(key)) {
+      delete environment[key];
+    }
+  }
+  environment.GIT_TERMINAL_PROMPT = "0";
+  environment.GIT_PAGER = "cat";
+  environment.GIT_OPTIONAL_LOCKS = "0";
+  return environment;
+}
 
 function wslPrefix(workspace: WorkspaceDefinition): string[] {
   if (workspace.runtime.kind !== "wsl") {
@@ -45,7 +78,7 @@ async function runGit(
     if (process.platform !== "win32") {
       throw new Error("WSL Git integration is available only on Windows");
     }
-    const environment = withoutEnvironmentKeys(
+    const environment = gitHostEnvironment(
       await readHostEnvironment(),
       excludedEnvironmentKeys
     );
@@ -61,6 +94,7 @@ async function runGit(
         cwd,
         "--exec",
         "/usr/bin/env",
+        ...GIT_REPOSITORY_ENV_KEYS.flatMap((key) => ["-u", key]),
         "GIT_TERMINAL_PROMPT=0",
         "GIT_PAGER=cat",
         "GIT_OPTIONAL_LOCKS=0",
@@ -75,16 +109,10 @@ async function runGit(
     });
   }
 
-  const hostEnvironment = withoutEnvironmentKeys(
-    applyEnvironmentOverrides(
-      await readHostEnvironment(),
-      workspace.environment ?? {}
-    ),
+  const hostEnvironment = gitHostEnvironment(
+    await readHostEnvironment(),
     excludedEnvironmentKeys
   );
-  hostEnvironment.GIT_TERMINAL_PROMPT = "0";
-  hostEnvironment.GIT_PAGER = "cat";
-  hostEnvironment.GIT_OPTIONAL_LOCKS = "0";
   const executable = await resolveExecutable("git", {
     cwd: workspace.cwd,
     env: hostEnvironment
