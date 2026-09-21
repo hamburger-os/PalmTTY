@@ -31,7 +31,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - workspace create/update plus Session creation both validate runtime launch targets
 - authenticated + exact-Origin runtime-aware directory browsing for workspace selection; responses expose directories only and are bounded by request rate, 512 returned entries, subprocess output, and timeout
 - host runtime adapter with absolute executable normalization, including current-user Windows App Execution Aliases for Store/MSIX PowerShell; each new/restarted Windows terminal refreshes Machine/User environment variables from Windows before resolving the shell and PATH
-- Windows WSL runtime adapter using structured `wsl.exe` argv for distribution/cwd/shell rather than shell-string interpolation; configured workspace environment variables are forwarded through bounded `WSLENV` names
+- Windows WSL runtime adapter using structured `wsl.exe` argv for distribution/cwd/shell rather than shell-string interpolation; configured workspace environment variables are forwarded by preserving existing colon-delimited `WSLENV` entries/flags and appending bounded names
 - Linux host runtime exercised by Ubuntu CI; macOS shares the host adapter but is not covered by repository CI
 - root development launcher derives the Agent target from the validated PalmTTY config, injects it into host-independent Vite tooling, and Vite refuses silent dev-port fallback
 - bounded client message size and terminal dimensions
@@ -56,7 +56,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - failed rediscovery alone does not delete potentially-live recovery state; definitely-dead recorded processes can be reclaimed without PID-based killing
 - Worker-owned recovery metadata is republished when missing; conflicting record/secret ownership fails closed
 - stale/dangling artifacts are cleaned without treating persisted PIDs as kill authority
-- login-token environment variable is removed before Worker spawn and from PTY environment
+- login-token environment variable is removed before Worker bootstrap, from the Worker process environment, and again from the PTY environment
 - terminal input is bounded to the same 64 KiB limit at browser and Worker IPC boundaries
 - concurrent Session creation is counted against maxSessions
 
@@ -79,7 +79,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - terminal WebSocket closure at login-session expiry
 - explicit Session lifecycle: `running → stopping → exited` for termination, with idempotent terminate requests
 - retained-session removal is separate from termination; only exited/failed Sessions can be cleared immediately, and the Worker owns final terminal/recovery-state disposal
-- explicit terminal restart terminates the current PTY, waits for terminal state, retires the retained Session, and creates a new Session from the latest persisted workspace definition while preserving terminal geometry; restart intentionally creates a new Session ID/history
+- explicit terminal restart reserves replacement capacity, resolves and validates the latest persisted workspace before touching the current PTY, then terminates, retires and replaces the Session while preserving terminal geometry; restart intentionally creates a new Session ID/history
 - bounded exited-session retention with Worker self-disposal
 
 ### Test coverage
