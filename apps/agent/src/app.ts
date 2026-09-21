@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -5,11 +6,12 @@ import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
 import type { PalmTTYConfig } from "@palmtty/config";
-import { publicWorkspace } from "@palmtty/config";
 import {
   CreateSessionSchema,
+  CreateWorkspaceSchema,
   MAX_MESSAGE_BYTES,
   WS_SUBPROTOCOL,
+  WorkspaceDefinitionSchema,
   encodeServerMessage,
   parseClientMessage
 } from "@palmtty/protocol";
@@ -18,12 +20,21 @@ import { z } from "zod";
 import { AUTH_COOKIE, AuthService } from "./auth.js";
 import { FixedWindowLimiter, isTrustedOrigin } from "./security.js";
 import { SessionManager, type SessionManagerOptions } from "./session-manager.js";
+import {
+  detectRuntimeCapabilities,
+  resolveRuntimeWorkspace
+} from "./workspace-runtime.js";
+import {
+  FileWorkspaceStore,
+  type WorkspaceStore
+} from "./workspace-store.js";
 
 const LoginSchema = z.object({ token: z.string().min(1).max(4096) });
 
 export type BuildAppOptions = {
   webRoot?: string;
-  sessionManager?: SessionManagerOptions;
+  sessionManager?: Omit<SessionManagerOptions, "workspaceStore">;
+  workspaceStore?: WorkspaceStore;
 };
 
 export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions = {}) {
@@ -48,9 +59,14 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   const auth = new AuthService(config.auth);
-  const sessions = new SessionManager(config, options.sessionManager);
+  const workspaceStore = options.workspaceStore ?? new FileWorkspaceStore();
+  const sessions = new SessionManager(config, {
+    ...options.sessionManager,
+    workspaceStore
+  });
   await sessions.initialize();
   const createLimiter = new FixedWindowLimiter(20, 60_000);
+  const workspaceMutationLimiter = new FixedWindowLimiter(60, 60_000);
 
   function authenticated(request: FastifyRequest): boolean {
     return auth.isAuthenticated(request.cookies[AUTH_COOKIE]);
@@ -109,9 +125,94 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     return reply.code(204).send();
   });
 
+  app.get("/api/v1/capabilities", { preHandler: requireAuth }, async () => (
+    detectRuntimeCapabilities()
+  ));
+
   app.get("/api/v1/workspaces", { preHandler: requireAuth }, async () => ({
-    workspaces: config.workspaces.map(publicWorkspace)
+    workspaces: workspaceStore.list()
   }));
+
+  app.post(
+    "/api/v1/workspaces",
+    { preHandler: [requireOrigin, requireAuth] },
+    async (request, reply) => {
+      if (!workspaceMutationLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_workspace_requests" });
+      }
+      const parsed = CreateWorkspaceSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_workspace_request" });
+      }
+
+      const workspace = WorkspaceDefinitionSchema.parse({
+        id: randomUUID(),
+        ...parsed.data
+      });
+      try {
+        await resolveRuntimeWorkspace(workspace);
+        await workspaceStore.create(workspace);
+        return reply.code(201).send({ workspace });
+      } catch (error) {
+        return reply.code(400).send({
+          error: "workspace_invalid",
+          message: error instanceof Error ? error.message : "Workspace validation failed"
+        });
+      }
+    }
+  );
+
+  app.put<{ Params: { id: string } }>(
+    "/api/v1/workspaces/:id",
+    { preHandler: [requireOrigin, requireAuth] },
+    async (request, reply) => {
+      if (!workspaceMutationLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_workspace_requests" });
+      }
+      if (!workspaceStore.get(request.params.id)) {
+        return reply.code(404).send({ error: "workspace_not_found" });
+      }
+      const parsed = CreateWorkspaceSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_workspace_request" });
+      }
+
+      const workspace = WorkspaceDefinitionSchema.parse({
+        id: request.params.id,
+        ...parsed.data
+      });
+      try {
+        await resolveRuntimeWorkspace(workspace);
+        if (!await workspaceStore.replace(request.params.id, workspace)) {
+          return reply.code(404).send({ error: "workspace_not_found" });
+        }
+        return { workspace };
+      } catch (error) {
+        return reply.code(400).send({
+          error: "workspace_invalid",
+          message: error instanceof Error ? error.message : "Workspace validation failed"
+        });
+      }
+    }
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    "/api/v1/workspaces/:id",
+    { preHandler: [requireOrigin, requireAuth] },
+    async (request, reply) => {
+      if (!workspaceMutationLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_workspace_requests" });
+      }
+      if (!workspaceStore.get(request.params.id)) {
+        return reply.code(404).send({ error: "workspace_not_found" });
+      }
+      if (sessions.hasActiveWorkspaceSessions(request.params.id)) {
+        return reply.code(409).send({ error: "workspace_in_use" });
+      }
+      await workspaceStore.delete(request.params.id);
+      return reply.code(204).send();
+    }
+  );
 
   app.get("/api/v1/sessions", { preHandler: requireAuth }, async () => ({
     sessions: sessions.list()
@@ -136,7 +237,10 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       return reply.code(201).send({ session });
     } catch (error) {
       request.log.warn({ err: error }, "Session creation failed");
-      return reply.code(409).send({ error: "session_create_failed" });
+      return reply.code(409).send({
+        error: "session_create_failed",
+        message: error instanceof Error ? error.message : "Session creation failed"
+      });
     }
   });
 

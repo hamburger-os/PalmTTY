@@ -18,6 +18,6 @@ PalmTTY is currently alpha software.
 
 ## Include enough context
 
-Useful reports include the Windows version, PowerShell version, Node.js version, browser/device, deployment path (loopback/private network/reverse proxy), relevant configuration with secrets removed, and minimal reproduction steps.
+Useful reports include the host OS/version, selected runtime (Host or WSL), shell/version, Node.js version, browser/device, deployment path (loopback/private network/reverse proxy), relevant configuration with secrets removed, and minimal reproduction steps.
 
 Never paste access tokens, cookies, terminal transcripts containing secrets, SSH keys, private repository URLs, or unredacted environment variables.

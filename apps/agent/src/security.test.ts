@@ -4,8 +4,7 @@ import { FixedWindowLimiter, assertSecureExposure, isTrustedOrigin } from "./sec
 
 function config(overrides: object = {}) {
   return parseConfig({
-    ...overrides,
-    workspaces: [{ id: "main", name: "Main", cwd: "C:\\Code" }]
+    ...overrides
   });
 }
 

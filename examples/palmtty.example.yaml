@@ -1,8 +1,7 @@
 # Safe local/development example.
-# Copy to palmtty.local.yaml and change each workspace cwd.
-# cwd is a directory. Do not put pwsh.exe or another executable path in cwd;
-# use shellPath only when you intentionally want an explicit shell executable.
-# Set PALMTTY_ACCESS_TOKEN before starting PalmTTY.
+# Copy to palmtty.local.yaml, set PALMTTY_ACCESS_TOKEN, and start PalmTTY.
+# Workspaces are intentionally not configured here: create and manage them
+# after signing in through the PalmTTY web UI.
 
 server:
   host: 127.0.0.1
@@ -26,19 +25,3 @@ sessions:
   scrollbackLines: 10000
   replayBytes: 2097152
   maxSocketBufferedBytes: 2097152
-
-workspaces:
-  - id: palmtty
-    name: PalmTTY
-    cwd: D:\\Code\\PalmTTY
-    shell: pwsh
-    args:
-      - -NoLogo
-    command: codex
-
-  - id: powershell
-    name: PowerShell
-    cwd: C:\\Users\\Public
-    shell: pwsh
-    args:
-      - -NoLogo

@@ -9,11 +9,13 @@ import {
   ServerMessageSchema,
   SessionPublicSchema,
   type ServerMessage,
-  type SessionPublic
+  type SessionPublic,
+  type WorkspaceDefinition
 } from "@palmtty/protocol";
 import type WebSocket from "ws";
 import { SessionManager } from "./session-manager.js";
 import { resolveExecutable } from "./workspace-runtime.js";
+import { MemoryWorkspaceStore } from "./workspace-store.js";
 
 class FakeSocket {
   readyState = 1;
@@ -67,29 +69,34 @@ function requiredWindowsShellPath(shellPath?: string): string {
   return shellPath;
 }
 
-function testConfig(windowsShellPath?: string) {
-  const workspace = process.platform === "win32"
+function processWorkspace(windowsShellPath?: string): WorkspaceDefinition {
+  return process.platform === "win32"
     ? {
         id: "process",
         name: "Process worker",
         cwd: process.cwd(),
-        shell: "custom" as const,
-        shellPath: requiredWindowsShellPath(windowsShellPath),
-        args: ["-NoLogo", "-NoProfile"]
+        runtime: {
+          kind: "host",
+          shell: requiredWindowsShellPath(windowsShellPath),
+          args: ["-NoLogo", "-NoProfile"]
+        }
       }
     : {
         id: "process",
         name: "Process worker",
         cwd: process.cwd(),
-        shell: "custom" as const,
-        shellPath: "/bin/sh",
-        args: ["-i"]
+        runtime: {
+          kind: "host",
+          shell: "/bin/sh",
+          args: ["-i"]
+        }
       };
+}
 
+function testConfig() {
   const config = parseConfig({
     server: { host: "127.0.0.1", port: 7688 },
-    auth: { enabled: false },
-    workspaces: [workspace]
+    auth: { enabled: false }
   });
   config.sessions.exitedRetentionMinutes = 0.01;
   return config;
@@ -166,14 +173,18 @@ describe("detached session worker process", () => {
     const windowsShellPath = process.platform === "win32"
       ? await resolveWindowsTestShell()
       : undefined;
-    const config = testConfig(windowsShellPath);
+    const config = testConfig();
+    const workspace = processWorkspace(windowsShellPath);
 
     // This subprocess creates the Worker and then exits completely. The Worker
     // must remain alive as a detached grandchild before this process reconnects.
     const session = await createFromAgentProcess(runtimeDir, windowsShellPath);
     expect(session.pid).toBeTypeOf("number");
 
-    const secondManager = new SessionManager(config, { runtimeDir });
+    const secondManager = new SessionManager(config, {
+      runtimeDir,
+      workspaceStore: new MemoryWorkspaceStore([workspace])
+    });
     managers.add(secondManager);
     await secondManager.initialize();
 
@@ -200,7 +211,10 @@ describe("detached session worker process", () => {
     managers.delete(secondManager);
     await new Promise((resolve) => setTimeout(resolve, 1_000));
 
-    const thirdManager = new SessionManager(config, { runtimeDir });
+    const thirdManager = new SessionManager(config, {
+      runtimeDir,
+      workspaceStore: new MemoryWorkspaceStore([workspace])
+    });
     managers.add(thirdManager);
     await thirdManager.initialize();
 

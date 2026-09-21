@@ -25,7 +25,7 @@ The project prefers evidence from tests, reproducible behavior and documented tr
 The maintainer may reject a change even when it is technically functional if it weakens a documented invariant, especially:
 
 - browser lifetime must not become terminal lifetime;
-- remote callers must not gain arbitrary cwd/shell/environment authority;
+- workspace mutation must remain an explicit authenticated + exact-Origin persistent operation; Session creation must remain workspace-ID-only and Web clients must not gain arbitrary environment-variable injection;
 - authentication and Origin checks remain separate controls;
 - secrets and terminal content do not enter default logs;
 - buffers and long-lived in-memory state remain bounded;

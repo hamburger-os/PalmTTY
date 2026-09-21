@@ -57,9 +57,10 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 ## 权限边界
 
-- 浏览器只能选择 workspace ID；
-- 不能远程提交任意 cwd、Shell 路径或环境变量；
-- Agent 启动 preflight 会先验证 workspace 并把 Shell 解析为绝对 executable，Worker 不依赖 PTY 库内部 PATH 查找；
+- Workspace CRUD 是显式高权限配置面，只有认证成功且 Origin 精确匹配的请求可以修改当前用户的持久化 workspace。
+- Web workspace 可以配置 cwd、runtime、Shell、Shell args 与启动命令；Web API **不开放 env 覆盖**。
+- Session 创建仍只提交 workspace ID，不允许用一次 Session 请求临时注入 cwd/shell/env。
+- Workspace 新建/更新会验证运行目标，Session 创建前再次验证；Host Shell 解析为绝对 executable，WSL 通过结构化 argv 调用 `wsl.exe`，不做命令字符串拼接。
 - Agent/Worker 默认不提权；
 - PTY 继承普通用户权限；
 - 默认日志不记录 terminal I/O、token、Worker secret 或 workspace env。
@@ -78,7 +79,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 ## 你审查时重点看
 
-1. 是否扩大远程调用者能控制的 cwd/shell/env？
+1. Workspace CRUD 是否仍受认证 + 精确 Origin 保护，Session 创建是否仍只按 ID，env 是否仍未暴露？
 2. 是否让 secret/终端内容进入日志、URL、argv 或浏览器？
 3. 是否破坏认证 + Origin + HTTPS 外部边界？
 4. 是否允许未认证本地 IPC 控制 Worker？

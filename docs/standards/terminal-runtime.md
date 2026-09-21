@@ -29,6 +29,15 @@ Additional references:
 - https://learn.microsoft.com/windows/msix/psf/create-shortcut-with-script-package-support-framework
 - https://github.com/nodejs/node/issues/36790
 
+## Windows Subsystem for Linux (WSL)
+
+Authoritative sources:
+
+- https://learn.microsoft.com/windows/wsl/basic-commands
+- https://learn.microsoft.com/windows/wsl/filesystems
+
+PalmTTY's WSL runtime is a Windows-host adapter around `wsl.exe`. It passes distribution selection, Linux working directory and an optional executable as distinct argv values. It does not construct one interpolated shell command for launch. The selected Linux path and optional shell are validated through WSL before the workspace is persisted and again before Session creation. Repository CI does not currently provide a real WSL environment, so WSL remains an implemented adapter with real-host validation still required.
+
 ## node-pty
 
 Upstream source: https://github.com/microsoft/node-pty

@@ -9,8 +9,7 @@ function authConfig() {
       tokenEnv: "TEST_TOKEN",
       maxLoginSessions: 2,
       sessionTtlMinutes: 5
-    },
-    workspaces: [{ id: "main", name: "Main", cwd: "C:\\Code" }]
+    }
   }).auth;
 }
 

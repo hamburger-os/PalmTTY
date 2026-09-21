@@ -4,7 +4,7 @@
 
 一个 PalmTTY Session 对应一个独立 Session Worker。Worker 持有唯一 PTY，并维护恢复该终端所需的 canonical state。
 
-会话内通常运行 PowerShell 7，也可以由本地 workspace 配置自动启动 Codex 等 CLI。
+会话内可以运行宿主 Shell 或 Windows 上的 WSL Shell，也可以由 workspace 自动启动 Codex 等 CLI。Windows 仍以 PowerShell 7/ConPTY 为首要路径；Ubuntu CI 同时覆盖 Unix host runtime。
 
 ## 进程模型
 
@@ -18,7 +18,7 @@ Session Worker
     ├─ seq + replay
     └─ retention timer
          │
-     PowerShell / CLI
+ Host shell / WSL / CLI
 ~~~
 
 每个 Session 一个 Worker，Worker 之间相互隔离。某个 Worker 或 PTY 崩溃不会要求其他 Session 一起退出。
@@ -77,14 +77,14 @@ Recovery metadata 属于 Worker 自己的 canonical lifecycle state。Worker 会
 
 ## Workspace
 
-Workspace 是本机配置，不是浏览器动态创建的数据。它定义 ID、显示名称、工作目录、Shell、Shell 参数、可选启动命令和可选环境变量覆盖。
+Workspace 不再写入 `palmtty.local.yaml`，而是 Agent 当前用户应用数据目录中的版本化持久化状态。Web UI 可以通过受认证 + 精确 Origin 保护的 API 创建、编辑和删除 workspace；Session 创建协议仍只提交 workspace ID。
 
-Agent 启动 preflight 会验证所有 workspace 目录，并按最终环境解析 Shell；进入 Worker bootstrap 的不是原始 shell 名称，而是包含绝对 executable 的规范化 runtime spec。这既提高 Windows 可诊断性，也避免 PTY 库内部 PATH 解析差异成为运行时依赖。
+Workspace 定义包含显示名称、工作目录、runtime、Shell、Shell args 与可选启动命令。Web 模型不开放 env 覆盖。Host runtime 在创建/修改与启动 Session 时验证本机目录和 Shell，并把 Shell 解析成绝对 executable。Windows WSL runtime 使用 `wsl.exe`，把 distribution、Linux cwd、Shell/args 作为结构化 argv 交给 PTY，不通过字符串插值拼命令。
 
-浏览器只能提交 workspace ID。
+正在创建或运行中的 Session 会阻止删除对应 workspace；Session 退出后即使仍处于 retention，也可以删除 launch template，已退出 Session 继续由 Worker 自己完成 retention/清理。编辑只影响后续新建 Session，已经运行的 Worker 保留创建时的规范化运行规格。
 
 ## 你审查时重点看
 
-任何允许浏览器直接传 cwd、shellPath、环境变量或任意启动命令的改动，都意味着安全边界扩大，需要单独审查。
+Workspace CRUD 属于明确的高权限配置操作。允许网页管理 cwd/Shell 是这次有意扩大后的产品边界，但不能继续退化成 Session 创建接口直接接受任意 cwd/shell/env；env 仍不属于 Web workspace 模型。
 
 任何把 canonical terminal state 从 Worker 复制回 Agent 的设计，都需要重新论证 Agent 重启一致性。

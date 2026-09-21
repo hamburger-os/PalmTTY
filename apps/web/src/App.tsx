@@ -1,26 +1,60 @@
 import { useCallback, useEffect, useState } from "react";
-import type { SessionPublic, WorkspacePublic } from "@palmtty/protocol";
+import type {
+  CreateWorkspaceInput,
+  RuntimeCapabilities,
+  SessionPublic,
+  WorkspacePublic
+} from "@palmtty/protocol";
 import {
+  ApiError,
   authStatus,
   createSession,
+  createWorkspace,
+  deleteWorkspace,
   listSessions,
   listWorkspaces,
   login,
   logout,
-  terminateSession
+  runtimeCapabilities,
+  terminateSession,
+  updateWorkspace
 } from "./api.js";
+import { useI18n } from "./i18n.js";
 import { TerminalView } from "./TerminalView.js";
+import {
+  WorkspaceDialog,
+  workspaceRuntimeSummary
+} from "./WorkspaceDialog.js";
 
 type AuthState = { enabled: boolean; authenticated: boolean };
+type WorkspaceEditor = WorkspacePublic | "new" | null;
+
+function formatError(
+  cause: unknown,
+  fallback: string,
+  translate: (code: string) => string
+): string {
+  if (cause instanceof ApiError) {
+    const message = translate(cause.code);
+    return cause.detail ? `${message} ${cause.detail}` : message;
+  }
+  if (cause instanceof Error) return translate(cause.message);
+  return translate(fallback);
+}
 
 export function App() {
+  const { t, error: translateError, connections } = useI18n();
   const [auth, setAuth] = useState<AuthState | null>(null);
+  const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspacePublic[]>([]);
   const [sessions, setSessions] = useState<SessionPublic[]>([]);
   const [activeSession, setActiveSession] = useState<string | null>(null);
+  const [workspaceEditor, setWorkspaceEditor] = useState<WorkspaceEditor>(null);
+  const [workspaceBusy, setWorkspaceBusy] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refreshCatalog = useCallback(async () => {
     const [workspaceResult, sessionResult] = await Promise.all([
       listWorkspaces(),
       listSessions()
@@ -29,40 +63,62 @@ export function App() {
     setSessions(sessionResult.sessions);
   }, []);
 
+  const loadAuthenticatedState = useCallback(async () => {
+    const [, runtime] = await Promise.all([
+      refreshCatalog(),
+      runtimeCapabilities()
+    ]);
+    setCapabilities(runtime);
+  }, [refreshCatalog]);
+
   useEffect(() => {
     void (async () => {
       try {
         const status = await authStatus();
         setAuth(status);
-        if (status.authenticated) await refresh();
+        if (status.authenticated) await loadAuthenticatedState();
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "startup_failed");
+        setError(formatError(cause, "startup_failed", translateError));
       }
     })();
-  }, [refresh]);
+  }, [loadAuthenticatedState, translateError]);
 
   useEffect(() => {
     if (!auth?.authenticated || activeSession) return;
-    const timer = window.setInterval(() => void refresh().catch(() => undefined), 3000);
+    const timer = window.setInterval(
+      () => void refreshCatalog().catch(() => undefined),
+      3000
+    );
     return () => window.clearInterval(timer);
-  }, [auth?.authenticated, activeSession, refresh]);
+  }, [auth?.authenticated, activeSession, refreshCatalog]);
 
   if (auth === null) {
-    return <main className="center-card"><h1>PalmTTY</h1><p>Connecting…</p></main>;
+    return (
+      <main className="center-card">
+        <div className="login-toolbar"><LanguageSwitcher /></div>
+        <h1>PalmTTY</h1>
+        <p>{t("auth.connecting")}</p>
+      </main>
+    );
   }
 
   if (!auth.authenticated) {
-    return <Login onLogin={async (token) => {
-      setError(null);
-      try {
-        await login(token);
-        const status = await authStatus();
-        setAuth(status);
-        await refresh();
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "login_failed");
-      }
-    }} error={error} />;
+    return (
+      <Login
+        onLogin={async (token) => {
+          setError(null);
+          try {
+            await login(token);
+            const status = await authStatus();
+            setAuth(status);
+            await loadAuthenticatedState();
+          } catch (cause) {
+            setError(formatError(cause, "login_failed", translateError));
+          }
+        }}
+        error={error}
+      />
+    );
   }
 
   if (activeSession) {
@@ -71,99 +127,262 @@ export function App() {
         sessionId={activeSession}
         onBack={() => {
           setActiveSession(null);
-          void refresh();
+          void refreshCatalog();
         }}
       />
     );
   }
 
+  const stateLabel = (state: SessionPublic["state"]) => {
+    switch (state) {
+      case "starting": return t("sessions.state.starting");
+      case "running": return t("sessions.state.running");
+      case "exited": return t("sessions.state.exited");
+      case "failed": return t("sessions.state.failed");
+    }
+  };
+
+  const closeWorkspaceEditor = () => {
+    if (workspaceBusy) return;
+    setWorkspaceEditor(null);
+    setWorkspaceError(null);
+  };
+
+  const saveWorkspace = async (input: CreateWorkspaceInput) => {
+    setWorkspaceBusy(true);
+    setWorkspaceError(null);
+    try {
+      if (workspaceEditor === "new") {
+        await createWorkspace(input);
+      } else if (workspaceEditor) {
+        await updateWorkspace(workspaceEditor.id, input);
+      }
+      await refreshCatalog();
+      setWorkspaceEditor(null);
+    } catch (cause) {
+      setWorkspaceError(
+        formatError(cause, "workspace_invalid", translateError)
+      );
+    } finally {
+      setWorkspaceBusy(false);
+    }
+  };
+
+  const removeWorkspace = async () => {
+    if (!workspaceEditor || workspaceEditor === "new") return;
+    setWorkspaceBusy(true);
+    setWorkspaceError(null);
+    try {
+      await deleteWorkspace(workspaceEditor.id);
+      await refreshCatalog();
+      setWorkspaceEditor(null);
+    } catch (cause) {
+      setWorkspaceError(
+        formatError(cause, "workspace_invalid", translateError)
+      );
+    } finally {
+      setWorkspaceBusy(false);
+    }
+  };
+
   return (
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <div className="eyebrow">self-hosted remote dev</div>
+          <div className="eyebrow">{t("app.eyebrow")}</div>
           <h1>PalmTTY</h1>
         </div>
-        {auth.enabled && (
-          <button className="ghost" onClick={() => void (async () => {
-            await logout();
-            setAuth({ enabled: true, authenticated: false });
-            setSessions([]);
-          })()}>Sign out</button>
-        )}
+        <div className="topbar-actions">
+          <LanguageSwitcher />
+          {auth.enabled && (
+            <button
+              className="ghost"
+              onClick={() => void (async () => {
+                await logout();
+                setAuth({ enabled: true, authenticated: false });
+                setCapabilities(null);
+                setWorkspaces([]);
+                setSessions([]);
+              })()}
+            >
+              {t("auth.signOut")}
+            </button>
+          )}
+        </div>
       </header>
 
       {error && <div className="error-banner">{error}</div>}
 
       <section>
         <div className="section-heading">
-          <h2>Workspaces</h2>
-          <span>{workspaces.length}</span>
+          <div className="section-title">
+            <h2>{t("workspaces.title")}</h2>
+            <span>{workspaces.length}</span>
+          </div>
+          <button
+            className="ghost compact"
+            disabled={!capabilities}
+            onClick={() => {
+              setWorkspaceError(null);
+              setWorkspaceEditor("new");
+            }}
+          >
+            + {t("workspaces.add")}
+          </button>
         </div>
-        <div className="card-grid">
-          {workspaces.map((workspace) => (
-            <button
-              key={workspace.id}
-              className="workspace-card"
-              onClick={() => void (async () => {
-                setError(null);
-                try {
-                  const result = await createSession(workspace.id);
-                  setActiveSession(result.session.id);
-                } catch (cause) {
-                  setError(cause instanceof Error ? cause.message : "session_create_failed");
-                }
-              })()}
-            >
-              <strong>{workspace.name}</strong>
-              <small>{workspace.shell}{workspace.startupCommand ? ` · ${workspace.startupCommand}` : ""}</small>
-              <span>New session →</span>
-            </button>
-          ))}
-        </div>
+
+        {workspaces.length === 0 ? (
+          <div className="empty workspace-empty">{t("workspaces.empty")}</div>
+        ) : (
+          <div className="card-grid">
+            {workspaces.map((workspace) => (
+              <article key={workspace.id} className="workspace-card">
+                <div className="workspace-card-heading">
+                  <strong>{workspace.name}</strong>
+                  <button
+                    type="button"
+                    className="ghost compact"
+                    onClick={() => {
+                      setWorkspaceError(null);
+                      setWorkspaceEditor(workspace);
+                    }}
+                  >
+                    {t("workspaces.edit")}
+                  </button>
+                </div>
+                <small className="workspace-path">{workspace.cwd}</small>
+                <small>
+                  {workspaceRuntimeSummary(workspace, {
+                    host: t("workspaces.host"),
+                    wsl: t("workspaces.wsl"),
+                    defaultShell: t("workspaces.defaultShell")
+                  })}
+                </small>
+                {workspace.startupCommand && (
+                  <small className="startup-command">
+                    $ {workspace.startupCommand}
+                  </small>
+                )}
+                <button
+                  type="button"
+                  className="workspace-launch"
+                  onClick={() => void (async () => {
+                    setError(null);
+                    try {
+                      const result = await createSession(workspace.id);
+                      setActiveSession(result.session.id);
+                    } catch (cause) {
+                      setError(
+                        formatError(cause, "session_create_failed", translateError)
+                      );
+                    }
+                  })()}
+                >
+                  {t("workspaces.newSession")} →
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section>
         <div className="section-heading">
-          <h2>Sessions</h2>
-          <button className="ghost compact" onClick={() => void refresh()}>Refresh</button>
+          <h2>{t("sessions.title")}</h2>
+          <button
+            className="ghost compact"
+            onClick={() => void refreshCatalog()}
+          >
+            {t("sessions.refresh")}
+          </button>
         </div>
         <div className="session-list">
-          {sessions.length === 0 && <div className="empty">No sessions yet.</div>}
+          {sessions.length === 0 && (
+            <div className="empty">{t("sessions.empty")}</div>
+          )}
           {sessions.map((session) => (
             <div className="session-row" key={session.id}>
-              <button className="session-main" onClick={() => setActiveSession(session.id)}>
+              <button
+                className="session-main"
+                onClick={() => setActiveSession(session.id)}
+              >
                 <span className={`status-dot ${session.state}`} />
                 <span>
-                  <strong>{workspaces.find((workspace) => workspace.id === session.workspaceId)?.name ?? session.workspaceId}</strong>
-                  <small>{session.state} · {session.connections} connection{session.connections === 1 ? "" : "s"}</small>
+                  <strong>
+                    {workspaces.find(
+                      (workspace) => workspace.id === session.workspaceId
+                    )?.name ?? session.workspaceId}
+                  </strong>
+                  <small>
+                    {stateLabel(session.state)} · {connections(session.connections)}
+                  </small>
                 </span>
               </button>
               <button
                 className="danger compact"
-                aria-label="Terminate session"
+                aria-label={t("sessions.terminate")}
                 onClick={() => void (async () => {
                   await terminateSession(session.id);
-                  await refresh();
+                  await refreshCatalog();
                 })()}
-              >×</button>
+              >
+                ×
+              </button>
             </div>
           ))}
         </div>
       </section>
+
+      {workspaceEditor && capabilities && (
+        <WorkspaceDialog
+          capabilities={capabilities}
+          {...(workspaceEditor === "new"
+            ? {}
+            : { workspace: workspaceEditor, onDelete: removeWorkspace })}
+          busy={workspaceBusy}
+          error={workspaceError}
+          onClose={closeWorkspaceEditor}
+          onSave={saveWorkspace}
+        />
+      )}
     </main>
   );
 }
 
-function Login({ onLogin, error }: { onLogin: (token: string) => Promise<void>; error: string | null }) {
+function LanguageSwitcher() {
+  const { locale, setLocale, t } = useI18n();
+  return (
+    <label className="language-switcher">
+      <span className="sr-only">{t("app.language")}</span>
+      <select
+        aria-label={t("app.language")}
+        value={locale}
+        onChange={(event) => setLocale(event.target.value as "en" | "zh-CN")}
+      >
+        <option value="zh-CN">中文</option>
+        <option value="en">English</option>
+      </select>
+    </label>
+  );
+}
+
+function Login({
+  onLogin,
+  error
+}: {
+  onLogin: (token: string) => Promise<void>;
+  error: string | null;
+}) {
+  const { t } = useI18n();
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
 
   return (
     <main className="center-card">
+      <div className="login-toolbar"><LanguageSwitcher /></div>
       <div className="palm-mark">⌁</div>
       <h1>PalmTTY</h1>
-      <p>Enter the access token configured on your workstation.</p>
+      <p>{t("auth.description")}</p>
       <form onSubmit={(event) => {
         event.preventDefault();
         setBusy(true);
@@ -174,11 +393,11 @@ function Login({ onLogin, error }: { onLogin: (token: string) => Promise<void>; 
           autoComplete="current-password"
           value={token}
           onChange={(event) => setToken(event.target.value)}
-          placeholder="Access token"
+          placeholder={t("auth.token")}
           autoFocus
         />
         <button type="submit" disabled={busy || token.length === 0}>
-          {busy ? "Signing in…" : "Sign in"}
+          {busy ? t("auth.signingIn") : t("auth.signIn")}
         </button>
       </form>
       {error && <div className="error-banner">{error}</div>}

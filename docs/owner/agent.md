@@ -6,7 +6,7 @@ PalmTTY Agent 是开发电脑上的 Web/API 控制面，负责：
 
 - 提供 HTTP 与 WebSocket API；
 - 登录认证和 Origin 安全检查；
-- 管理本机 workspace 白名单；
+- 管理当前用户的持久化 workspace 目录与运行时验证；
 - 创建、发现并认证独立 Session Worker；
 - 把浏览器 WebSocket 转发到对应 Worker；
 - 托管编译后的手机端 PWA。
@@ -21,7 +21,7 @@ Agent 不再拥有 PTY，也不保存 canonical terminal state。
   ▼
 PalmTTY Agent
   ├─ Auth / Origin
-  ├─ Workspace 白名单
+  ├─ Workspace Store / Runtime Adapters
   ├─ Worker Registry
   └─ 静态 Web
         │
@@ -55,11 +55,11 @@ Agent 正常关闭、升级或异常退出时：
 
 ## Worker 创建
 
-Agent 启动前先执行 runtime preflight：认证环境与外部暴露规则必须有效，配置的 Agent TCP host/port 必须能实际 bind，所有 workspace `cwd` 必须是真实目录，Shell 必须能解析为绝对启动路径。Windows 当前用户 `%LOCALAPPDATA%\Microsoft\WindowsApps` 下的 App Execution Alias 采用专门识别逻辑，以兼容 Store/MSIX PowerShell 的 reparse point；其他可执行路径继续执行严格文件校验。Windows bind 返回 `EACCES/WSAEACCES` 时，preflight 会提示检查现有 listener 与 excluded/reserved TCP range，而不是等到 Fastify 初始化完成后才失败。解析后的规范化运行规格才会进入 Worker bootstrap，因此 PTY 启动不依赖 node-pty 自己的 PATH 查找。
+Agent 启动前的 runtime preflight 只处理认证环境、外部暴露规则和 Agent TCP host/port 可绑定性，不再遍历 workspace。Workspace 是独立的 per-user 持久化状态；新建/修改时通过认证 + 精确 Origin 保护的 API 验证，创建 Session 时再次验证。Host runtime 会把 Shell 解析为绝对启动路径；Windows 当前用户 `%LOCALAPPDATA%\Microsoft\WindowsApps` 下的 App Execution Alias 有专门处理。WSL runtime 只在 Windows Agent 上启用，解析 `wsl.exe`，并把发行版、Linux cwd、Shell/args 作为结构化参数传入。只有规范化后的运行规格才进入 Worker bootstrap。
 
 创建 Session 时 Agent：
 
-1. 从已经 preflight 的 workspace runtime spec 取得 cwd、绝对 Shell、args、env；
+1. 按 workspace ID 从持久化 store 读取定义并再次运行 runtime adapter 验证，生成 cwd、绝对 executable 与 args；
 2. 生成随机 Session ID、IPC endpoint ID 与 256-bit Worker secret；
 3. detached 启动 Worker，并通过一次性匿名 stdin 发送 bootstrap；
 4. Worker 完成 IPC 监听、secret/record 持久化后返回 READY，但此时仍处于“未接管创建租约”；
@@ -72,7 +72,7 @@ PalmTTY 登录 token 对应的环境变量会从 Worker 环境和最终 PTY 环�
 ## 重要边界
 
 - Agent/Worker 默认都不应以管理员身份运行。
-- 浏览器只能选择配置好的 workspace，不能远程指定任意目录、Shell 或环境变量。
+- 浏览器可以显式管理持久化 workspace 的 cwd/runtime/Shell/启动命令，但该能力必须经过认证与精确 Origin；Session 创建接口本身仍只接受 workspace ID，Web 模型不开放任意 env 注入。
 - Agent 不理解 Codex 的内部协议；Codex 只是终端里的普通 CLI。
 - Worker secret 不进入浏览器、命令行、URL、普通日志或 PTY 环境。
 - 持久化 PID 只用于诊断，不允许直接作为 kill authority；PID 可能被系统复用。
@@ -85,5 +85,5 @@ PalmTTY 登录 token 对应的环境变量会从 Worker 环境和最终 PTY 环�
 - Agent 关闭路径是否误杀 Worker；
 - Worker bootstrap/secret 是否泄漏到 argv、env、URL 或日志；
 - 是否按记录的 PID 直接杀进程；
-- 是否扩大浏览器的 cwd/shell/env 权限；
+- Workspace CRUD 是否仍是显式持久化修改面，而不是把 cwd/shell/env 重新塞进 Session 创建请求；
 - IPC 与浏览器 backpressure 是否仍有硬上限。

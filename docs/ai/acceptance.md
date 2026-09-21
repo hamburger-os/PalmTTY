@@ -36,13 +36,19 @@ Security, session and reconnect changes should include or update tests for:
 - backpressure / slow-client cutoff
 - exit delivery and retained-session cleanup
 - concurrent maxSessions enforcement
+- workspace CRUD requires authentication + exact Origin
+- workspace persistence round-trip and duplicate-ID rejection
+- workspace deletion blocked while a Session is active, but allowed after exit even during retention
+- Host runtime executable/cwd validation
+- WSL argv construction without shell-string interpolation and non-Windows rejection
 
 The Agent suite includes:
 
 - end-to-end Fastify HTTP/WebSocket + Worker IPC coverage with deterministic PTYs;
 - a real detached-process integration test where one Agent process creates a Worker and exits, and another Agent later rediscovers the same live terminal;
 - Windows CI coverage using real node-pty + PowerShell 7 / ConPTY and Unicode, while local Windows checks may use Windows PowerShell for generic ConPTY/process coverage;
-- workspace-runtime coverage for absolute shell resolution, current-user WindowsApps alias preference, executable-as-cwd diagnostics, and actionable preflight failures;
+- workspace-runtime coverage for absolute host-shell resolution, current-user WindowsApps alias preference, executable-as-cwd diagnostics, structured WSL argv, and platform gating;
+- workspace-store coverage for versioned persistent CRUD;
 - Worker storage coverage asserting the runtime recovery generation stays aligned with the private Worker IPC protocol generation.
 
 ## Build
@@ -65,12 +71,14 @@ On a configured PalmTTY host, before `dev`/`start` or release validation:
 pnpm run preflight
 ~~~
 
-This requires the intended PalmTTY config and authentication environment. The preflight should report all detected auth/security/server-bind/workspace launch failures together so host setup can be corrected in one pass. It is not a generic CI/contributor prerequisite. The explicit `run` form is required because pnpm 10 has its own built-in `doctor` command; PalmTTY deliberately names its host check `preflight` to avoid command dispatch ambiguity.
+This requires the intended PalmTTY config and authentication environment. The preflight reports auth/security/server-bind failures. Workspace launch validation is intentionally performed when a workspace is created/updated and again when a Session starts, so a stale project path cannot prevent the Agent control plane from starting. It is not a generic CI/contributor prerequisite. The explicit `run` form is required because pnpm 10 has its own built-in `doctor` command; PalmTTY deliberately names its host check `preflight` to avoid command dispatch ambiguity.
 
 ## Manual Windows validation before a release
 
-- run `pnpm run preflight` with the intended config/token and confirm the Agent TCP endpoint is bindable and every workspace resolves its shell successfully; for Store/MSIX PowerShell, confirm the current-user WindowsApps App Execution Alias is accepted;
-
+- run `pnpm run preflight` with the intended config/token and confirm the Agent TCP endpoint is bindable;
+- create a Host workspace in the Web UI and confirm Store/MSIX PowerShell resolves through the current-user WindowsApps App Execution Alias where applicable;
+- when WSL is installed, create a WSL workspace and confirm distribution/cwd/shell validation succeeds;
+- switch the UI between 中文 and English and reload to confirm the preference persists;
 - start pwsh through PalmTTY;
 - run a Unicode/CJK command;
 - start Codex CLI;

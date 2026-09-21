@@ -8,7 +8,7 @@
 浏览器 -> 127.0.0.1:7688 -> PalmTTY
 ```
 
-此模式可以使用非 Secure Cookie，但仍建议启用 access token。
+此模式可以使用非 Secure Cookie，但仍建议启用 access token。Agent 启动后再通过 Web UI 管理 Workspace；Workspace 不写入 `palmtty.local.yaml`，而是保存到当前用户应用数据目录。
 
 ## 家庭局域网 / QNAP
 

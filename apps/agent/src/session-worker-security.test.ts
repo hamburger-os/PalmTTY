@@ -2,7 +2,8 @@ import { mkdtemp, rm, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseConfig, type WorkspaceConfig } from "@palmtty/config";
+import { parseConfig } from "@palmtty/config";
+import type { WorkspaceDefinition } from "@palmtty/protocol";
 import type { RuntimeWorkspace } from "./workspace-runtime.js";
 import { SessionManager } from "./session-manager.js";
 import { SessionWorkerServer } from "./session-worker.js";
@@ -10,6 +11,7 @@ import type { PtyFactory, PtyHandle } from "./session-runtime.js";
 import { WorkerClient } from "./worker-client.js";
 import { WORKER_PROTOCOL_VERSION, WorkerRequestSchema, type WorkerBootstrap } from "./worker-protocol.js";
 import type { WorkerSpawner } from "./worker-spawner.js";
+import { MemoryWorkspaceStore } from "./workspace-store.js";
 import {
   ensureRuntimeLayout,
   readWorkerRecord,
@@ -57,15 +59,16 @@ class SilentPty implements PtyHandle {
 
 const silentPtyFactory: PtyFactory = () => new SilentPty();
 
-function workspace(): WorkspaceConfig {
+function workspace(): WorkspaceDefinition {
   return {
     id: "security",
     name: "Security",
     cwd: process.cwd(),
-    shell: "custom",
-    shellPath: process.execPath,
-    args: [],
-    env: {}
+    runtime: {
+      kind: "host",
+      shell: process.execPath,
+      args: []
+    }
   };
 }
 
@@ -216,12 +219,12 @@ describe("session worker security boundary", () => {
     };
     const config = parseConfig({
       server: { host: "127.0.0.1", port: 7688 },
-      auth: { enabled: false },
-      workspaces: [workspace()]
+      auth: { enabled: false }
     });
     const manager = new SessionManager(config, {
       runtimeDir,
-      workerSpawner: spawner
+      workerSpawner: spawner,
+      workspaceStore: new MemoryWorkspaceStore([workspace()])
     });
     await manager.initialize();
 
@@ -272,11 +275,13 @@ describe("session worker security boundary", () => {
 
     const config = parseConfig({
       server: { host: "127.0.0.1", port: 7688 },
-      auth: { enabled: false },
-      workspaces: [workspace()]
+      auth: { enabled: false }
     });
 
-    const manager = new SessionManager(config, { runtimeDir });
+    const manager = new SessionManager(config, {
+      runtimeDir,
+      workspaceStore: new MemoryWorkspaceStore([workspace()])
+    });
     await manager.initialize();
 
     expect(manager.list()).toEqual([]);

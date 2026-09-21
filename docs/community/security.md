@@ -13,8 +13,8 @@ PalmTTY provides shell access with the privileges of the OS user running it. Tre
 - Browser login uses a bootstrap secret sent only in a POST body, never in a URL.
 - Successful login creates an in-memory HttpOnly, SameSite=Strict session cookie; Secure is required for normal non-loopback deployment.
 - Authentication and Origin are separate controls.
-- Browser requests can select only configured workspace IDs; they cannot submit arbitrary cwd, shell executable or environment values.
-- Startup preflight resolves every locally configured shell to an absolute executable before Worker creation; PTY launch does not trust library-specific PATH lookup.
+- Workspace management is an explicit authenticated, exact-Origin-protected mutation surface. The browser may persist cwd/runtime/shell/startup-command choices, but Session creation still accepts only a workspace ID and the Web model does not expose arbitrary environment-variable injection.
+- Workspace create/update validates the selected runtime. Host shells are resolved to absolute executables; WSL launch data is passed as structured argv. Session creation validates the stored workspace again before Worker creation.
 - Terminal I/O, login tokens, Worker secrets and workspace environment values are excluded from default logs.
 - Login attempts, Session creation, terminal dimensions, input size, replay state, exited-session retention and socket backpressure are bounded.
 
@@ -57,8 +57,8 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 - 浏览器登录 secret 只通过 POST body 提交，不进入 URL。
 - 登录 Cookie 使用 HttpOnly、SameSite=Strict；正常非 loopback 部署要求 Secure。
 - 认证与 Origin 是独立控制。
-- 浏览器只能选择预配置 workspace ID，不能提交任意 cwd、Shell 或环境变量。
-- 启动 preflight 会把每个本地配置的 Shell 解析为绝对可执行路径，再创建 Worker；PTY 启动不依赖库内部的 PATH 查找。
+- Workspace 管理是显式的高权限修改面，只能通过“已认证 + 精确 Origin”保护的 API 持久化 cwd、运行环境、Shell 与启动命令；真正创建 Session 时仍只接受 workspace ID，Web 模型不开放任意环境变量注入。
+- 新建/修改 workspace 时会验证运行目标；Host Shell 解析为绝对可执行文件，WSL 参数按结构化 argv 传递；创建 Session 前还会再次验证持久化 workspace。
 - 默认日志不记录终端 I/O、登录 token、Worker secret 或 workspace 环境变量。
 - 登录、Session 创建、终端尺寸、输入、replay、退出保留和 socket backlog 都有资源上限。
 

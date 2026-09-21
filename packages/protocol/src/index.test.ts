@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   CreateSessionSchema,
+  CreateWorkspaceSchema,
   MAX_INPUT_BYTES,
+  WorkspaceDefinitionSchema,
   parseClientMessage
 } from "./index.js";
 
@@ -12,6 +14,34 @@ describe("protocol", () => {
       cols: 80,
       rows: 24
     });
+  });
+
+  it("parses host and WSL workspace definitions", () => {
+    expect(WorkspaceDefinitionSchema.parse({
+      id: "host-1",
+      name: "Host",
+      cwd: "/workspace",
+      runtime: { kind: "host" }
+    }).runtime).toEqual({ kind: "host", args: [] });
+
+    expect(CreateWorkspaceSchema.parse({
+      name: "Ubuntu",
+      cwd: "/home/dev/project",
+      runtime: {
+        kind: "wsl",
+        distribution: "Ubuntu",
+        shell: "/bin/bash",
+        args: ["-l"]
+      }
+    }).runtime.kind).toBe("wsl");
+  });
+
+  it("requires a WSL shell when shell arguments are configured", () => {
+    expect(() => CreateWorkspaceSchema.parse({
+      name: "Ubuntu",
+      cwd: "/home/dev/project",
+      runtime: { kind: "wsl", args: ["-l"] }
+    })).toThrow();
   });
 
   it("rejects oversized terminal dimensions", () => {

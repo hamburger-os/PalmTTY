@@ -10,4 +10,4 @@ After any behavior, architecture, configuration, protocol, security, deployment,
 
 A task is not complete until code and documentation agree and `pnpm docs:check` passes.
 
-Never log terminal input/output, secrets, access tokens, or workspace environment values by default. Never silently elevate PalmTTY or expand a configured workspace boundary from a remote request.
+Never log terminal input/output, secrets, access tokens, or workspace environment values by default. Never silently elevate PalmTTY. Workspace CRUD is an intentional authenticated persistent mutation surface; do not bypass it by adding ad-hoc cwd/shell/env authority to Session creation.

@@ -2,13 +2,13 @@
 
 ## 核心语义
 
-PalmTTY 不把网页、Agent 或网络连接的生命周期等同于终端生命周期。手机换网、锁屏、页面刷新，以及 Agent API/Web 进程重启，都不应结束正在运行的 PowerShell/Codex。
+PalmTTY 不把网页、Agent 或网络连接的生命周期等同于终端生命周期。手机换网、锁屏、页面刷新，以及 Agent API/Web 进程重启，都不应结束正在运行的 Host/WSL Shell、Codex 或其他 CLI。
 
 ## Canonical state 在 Worker
 
 每个 Session Worker 同时维护：
 
-1. 真实 PTY：PowerShell/Codex 进程；
+1. 真实 PTY：Host/WSL Shell、Codex 或其他 CLI 进程；
 2. Headless Terminal 镜像：当前屏幕与有限 scrollback；
 3. 有界 Replay Buffer：最近一段带序号的增量输出。
 

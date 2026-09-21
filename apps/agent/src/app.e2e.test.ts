@@ -15,6 +15,7 @@ import { SessionWorkerServer } from "./session-worker.js";
 import type { PtyFactory, PtyHandle } from "./session-runtime.js";
 import type { WorkerBootstrap } from "./worker-protocol.js";
 import type { WorkerSpawner } from "./worker-spawner.js";
+import { MemoryWorkspaceStore } from "./workspace-store.js";
 
 const TOKEN_ENV = "PALMTTY_E2E_TOKEN";
 const TOKEN = "0123456789abcdef0123456789abcdef";
@@ -149,6 +150,19 @@ afterEach(async () => {
   delete process.env[TOKEN_ENV];
 });
 
+function e2eWorkspace() {
+  return {
+    id: "e2e",
+    name: "E2E",
+    cwd: process.cwd(),
+    runtime: {
+      kind: "host" as const,
+      shell: process.execPath,
+      args: []
+    }
+  };
+}
+
 async function startHarness(
   mutate?: (config: PalmTTYConfig) => void
 ): Promise<Harness> {
@@ -164,15 +178,7 @@ async function startHarness(
       enabled: true,
       tokenEnv: TOKEN_ENV,
       sessionTtlMinutes: 5
-    },
-    workspaces: [{
-      id: "e2e",
-      name: "E2E",
-      cwd: process.cwd(),
-      shell: "custom",
-      shellPath: process.execPath,
-      args: []
-    }]
+    }
   });
   mutate?.(config);
 
@@ -182,7 +188,8 @@ async function startHarness(
   const workerSpawner = new EmbeddedWorkerSpawner(pty);
   liveSpawners.add(workerSpawner);
   const app = await buildApp(config, {
-    sessionManager: { runtimeDir, workerSpawner }
+    sessionManager: { runtimeDir, workerSpawner },
+    workspaceStore: new MemoryWorkspaceStore([e2eWorkspace()])
   });
   liveApps.add(app);
   const address = await app.listen({ host: "127.0.0.1", port: 0 });
@@ -413,6 +420,28 @@ describe("terminal WebSocket integration", () => {
   });
 
 
+  it("prevents deleting a workspace while a Session is active", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    await createSession(harness, cookie);
+
+    const response = await fetch(
+      `${harness.origin}/api/v1/workspaces/e2e`,
+      {
+        method: "DELETE",
+        headers: {
+          cookie,
+          origin: harness.origin
+        }
+      }
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "workspace_in_use"
+    });
+  });
+
   it("enforces authentication, exact Origin, and the PalmTTY subprotocol independently", async () => {
     const harness = await startHarness();
     const cookie = await login(harness);
@@ -605,7 +634,8 @@ describe("terminal WebSocket integration", () => {
       sessionManager: {
         runtimeDir: harness.runtimeDir,
         workerSpawner: harness.workerSpawner
-      }
+      },
+      workspaceStore: new MemoryWorkspaceStore([e2eWorkspace()])
     });
     liveApps.add(restartedApp);
     const restartedAddress = await restartedApp.listen({ host: "127.0.0.1", port: 0 });
@@ -710,6 +740,18 @@ describe("terminal WebSocket integration", () => {
     expect(retained.status).toBe(200);
     const retainedBody = await retained.json() as { session: SessionPublic };
     expect(retainedBody.session.state).toBe("exited");
+
+    const deleteWorkspace = await fetch(
+      `${harness.origin}/api/v1/workspaces/e2e`,
+      {
+        method: "DELETE",
+        headers: {
+          cookie,
+          origin: harness.origin
+        }
+      }
+    );
+    expect(deleteWorkspace.status).toBe(204);
 
     await waitUntil(async () => (await getSession(harness, cookie, session.id)).status === 404, 3_000);
   }, 10_000);

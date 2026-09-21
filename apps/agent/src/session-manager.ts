@@ -19,10 +19,8 @@ import {
   removeWorkerState,
   type WorkerRecord
 } from "./worker-storage.js";
-import {
-  resolveRuntimeWorkspaces,
-  type RuntimeWorkspace
-} from "./workspace-runtime.js";
+import { resolveRuntimeWorkspace } from "./workspace-runtime.js";
+import type { WorkspaceStore } from "./workspace-store.js";
 
 type ManagedWorker = {
   record: WorkerRecord;
@@ -36,7 +34,7 @@ type ManagedWorker = {
 export type SessionManagerOptions = {
   runtimeDir?: string;
   workerSpawner?: WorkerSpawner;
-  runtimeWorkspaces?: ReadonlyMap<string, RuntimeWorkspace>;
+  workspaceStore: WorkspaceStore;
 };
 
 const CREATE_CONNECT_DELAYS_MS = [0, 50, 100, 200, 400, 800, 1200, 1600];
@@ -71,32 +69,26 @@ function processDefinitelyDead(pid: number): boolean {
 export class SessionManager {
   readonly runtimeDir: string;
   private readonly workerSpawner: WorkerSpawner;
-  private readonly preflightWorkspaces: ReadonlyMap<string, RuntimeWorkspace> | undefined;
+  private readonly workspaceStore: WorkspaceStore;
   private readonly sessions = new Map<string, ManagedWorker>();
-  private workspaces = new Map<string, RuntimeWorkspace>();
+  private readonly pendingByWorkspace = new Map<string, number>();
   private pendingCreates = 0;
   private initialized = false;
   private closing = false;
 
   constructor(
     private readonly config: PalmTTYConfig,
-    options: SessionManagerOptions = {}
+    options: SessionManagerOptions
   ) {
     this.runtimeDir = options.runtimeDir ?? defaultRuntimeDir();
     this.workerSpawner = options.workerSpawner ?? new ProcessWorkerSpawner();
-    this.preflightWorkspaces = options.runtimeWorkspaces;
+    this.workspaceStore = options.workspaceStore;
   }
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    // Resolve every locally configured launch target before opening the control
-    // plane. Workers receive absolute executables and never depend on node-pty's
-    // platform-specific PATH lookup.
-    this.workspaces = this.preflightWorkspaces
-      ? new Map(this.preflightWorkspaces)
-      : await resolveRuntimeWorkspaces(this.config.workspaces);
-
+    await this.workspaceStore.initialize();
     await ensureRuntimeLayout(this.runtimeDir);
     await cleanupDanglingWorkerState(this.runtimeDir);
 
@@ -145,8 +137,20 @@ export class SessionManager {
     return this.sessions.has(id);
   }
 
+  hasActiveWorkspaceSessions(workspaceId: string): boolean {
+    if ((this.pendingByWorkspace.get(workspaceId) ?? 0) > 0) return true;
+    return [...this.sessions.values()].some(
+      ({ session }) =>
+        session.workspaceId === workspaceId &&
+        (session.state === "starting" || session.state === "running")
+    );
+  }
+
   async create(workspaceId: string, cols: number, rows: number): Promise<SessionPublic> {
     this.requireInitialized();
+
+    const definition = this.workspaceStore.get(workspaceId);
+    if (!definition) throw new Error("Unknown workspace");
 
     const active = [...this.sessions.values()].filter(({ session }) =>
       session.state === "running" || session.state === "starting"
@@ -155,10 +159,13 @@ export class SessionManager {
       throw new Error("Maximum session count reached");
     }
     this.pendingCreates += 1;
+    this.pendingByWorkspace.set(
+      workspaceId,
+      (this.pendingByWorkspace.get(workspaceId) ?? 0) + 1
+    );
 
     try {
-      const workspace = this.workspaces.get(workspaceId);
-      if (!workspace) throw new Error("Unknown workspace");
+      const workspace = await resolveRuntimeWorkspace(definition);
 
       const id = sessionId();
       const endpoint = endpointId();
@@ -221,6 +228,9 @@ export class SessionManager {
       }
     } finally {
       this.pendingCreates -= 1;
+      const remaining = (this.pendingByWorkspace.get(workspaceId) ?? 1) - 1;
+      if (remaining <= 0) this.pendingByWorkspace.delete(workspaceId);
+      else this.pendingByWorkspace.set(workspaceId, remaining);
     }
   }
 

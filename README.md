@@ -5,7 +5,7 @@
 **Your dev shell, in your palm.**  
 **把开发终端放进手掌里。**
 
-Mobile-first · self-hosted · Windows-first · PowerShell 7 · ConPTY · xterm.js
+Mobile-first · self-hosted · Windows-first · Host + WSL runtimes · xterm.js
 
 [![CI](https://github.com/hamburger-os/PalmTTY/actions/workflows/ci.yml/badge.svg)](https://github.com/hamburger-os/PalmTTY/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/hamburger-os/PalmTTY/actions/workflows/codeql.yml/badge.svg)](https://github.com/hamburger-os/PalmTTY/actions/workflows/codeql.yml)
@@ -16,11 +16,11 @@ Mobile-first · self-hosted · Windows-first · PowerShell 7 · ConPTY · xterm.
 </div>
 
 > [!WARNING]
-> PalmTTY exposes an interactive shell with the privileges of the Windows user running the Agent. Treat compromise as workstation compromise. Use a private HTTPS entry point or an authenticated HTTPS reverse proxy; do not expose an unauthenticated Agent port to the Internet.
+> PalmTTY exposes an interactive shell with the privileges of the OS user running the Agent. Treat compromise as workstation compromise. Use a private HTTPS entry point or an authenticated HTTPS reverse proxy; do not expose an unauthenticated Agent port to the Internet.
 
-PalmTTY is a mobile-first, self-hosted remote development terminal for Windows 11, PowerShell 7, Codex, Git and other terminal-based developer tools. It is designed for the moment when your development workstation is elsewhere but your phone is in your hand.
+PalmTTY is a mobile-first, self-hosted remote development terminal. Windows 11 remains the primary host target, with native host shells and WSL workspaces; the same host-runtime path is exercised on Ubuntu CI and is designed for Linux/macOS hosts. Codex, Git and other terminal tools remain ordinary shell workloads.
 
-PalmTTY 是一个面向手机、自托管的远程开发终端，首要支持 Windows 11 + PowerShell 7 + ConPTY，可直接运行 Codex、Git 与其他 CLI 开发工具。
+PalmTTY 是一个面向手机、自托管的远程开发终端。Windows 11 仍是首要宿主平台，同时支持宿主机 Shell 与 WSL 工作区；同一套宿主运行时也在 Ubuntu CI 中验证，并按 Linux/macOS 宿主扩展设计。Codex、Git 等工具仍只是普通终端工作负载。
 
 ## Status / 当前状态
 
@@ -29,6 +29,11 @@ PalmTTY is **alpha**. Each terminal now runs in an independent durable Session W
 | Capability | Alpha status |
 |---|---|
 | Windows / PowerShell 7 / ConPTY | Implemented and exercised in Windows CI |
+| Linux host runtime | Implemented and exercised on Ubuntu CI |
+| WSL runtime | Implemented with runtime validation; real-owner-host validation still required |
+| macOS host runtime | Architecture implemented; no repository macOS CI yet |
+| Web workspace management | Persistent create/edit/delete via authenticated same-origin API |
+| UI languages | English and Simplified Chinese |
 | Browser or network disconnect | PTY survives while the Agent stays alive |
 | Reconnect | Sequence replay + server-side terminal snapshot fallback |
 | Mobile terminal | xterm.js PWA, special-key bar, multiline composer |
@@ -44,7 +49,7 @@ PalmTTY is intentionally narrower than a browser IDE:
 
 - **Keep the real shell on your workstation.** A per-session Worker owns the PTY; the Agent and browser are replaceable clients/control planes.
 - **Survive mobile reality.** WebSocket reconnect, bounded replay, snapshot recovery and application heartbeat are built around Wi-Fi/cellular switching and backgrounded tabs.
-- **Keep remote authority explicit.** The browser selects only configured workspaces; it cannot submit arbitrary working directories or shell executables.
+- **Keep remote authority explicit.** Workspace changes are persistent authenticated mutations, not ad-hoc Session parameters. Session creation still accepts only a workspace ID; environment injection is not exposed by the Web API.
 - **Stay AI-vendor-neutral.** Codex, Claude Code, OpenCode and other terminal tools are workloads, not protocol dependencies.
 - **Remain self-hosted.** No cloud relay is required by the core architecture.
 
@@ -60,7 +65,7 @@ Private HTTPS entry point
     ▼
 PalmTTY Agent
  ├─ authentication + exact Origin policy
- ├─ workspace allowlist
+ ├─ persistent workspace catalog + runtime validation
  ├─ Worker registry / WebSocket proxy
  └─ static Web/PWA
     │ authenticated local IPC
@@ -70,7 +75,7 @@ Session Worker (one per terminal)
  ├─ headless xterm snapshot
  └─ bounded sequenced replay
     │
-PowerShell 7
+Host shell / WSL shell
     │
 Codex / Git / npm / dotnet / ...
 ```
@@ -84,7 +89,7 @@ Requirements:
 - Windows 11
 - Node.js 22.11+
 - Corepack / pnpm
-- PowerShell 7 (`pwsh`)
+- PowerShell 7 (`pwsh`) for the default Windows host-shell experience; WSL or another explicit shell is optional
 
 ```powershell
 git clone https://github.com/hamburger-os/PalmTTY.git
@@ -94,7 +99,6 @@ corepack enable
 pnpm install --frozen-lockfile
 
 Copy-Item examples/palmtty.example.yaml palmtty.local.yaml
-# Edit the workspace path in palmtty.local.yaml.
 
 $env:PALMTTY_CONFIG = "$PWD\palmtty.local.yaml"
 $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
@@ -104,11 +108,11 @@ pnpm check
 pnpm start
 ```
 
-Open `http://127.0.0.1:7688` and sign in with the access token.
+Open `http://127.0.0.1:7688`, sign in with the access token, then create a workspace from the Web UI. Workspaces are stored separately from `palmtty.local.yaml`. On Windows, choose **Host** for PowerShell/other Windows shells or **WSL** for a Linux distribution; on Linux/macOS use the Host runtime.
 
-`pnpm run preflight` validates the authentication environment, security exposure rules, the configured Agent TCP listen endpoint, workspace directories, and shell executables before the Agent starts, and reports all detected host-configuration failures together. On Windows, PowerShell 7 installed through Microsoft Store/MSIX is supported through the current user's Windows App Execution Alias. Shells are normalized to absolute launch paths before Worker creation. A workspace `cwd` must be a directory; use `shellPath` only for an explicit shell executable.
+`pnpm run preflight` validates the authentication environment, security exposure rules and configured Agent TCP listen endpoint before the Agent starts. Workspace directories and shells are validated when a workspace is created/updated and again when a Session starts. Windows Store/MSIX PowerShell is supported through the current user's App Execution Alias, and resolved host shells are normalized to absolute launch paths before Worker creation.
 
-For development, run `pnpm dev`. It invokes PalmTTY's `preflight` package script explicitly before Vite and the Agent are launched, so a bad token, workspace, or shell fails once with an actionable startup error instead of leaving the frontend proxy retrying a dead Agent. The script is intentionally not named `doctor` because pnpm 10 already owns `pnpm doctor` as a package-manager diagnostic command. The example development configuration already includes the Vite origin required by the exact Origin check. In development, the root `pnpm dev` launcher reads the same `PALMTTY_CONFIG`, derives the local Agent URL from `server.host`/`server.port`, and injects it into Vite as `PALMTTY_AGENT_URL`; an explicitly supplied `PALMTTY_AGENT_URL` still overrides the derived target. Vite uses strict port 5173 so it cannot silently move to a different untrusted Origin.
+For development, run `pnpm dev`. It invokes PalmTTY's `preflight` package script explicitly before Vite and the Agent are launched, so a bad token or Agent endpoint fails once with an actionable startup error instead of leaving the frontend proxy retrying a dead Agent. The script is intentionally not named `doctor` because pnpm 10 already owns `pnpm doctor` as a package-manager diagnostic command. The example development configuration already includes the Vite origin required by the exact Origin check. In development, the root `pnpm dev` launcher reads the same `PALMTTY_CONFIG`, derives the local Agent URL from `server.host`/`server.port`, and injects it into Vite as `PALMTTY_AGENT_URL`; an explicitly supplied `PALMTTY_AGENT_URL` still overrides the derived target. Vite uses strict port 5173 so it cannot silently move to a different untrusted Origin.
 
 ## Secure remote access / 安全远程访问
 

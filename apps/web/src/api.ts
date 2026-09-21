@@ -1,15 +1,35 @@
-import type { SessionPublic, WorkspacePublic } from "@palmtty/protocol";
+import type {
+  CreateWorkspaceInput,
+  RuntimeCapabilities,
+  SessionPublic,
+  WorkspacePublic
+} from "@palmtty/protocol";
+
+export class ApiError extends Error {
+  constructor(
+    readonly code: string,
+    readonly detail?: string
+  ) {
+    super(code);
+    this.name = "ApiError";
+  }
+}
 
 async function responseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let code = `http_${response.status}`;
+    let detail: string | undefined;
     try {
-      const body = await response.json() as { error?: string };
+      const body = await response.json() as {
+        error?: string;
+        message?: string;
+      };
       if (body.error) code = body.error;
+      if (body.message) detail = body.message;
     } catch {
       // Ignore non-JSON error bodies.
     }
-    throw new Error(code);
+    throw new ApiError(code, detail);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -37,10 +57,53 @@ export async function logout() {
   }));
 }
 
+export async function runtimeCapabilities() {
+  return responseJson<RuntimeCapabilities>(
+    await fetch("/api/v1/capabilities", { credentials: "same-origin" })
+  );
+}
+
 export async function listWorkspaces() {
   return responseJson<{ workspaces: WorkspacePublic[] }>(
     await fetch("/api/v1/workspaces", { credentials: "same-origin" })
   );
+}
+
+export async function createWorkspace(input: CreateWorkspaceInput) {
+  return responseJson<{ workspace: WorkspacePublic }>(await fetch(
+    "/api/v1/workspaces",
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input)
+    }
+  ));
+}
+
+export async function updateWorkspace(
+  id: string,
+  input: CreateWorkspaceInput
+) {
+  return responseJson<{ workspace: WorkspacePublic }>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(id)}`,
+    {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input)
+    }
+  ));
+}
+
+export async function deleteWorkspace(id: string) {
+  return responseJson<void>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+      credentials: "same-origin"
+    }
+  ));
 }
 
 export async function listSessions() {

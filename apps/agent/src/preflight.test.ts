@@ -1,5 +1,3 @@
-import os from "node:os";
-import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseConfig } from "@palmtty/config";
 import { preflightRuntime } from "./preflight.js";
@@ -9,7 +7,7 @@ afterEach(() => {
 });
 
 describe("runtime preflight", () => {
-  it("reports authentication and workspace failures together", async () => {
+  it("reports authentication failures", async () => {
     vi.stubEnv("PALMTTY_TEST_ACCESS_TOKEN", "short");
 
     const config = parseConfig({
@@ -17,30 +15,12 @@ describe("runtime preflight", () => {
       auth: {
         enabled: true,
         tokenEnv: "PALMTTY_TEST_ACCESS_TOKEN"
-      },
-      workspaces: [
-        {
-          id: "missing",
-          name: "Missing workspace",
-          cwd: path.join(os.tmpdir(), "palmtty-preflight-definitely-missing"),
-          shell: "custom",
-          shellPath: process.execPath
-        }
-      ]
+      }
     });
 
-    let failure: unknown;
-    try {
-      await preflightRuntime(config, { serverProbe: async () => undefined });
-    } catch (error) {
-      failure = error;
-    }
-
-    expect(failure).toBeInstanceOf(Error);
-    const message = (failure as Error).message;
-    expect(message).toContain("Runtime preflight failed:");
-    expect(message).toContain("PALMTTY_TEST_ACCESS_TOKEN");
-    expect(message).toContain('Workspace "missing" directory is unavailable');
+    await expect(
+      preflightRuntime(config, { serverProbe: async () => undefined })
+    ).rejects.toThrow("PALMTTY_TEST_ACCESS_TOKEN");
   });
 
   it("does not bind an endpoint rejected by the exposure gate", async () => {
@@ -52,17 +32,7 @@ describe("runtime preflight", () => {
         secureCookies: false,
         unsafeAllowInsecureLan: false
       },
-      auth: { enabled: false },
-      workspaces: [
-        {
-          id: "node",
-          name: "Node",
-          cwd: process.cwd(),
-          shell: "custom",
-          shellPath: process.execPath,
-          args: []
-        }
-      ]
+      auth: { enabled: false }
     });
 
     await expect(
@@ -71,7 +41,7 @@ describe("runtime preflight", () => {
     expect(serverProbe).not.toHaveBeenCalled();
   });
 
-  it("aggregates a server bind failure with other host errors", async () => {
+  it("aggregates a server bind failure with auth errors", async () => {
     vi.stubEnv("PALMTTY_TEST_ACCESS_TOKEN", "short");
 
     const config = parseConfig({
@@ -79,17 +49,7 @@ describe("runtime preflight", () => {
       auth: {
         enabled: true,
         tokenEnv: "PALMTTY_TEST_ACCESS_TOKEN"
-      },
-      workspaces: [
-        {
-          id: "node",
-          name: "Node",
-          cwd: process.cwd(),
-          shell: "custom",
-          shellPath: process.execPath,
-          args: []
-        }
-      ]
+      }
     });
 
     await expect(
@@ -103,26 +63,14 @@ describe("runtime preflight", () => {
     );
   });
 
-  it("returns normalized workspaces when the host is launchable", async () => {
+  it("passes with safe host configuration even when no workspace exists", async () => {
     const config = parseConfig({
       server: { host: "127.0.0.1", port: 7688 },
-      auth: { enabled: false },
-      workspaces: [
-        {
-          id: "node",
-          name: "Node",
-          cwd: process.cwd(),
-          shell: "custom",
-          shellPath: process.execPath,
-          args: []
-        }
-      ]
+      auth: { enabled: false }
     });
 
-    const result = await preflightRuntime(config, { serverProbe: async () => undefined });
-    const workspace = result.workspaces.get("node");
-    expect(workspace?.id).toBe("node");
-    expect(workspace?.executable).toBeTypeOf("string");
-    expect(path.isAbsolute(workspace?.executable ?? "")).toBe(true);
+    await expect(
+      preflightRuntime(config, { serverProbe: async () => undefined })
+    ).resolves.toBeUndefined();
   });
 });

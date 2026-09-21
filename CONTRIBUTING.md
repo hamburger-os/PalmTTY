@@ -63,7 +63,7 @@ Keep PRs focused. Explain why the change is needed, not only what files changed.
 - No terminal I/O logging by default. / 默认不记录终端输入输出。
 - No secrets in URLs. / secret 不进入 URL。
 - No silent privilege elevation. / 不静默提权。
-- Remote callers select configured workspaces; they do not gain arbitrary cwd/shell authority. / 远程端只能选择预配置 workspace。
+- Workspace CRUD is an authenticated, exact-Origin-protected persistent mutation surface; Session creation still accepts only a workspace ID, and Web clients do not gain arbitrary env injection. / Workspace 可通过认证且受精确 Origin 保护的接口持久化管理；Session 创建仍只接受 workspace ID，网页端不开放任意 env 注入。
 - New buffers and long-lived state must be bounded. / 新增缓冲区和长期内存状态必须有明确上限。
 - Codex and other AI CLIs remain workloads, not PalmTTY protocol dependencies. / AI CLI 是工作负载，不是核心协议依赖。
 - Keep Agent lifetime separate from terminal lifetime: PTY, headless terminal state, seq and replay belong to the Session Worker. / Agent 生命周期不能重新绑定终端生命周期；PTY、headless 状态、seq 与 replay 必须归 Session Worker。
