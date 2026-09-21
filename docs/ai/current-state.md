@@ -42,7 +42,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - per-session 256-bit Worker secret
 - bootstrap delivered over anonymous stdin, never argv/URL
 - startup READY handshake: Session creation succeeds only after the Worker has published recovery state and is listening
-- Worker secret and minimal record persisted in a per-user runtime directory
+- Worker secret and minimal record persisted in a per-user runtime directory isolated by private Worker IPC generation; protocol v2 uses `runtime-v2`
 - Agent startup rediscovers Workers in parallel and authenticates them
 - Agent normal shutdown/restart disconnects control only and does not kill PTYs
 - Worker creation uses an authenticated idempotent adoption transaction: READY is not yet durable; adoption responses can be retried across a fresh IPC connection, while an unadopted Worker has a short creation lease and self-cleans its PTY/recovery state if the creator disappears
