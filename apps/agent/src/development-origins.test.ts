@@ -4,6 +4,7 @@ import {
   parseDevelopmentTrustedOrigins,
   withDevelopmentTrustedOrigins
 } from "./development-origins.js";
+import { isTrustedOrigin } from "./security.js";
 
 describe("development trusted origins", () => {
   it("parses and deduplicates exact HTTP origins", () => {
@@ -49,5 +50,7 @@ describe("development trusted origins", () => {
       "http://127.0.0.1:5173",
       "http://192.168.31.3:5173"
     ]);
+    expect(isTrustedOrigin("http://192.168.31.3:5173", merged)).toBe(true);
+    expect(isTrustedOrigin("http://192.168.31.4:5173", merged)).toBe(false);
   });
 });
