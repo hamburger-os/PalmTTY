@@ -15,18 +15,20 @@ export const WorkerRecordSchema = z.object({
 });
 export type WorkerRecord = z.infer<typeof WorkerRecordSchema>;
 
+export const WORKER_RUNTIME_GENERATION = "runtime-v2" as const;
+
 export function defaultRuntimeDir(): string {
   if (process.platform === "win32") {
     const base = process.env.LOCALAPPDATA ?? process.env.APPDATA ?? os.homedir();
-    return path.join(base, "PalmTTY", "runtime-v1");
+    return path.join(base, "PalmTTY", WORKER_RUNTIME_GENERATION);
   }
   if (process.platform === "darwin") {
-    return path.join(os.homedir(), "Library", "Application Support", "PalmTTY", "runtime-v1");
+    return path.join(os.homedir(), "Library", "Application Support", "PalmTTY", WORKER_RUNTIME_GENERATION);
   }
   const runtime = process.env.XDG_RUNTIME_DIR;
   return runtime
-    ? path.join(runtime, "palmtty")
-    : path.join(os.homedir(), ".local", "state", "palmtty", "runtime-v1");
+    ? path.join(runtime, "palmtty", WORKER_RUNTIME_GENERATION)
+    : path.join(os.homedir(), ".local", "state", "palmtty", WORKER_RUNTIME_GENERATION);
 }
 
 export function sessionsDir(runtimeDir: string): string {
