@@ -16,22 +16,18 @@ describe("configuration", () => {
 
   it("derives a local client URL for wildcard server binds", () => {
     const ipv4 = parseConfig({
-      server: { host: "0.0.0.0", port: 8123 },
-      workspaces: [{ id: "main", name: "Main", cwd: "C:\\Code" }]
+      server: { host: "0.0.0.0", port: 8123 }
     });
     const ipv6 = parseConfig({
-      server: { host: "::", port: 8124 },
-      workspaces: [{ id: "main", name: "Main", cwd: "C:\\Code" }]
+      server: { host: "::", port: 8124 }
     });
 
     expect(localAgentUrl(ipv4)).toBe("http://127.0.0.1:8123");
     expect(localAgentUrl(ipv6)).toBe("http://[::1]:8124");
   });
 
-  it("applies safe local defaults", () => {
-    const config = parseConfig({
-      workspaces: [{ id: "main", name: "Main", cwd: "C:\\Code", shell: "pwsh" }]
-    });
+  it("applies safe local defaults without requiring a workspace", () => {
+    const config = parseConfig({});
     expect(config.server.host).toBe("127.0.0.1");
     expect(config.auth.enabled).toBe(true);
     expect(config.auth.maxLoginSessions).toBe(32);
@@ -39,18 +35,9 @@ describe("configuration", () => {
     expect(config.sessions.exitedRetentionMinutes).toBe(30);
   });
 
-  it("rejects duplicate workspace ids", () => {
+  it("rejects legacy workspace configuration instead of silently ignoring it", () => {
     expect(() => parseConfig({
-      workspaces: [
-        { id: "same", name: "A", cwd: "C:\\A" },
-        { id: "same", name: "B", cwd: "C:\\B" }
-      ]
-    })).toThrow();
-  });
-
-  it("requires a path for custom shells", () => {
-    expect(() => parseConfig({
-      workspaces: [{ id: "x", name: "X", cwd: "C:\\X", shell: "custom" }]
+      workspaces: [{ id: "legacy", name: "Legacy", cwd: "C:\\Code" }]
     })).toThrow();
   });
 });
