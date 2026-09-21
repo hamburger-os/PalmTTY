@@ -206,7 +206,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       if (!workspaceStore.get(request.params.id)) {
         return reply.code(404).send({ error: "workspace_not_found" });
       }
-      if (sessions.hasWorkspaceSessions(request.params.id)) {
+      if (sessions.hasActiveWorkspaceSessions(request.params.id)) {
         return reply.code(409).send({ error: "workspace_in_use" });
       }
       await workspaceStore.delete(request.params.id);
