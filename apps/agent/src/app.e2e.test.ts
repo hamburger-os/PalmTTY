@@ -150,6 +150,19 @@ afterEach(async () => {
   delete process.env[TOKEN_ENV];
 });
 
+function e2eWorkspace() {
+  return {
+    id: "e2e",
+    name: "E2E",
+    cwd: process.cwd(),
+    runtime: {
+      kind: "host" as const,
+      shell: process.execPath,
+      args: []
+    }
+  };
+}
+
 async function startHarness(
   mutate?: (config: PalmTTYConfig) => void
 ): Promise<Harness> {
@@ -176,16 +189,7 @@ async function startHarness(
   liveSpawners.add(workerSpawner);
   const app = await buildApp(config, {
     sessionManager: { runtimeDir, workerSpawner },
-    workspaceStore: new MemoryWorkspaceStore([{
-      id: "e2e",
-      name: "E2E",
-      cwd: process.cwd(),
-      runtime: {
-        kind: "host",
-        shell: process.execPath,
-        args: []
-      }
-    }])
+    workspaceStore: new MemoryWorkspaceStore([e2eWorkspace()])
   });
   liveApps.add(app);
   const address = await app.listen({ host: "127.0.0.1", port: 0 });
@@ -416,6 +420,28 @@ describe("terminal WebSocket integration", () => {
   });
 
 
+  it("prevents deleting a workspace while a Session is retained", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    await createSession(harness, cookie);
+
+    const response = await fetch(
+      `${harness.origin}/api/v1/workspaces/e2e`,
+      {
+        method: "DELETE",
+        headers: {
+          cookie,
+          origin: harness.origin
+        }
+      }
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "workspace_in_use"
+    });
+  });
+
   it("enforces authentication, exact Origin, and the PalmTTY subprotocol independently", async () => {
     const harness = await startHarness();
     const cookie = await login(harness);
@@ -608,7 +634,8 @@ describe("terminal WebSocket integration", () => {
       sessionManager: {
         runtimeDir: harness.runtimeDir,
         workerSpawner: harness.workerSpawner
-      }
+      },
+      workspaceStore: new MemoryWorkspaceStore([e2eWorkspace()])
     });
     liveApps.add(restartedApp);
     const restartedAddress = await restartedApp.listen({ host: "127.0.0.1", port: 0 });
