@@ -74,9 +74,9 @@ async function browseHostDirectory(
 
   const entries = await readdir(currentPath, { withFileTypes: true });
   const directories: DirectoryLocation[] = [];
+  let truncated = false;
 
   for (const entry of entries) {
-    if (directories.length > MAX_DIRECTORIES) break;
     const candidate = path.join(currentPath, entry.name);
     let isDirectory = entry.isDirectory();
     if (!isDirectory && entry.isSymbolicLink()) {
@@ -87,6 +87,10 @@ async function browseHostDirectory(
       }
     }
     if (isDirectory) {
+      if (directories.length >= MAX_DIRECTORIES) {
+        truncated = true;
+        break;
+      }
       directories.push({ label: entry.name, path: candidate });
     }
   }
@@ -96,8 +100,8 @@ async function browseHostDirectory(
     currentPath,
     parentPath: parent === currentPath ? null : parent,
     locations: await hostLocations(os.homedir()),
-    directories: sortLocations(directories.slice(0, MAX_DIRECTORIES)),
-    truncated: directories.length > MAX_DIRECTORIES || entries.length > MAX_DIRECTORIES * 8
+    directories: sortLocations(directories),
+    truncated
   });
 }
 
@@ -201,7 +205,12 @@ async function browseWslDirectory(
   const records = output.split("\0").filter((value) => value.length > 0);
   const currentPath = records[0];
   const home = records[1];
-  if (!currentPath || !home || !path.posix.isAbsolute(currentPath)) {
+  if (
+    !currentPath ||
+    !home ||
+    !path.posix.isAbsolute(currentPath) ||
+    !path.posix.isAbsolute(home)
+  ) {
     throw new Error("WSL directory browser returned an invalid path");
   }
 
