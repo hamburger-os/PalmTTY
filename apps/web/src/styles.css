@@ -264,6 +264,11 @@ section {
   box-shadow: 0 0 8px color-mix(in srgb, var(--success) 44%, transparent);
 }
 
+.status-dot.stopping {
+  background: var(--warning);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--warning) 42%, transparent);
+}
+
 .status-dot.failed {
   background: var(--danger);
 }
@@ -286,19 +291,12 @@ button.icon-button {
   line-height: 1;
 }
 
-button.danger-icon {
+.session-action {
   align-self: center;
-  margin-right: 5px;
-  color: var(--danger);
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  font-size: 22px;
-}
-
-button.danger-icon:hover:not(:disabled) {
-  background: var(--danger-bg);
-  transform: none;
+  margin-right: 6px;
+  min-height: 34px;
+  white-space: nowrap;
+  font-size: var(--text-xs);
 }
 
 .center-card {
@@ -580,7 +578,8 @@ button.directory-choose {
 }
 
 .connection.reconnecting,
-.connection.connecting {
+.connection.connecting,
+.connection.stopping {
   color: var(--warning);
 }
 
