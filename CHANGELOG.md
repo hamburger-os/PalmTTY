@@ -25,7 +25,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 
 ### Fixed
 
-- Added Agent TCP endpoint bind probing to host preflight, with actionable Windows `EACCES/WSAEACCES` diagnostics; development Vite now derives its proxy target from the same PalmTTY config and uses strict port 5173.
+- Added Agent TCP endpoint bind probing to host preflight, with actionable Windows `EACCES/WSAEACCES` diagnostics; the root development launcher now derives and injects Vite's proxy target from the same PalmTTY config, while Vite uses strict port 5173 and stays host-config independent during test/build.
 - Isolated Worker recovery state into `runtime-v2`, matching private Worker IPC protocol generation 2 so new Agents do not rediscover previous-generation Worker state.
 - Recognize current-user Windows App Execution Aliases during shell resolution so Store/MSIX-installed PowerShell 7 is not misreported as missing; prefer the user activation alias over protected package PATH entries and report executable paths mistakenly used as workspace `cwd` as not-a-directory configuration errors.
 - Renamed the host runtime check from `doctor` to `preflight` so pnpm 10's built-in `pnpm doctor` can no longer bypass PalmTTY startup validation; `pnpm dev` now explicitly runs the project preflight first, and preflight reports all detected host configuration failures together.
