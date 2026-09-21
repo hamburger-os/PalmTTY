@@ -7,7 +7,7 @@ PalmTTY Agent 是开发电脑上的 Web/API 控制面，负责：
 - 提供 HTTP 与 WebSocket API；
 - 登录认证和 Origin 安全检查；
 - 管理当前用户的持久化 workspace 目录与运行时验证；
-- 为 Workspace 编辑器提供受认证 + 精确 Origin 保护的只读目录浏览与有界 Shell 探测；
+- 为 Workspace 编辑器提供受认证 + 精确 Origin 保护的只读目录浏览与统一终端配置发现；Host 侧只探测已知 Shell，WSL 侧只枚举已注册发行版，不通过扫描动作启动发行版；
 - 创建、发现并认证独立 Session Worker；
 - 把浏览器 WebSocket 转发到对应 Worker；
 - 托管编译后的手机端 PWA。
