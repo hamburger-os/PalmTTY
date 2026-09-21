@@ -54,8 +54,8 @@ All themes share the same clear/specular glass tokens. Theme identity comes from
 
 Surface tiers:
 
-- `.glass-shell`: small application shells, top bars, login cards and dialogs. Quality mode may use bounded backdrop sampling.
-- `.glass-panel`: structural controls such as terminal header, key bar and composer shell. No large-area backdrop blur.
+- `.glass-shell`: small application shells, top bars, login cards and compact dialogs. Quality mode may use bounded backdrop sampling.
+- `.glass-panel`: structural controls such as terminal header, key bar, composer shell and large/full-height editors. No large-area backdrop blur.
 - `.glass-content`: primary content such as the terminal viewport and stable read areas. No backdrop blur.
 - `.glass-control`: dense nested controls such as the directory picker. No backdrop blur.
 - `.glass-card`: workspace/session cards derived from the same physics.
