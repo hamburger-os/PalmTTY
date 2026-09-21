@@ -8,8 +8,8 @@
 - Windows 11 is the primary host target.
 - Node.js 22 or newer.
 - pnpm through Corepack.
-- PowerShell 7 available as `pwsh`, or an explicit `shellPath` in the workspace.
-- A workspace directory that the current Windows user can access.
+- PowerShell 7 available as `pwsh`, including the normal Microsoft Store/MSIX App Execution Alias, or an explicit `shellPath` in the workspace.
+- A workspace `cwd` directory that the current Windows user can access. `cwd` is not the shell executable path.
 
 ### Build
 
@@ -24,7 +24,7 @@ pnpm check
 pnpm start
 ```
 
-`PALMTTY_ACCESS_TOKEN` must contain at least 16 characters; use a long random secret for real deployments. `pnpm run preflight` validates the auth environment, security exposure, workspace directories, and shell executables, reporting all detected host-configuration failures in one run. PalmTTY resolves shell executables to absolute paths before Worker creation. Use `pnpm run preflight`, not `pnpm doctor`: pnpm 10 already uses `doctor` for its own package-manager diagnostics.
+`PALMTTY_ACCESS_TOKEN` must contain at least 16 characters; use a long random secret for real deployments. `pnpm run preflight` validates the auth environment, security exposure, workspace directories, and shell executables, reporting all detected host-configuration failures in one run. On Windows, PalmTTY recognizes the current user's Windows App Execution Alias for Store/MSIX-installed PowerShell 7 and preserves that absolute activation path for Worker creation. Use `pnpm run preflight`, not `pnpm doctor`: pnpm 10 already uses `doctor` for its own package-manager diagnostics.
 
 Then open `http://127.0.0.1:7688` on the same machine.
 
@@ -47,8 +47,8 @@ pnpm dev
 - 首要宿主平台为 Windows 11。
 - Node.js 22 或更高版本。
 - 通过 Corepack 使用 pnpm。
-- 已安装 PowerShell 7，并可通过 `pwsh` 启动；也可以在 workspace 中显式配置 `shellPath`。
-- 当前 Windows 用户可以访问的工作目录。
+- 已安装 PowerShell 7，并可通过 `pwsh` 启动；Microsoft Store/MSIX 安装产生的标准 Windows App Execution Alias 也受支持；也可以在 workspace 中显式配置 `shellPath`。
+- 当前 Windows 用户可以访问的 workspace `cwd` 目录。`cwd` 必须是目录，不是 `pwsh.exe` 等 Shell 可执行文件路径。
 
 ### 构建运行
 
@@ -63,7 +63,7 @@ pnpm check
 pnpm start
 ```
 
-`PALMTTY_ACCESS_TOKEN` 至少需要 16 个字符，实际部署应使用长随机 secret。`pnpm run preflight` 会在启动前检查认证环境、安全暴露规则、workspace 目录和 Shell 可执行文件，并在一次执行中汇总所有发现的宿主配置错误；Shell 会先解析为绝对路径，再交给 Worker 创建 PTY。请使用 `pnpm run preflight`，不要使用 `pnpm doctor`：pnpm 10 已经把 `doctor` 用作包管理器自身的诊断命令。
+`PALMTTY_ACCESS_TOKEN` 至少需要 16 个字符，实际部署应使用长随机 secret。`pnpm run preflight` 会在启动前检查认证环境、安全暴露规则、workspace 目录和 Shell 可执行文件，并在一次执行中汇总所有发现的宿主配置错误；Windows 上会识别当前用户的 Windows App Execution Alias，并把 Store/MSIX PowerShell 7 的绝对激活路径交给 Worker。请使用 `pnpm run preflight`，不要使用 `pnpm doctor`：pnpm 10 已经把 `doctor` 用作包管理器自身的诊断命令。
 
 之后在本机打开 `http://127.0.0.1:7688`。
 
