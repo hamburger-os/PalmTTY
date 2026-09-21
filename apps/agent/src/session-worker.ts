@@ -407,8 +407,23 @@ export class SessionWorkerServer {
 
         case "terminate":
           await this.runtime.terminate();
+          this.publishStatus();
           this.respond(connection, request.requestId, { terminating: true });
           return;
+
+        case "retire": {
+          const state = this.runtime.toPublic(this.attachedClients.size).state;
+          if (state === "starting" || state === "running" || state === "stopping") {
+            throw new Error("Session is still active");
+          }
+          this.respond(connection, request.requestId, { retiring: true });
+          setImmediate(() => {
+            void this.shutdown({ killPty: false, cleanupState: true }).then(() => {
+              this.options.onRetired?.();
+            });
+          });
+          return;
+        }
 
         case "ping":
           this.respond(connection, request.requestId, { pong: true });
