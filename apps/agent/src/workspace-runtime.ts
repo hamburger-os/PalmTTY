@@ -1,18 +1,21 @@
+import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { access, lstat, realpath, stat } from "node:fs/promises";
 import path from "node:path";
-import type { WorkspaceConfig } from "@palmtty/config";
+import type {
+  RuntimeCapabilities,
+  WorkspaceDefinition
+} from "@palmtty/protocol";
 import { z } from "zod";
 
 export const RuntimeWorkspaceSchema = z.object({
   id: z.string().min(1).max(64),
   cwd: z.string().min(1).refine(path.isAbsolute, "runtime cwd must be absolute"),
   executable: z.string().min(1).refine(path.isAbsolute, "runtime executable must be absolute"),
-  args: z.array(z.string()).max(32),
+  args: z.array(z.string()).max(64),
   command: z.string().max(8192).optional(),
   env: z.record(z.string(), z.string())
 });
-
 export type RuntimeWorkspace = z.infer<typeof RuntimeWorkspaceSchema>;
 
 function environmentValue(
@@ -90,11 +93,6 @@ async function usableFile(
   candidate: string,
   env: NodeJS.ProcessEnv | Record<string, string>
 ): Promise<string | undefined> {
-  // MSIX App Execution Aliases under the current user's WindowsApps directory
-  // are special reparse points. Node's stat/access APIs can report EACCES for
-  // them even though Windows can launch the alias. lstat can inspect the alias
-  // itself, so preserve this absolute activation path instead of trying to
-  // resolve through the protected package target.
   if (process.platform === "win32" && isUserWindowsAppsEntry(candidate, env)) {
     try {
       const info = await lstat(candidate);
@@ -143,11 +141,6 @@ export async function resolveExecutable(
     for (const entry of searchPathEntries(env)) {
       for (const extension of extensions) {
         const candidate = path.join(entry, `${program}${extension}`);
-        // PATH entries may contain the protected MSIX package install
-        // directory. That path is not the user activation boundary and can
-        // fail when spawned outside package identity. Skip it during PATH
-        // discovery and allow the normal current-user App Execution Alias to
-        // win later in PATH. An explicit shellPath remains authoritative.
         if (isProtectedWindowsAppsEntry(candidate, env)) continue;
         const resolved = await usableFile(candidate, env);
         if (resolved) return resolved;
@@ -157,25 +150,8 @@ export async function resolveExecutable(
 
   throw new Error(
     `Shell executable "${program}" was not found. ` +
-    "Install it, add it to PATH, or configure an explicit shellPath."
+    "Install it, add it to PATH, or configure an explicit shell."
   );
-}
-
-function mergedEnvironment(workspace: WorkspaceConfig): NodeJS.ProcessEnv {
-  const merged: NodeJS.ProcessEnv = { ...process.env };
-  if (process.platform !== "win32") {
-    Object.assign(merged, workspace.env);
-    return merged;
-  }
-
-  for (const [key, value] of Object.entries(workspace.env)) {
-    const lower = key.toLowerCase();
-    for (const existing of Object.keys(merged)) {
-      if (existing.toLowerCase() === lower && existing !== key) delete merged[existing];
-    }
-    merged[key] = value;
-  }
-  return merged;
 }
 
 async function workspaceDirectoryState(
@@ -192,9 +168,83 @@ async function workspaceDirectoryState(
   }
 }
 
-export async function resolveRuntimeWorkspace(
-  workspace: WorkspaceConfig
+function defaultHostShell(env: NodeJS.ProcessEnv): string {
+  if (process.platform === "win32") return "pwsh.exe";
+  return env.SHELL?.trim() || "/bin/sh";
+}
+
+function wslPrefix(workspace: WorkspaceDefinition): string[] {
+  if (workspace.runtime.kind !== "wsl") {
+    throw new Error("Workspace is not a WSL runtime");
+  }
+  return workspace.runtime.distribution
+    ? ["--distribution", workspace.runtime.distribution]
+    : [];
+}
+
+export function buildWslLaunchArgs(workspace: WorkspaceDefinition): string[] {
+  if (workspace.runtime.kind !== "wsl") {
+    throw new Error("Workspace is not a WSL runtime");
+  }
+  const args = [...wslPrefix(workspace), "--cd", workspace.cwd];
+  if (workspace.runtime.shell) {
+    args.push("--exec", workspace.runtime.shell, ...workspace.runtime.args);
+  }
+  return args;
+}
+
+async function runProcessProbe(
+  executable: string,
+  args: string[],
+  timeoutMs = 8_000
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(executable, args, {
+      stdio: ["ignore", "ignore", "pipe"],
+      windowsHide: true
+    });
+    let stderr = "";
+    let settled = false;
+
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve();
+    };
+
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      if (stderr.length < 8192) stderr += chunk.slice(0, 8192 - stderr.length);
+    });
+    child.once("error", (error) => finish(error));
+    child.once("close", (code) => {
+      if (code === 0) {
+        finish();
+        return;
+      }
+      const detail = stderr.trim();
+      finish(new Error(
+        detail
+          ? `WSL validation failed: ${detail}`
+          : `WSL validation failed with exit code ${code ?? "unknown"}`
+      ));
+    });
+
+    const timer = setTimeout(() => {
+      child.kill();
+      finish(new Error("WSL validation timed out"));
+    }, timeoutMs);
+    timer.unref();
+  });
+}
+
+async function resolveHostWorkspace(
+  workspace: WorkspaceDefinition
 ): Promise<RuntimeWorkspace> {
+  if (workspace.runtime.kind !== "host") throw new Error("Expected host runtime");
+
   const cwdState = await workspaceDirectoryState(workspace.cwd);
   if (cwdState === "unavailable") {
     throw new Error(
@@ -207,13 +257,13 @@ export async function resolveRuntimeWorkspace(
     );
   }
 
-  const requestedExecutable =
-    workspace.shellPath ?? (process.platform === "win32" ? "pwsh.exe" : "pwsh");
+  const cwd = await realpath(workspace.cwd);
+  const requestedExecutable = workspace.runtime.shell ?? defaultHostShell(process.env);
   let executable: string;
   try {
     executable = await resolveExecutable(requestedExecutable, {
-      cwd: workspace.cwd,
-      env: mergedEnvironment(workspace)
+      cwd,
+      env: process.env
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
@@ -222,19 +272,102 @@ export async function resolveRuntimeWorkspace(
 
   return RuntimeWorkspaceSchema.parse({
     id: workspace.id,
-    cwd: await realpath(workspace.cwd),
+    cwd,
     executable,
-    args: workspace.args,
-    ...(workspace.command ? { command: workspace.command } : {}),
-    env: workspace.env
+    args: workspace.runtime.args,
+    ...(workspace.startupCommand ? { command: workspace.startupCommand } : {}),
+    env: {}
   });
 }
 
-export async function resolveRuntimeWorkspaces(
-  workspaces: WorkspaceConfig[]
-): Promise<Map<string, RuntimeWorkspace>> {
-  const resolved = await Promise.all(workspaces.map(resolveRuntimeWorkspace));
-  return new Map(resolved.map((workspace) => [workspace.id, workspace]));
+async function resolveWslWorkspace(
+  workspace: WorkspaceDefinition
+): Promise<RuntimeWorkspace> {
+  if (workspace.runtime.kind !== "wsl") throw new Error("Expected WSL runtime");
+  if (process.platform !== "win32") {
+    throw new Error("WSL workspaces are supported only by a Windows PalmTTY Agent");
+  }
+
+  let executable: string;
+  try {
+    executable = await resolveExecutable("wsl.exe", {
+      cwd: process.cwd(),
+      env: process.env
+    });
+  } catch {
+    throw new Error(
+      `Workspace "${workspace.id}" requires WSL, but wsl.exe is unavailable`
+    );
+  }
+
+  const probe = [
+    ...wslPrefix(workspace),
+    "--cd",
+    workspace.cwd,
+    "--exec",
+    "/bin/sh",
+    "-lc",
+    workspace.runtime.shell
+      ? 'command -v "$1" >/dev/null 2>&1'
+      : "exit 0",
+    "palmtty-probe",
+    ...(workspace.runtime.shell ? [workspace.runtime.shell] : [])
+  ];
+
+  try {
+    await runProcessProbe(executable, probe);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Workspace "${workspace.id}" is not launchable: ${detail}`);
+  }
+
+  return RuntimeWorkspaceSchema.parse({
+    id: workspace.id,
+    cwd: process.cwd(),
+    executable,
+    args: buildWslLaunchArgs(workspace),
+    ...(workspace.startupCommand ? { command: workspace.startupCommand } : {}),
+    env: {}
+  });
+}
+
+export async function resolveRuntimeWorkspace(
+  workspace: WorkspaceDefinition
+): Promise<RuntimeWorkspace> {
+  return workspace.runtime.kind === "wsl"
+    ? resolveWslWorkspace(workspace)
+    : resolveHostWorkspace(workspace);
+}
+
+export async function detectRuntimeCapabilities(): Promise<RuntimeCapabilities> {
+  const platform: RuntimeCapabilities["platform"] =
+    process.platform === "win32" ||
+    process.platform === "linux" ||
+    process.platform === "darwin"
+      ? process.platform
+      : "other";
+
+  let wsl = false;
+  if (process.platform === "win32") {
+    try {
+      const executable = await resolveExecutable("wsl.exe", {
+        cwd: process.cwd(),
+        env: process.env
+      });
+      await runProcessProbe(executable, ["--status"], 5_000);
+      wsl = true;
+    } catch {
+      wsl = false;
+    }
+  }
+
+  return {
+    platform,
+    runtimes: {
+      host: true,
+      wsl
+    }
+  };
 }
 
 export function buildPtyEnvironment(
