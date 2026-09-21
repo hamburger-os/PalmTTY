@@ -94,6 +94,7 @@ async function runGit(
         cwd,
         "--exec",
         "/usr/bin/env",
+        ...excludedEnvironmentKeys.flatMap((key) => ["-u", key]),
         ...GIT_REPOSITORY_ENV_KEYS.flatMap((key) => ["-u", key]),
         "GIT_TERMINAL_PROMPT=0",
         "GIT_PAGER=cat",
