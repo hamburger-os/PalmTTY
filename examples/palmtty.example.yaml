@@ -1,5 +1,7 @@
 # Safe local/development example.
-# Copy to palmtty.local.yaml and change the workspace path.
+# Copy to palmtty.local.yaml and change each workspace cwd.
+# cwd is a directory. Do not put pwsh.exe or another executable path in cwd;
+# use shellPath only when you intentionally want an explicit shell executable.
 # Set PALMTTY_ACCESS_TOKEN before starting PalmTTY.
 
 server:

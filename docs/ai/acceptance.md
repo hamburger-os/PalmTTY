@@ -42,7 +42,7 @@ The Agent suite includes:
 - end-to-end Fastify HTTP/WebSocket + Worker IPC coverage with deterministic PTYs;
 - a real detached-process integration test where one Agent process creates a Worker and exits, and another Agent later rediscovers the same live terminal;
 - Windows CI coverage using real node-pty + PowerShell 7 / ConPTY and Unicode, while local Windows checks may use Windows PowerShell for generic ConPTY/process coverage;
-- workspace-runtime coverage for absolute shell resolution and actionable preflight failures.
+- workspace-runtime coverage for absolute shell resolution, current-user WindowsApps alias preference, executable-as-cwd diagnostics, and actionable preflight failures.
 
 ## Build
 
@@ -68,7 +68,7 @@ This requires the intended PalmTTY config and authentication environment. The pr
 
 ## Manual Windows validation before a release
 
-- run `pnpm run preflight` with the intended config/token and confirm every workspace resolves its shell successfully;
+- run `pnpm run preflight` with the intended config/token and confirm every workspace resolves its shell successfully; for Store/MSIX PowerShell, confirm the current-user WindowsApps App Execution Alias is accepted;
 
 - start pwsh through PalmTTY;
 - run a Unicode/CJK command;
