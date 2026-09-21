@@ -6,6 +6,7 @@ import {
 } from "@palmtty/protocol";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
+import { useI18n } from "./i18n.js";
 
 type ConnectionState = "connecting" | "connected" | "reconnecting" | "closed";
 
@@ -22,6 +23,7 @@ function controlCharacter(value: string): string | undefined {
 }
 
 export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack: () => void }) {
+  const { t } = useI18n();
   const hostRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -51,6 +53,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
     const terminal = new Terminal({
       cursorBlink: true,
       fontSize: 14,
+      lineHeight: 1.15,
       fontFamily: '"Cascadia Mono", "SFMono-Regular", Consolas, monospace',
       scrollback: 10000,
       allowProposedApi: false
@@ -147,7 +150,11 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
         if (message.type === "exit") {
           sessionExitedRef.current = true;
           ready = false;
-          terminal.write(`\r\n\u001b[90m[PalmTTY] session exited${message.exitCode === undefined ? "" : ` (${message.exitCode})`}\u001b[0m\r\n`);
+          terminal.write(
+            `\r\n\u001b[90m${t("terminal.sessionExited", {
+              code: message.exitCode === undefined ? "" : ` (${message.exitCode})`
+            })}\u001b[0m\r\n`
+          );
           setConnection("closed");
         }
 
@@ -207,7 +214,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
       terminal.dispose();
       terminalRef.current = null;
     };
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   const toggleCtrl = () => {
     ctrlRef.current = !ctrlRef.current;
@@ -235,13 +242,17 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
   return (
     <main className="terminal-page">
       <header className="terminal-header">
-        <button className="ghost compact" onClick={onBack}>← Sessions</button>
-        <span className={`connection ${connection}`}>{connection}</span>
+        <button className="ghost compact" onClick={onBack}>
+          ← {t("terminal.back")}
+        </button>
+        <span className={`connection ${connection}`}>
+          {t(`terminal.connection.${connection}`)}
+        </span>
       </header>
 
       <div ref={hostRef} className="terminal-host" />
 
-      <div className="keybar" aria-label="Terminal special keys">
+      <div className="keybar" aria-label={t("terminal.specialKeys")}>
         {key("Esc", "\u001b")}
         {key("Tab", "\t")}
         <button className={ctrl ? "armed" : ""} onClick={toggleCtrl}>Ctrl</button>
@@ -264,10 +275,10 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
         <textarea
           value={composer}
           onChange={(event) => setComposer(event.target.value)}
-          placeholder="Compose a long command or AI prompt…"
+          placeholder={t("terminal.composer")}
           rows={2}
         />
-        <button type="submit" disabled={!composer}>Send</button>
+        <button type="submit" disabled={!composer}>{t("terminal.send")}</button>
       </form>
     </main>
   );
