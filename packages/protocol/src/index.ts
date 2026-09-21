@@ -243,11 +243,6 @@ export const GitDiffResponseSchema = z.object({
 }).strict();
 export type GitDiffResponse = z.infer<typeof GitDiffResponseSchema>;
 
-export const GitPathActionRequestSchema = z.object({
-  path: z.string().min(1).max(4096)
-}).strict();
-export type GitPathActionRequest = z.infer<typeof GitPathActionRequestSchema>;
-
 export const SessionStateSchema = z.enum([
   "starting",
   "running",
