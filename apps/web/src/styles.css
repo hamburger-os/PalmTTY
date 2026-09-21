@@ -4,13 +4,25 @@
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #f5f7fa;
   background: #0b0d10;
+  color-scheme: dark;
   font-synthesis: none;
 }
 
 html, body, #root { margin: 0; min-height: 100%; background: #0b0d10; }
-button, input, textarea { font: inherit; }
+button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { opacity: .55; cursor: default; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 .app-shell {
   width: min(920px, 100%);
@@ -26,6 +38,11 @@ button:disabled { opacity: .55; cursor: default; }
 }
 
 .topbar { margin-bottom: 28px; }
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 h1, h2, p { margin-top: 0; }
 h1 { margin-bottom: 0; letter-spacing: -.035em; }
 h2 { font-size: 16px; margin-bottom: 0; }
@@ -34,6 +51,12 @@ h2 { font-size: 16px; margin-bottom: 0; }
 section { margin-top: 26px; }
 .section-heading { margin-bottom: 12px; color: #aeb7c4; }
 .section-heading > span { font-size: 12px; }
+.section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.section-title > span { font-size: 12px; }
 
 .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
 .workspace-card, .session-row, .center-card {
@@ -43,17 +66,44 @@ section { margin-top: 26px; }
 }
 
 .workspace-card {
-  min-height: 128px;
+  min-height: 154px;
   color: inherit;
   text-align: left;
   padding: 16px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 8px;
 }
+.workspace-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.workspace-card-heading strong { overflow-wrap: anywhere; }
 .workspace-card small, .session-row small { color: #8f9aaa; }
-.workspace-card span { margin-top: auto; color: #c9d1dc; font-size: 13px; }
+.workspace-path { overflow-wrap: anywhere; }
+.startup-command {
+  font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.workspace-launch {
+  margin-top: auto;
+  align-self: flex-start;
+  background: transparent;
+  padding: 8px 0 0;
+  border: 0;
+  border-radius: 0;
+  color: #d7dee8;
+}
+.workspace-launch:hover { background: transparent; color: #fff; }
+.workspace-empty {
+  padding: 20px;
+  border: 1px dashed #2b323c;
+  border-radius: 12px;
+  background: #101318;
+}
 
 .session-list { display: grid; gap: 8px; }
 .session-row { display: flex; align-items: center; overflow: hidden; }
@@ -85,6 +135,27 @@ button:hover { background: #2a313c; }
 button.ghost { background: transparent; }
 button.compact { padding: 7px 10px; }
 button.danger { color: #ff9a94; background: transparent; border: 0; font-size: 22px; }
+button.danger-outline {
+  color: #ff9a94;
+  background: transparent;
+  border-color: #67373b;
+}
+button.danger-outline:hover { background: #28171a; }
+button.icon-button { min-width: 38px; font-size: 20px; line-height: 1; }
+
+.language-switcher select {
+  border: 1px solid #343b46;
+  background: #0f1216;
+  color: #dce3ec;
+  border-radius: 9px;
+  padding: 8px 9px;
+}
+.login-toolbar {
+  min-height: 38px;
+  display: flex;
+  justify-content: flex-end;
+  margin: -8px -8px 8px 0;
+}
 
 .center-card {
   width: min(420px, calc(100% - 32px));
@@ -92,7 +163,8 @@ button.danger { color: #ff9a94; background: transparent; border: 0; font-size: 2
   padding: 28px;
 }
 .center-card form { display: grid; gap: 10px; }
-.center-card input, .composer textarea {
+.center-card input, .composer textarea,
+.workspace-form input, .workspace-form textarea, .workspace-form select {
   width: 100%;
   border: 1px solid #343b46;
   background: #0f1216;
@@ -101,7 +173,10 @@ button.danger { color: #ff9a94; background: transparent; border: 0; font-size: 2
   padding: 12px;
   outline: none;
 }
-.center-card input:focus, .composer textarea:focus { border-color: #77869b; }
+.center-card input:focus, .composer textarea:focus,
+.workspace-form input:focus, .workspace-form textarea:focus, .workspace-form select:focus {
+  border-color: #77869b;
+}
 .palm-mark { font-size: 34px; margin-bottom: 8px; }
 .error-banner {
   margin-top: 12px;
@@ -113,6 +188,58 @@ button.danger { color: #ff9a94; background: transparent; border: 0; font-size: 2
   overflow-wrap: anywhere;
 }
 .empty { color: #7f8996; padding: 16px 0; }
+
+.workspace-dialog {
+  width: min(620px, calc(100% - 28px));
+  max-height: min(760px, calc(100dvh - 32px));
+  padding: 0;
+  border: 1px solid #343b46;
+  border-radius: 16px;
+  background: #15191f;
+  color: #f5f7fa;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .55);
+}
+.workspace-dialog::backdrop { background: rgba(0, 0, 0, .66); }
+.workspace-form {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  overflow: auto;
+  max-height: inherit;
+}
+.dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.workspace-form label {
+  display: grid;
+  gap: 7px;
+  color: #dce3ec;
+  font-size: 14px;
+}
+.workspace-form label > small {
+  color: #8f9aaa;
+  line-height: 1.45;
+}
+.workspace-form input, .workspace-form textarea, .workspace-form select {
+  font-size: 16px;
+}
+.workspace-form textarea { resize: vertical; min-height: 68px; }
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 2px;
+}
+.dialog-primary-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
 
 .terminal-page {
   height: 100dvh;
@@ -129,9 +256,16 @@ button.danger { color: #ff9a94; background: transparent; border: 0; font-size: 2
 .connection { font-size: 12px; color: #909aaa; }
 .connection.connected { color: #7ee787; }
 .connection.reconnecting { color: #e3b341; }
-.terminal-host { min-height: 0; padding: 8px 6px 0; overflow: hidden; }
+.terminal-host {
+  min-height: 0;
+  padding: 8px 6px 8px;
+  overflow: hidden;
+}
 .terminal-host .xterm { height: 100%; }
-.terminal-host .xterm-viewport { overscroll-behavior: contain; }
+.terminal-host .xterm-viewport {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
 
 .keybar {
   display: flex;
@@ -153,13 +287,28 @@ button.danger { color: #ff9a94; background: transparent; border: 0; font-size: 2
   padding: 8px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   background: #101318;
 }
-.composer textarea { resize: none; min-height: 46px; max-height: 120px; }
+.composer textarea { resize: none; min-height: 46px; max-height: 120px; font-size: 16px; }
 
 @media (min-width: 700px) {
-  .terminal-page { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+  .terminal-page {
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell { padding-left: 12px; padding-right: 12px; }
+  .topbar { align-items: flex-start; }
+  .topbar-actions { flex-direction: column; align-items: flex-end; }
+  .dialog-actions { align-items: stretch; flex-direction: column-reverse; }
+  .dialog-actions > span { display: none; }
+  .dialog-primary-actions { width: 100%; }
+  .dialog-primary-actions > button { flex: 1; }
+  button.danger-outline { width: 100%; }
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
   .terminal-header { min-height: 38px; }
+  .terminal-host { padding-top: 5px; padding-bottom: 6px; }
   .composer textarea { min-height: 38px; }
 }
