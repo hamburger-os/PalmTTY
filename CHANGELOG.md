@@ -11,6 +11,9 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - Independent detached Session Worker per terminal, with Agent-restart persistence and authenticated local IPC.
 - Worker recovery metadata, per-session 256-bit secrets, startup READY handshake, heartbeat/reconnect and orphan-state cleanup.
 - Cross-process integration tests proving a Worker survives creator-Agent exit and can be rediscovered with replay intact.
+- Persistent Web-managed workspace catalog with authenticated create/edit/delete, separate from operator YAML configuration.
+- Host runtime adapter for Windows/Linux/macOS design, plus a structured Windows WSL adapter; Ubuntu CI exercises the Linux host path.
+- English and Simplified Chinese Web UI with persisted language preference.
 
 - Windows-first PowerShell 7 terminal sessions through node-pty / ConPTY.
 - Mobile React + xterm.js PWA with special-key controls and multiline composer.
@@ -25,6 +28,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 
 ### Fixed
 
+- Increased xterm line height and terminal bottom spacing so the final rendered row is not visually clipped against the mobile controls.
 - Added Agent TCP endpoint bind probing to host preflight, with actionable Windows `EACCES/WSAEACCES` diagnostics; the root development launcher now derives and injects Vite's proxy target from the same PalmTTY config, while Vite uses strict port 5173 and stays host-config independent during test/build.
 - Isolated Worker recovery state into `runtime-v2`, matching private Worker IPC protocol generation 2 so new Agents do not rediscover previous-generation Worker state.
 - Recognize current-user Windows App Execution Aliases during shell resolution so Store/MSIX-installed PowerShell 7 is not misreported as missing; prefer the user activation alias over protected package PATH entries and report executable paths mistakenly used as workspace `cwd` as not-a-directory configuration errors.
@@ -33,6 +37,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 
 ### Security
 
+- Workspace mutation is now an explicit authenticated + exact-Origin-protected API; Session creation still accepts only workspace IDs, and the Web workspace model does not expose environment-variable injection.
 - Worker secrets never reach the browser and are excluded from argv/URL/default logs; the login-token environment variable is stripped from Worker/PTTY environments.
 - Stale Worker records are cleaned without PID-based process killing, avoiding PID-reuse hazards.
 - Worker IPC terminal input and frames/backpressure are bounded.
