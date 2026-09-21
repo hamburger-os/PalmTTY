@@ -32,6 +32,7 @@ import {
   FileWorkspaceStore,
   type WorkspaceStore
 } from "./workspace-store.js";
+import { registerWorkspaceToolRoutes } from "./workspace-tool-routes.js";
 
 const LoginSchema = z.object({ token: z.string().min(1).max(4096) });
 
@@ -196,6 +197,12 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       }
     }
   );
+
+  registerWorkspaceToolRoutes(app, {
+    workspaceStore,
+    requireAuth,
+    requireOrigin
+  });
 
   app.get("/api/v1/workspaces", { preHandler: requireAuth }, async () => ({
     workspaces: workspaceStore.list()
