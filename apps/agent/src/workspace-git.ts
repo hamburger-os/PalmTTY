@@ -63,6 +63,7 @@ async function runGit(
         "/usr/bin/env",
         "GIT_TERMINAL_PROMPT=0",
         "GIT_PAGER=cat",
+        "GIT_OPTIONAL_LOCKS=0",
         "git",
         ...GIT_BASE_ARGS,
         ...args
@@ -83,6 +84,7 @@ async function runGit(
   );
   hostEnvironment.GIT_TERMINAL_PROMPT = "0";
   hostEnvironment.GIT_PAGER = "cat";
+  hostEnvironment.GIT_OPTIONAL_LOCKS = "0";
   const executable = await resolveExecutable("git", {
     cwd: workspace.cwd,
     env: hostEnvironment
