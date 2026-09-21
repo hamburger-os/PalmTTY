@@ -1,11 +1,11 @@
-import net, { type AddressInfo } from "node:net";
+import net, { type AddressInfo, type Server } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   describeServerBindError,
   probeServerEndpoint
 } from "./server-endpoint.js";
 
-const servers = new Set<net.Server>();
+const servers = new Set<Server>();
 
 afterEach(async () => {
   await Promise.all(
@@ -23,7 +23,7 @@ afterEach(async () => {
   servers.clear();
 });
 
-async function listeningServer(): Promise<{ server: net.Server; port: number }> {
+async function listeningServer(): Promise<{ server: Server; port: number }> {
   const server = net.createServer();
   servers.add(server);
   await new Promise<void>((resolve, reject) => {
