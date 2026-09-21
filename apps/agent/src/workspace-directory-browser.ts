@@ -32,38 +32,35 @@ function uniqueLocations(entries: DirectoryLocation[]): DirectoryLocation[] {
   });
 }
 
-let hostLocationsPromise: Promise<DirectoryLocation[]> | undefined;
+let cachedHostLocations: DirectoryLocation[] | undefined;
 
-async function computeHostLocations(home: string): Promise<DirectoryLocation[]> {
+function hostLocations(): DirectoryLocation[] {
+  if (cachedHostLocations) return cachedHostLocations;
+
+  const home = os.homedir();
+  const cwd = process.cwd();
   if (process.platform !== "win32") {
-    return uniqueLocations([
+    cachedHostLocations = uniqueLocations([
       { label: "~", path: home },
+      { label: ".", path: cwd },
       { label: "/", path: "/" }
     ]);
+    return cachedHostLocations;
   }
 
-  const roots = await Promise.all(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(async (letter) => {
-      const root = `${letter}:\\`;
-      try {
-        return (await stat(root)).isDirectory()
-          ? { label: root, path: root }
-          : undefined;
-      } catch {
-        return undefined;
-      }
-    })
-  );
+  const roots = [
+    path.parse(home).root,
+    path.parse(cwd).root,
+    process.env.SystemDrive ? `${process.env.SystemDrive}\\` : undefined,
+    process.env.HOMEDRIVE ? `${process.env.HOMEDRIVE}\\` : undefined
+  ].filter((value): value is string => Boolean(value));
 
-  return uniqueLocations([
+  cachedHostLocations = uniqueLocations([
     { label: "~", path: home },
-    ...roots.filter((entry): entry is DirectoryLocation => Boolean(entry))
+    { label: ".", path: cwd },
+    ...roots.map((root) => ({ label: root, path: root }))
   ]);
-}
-
-function hostLocations(): Promise<DirectoryLocation[]> {
-  hostLocationsPromise ??= computeHostLocations(os.homedir());
-  return hostLocationsPromise;
+  return cachedHostLocations;
 }
 
 async function browseHostDirectory(
@@ -106,7 +103,7 @@ async function browseHostDirectory(
   return DirectoryListingSchema.parse({
     currentPath,
     parentPath: parent === currentPath ? null : parent,
-    locations: await hostLocations(),
+    locations: hostLocations(),
     directories: sortLocations(directories),
     truncated
   });
