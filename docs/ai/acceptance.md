@@ -37,16 +37,16 @@ Security, session and reconnect changes should include or update tests for:
 - auth-session expiry closing established sockets
 - backpressure / slow-client cutoff
 - explicit terminate action transitions an active Session through `stopping` to `exited`, repeated terminate is idempotent, and `stopping` still counts as active
-- explicit restart waits for terminal exit, retires the previous retained Session, creates a new Session ID with the previous geometry, and does not accept ad-hoc launch overrides
+- explicit restart reserves replacement capacity, validates/resolves the replacement before terminating the current PTY, then waits for exit, retires the previous retained Session, creates a new Session ID with the previous geometry, and does not accept ad-hoc launch overrides
 - active/stopping Sessions reject clear/delete, while exited/failed Sessions can be cleared immediately and disappear from the registry
 - exit delivery and retention-expiry cleanup
 - concurrent maxSessions enforcement
 - workspace CRUD requires authentication + exact Origin
 - workspace persistence round-trip and duplicate-ID rejection
 - workspace deletion blocked while a Session is active, but allowed after exit even during retention
-- Host runtime executable/cwd validation, Windows fresh Machine/User environment rebuilding, and workspace-environment override/exclusion behavior
+- Host runtime executable/cwd validation, Windows fresh Machine/User environment rebuilding, workspace-environment override/exclusion behavior, and configured login-token removal before Worker bootstrap
 - bounded Host/WSL shell-profile detection with exact-Origin authentication and a manual Custom fallback in the Web editor
-- WSL argv construction without shell-string interpolation, workspace variable forwarding through `WSLENV`, and non-Windows rejection
+- WSL argv construction without shell-string interpolation, preservation of colon-delimited `WSLENV` entries/flags while forwarding workspace variables, and non-Windows rejection
 - Web workspace editor activation remains idempotent under repeated/StrictMode-style effect setup and does not depend on runtime capability probing to open
 - workspace directory browsing requires authentication + exact Origin, returns directories only, and remains bounded
 - workspace environment editing accepts bounded `NAME=value` input, rejects duplicate/reserved names, and persists only through workspace CRUD
@@ -57,7 +57,7 @@ The Agent suite includes:
 - end-to-end Fastify HTTP/WebSocket + Worker IPC coverage with deterministic PTYs;
 - a real detached-process integration test where one Agent process creates a Worker and exits, and another Agent later rediscovers the same live terminal;
 - Windows CI coverage using real node-pty + PowerShell 7 / ConPTY and Unicode, including PalmTTY's bundled-ConPTY-DLL path used to avoid node-pty's explicit-kill console-list helper; local Windows checks may use Windows PowerShell for generic ConPTY/process coverage;
-- workspace-runtime coverage for absolute host-shell resolution, current-user WindowsApps alias preference, executable-as-cwd diagnostics, structured WSL argv, and platform gating;
+- workspace-runtime coverage for absolute host-shell resolution, current-user WindowsApps alias preference, fresh environment composition/exclusion, executable-as-cwd diagnostics, structured WSL argv, and platform gating;
 - workspace-store coverage for versioned persistent CRUD;
 - Worker storage coverage asserting the runtime recovery generation stays aligned with the private Worker IPC protocol generation.
 
