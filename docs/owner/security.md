@@ -29,7 +29,7 @@ PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。安全失
 
 - secret 只通过 Worker 创建时的一次性匿名 stdin bootstrap 传递；
 - secret 不放 argv、URL、浏览器协议或普通日志；
-- PalmTTY 控制环境变量（认证 token、配置路径、开发代理/Origin/监听参数、Windows spawn trace 开关）在 Worker bootstrap 前从规范化 Workspace 环境剔除，并从 Worker 进程环境删除；Windows 下按环境变量名大小写不敏感语义处理；
+- `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量，在 Worker bootstrap 前从规范化 Workspace 环境剔除，并从 Worker 进程环境删除；Windows 下按环境变量名大小写不敏感语义处理；
 - Worker 先验证 protocol version + secret，未认证连接不能 attach/input/resize/terminate/retire；
 - 新 Agent 只有持有 recovery secret 才能接管控制连接；
 - Worker secret 在用户 runtime 目录单独保存；
@@ -59,7 +59,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 - Workspace CRUD 是显式高权限配置面，只有认证成功且 Origin 精确匹配的请求可以修改当前用户的持久化 workspace。
 - Workspace 目录选择器也是“认证 + 精确 Origin”保护的显式 API，但只读且只枚举目录名称/绝对路径，不返回文件内容；Host/WSL 浏览均有限流、返回数量上限，WSL 还限制子进程输出与执行时间。
-- Web workspace 可以配置 cwd、runtime、Shell、Shell args、有界 environment 与启动命令。Environment 是当前用户应用数据中的持久化配置，可能敏感但不是 secret vault；默认日志不得记录其值。PalmTTY 自身控制变量（认证 token、配置路径、开发代理/Origin/监听参数、spawn trace）属于保留项，Workspace mutation 会拒绝持久化它们；Worker bootstrap 和 PTY 仍继续剔除作为纵深防御。
+- Web workspace 可以配置 cwd、runtime、Shell、Shell args、有界 environment 与启动命令。Environment 是当前用户应用数据中的持久化配置，可能敏感但不是 secret vault；默认日志不得记录其值。`PALMTTY_*` 整个命名空间以及单独配置的认证 token 环境变量属于保留项，Workspace mutation 会拒绝持久化它们；Worker bootstrap 和 PTY 仍继续剔除作为纵深防御。
 - Session 创建与重启都只使用已持久化的 workspace authority，不允许用一次 Session 请求临时注入 cwd/shell/env。
 - Workspace 新建/更新会验证运行目标，Session 创建/重启前再次验证；Host Shell 解析为绝对 executable，Windows 新终端先刷新 Machine/User 环境再应用 Workspace environment；WSL 通过结构化 argv 调用 `wsl.exe`，并仅通过 `WSLENV` 名称列表转发 workspace variables，不做用户命令字符串拼接。
 - 终端 Profile 发现与目录浏览一样要求认证 + 精确 Origin，并具有独立限流、输出与超时边界；Host 侧只返回已知 Shell Profile，Windows WSL 侧通过 `wsl.exe --list --quiet` 枚举已注册发行版，不进入发行版执行探测脚本，也不提供任意命令执行。
