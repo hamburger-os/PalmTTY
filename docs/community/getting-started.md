@@ -47,7 +47,7 @@ $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
 pnpm dev
 ```
 
-`pnpm dev` runs the same preflight before it starts either development server. An invalid token, unavailable Agent listen endpoint, workspace, or shell therefore fails once instead of leaving Vite running against an unavailable Agent. Vite reads the same `PALMTTY_CONFIG` and derives its `/api` proxy target from the configured Agent host/port; `PALMTTY_AGENT_URL` can still override that target explicitly. Vite uses strict port 5173. Add `http://127.0.0.1:5173` to `trustedOrigins` while using this mode.
+`pnpm dev` runs the same preflight before it starts either development server. An invalid token, unavailable Agent listen endpoint, workspace, or shell therefore fails once instead of leaving Vite running against an unavailable Agent. The root `pnpm dev` launcher reads the same `PALMTTY_CONFIG`, derives the local Agent URL from the configured host/port, and injects it into Vite as `PALMTTY_AGENT_URL`; an explicitly supplied `PALMTTY_AGENT_URL` can still override that target. Vite uses strict port 5173. Add `http://127.0.0.1:5173` to `trustedOrigins` while using this mode.
 
 ## 中文
 
@@ -95,4 +95,4 @@ $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
 pnpm dev
 ```
 
-`pnpm dev` 会先执行同一套 preflight，再启动 Agent 和 Vite；token、Agent 监听端点不可用、workspace 或 Shell 配置错误都会直接失败，不会留下一个持续代理到失效 Agent 的 Vite 进程。Vite 会读取同一个 `PALMTTY_CONFIG`，按 `server.host`/`server.port` 自动生成 `/api` 代理目标；仍可用 `PALMTTY_AGENT_URL` 显式覆盖。Vite 固定使用 5173 且开启 strict port，不会静默切换到未加入 `trustedOrigins` 的其他端口。
+`pnpm dev` 会先执行同一套 preflight，再启动 Agent 和 Vite；token、Agent 监听端点不可用、workspace 或 Shell 配置错误都会直接失败，不会留下一个持续代理到失效 Agent 的 Vite 进程。根 `pnpm dev` 启动器会读取同一个 `PALMTTY_CONFIG`，按 `server.host`/`server.port` 推导本地 Agent URL，再通过 `PALMTTY_AGENT_URL` 注入 Vite；用户显式设置的 `PALMTTY_AGENT_URL` 仍可覆盖该目标。Vite 固定使用 5173 且开启 strict port，不会静默切换到未加入 `trustedOrigins` 的其他端口。
