@@ -59,6 +59,8 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 - Workspace CRUD 是显式高权限配置面，只有认证成功且 Origin 精确匹配的请求可以修改当前用户的持久化 workspace。
 - Workspace 目录选择器也是“认证 + 精确 Origin”保护的显式 API，但只读且只枚举目录名称/绝对路径，不返回文件内容；Host/WSL 浏览均有限流、返回数量上限，WSL 还限制子进程输出与执行时间。
+- 会话工作台的 Files 与 Git 是与目录选择器、终端 WebSocket 分离的只读检查面，全部要求认证 + 精确 Origin，并有独立限流。Files API 只接收规范化 Workspace 相对路径，Host 使用 `realpath`/symlink containment 防止越过 Workspace 根目录，WSL 在发行版内再次解析 physical path 并做根目录前缀检查；目录最多返回 512 项，文本预览最多 512 KiB，二进制内容不解码。
+- Git API 只暴露 status/diff，不提供 stage/commit/push/pull。Git 命令使用结构化 argv、输出/超时上限和 `--` pathspec 分隔；diff 禁止 external diff/textconv，status 禁用 fsmonitor，以避免一次“查看”动作隐式执行仓库配置中的外部程序。Git/WSL 辅助子进程会从环境中剔除 PalmTTY 登录 token 对应的配置变量。
 - Web workspace 可以配置 cwd、runtime、Shell、Shell args、有界 environment 与启动命令。Environment 是当前用户应用数据中的持久化配置，可能敏感但不是 secret vault；默认日志不得记录其值。当前认证 token 对应的环境变量名属于保留项，Workspace mutation 会拒绝持久化它；Worker bootstrap 和 PTY 仍继续执行剔除作为纵深防御。
 - Session 创建与重启都只使用已持久化的 workspace authority，不允许用一次 Session 请求临时注入 cwd/shell/env。
 - Workspace 新建/更新会验证运行目标，Session 创建/重启前再次验证；Host Shell 解析为绝对 executable，Windows 新终端先刷新 Machine/User 环境再应用 Workspace environment；WSL 通过结构化 argv 调用 `wsl.exe`，并仅通过 `WSLENV` 名称列表转发 workspace variables，不做用户命令字符串拼接。
@@ -69,7 +71,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 ## 资源限制
 
-- 登录、创建 Session、Session lifecycle mutation、目录浏览与终端 Profile 发现分别限流；
+- 登录、创建 Session、Session lifecycle mutation、目录浏览、终端 Profile 发现与 Workspace Git/Files 检查面分别限流；
 - Session 数量有上限，并发创建也计入上限；
 - browser WebSocket 消息和终端尺寸有上限；
 - replay、scrollback、IPC frame、IPC backlog、browser backpressure 均有限制；
@@ -81,7 +83,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 ## 你审查时重点看
 
-1. Workspace CRUD、目录浏览与终端 Profile 发现是否仍受认证 + 精确 Origin 保护；Profile 发现是否仍然只是有界枚举而不是通用执行；Session 创建/重启是否仍只消费持久化 Workspace authority，而不是接收临时 cwd/shell/env？
+1. Workspace CRUD、目录浏览、终端 Profile 与 Git/Files 工作台是否仍受认证 + 精确 Origin 保护；Files 是否始终约束在 Workspace 根目录；Git 是否保持只读、有界并禁止 external diff/textconv/fsmonitor；Session 创建/重启是否仍只消费持久化 Workspace authority，而不是接收临时 cwd/shell/env？
 2. 是否让 secret/终端内容进入日志、URL、argv 或浏览器？
 3. 是否破坏认证 + Origin + HTTPS 外部边界？
 4. 是否允许未认证本地 IPC 控制 Worker？
