@@ -20,8 +20,9 @@ async function developmentAgentUrl(): Promise<string> {
   return `http://${urlHost(config.server.host)}:${config.server.port}`;
 }
 
-export default defineConfig(async ({ command }) => {
-  const agent = command === "serve"
+export default defineConfig(async ({ command, mode }) => {
+  const useRuntimeConfig = command === "serve" && mode !== "test" && !process.env.VITEST;
+  const agent = useRuntimeConfig
     ? await developmentAgentUrl()
     : process.env.PALMTTY_AGENT_URL ?? DEFAULT_AGENT_URL;
 
