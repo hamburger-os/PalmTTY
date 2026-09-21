@@ -28,6 +28,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 
 ### Fixed
 
+- Fixed the workspace editor so it opens immediately even while runtime capability detection is still pending; modal activation is idempotent under React StrictMode, and capability probing is reused for the lifetime of the Agent process.
 - Increased xterm line height and terminal bottom spacing so the final rendered row is not visually clipped against the mobile controls.
 - Added Agent TCP endpoint bind probing to host preflight, with actionable Windows `EACCES/WSAEACCES` diagnostics; the root development launcher now derives and injects Vite's proxy target from the same PalmTTY config, while Vite uses strict port 5173 and stays host-config independent during test/build.
 - Isolated Worker recovery state into `runtime-v2`, matching private Worker IPC protocol generation 2 so new Agents do not rediscover previous-generation Worker state.
