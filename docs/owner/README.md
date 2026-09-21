@@ -7,7 +7,7 @@
 ## 模块索引
 
 - [agent.md](agent.md) — Agent 服务端职责与边界
-- [session.md](session.md) — PowerShell/ConPTY 会话模型
+- [session.md](session.md) — Host / WSL / PTY 会话模型
 - [reconnect.md](reconnect.md) — 断线重连与终端状态恢复
 - [security.md](security.md) — 安全模型、认证与公网边界
 - [web-mobile.md](web-mobile.md) — 手机端 Web/PWA 交互
