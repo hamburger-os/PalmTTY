@@ -32,6 +32,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
   const { t } = useI18n();
   const { terminalTheme } = useTheme();
   const translateRef = useRef(t);
+  const terminalThemeRef = useRef(terminalTheme);
   const hostRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -77,7 +78,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
       fontFamily: '"Cascadia Mono", "SFMono-Regular", Consolas, monospace',
       scrollback: 10000,
       allowProposedApi: false,
-      theme: terminalTheme
+      theme: terminalThemeRef.current
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
@@ -322,6 +323,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
   }, [sessionId]);
 
   useEffect(() => {
+    terminalThemeRef.current = terminalTheme;
     const terminal = terminalRef.current;
     if (terminal) terminal.options.theme = terminalTheme;
   }, [terminalTheme]);
