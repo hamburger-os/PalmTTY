@@ -14,7 +14,7 @@ PalmTTY provides shell access with the privileges of the OS user running it. Tre
 - Successful login creates an in-memory HttpOnly, SameSite=Strict session cookie; Secure is required for normal non-loopback deployment.
 - Authentication and Origin are separate controls.
 - Workspace management is an explicit authenticated, exact-Origin-protected mutation surface. The directory picker uses a separate authenticated + exact-Origin read-only API that lists directories only; it is rate-limited and bounded, and it never returns file contents.
-- Workspace management The browser may persist cwd/runtime/shell/startup-command choices, but Session creation still accepts only a workspace ID and the Web model does not expose arbitrary environment-variable injection.
+- The browser may persist cwd/runtime/shell/startup-command choices, but Session creation still accepts only a workspace ID and the Web model does not expose arbitrary environment-variable injection.
 - Workspace create/update validates the selected runtime. Host shells are resolved to absolute executables; WSL launch data is passed as structured argv. Session creation validates the stored workspace again before Worker creation.
 - Terminal I/O, login tokens, Worker secrets and workspace environment values are excluded from default logs.
 - Login attempts, Session creation, terminal dimensions, input size, replay state, exited-session retention and socket backpressure are bounded.
