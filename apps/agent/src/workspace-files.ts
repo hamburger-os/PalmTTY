@@ -216,6 +216,8 @@ async function runWslScript(
     args: [
       ...wslPrefix(workspace),
       "--exec",
+      "/usr/bin/env",
+      ...excludedEnvironmentKeys.flatMap((key) => ["-u", key]),
       "/bin/sh",
       "-c",
       script,
