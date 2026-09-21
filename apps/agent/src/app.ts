@@ -80,6 +80,18 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     return auth.isAuthenticated(request.cookies[AUTH_COOKIE]);
   }
 
+  function workspaceUsesReservedEnvironment(
+    environment: Record<string, string> | undefined
+  ): boolean {
+    if (!environment) return false;
+    const reserved = config.auth.tokenEnv;
+    return Object.keys(environment).some((key) => (
+      process.platform === "win32"
+        ? key.toLowerCase() === reserved.toLowerCase()
+        : key === reserved
+    ));
+  }
+
   async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
     if (!authenticated(request)) {
       return reply.code(401).send({ error: "authentication_required" });
@@ -200,6 +212,12 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       if (!parsed.success) {
         return reply.code(400).send({ error: "invalid_workspace_request" });
       }
+      if (workspaceUsesReservedEnvironment(parsed.data.environment)) {
+        return reply.code(400).send({
+          error: "workspace_invalid",
+          message: `Environment variable "${config.auth.tokenEnv}" is reserved by PalmTTY authentication`
+        });
+      }
 
       const workspace = WorkspaceDefinitionSchema.parse({
         id: randomUUID(),
@@ -231,6 +249,12 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       const parsed = CreateWorkspaceSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: "invalid_workspace_request" });
+      }
+      if (workspaceUsesReservedEnvironment(parsed.data.environment)) {
+        return reply.code(400).send({
+          error: "workspace_invalid",
+          message: `Environment variable "${config.auth.tokenEnv}" is reserved by PalmTTY authentication`
+        });
       }
 
       const workspace = WorkspaceDefinitionSchema.parse({
