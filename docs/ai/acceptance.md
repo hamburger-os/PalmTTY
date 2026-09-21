@@ -65,11 +65,11 @@ On a configured PalmTTY host, before `dev`/`start` or release validation:
 pnpm run preflight
 ~~~
 
-This requires the intended PalmTTY config and authentication environment. The preflight should report all detected auth/security/workspace launch failures together so host setup can be corrected in one pass. It is not a generic CI/contributor prerequisite. The explicit `run` form is required because pnpm 10 has its own built-in `doctor` command; PalmTTY deliberately names its host check `preflight` to avoid command dispatch ambiguity.
+This requires the intended PalmTTY config and authentication environment. The preflight should report all detected auth/security/server-bind/workspace launch failures together so host setup can be corrected in one pass. It is not a generic CI/contributor prerequisite. The explicit `run` form is required because pnpm 10 has its own built-in `doctor` command; PalmTTY deliberately names its host check `preflight` to avoid command dispatch ambiguity.
 
 ## Manual Windows validation before a release
 
-- run `pnpm run preflight` with the intended config/token and confirm every workspace resolves its shell successfully; for Store/MSIX PowerShell, confirm the current-user WindowsApps App Execution Alias is accepted;
+- run `pnpm run preflight` with the intended config/token and confirm the Agent TCP endpoint is bindable and every workspace resolves its shell successfully; for Store/MSIX PowerShell, confirm the current-user WindowsApps App Execution Alias is accepted;
 
 - start pwsh through PalmTTY;
 - run a Unicode/CJK command;

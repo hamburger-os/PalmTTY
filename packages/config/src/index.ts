@@ -1,4 +1,6 @@
 import { readFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
@@ -92,4 +94,44 @@ export function publicWorkspace(workspace: WorkspaceConfig) {
     shell: workspace.shell,
     ...(workspace.command ? { startupCommand: workspace.command } : {})
   };
+}
+
+export function defaultConfigPath(): string {
+  if (process.platform === "win32") {
+    return path.join(process.env.APPDATA ?? os.homedir(), "PalmTTY", "config.yaml");
+  }
+  if (process.platform === "darwin") {
+    return path.join(
+      os.homedir(),
+      "Library",
+      "Application Support",
+      "PalmTTY",
+      "config.yaml"
+    );
+  }
+  return path.join(
+    process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"),
+    "palmtty",
+    "config.yaml"
+  );
+}
+
+export function configPathFromEnvironment(): string {
+  return process.env.PALMTTY_CONFIG
+    ? path.resolve(process.env.PALMTTY_CONFIG)
+    : defaultConfigPath();
+}
+
+export function localAgentUrl(
+  config: Pick<PalmTTYConfig, "server">
+): string {
+  const normalized = config.server.host.trim().replace(/^\[|\]$/g, "");
+  const host = normalized === "0.0.0.0"
+    ? "127.0.0.1"
+    : normalized === "::"
+      ? "[::1]"
+      : normalized.includes(":")
+        ? `[${normalized}]`
+        : normalized;
+  return `http://${host}:${config.server.port}`;
 }

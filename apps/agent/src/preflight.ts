@@ -1,5 +1,6 @@
 import type { PalmTTYConfig } from "@palmtty/config";
 import { assertAuthEnvironment } from "./auth.js";
+import { probeServerEndpoint } from "./server-endpoint.js";
 import { assertSecureExposure } from "./security.js";
 import {
   resolveRuntimeWorkspace,
@@ -10,18 +11,25 @@ export type RuntimePreflight = {
   workspaces: ReadonlyMap<string, RuntimeWorkspace>;
 };
 
+export type RuntimePreflightOptions = {
+  serverProbe?: (server: PalmTTYConfig["server"]) => Promise<void>;
+};
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
 export async function preflightRuntime(
-  config: PalmTTYConfig
+  config: PalmTTYConfig,
+  options: RuntimePreflightOptions = {}
 ): Promise<RuntimePreflight> {
   const issues: string[] = [];
 
+  let exposureAllowed = true;
   try {
     assertSecureExposure(config);
   } catch (error) {
+    exposureAllowed = false;
     issues.push(errorMessage(error));
   }
 
@@ -29,6 +37,14 @@ export async function preflightRuntime(
     assertAuthEnvironment(config.auth);
   } catch (error) {
     issues.push(errorMessage(error));
+  }
+
+  if (exposureAllowed) {
+    try {
+      await (options.serverProbe ?? probeServerEndpoint)(config.server);
+    } catch (error) {
+      issues.push(errorMessage(error));
+    }
   }
 
   const workspaceResults = await Promise.allSettled(

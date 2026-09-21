@@ -1,36 +1,15 @@
-import os from "node:os";
 import path from "node:path";
-import { loadConfig } from "@palmtty/config";
+import { configPathFromEnvironment, loadConfig } from "@palmtty/config";
 import { buildApp } from "./app.js";
 import { preflightRuntime } from "./preflight.js";
+import { describeServerBindError } from "./server-endpoint.js";
 import { runSessionWorkerFromStdin } from "./session-worker.js";
-
-function defaultConfigPath(): string {
-  if (process.platform === "win32") {
-    return path.join(process.env.APPDATA ?? os.homedir(), "PalmTTY", "config.yaml");
-  }
-  if (process.platform === "darwin") {
-    return path.join(
-      os.homedir(),
-      "Library",
-      "Application Support",
-      "PalmTTY",
-      "config.yaml"
-    );
-  }
-  return path.join(
-    process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"),
-    "palmtty",
-    "config.yaml"
-  );
-}
 
 function configPathFromArgs(): string {
   const index = process.argv.indexOf("--config");
   const explicitPath = index >= 0 ? process.argv[index + 1] : undefined;
   if (explicitPath) return path.resolve(explicitPath);
-  if (process.env.PALMTTY_CONFIG) return path.resolve(process.env.PALMTTY_CONFIG);
-  return defaultConfigPath();
+  return configPathFromEnvironment();
 }
 
 async function main() {
@@ -62,7 +41,15 @@ async function main() {
       runtimeWorkspaces: preflight.workspaces
     }
   });
-  await app.listen({ host: config.server.host, port: config.server.port });
+  try {
+    await app.listen({ host: config.server.host, port: config.server.port });
+  } catch (error) {
+    await app.close().catch(() => undefined);
+    throw new Error(
+      describeServerBindError(config.server, error),
+      { cause: error }
+    );
+  }
   console.log(`[PalmTTY] listening on ${config.server.host}:${config.server.port}`);
 }
 

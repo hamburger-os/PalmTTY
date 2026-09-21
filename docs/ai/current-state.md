@@ -27,8 +27,9 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - exact Origin allowlist and non-loopback startup safety gate
 - bounded login/session-create rate limiting
 - workspace ID allowlist
-- runtime preflight for auth/security exposure, workspace directories and shell executable resolution, exposed as the unambiguous `pnpm run preflight` package script and aggregating all detected host-configuration failures
+- runtime preflight for auth/security exposure, configured Agent TCP bindability, workspace directories and shell executable resolution, exposed as the unambiguous `pnpm run preflight` package script and aggregating all detected host-configuration failures
 - normalized per-workspace launch specs with absolute shell launch paths before Worker bootstrap, including current-user Windows App Execution Aliases for Store/MSIX PowerShell
+- root development launcher derives the Agent target from the validated PalmTTY config, injects it into host-independent Vite tooling, and Vite refuses silent dev-port fallback
 - bounded client message size and terminal dimensions
 - no intentional terminal I/O logging
 - Agent is a replaceable control plane and no longer owns PTYs or canonical terminal state
