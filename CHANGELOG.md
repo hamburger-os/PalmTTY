@@ -15,8 +15,8 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - Host runtime adapter for Windows/Linux/macOS design, plus a structured Windows WSL adapter; Ubuntu CI exercises the Linux host path.
 - English and Simplified Chinese Web UI with persisted language preference.
 - PalmTTY-owned Spectrum / Obsidian / Frosted visual themes, Quality / Performance rendering modes, reduced-motion handling, semantic liquid-glass surfaces, and matching theme/review Agent Skills.
-- Runtime-aware remote directory picker for Host/WSL workspaces, plus shell-argument examples and one-click startup presets for common terminal coding agents.
-- Explicit Session lifecycle actions: terminate active Sessions through `stopping → exited`, retain exited terminal state for review, and clear retained Sessions independently.
+- Runtime-aware remote directory picker for Host/WSL workspaces, automatic installed-Shell profiles with a Custom fallback, bounded Workspace environment variables, and one-click startup presets for common terminal coding agents.
+- Explicit Session lifecycle actions: terminate active Sessions through `stopping → exited`, restart a terminal by replacing its PTY/Session from the latest validated Workspace, retain exited terminal state for review, and clear retained Sessions independently.
 
 - Windows-first PowerShell 7 terminal sessions through node-pty / ConPTY.
 - Mobile React + xterm.js PWA with special-key controls and multiline composer.
@@ -31,6 +31,9 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 
 ### Fixed
 
+- Refresh Windows Machine/User environment values for every new/restarted Host terminal so CLIs installed into the user PATH after Agent startup become available without restarting PalmTTY.
+- Preserve existing `WSLENV` entries/flags while forwarding Workspace variables with the documented colon-delimited syntax.
+- Preflight terminal restart before terminating the current PTY, so an invalid/deleted Workspace does not destroy an otherwise usable Session.
 - Refined Web surface ownership: Workspace/confirmation dialogs now use a dedicated readability-first modal material, long Workspace forms keep fixed header/footer actions around one scrolling body, and mobile touch targets use shared sizing tokens.
 - Removed the terminal's double-surface visual seam by making the host gutter and xterm canvas share the active theme background, softened the Spectrum terminal field, and isolated locale/theme presentation updates from the terminal transport lifecycle.
 - Replaced the workspace browser-native delete confirmation with the shared themed confirmation flow and kept theme changes isolated from xterm/WebSocket recovery state.
@@ -50,8 +53,9 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 ### Security
 
 - Directory browsing is an authenticated + exact-Origin read-only API that returns directories only, with rate, entry-count, process-output, and timeout bounds.
-- Workspace mutation is now an explicit authenticated + exact-Origin-protected API; Session creation still accepts only workspace IDs, and the Web workspace model does not expose environment-variable injection.
-- Worker secrets never reach the browser and are excluded from argv/URL/default logs; the login-token environment variable is stripped from Worker/PTTY environments.
+- Workspace mutation is an explicit authenticated + exact-Origin-protected API; bounded Workspace environment variables are persistent configuration, while Session creation/restart do not accept ad-hoc cwd/shell/env overrides.
+- Directory and installed-Shell inspection APIs require authentication + exact Origin and remain bounded; Shell detection does not expose arbitrary command execution.
+- Worker secrets never reach the browser and are excluded from argv/URL/default logs; the login-token environment variable is stripped before Worker bootstrap and again from Worker/PTTY environments.
 - Stale Worker records are cleaned without PID-based process killing, avoiding PID-reuse hazards.
 - Worker IPC terminal input and frames/backpressure are bounded.
 - Session lifecycle mutations have a dedicated rate limit; retained-session retirement is authenticated Worker IPC and is rejected while the Session is active/stopping.
