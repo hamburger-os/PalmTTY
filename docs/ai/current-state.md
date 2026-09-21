@@ -28,7 +28,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - bounded login/session-create rate limiting
 - workspace ID allowlist
 - runtime preflight for auth/security exposure, workspace directories and shell executable resolution, exposed as the unambiguous `pnpm run preflight` package script and aggregating all detected host-configuration failures
-- normalized per-workspace launch specs with absolute shell executables before Worker bootstrap
+- normalized per-workspace launch specs with absolute shell launch paths before Worker bootstrap, including current-user Windows App Execution Aliases for Store/MSIX PowerShell
 - bounded client message size and terminal dimensions
 - no intentional terminal I/O logging
 - Agent is a replaceable control plane and no longer owns PTYs or canonical terminal state
@@ -89,7 +89,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Worker self-healing of missing recovery record/secret without weakening conflict detection
 - oversized Worker terminal input rejection
 - detached Worker survival across complete creator Agent process exit
-- real Windows node-pty + ConPTY Unicode smoke test with local PowerShell fallback; repository Windows CI explicitly requires PowerShell 7
+- real Windows node-pty + ConPTY Unicode smoke test with local PowerShell fallback; repository Windows CI explicitly requires PowerShell 7; owner-host MSIX/App Execution Alias PTY launch remains part of real-host validation
 
 ### Web/mobile
 
