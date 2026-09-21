@@ -29,11 +29,13 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 
 ### Fixed
 
+- Made terminal recovery geometry-aware: the browser now sends its fitted rows/columns in the resume handshake, the Worker resizes canonical PTY/xterm state before recovery, and geometry changes force a fresh snapshot so refresh/reconnect cannot restore a snapshot into a mismatched viewport.
+- Treat the terminal recovery `hello` as a completion boundary, serialize browser xterm writes, freeze fitting while recovery is in flight, and prevent disconnected/recovering input from being silently dropped.
 - Removed the duplicate workspace-dialog scrollbar by making the form the single vertical scroll owner.
 - Fixed the workspace editor so it opens immediately even while runtime capability detection is still pending; modal activation is idempotent under React StrictMode, and capability probing is reused for the lifetime of the Agent process.
 - Increased xterm line height and terminal bottom spacing so the final rendered row is not visually clipped against the mobile controls.
 - Added Agent TCP endpoint bind probing to host preflight, with actionable Windows `EACCES/WSAEACCES` diagnostics; the root development launcher now derives and injects Vite's proxy target from the same PalmTTY config, while Vite uses strict port 5173 and stays host-config independent during test/build.
-- Isolated Worker recovery state into `runtime-v2`, matching private Worker IPC protocol generation 2 so new Agents do not rediscover previous-generation Worker state.
+- Isolated Worker recovery state into `runtime-v3`, matching private Worker IPC protocol generation 3 so new Agents do not rediscover previous-generation Worker state.
 - Recognize current-user Windows App Execution Aliases during shell resolution so Store/MSIX-installed PowerShell 7 is not misreported as missing; prefer the user activation alias over protected package PATH entries and report executable paths mistakenly used as workspace `cwd` as not-a-directory configuration errors.
 - Renamed the host runtime check from `doctor` to `preflight` so pnpm 10's built-in `pnpm doctor` can no longer bypass PalmTTY startup validation; `pnpm dev` now explicitly runs the project preflight first, and preflight reports all detected host configuration failures together.
 - Made generic Windows ConPTY and detached-Worker integration tests portable to hosts without PowerShell 7 while keeping official Windows CI pinned to real PowerShell 7 coverage.

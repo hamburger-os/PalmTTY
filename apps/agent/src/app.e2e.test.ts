@@ -501,7 +501,7 @@ describe("terminal WebSocket integration", () => {
     const inbox = new MessageInbox(socket);
     await waitForOpen(socket);
 
-    socket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    socket.send(JSON.stringify({ type: "resume", lastSeq: 0, cols: 80, rows: 24 }));
     socket.send(JSON.stringify({ type: "resize", cols: 120, rows: 35 }));
     socket.send(JSON.stringify({ type: "input", data: "ORDERED" }));
 
@@ -522,6 +522,60 @@ describe("terminal WebSocket integration", () => {
     socket.close(1000, "test complete");
   });
 
+  it("resizes canonical state before recovery and snapshots across a geometry change", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    const session = await createSession(harness, cookie);
+
+    const firstSocket = socketFor(harness, session.id, cookie);
+    const firstInbox = new MessageInbox(firstSocket);
+    await waitForOpen(firstSocket);
+    firstSocket.send(JSON.stringify({
+      type: "resume",
+      lastSeq: 0,
+      cols: 80,
+      rows: 24
+    }));
+    await firstInbox.next((message) => message.type === "hello");
+
+    harness.pty.latest().emitData("GEOMETRY_BEFORE\r\n");
+    await firstInbox.waitForText("GEOMETRY_BEFORE");
+    const resumeFrom = firstInbox.latestSeq;
+
+    const firstClosed = waitForClose(firstSocket);
+    firstSocket.close(1000, "change viewport geometry");
+    await firstClosed;
+
+    harness.pty.latest().emitData("GEOMETRY_AFTER\r\n");
+
+    const secondSocket = socketFor(harness, session.id, cookie);
+    const secondInbox = new MessageInbox(secondSocket);
+    await waitForOpen(secondSocket);
+    secondSocket.send(JSON.stringify({
+      type: "resume",
+      lastSeq: resumeFrom,
+      cols: 120,
+      rows: 35
+    }));
+
+    await secondInbox.next((message) => message.type === "hello");
+    const recovery = await secondInbox.next(
+      (message) => message.type === "snapshot" || message.type === "output"
+    );
+
+    expect(recovery.type).toBe("snapshot");
+    if (recovery.type === "snapshot") {
+      expect(recovery.data).toContain("GEOMETRY_AFTER");
+    }
+    expect(harness.pty.latest().events).toContainEqual({
+      type: "resize",
+      cols: 120,
+      rows: 35
+    });
+
+    secondSocket.close(1000, "test complete");
+  });
+
   it("keeps the PTY alive across browser disconnect and replays retained output", async () => {
     const harness = await startHarness();
     const cookie = await login(harness);
@@ -530,7 +584,7 @@ describe("terminal WebSocket integration", () => {
     const firstSocket = socketFor(harness, session.id, cookie);
     const firstInbox = new MessageInbox(firstSocket);
     await waitForOpen(firstSocket);
-    firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0, cols: 80, rows: 24 }));
     await firstInbox.next((message) => message.type === "hello");
 
     harness.pty.latest().emitData("PALMTTY_READY\r\n");
@@ -553,7 +607,7 @@ describe("terminal WebSocket integration", () => {
     const secondSocket = socketFor(harness, session.id, cookie);
     const secondInbox = new MessageInbox(secondSocket);
     await waitForOpen(secondSocket);
-    secondSocket.send(JSON.stringify({ type: "resume", lastSeq: resumeFrom }));
+    secondSocket.send(JSON.stringify({ type: "resume", lastSeq: resumeFrom, cols: 80, rows: 24 }));
 
     await secondInbox.next((message) => message.type === "hello");
     const recovery = await secondInbox.next(
@@ -577,7 +631,7 @@ describe("terminal WebSocket integration", () => {
     const firstSocket = socketFor(harness, session.id, cookie);
     const firstInbox = new MessageInbox(firstSocket);
     await waitForOpen(firstSocket);
-    firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0, cols: 80, rows: 24 }));
     await firstInbox.next((message) => message.type === "hello");
 
     harness.pty.latest().emitData("PALMTTY_READY\r\n");
@@ -595,7 +649,7 @@ describe("terminal WebSocket integration", () => {
     const secondSocket = socketFor(harness, session.id, cookie);
     const secondInbox = new MessageInbox(secondSocket);
     await waitForOpen(secondSocket);
-    secondSocket.send(JSON.stringify({ type: "resume", lastSeq: staleSeq }));
+    secondSocket.send(JSON.stringify({ type: "resume", lastSeq: staleSeq, cols: 80, rows: 24 }));
 
     await secondInbox.next((message) => message.type === "hello");
     const recovery = await secondInbox.next(
@@ -617,7 +671,7 @@ describe("terminal WebSocket integration", () => {
     const firstSocket = socketFor(harness, session.id, firstCookie);
     const firstInbox = new MessageInbox(firstSocket);
     await waitForOpen(firstSocket);
-    firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0, cols: 80, rows: 24 }));
     await firstInbox.next((message) => message.type === "hello");
 
     harness.pty.latest().emitData("BEFORE_AGENT_RESTART\r\n");
@@ -665,7 +719,7 @@ describe("terminal WebSocket integration", () => {
     const secondSocket = socketFor(restartedHarness, session.id, secondCookie);
     const secondInbox = new MessageInbox(secondSocket);
     await waitForOpen(secondSocket);
-    secondSocket.send(JSON.stringify({ type: "resume", lastSeq: resumeFrom }));
+    secondSocket.send(JSON.stringify({ type: "resume", lastSeq: resumeFrom, cols: 80, rows: 24 }));
 
     await secondInbox.next((message) => message.type === "hello");
     await secondInbox.waitForText("DURING_AGENT_RESTART");
@@ -692,7 +746,7 @@ describe("terminal WebSocket integration", () => {
     const inbox = new MessageInbox(socket);
     const closed = waitForClose(socket, 5_000);
     await waitForOpen(socket);
-    socket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    socket.send(JSON.stringify({ type: "resume", lastSeq: 0, cols: 80, rows: 24 }));
     await inbox.next((message) => message.type === "hello");
 
     await expect(closed).resolves.toMatchObject({
@@ -712,7 +766,7 @@ describe("terminal WebSocket integration", () => {
     const slowSocket = socketFor(harness, session.id, cookie);
     const slowInbox = new MessageInbox(slowSocket);
     await waitForOpen(slowSocket);
-    slowSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    slowSocket.send(JSON.stringify({ type: "resume", lastSeq: 0, cols: 80, rows: 24 }));
     await slowInbox.next((message) => message.type === "hello");
 
     // Force the configured cutoff branch deterministically after attachment.
@@ -728,7 +782,7 @@ describe("terminal WebSocket integration", () => {
     const exitSocket = socketFor(harness, session.id, cookie);
     const exitInbox = new MessageInbox(exitSocket);
     await waitForOpen(exitSocket);
-    exitSocket.send(JSON.stringify({ type: "resume", lastSeq: 0 }));
+    exitSocket.send(JSON.stringify({ type: "resume", lastSeq: 0, cols: 80, rows: 24 }));
     await exitInbox.next((message) => message.type === "hello");
 
     harness.pty.latest().emitExit(7);

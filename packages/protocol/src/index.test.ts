@@ -69,10 +69,14 @@ describe("protocol", () => {
     expect(() => parseClientMessage(JSON.stringify({ type: "input", data }))).toThrow();
   });
 
-  it("parses resume messages", () => {
-    expect(parseClientMessage('{"type":"resume","lastSeq":9}')).toEqual({
+  it("requires the recovery geometry in resume messages", () => {
+    expect(parseClientMessage('{"type":"resume","lastSeq":9,"cols":120,"rows":35}')).toEqual({
       type: "resume",
-      lastSeq: 9
+      lastSeq: 9,
+      cols: 120,
+      rows: 35
     });
+    expect(() => parseClientMessage('{"type":"resume","lastSeq":9}')).toThrow();
+    expect(() => parseClientMessage('{"type":"resume","lastSeq":9,"cols":501,"rows":35}')).toThrow();
   });
 });

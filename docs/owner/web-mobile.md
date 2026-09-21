@@ -34,6 +34,8 @@
 - 竖屏/横屏布局；
 - Safe Area 处理；
 - xterm 使用略大的 lineHeight 与终端底部内边距，避免最后一行字形下缘贴住/被底部工具栏视觉遮挡；
+- 首次连接/重连会先 `fit` 得到浏览器实际 rows/cols，并把几何尺寸随 resume 一起提交；snapshot/replay 完成前冻结再次 fit，避免把服务端按旧尺寸序列化的终端状态写进新尺寸 xterm；
+- 恢复期间终端输入与发送按钮保持不可用，Composer 文本不会因为连接尚未就绪而被静默清空；
 - PWA manifest。
 
 ## 设计边界

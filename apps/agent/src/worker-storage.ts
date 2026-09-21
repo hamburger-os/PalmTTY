@@ -15,7 +15,7 @@ export const WorkerRecordSchema = z.object({
 });
 export type WorkerRecord = z.infer<typeof WorkerRecordSchema>;
 
-export const WORKER_RUNTIME_GENERATION = "runtime-v2" as const;
+export const WORKER_RUNTIME_GENERATION = "runtime-v3" as const;
 
 export function defaultRuntimeDir(): string {
   if (process.platform === "win32") {

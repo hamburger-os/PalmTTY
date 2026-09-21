@@ -63,7 +63,7 @@ Login sessions remain in Agent memory, so after Agent restart the user signs in 
 
 On Windows the Agent and Worker communicate through a named pipe. Current non-Windows CI uses Unix domain sockets.
 
-Every Worker has an independent 256-bit secret. The secret is sent to the Worker once through anonymous stdin at creation time and persisted only in the local runtime recovery area; it never reaches the browser. Recovery state is isolated by private Worker IPC generation; the current protocol v2 uses a `runtime-v2` directory and does not rediscover previous-generation runtime state. IPC frames and socket backlog are bounded.
+Every Worker has an independent 256-bit secret. The secret is sent to the Worker once through anonymous stdin at creation time and persisted only in the local runtime recovery area; it never reaches the browser. Recovery state is isolated by private Worker IPC generation; the current protocol v3 uses a `runtime-v3` directory and does not rediscover previous-generation runtime state. IPC frames and socket backlog are bounded.
 
 Persisted PIDs are diagnostic metadata only. PalmTTY never treats an old PID as sufficient authority to kill a process. A failed Agent connection is also not proof that a Worker is dead: potentially-live recovery metadata is preserved, and an adopted Worker retries control-plane reconnection instead of converting an IPC outage into PTY loss. Missing Worker-owned recovery files are republished by the Worker; conflicting recovery authority fails closed.
 
@@ -78,7 +78,7 @@ All PTY output is processed inside the Worker in one ordered pipeline:
 3. append to bounded replay;
 4. deliver to the connected Agent/browser when present.
 
-On attach, retained history is replayed when possible. Otherwise the Worker emits a serialized terminal snapshot. Recovery and establishment of the live subscription occur within the same ordered Worker operation, preventing a message gap.
+On attach, the browser sends its fitted rows/columns together with `lastSeq`. The Worker applies that geometry to the canonical PTY/headless terminal before recovery. Retained history is replayed only when the geometry is unchanged and the requested sequence is still retained; a geometry change forces a fresh serialized snapshot. Recovery frames are sent before `hello`, which marks the recovery-complete boundary. Recovery and establishment of the live subscription occur within the same ordered Worker operation, preventing a message gap.
 
 ## 中文
 
@@ -98,4 +98,4 @@ Windows 本地控制 IPC 使用 Named Pipe；其他当前 CI 平台使用 Unix d
 
 Workspace 现在是 Agent 持有的独立持久化状态，通过“认证 + 精确 Origin”保护的 HTTP API 在网页端创建、编辑和删除；编辑器另有一个有边界的只读目录浏览 API，可浏览所选 Host/WSL 运行环境，只返回目录名称/路径，不读取文件内容；创建 Session 时仍只提交 workspace ID。工作区新建/修改时会先验证，创建 Worker 前再次验证。Host 运行时把 Shell 解析成绝对可执行路径；Windows 上的 WSL 运行时解析 `wsl.exe`，并把发行版、cwd、Shell 作为结构化 argv 传递，不做字符串命令拼接。Worker bootstrap 只接收规范化后的运行规格。
 
-PTY 输出、headless mirror、seq 与 replay 都在 Worker 内按同一有序流水线更新，因此 Agent 不在线期间状态仍连续；浏览器恢复时优先 replay，过旧则 snapshot，恢复边界与实时订阅之间不留消息窗口。
+PTY 输出、headless mirror、seq 与 replay 都在 Worker 内按同一有序流水线更新，因此 Agent 不在线期间状态仍连续。浏览器恢复时把已 fit 的 rows/cols 与 lastSeq 一起提交；Worker 先把 canonical PTY/headless mirror 调整到该 geometry，尺寸未变且历史仍可用时才 replay，尺寸变化或历史过旧时使用新 geometry 下的 snapshot。恢复帧之后的 `hello` 表示恢复完成，恢复边界与实时订阅之间不留消息窗口。

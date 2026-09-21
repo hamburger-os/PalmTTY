@@ -324,7 +324,13 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
 
             if (message.type === "resume") {
               if (attached) return;
-              await sessions.attach(id, socket, message.lastSeq);
+              await sessions.attach(
+                id,
+                socket,
+                message.lastSeq,
+                message.cols,
+                message.rows
+              );
               attached = true;
               clearTimeout(resumeTimer);
               return;

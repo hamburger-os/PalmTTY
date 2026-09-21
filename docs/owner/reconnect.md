@@ -34,13 +34,16 @@ PTY 输出
 
 ## 浏览器恢复
 
-浏览器重新建立 WebSocket 后发送最后收到的 lastSeq。
+浏览器重新建立 WebSocket 时先对当前容器执行一次 `fit`，然后在 resume 中同时发送最后收到的 `lastSeq` 与当前 `cols/rows`。恢复开始后浏览器冻结后续 fit，直到 Worker 发出恢复完成边界。
 
-- 缺失输出仍在 replay buffer：Worker 补发缺失帧；
-- lastSeq 太旧或页面没有旧状态：Worker 发送当前 terminal snapshot；
+Worker 在同一个有序操作内先比较并应用几何尺寸，再决定恢复方式：
+
+- cols/rows 与 canonical geometry 相同且缺失输出仍在 replay buffer：补发缺失帧；
+- cols/rows 发生变化：先 resize PTY 与 headless xterm，再强制发送新 geometry 下的 terminal snapshot，不 replay 旧 geometry 产生的字节流；
+- lastSeq 太旧或页面没有旧状态：发送当前 terminal snapshot；
 - 从未产生 PTY 输出（seq = 0）：snapshot 确定为空字符串。
 
-恢复消息生成与 live subscription 建立位于同一个 Worker 有序操作中，避免 snapshot/replay 与下一帧实时输出之间出现窗口。
+snapshot/replay 帧之后才发送 `hello`；浏览器把 `hello` 作为 recovery-complete marker，并在此前的 xterm write 全部解析完成后才允许输入与重新 fit。恢复消息生成与 live subscription 建立仍位于同一个 Worker 有序操作中，避免 snapshot/replay 与下一帧实时输出之间出现窗口。
 
 ## Agent 重启恢复
 
