@@ -274,7 +274,10 @@ export function WorkspaceDialog({
                 type="button"
                 className="chip"
                 key={preset.id}
-                onClick={() => setShellArgs(preset.args.join("\n"))}
+                onClick={() => {
+                  if (preset.shell) setShell(preset.shell);
+                  setShellArgs(preset.args.join("\n"));
+                }}
               >
                 {preset.id === "pwsh-default"
                   ? t("workspace.shellPresetPwshDefault")
