@@ -131,6 +131,18 @@ export function decodeWindowsCommandOutput(output: Buffer): string {
   return output.toString("utf8");
 }
 
+const HIDDEN_WSL_UTILITY_PREFIXES = [
+  "docker-desktop",
+  "rancher-desktop"
+] as const;
+
+function isHiddenWslUtilityDistribution(name: string): boolean {
+  const canonical = name.toLowerCase();
+  return HIDDEN_WSL_UTILITY_PREFIXES.some((prefix) => (
+    canonical.startsWith(prefix)
+  ));
+}
+
 export function parseWslDistributionList(output: string): string[] {
   const seen = new Set<string>();
   const distributions: string[] = [];
@@ -140,7 +152,7 @@ export function parseWslDistributionList(output: string): string[] {
       .replace(/\0/g, "")
       .replace(/^\s*\*\s*/, "")
       .trim();
-    if (!name) continue;
+    if (!name || isHiddenWslUtilityDistribution(name)) continue;
 
     const canonical = name.toLowerCase();
     if (seen.has(canonical)) continue;
