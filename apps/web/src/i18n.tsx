@@ -9,8 +9,7 @@ import {
 
 export type Locale = "en" | "zh-CN";
 
-const messages = {
-  en: {
+const en = {
     "app.eyebrow": "self-hosted remote dev",
     "app.language": "Language",
     "auth.connecting": "Connecting…",
@@ -95,8 +94,11 @@ const messages = {
     "errors.http_409": "The requested change conflicts with the current state.",
     "errors.http_429": "Too many requests. Try again shortly.",
     "errors.http_500": "The PalmTTY Agent reported an internal error."
-  },
-  "zh-CN": {
+} as const;
+
+type MessageKey = keyof typeof en;
+
+const zhCN: Record<MessageKey, string> = {
     "app.eyebrow": "自托管远程开发终端",
     "app.language": "语言",
     "auth.connecting": "正在连接…",
@@ -181,10 +183,12 @@ const messages = {
     "errors.http_409": "该修改与当前状态冲突。",
     "errors.http_429": "请求过于频繁，请稍后重试。",
     "errors.http_500": "PalmTTY Agent 发生内部错误。"
-  }
-} as const;
+};
 
-type MessageKey = keyof typeof messages.en;
+const messages: Record<Locale, Record<MessageKey, string>> = {
+  en,
+  "zh-CN": zhCN
+};
 type Variables = Record<string, string | number>;
 
 function detectLocale(): Locale {
