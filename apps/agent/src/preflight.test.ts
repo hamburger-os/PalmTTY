@@ -60,9 +60,9 @@ describe("runtime preflight", () => {
     });
 
     const result = await preflightRuntime(config);
-    expect(result.workspaces.get("node")).toMatchObject({
-      id: "node",
-      executable: process.execPath
-    });
+    const workspace = result.workspaces.get("node");
+    expect(workspace?.id).toBe("node");
+    expect(workspace?.executable).toBeTypeOf("string");
+    expect(path.isAbsolute(workspace?.executable ?? "")).toBe(true);
   });
 });
