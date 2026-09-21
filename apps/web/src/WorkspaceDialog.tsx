@@ -165,188 +165,188 @@ export function WorkspaceDialog({
         </div>
 
         <div className="workspace-form-body">
-        <label>
-          <span>{t("workspace.name")}</span>
-          <input
-            className="glass-input"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={t("workspace.namePlaceholder")}
-            maxLength={100}
-            required
-            autoFocus
-          />
-        </label>
-
-        <label>
-          <span>{t("workspace.runtime")}</span>
-          <select
-            className="glass-input glass-select"
-            value={kind}
-            onChange={(event) => setKind(event.target.value as "host" | "wsl")}
-          >
-            <option value="host">{t("workspaces.host")}</option>
-            {canChooseWsl && (
-              <option value="wsl">{t("workspaces.wsl")}</option>
-            )}
-          </select>
-          <small>
-            {kind === "wsl"
-              ? t("workspace.wslHelp")
-              : t("workspace.hostHelp")}
-          </small>
-        </label>
-
-        {kind === "wsl" && (
           <label>
-            <span>{t("workspace.distribution")}</span>
+            <span>{t("workspace.name")}</span>
             <input
               className="glass-input"
-              value={distribution}
-              onChange={(event) => setDistribution(event.target.value)}
-              placeholder={t("workspace.distributionPlaceholder")}
-              maxLength={128}
-            />
-            <small>{t("workspace.distributionOptional")}</small>
-          </label>
-        )}
-
-        <div className="workspace-field">
-          <label htmlFor="workspace-cwd">{t("workspace.cwd")}</label>
-          <div className="workspace-input-action">
-            <input
-              className="glass-input"
-              id="workspace-cwd"
-              value={cwd}
-              onChange={(event) => setCwd(event.target.value)}
-              placeholder={
-                kind === "wsl"
-                  ? t("workspace.cwdWslPlaceholder")
-                  : t("workspace.cwdHostPlaceholder")
-              }
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={t("workspace.namePlaceholder")}
+              maxLength={100}
               required
+              autoFocus
             />
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => setDirectoryPickerOpen((open) => !open)}
+          </label>
+
+          <label>
+            <span>{t("workspace.runtime")}</span>
+            <select
+              className="glass-input glass-select"
+              value={kind}
+              onChange={(event) => setKind(event.target.value as "host" | "wsl")}
             >
-              {directoryPickerOpen
-                ? t("workspace.directoryHide")
-                : t("workspace.directoryBrowse")}
-            </button>
+              <option value="host">{t("workspaces.host")}</option>
+              {canChooseWsl && (
+                <option value="wsl">{t("workspaces.wsl")}</option>
+              )}
+            </select>
+            <small>
+              {kind === "wsl"
+                ? t("workspace.wslHelp")
+                : t("workspace.hostHelp")}
+            </small>
+          </label>
+
+          {kind === "wsl" && (
+            <label>
+              <span>{t("workspace.distribution")}</span>
+              <input
+                className="glass-input"
+                value={distribution}
+                onChange={(event) => setDistribution(event.target.value)}
+                placeholder={t("workspace.distributionPlaceholder")}
+                maxLength={128}
+              />
+              <small>{t("workspace.distributionOptional")}</small>
+            </label>
+          )}
+
+          <div className="workspace-field">
+            <label htmlFor="workspace-cwd">{t("workspace.cwd")}</label>
+            <div className="workspace-input-action">
+              <input
+                className="glass-input"
+                id="workspace-cwd"
+                value={cwd}
+                onChange={(event) => setCwd(event.target.value)}
+                placeholder={
+                  kind === "wsl"
+                    ? t("workspace.cwdWslPlaceholder")
+                    : t("workspace.cwdHostPlaceholder")
+                }
+                required
+              />
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setDirectoryPickerOpen((open) => !open)}
+              >
+                {directoryPickerOpen
+                  ? t("workspace.directoryHide")
+                  : t("workspace.directoryBrowse")}
+              </button>
+            </div>
+            <small>{t("workspace.cwdBrowseHelp")}</small>
           </div>
-          <small>{t("workspace.cwdBrowseHelp")}</small>
-        </div>
 
-        {directoryPickerOpen && (
-          <DirectoryPicker
-            key={`${kind}:${distribution.trim()}`}
-            kind={kind}
-            {...(kind === "wsl" && distribution.trim()
-              ? { distribution: distribution.trim() }
-              : {})}
-            {...(cwd.trim() ? { initialPath: cwd.trim() } : {})}
-            onChoose={(path) => {
-              setCwd(path);
-              setDirectoryPickerOpen(false);
-            }}
-            onClose={() => setDirectoryPickerOpen(false)}
-          />
-        )}
+          {directoryPickerOpen && (
+            <DirectoryPicker
+              key={`${kind}:${distribution.trim()}`}
+              kind={kind}
+              {...(kind === "wsl" && distribution.trim()
+                ? { distribution: distribution.trim() }
+                : {})}
+              {...(cwd.trim() ? { initialPath: cwd.trim() } : {})}
+              onChoose={(path) => {
+                setCwd(path);
+                setDirectoryPickerOpen(false);
+              }}
+              onClose={() => setDirectoryPickerOpen(false)}
+            />
+          )}
 
-        <label>
-          <span>{t("workspace.shell")}</span>
-          <input
-            className="glass-input"
-            value={shell}
-            onChange={(event) => setShell(event.target.value)}
-            placeholder={shellPlaceholder}
-          />
-          <small>{t("workspace.shellOptional")}</small>
-        </label>
+          <label>
+            <span>{t("workspace.shell")}</span>
+            <input
+              className="glass-input"
+              value={shell}
+              onChange={(event) => setShell(event.target.value)}
+              placeholder={shellPlaceholder}
+            />
+            <small>{t("workspace.shellOptional")}</small>
+          </label>
 
-        <div className="workspace-field">
-          <label htmlFor="workspace-shell-args">{t("workspace.shellArgs")}</label>
-          <textarea
-            className="glass-input"
-            id="workspace-shell-args"
-            value={shellArgs}
-            onChange={(event) => setShellArgs(event.target.value)}
-            placeholder={t("workspace.shellArgsPlaceholder")}
-            rows={2}
-          />
-          <small>{t("workspace.shellArgsHelp")}</small>
-          <div className="preset-row" aria-label={t("workspace.shellArgsExamples")}>
-            <span className="preset-caption">{t("workspace.shellArgsExamples")}</span>
-            {argumentPresets.map((preset) => (
-              <button
-                type="button"
-                className="chip"
-                key={preset.id}
-                onClick={() => {
-                  if (preset.shell) setShell(preset.shell);
-                  setShellArgs(preset.args.join("\n"));
-                }}
-              >
-                {preset.id === "pwsh-default"
-                  ? t("workspace.shellPresetPwshDefault")
-                  : preset.id === "pwsh-clean"
-                    ? t("workspace.shellPresetPwshClean")
-                    : preset.id === "cmd-quiet"
-                      ? t("workspace.shellPresetCmdQuiet")
-                      : t("workspace.shellPresetLogin")}
-              </button>
-            ))}
-            {shellArgs && (
-              <button
-                type="button"
-                className="chip"
-                onClick={() => setShellArgs("")}
-              >
-                {t("workspace.clear")}
-              </button>
-            )}
+          <div className="workspace-field">
+            <label htmlFor="workspace-shell-args">{t("workspace.shellArgs")}</label>
+            <textarea
+              className="glass-input"
+              id="workspace-shell-args"
+              value={shellArgs}
+              onChange={(event) => setShellArgs(event.target.value)}
+              placeholder={t("workspace.shellArgsPlaceholder")}
+              rows={2}
+            />
+            <small>{t("workspace.shellArgsHelp")}</small>
+            <div className="preset-row" aria-label={t("workspace.shellArgsExamples")}>
+              <span className="preset-caption">{t("workspace.shellArgsExamples")}</span>
+              {argumentPresets.map((preset) => (
+                <button
+                  type="button"
+                  className="chip"
+                  key={preset.id}
+                  onClick={() => {
+                    if (preset.shell) setShell(preset.shell);
+                    setShellArgs(preset.args.join("\n"));
+                  }}
+                >
+                  {preset.id === "pwsh-default"
+                    ? t("workspace.shellPresetPwshDefault")
+                    : preset.id === "pwsh-clean"
+                      ? t("workspace.shellPresetPwshClean")
+                      : preset.id === "cmd-quiet"
+                        ? t("workspace.shellPresetCmdQuiet")
+                        : t("workspace.shellPresetLogin")}
+                </button>
+              ))}
+              {shellArgs && (
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() => setShellArgs("")}
+                >
+                  {t("workspace.clear")}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="workspace-field">
-          <label htmlFor="workspace-startup-command">{t("workspace.startupCommand")}</label>
-          <input
-            className="glass-input"
-            id="workspace-startup-command"
-            value={startupCommand}
-            onChange={(event) => setStartupCommand(event.target.value)}
-            placeholder={t("workspace.startupPlaceholder")}
-            maxLength={8192}
-          />
-          <small>{t("workspace.startupOptional")}</small>
-          <div className="preset-row" aria-label={t("workspace.agentPresets")}>
-            <span className="preset-caption">{t("workspace.agentPresets")}</span>
-            {STARTUP_COMMAND_PRESETS.map((preset) => (
-              <button
-                type="button"
-                className="chip"
-                key={preset.id}
-                title={preset.command}
-                onClick={() => setStartupCommand(preset.command)}
-              >
-                {preset.label}
-              </button>
-            ))}
-            {startupCommand && (
-              <button
-                type="button"
-                className="chip"
-                onClick={() => setStartupCommand("")}
-              >
-                {t("workspace.clear")}
-              </button>
-            )}
+          <div className="workspace-field">
+            <label htmlFor="workspace-startup-command">{t("workspace.startupCommand")}</label>
+            <input
+              className="glass-input"
+              id="workspace-startup-command"
+              value={startupCommand}
+              onChange={(event) => setStartupCommand(event.target.value)}
+              placeholder={t("workspace.startupPlaceholder")}
+              maxLength={8192}
+            />
+            <small>{t("workspace.startupOptional")}</small>
+            <div className="preset-row" aria-label={t("workspace.agentPresets")}>
+              <span className="preset-caption">{t("workspace.agentPresets")}</span>
+              {STARTUP_COMMAND_PRESETS.map((preset) => (
+                <button
+                  type="button"
+                  className="chip"
+                  key={preset.id}
+                  title={preset.command}
+                  onClick={() => setStartupCommand(preset.command)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              {startupCommand && (
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() => setStartupCommand("")}
+                >
+                  {t("workspace.clear")}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
 
-        {error && <div className="error-banner">{error}</div>}
+          {error && <div className="error-banner">{error}</div>}
         </div>
 
         <div className="dialog-actions workspace-dialog-footer">
