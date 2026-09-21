@@ -3,7 +3,6 @@ import type { PalmTTYConfig } from "@palmtty/config";
 import {
   encodeServerMessage,
   isActiveSessionState,
-  isTerminalSessionState,
   type SessionPublic,
   type ServerMessage
 } from "@palmtty/protocol";
@@ -333,19 +332,11 @@ export class SessionManager {
     managed.worker.onClose(() => {
       if (this.closing || this.sessions.get(managed.record.sessionId) !== managed) return;
 
-      if (isTerminalSessionState(managed.session.state)) {
-        this.sessions.delete(managed.record.sessionId);
-        for (const socket of managed.clients.values()) {
-          try {
-            socket.close(1000, "Exited session retention expired");
-          } catch {
-            // Best effort during normal retired-session cleanup.
-          }
-        }
-        managed.clients.clear();
-        return;
-      }
-
+      // IPC loss is not proof of Worker death, including while an exited
+      // Session is still inside its retention window. Reconnect first; the
+      // reconnect loop removes the Session only after the Worker process is
+      // definitely gone. Explicit remove() deletes the registry entry before
+      // closing the client, so it never enters this path.
       for (const socket of managed.clients.values()) {
         try {
           socket.close(1012, "Session worker reconnecting");
