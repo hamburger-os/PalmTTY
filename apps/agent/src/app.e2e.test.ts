@@ -15,6 +15,7 @@ import { SessionWorkerServer } from "./session-worker.js";
 import type { PtyFactory, PtyHandle } from "./session-runtime.js";
 import type { WorkerBootstrap } from "./worker-protocol.js";
 import type { WorkerSpawner } from "./worker-spawner.js";
+import { MemoryWorkspaceStore } from "./workspace-store.js";
 
 const TOKEN_ENV = "PALMTTY_E2E_TOKEN";
 const TOKEN = "0123456789abcdef0123456789abcdef";
@@ -164,15 +165,7 @@ async function startHarness(
       enabled: true,
       tokenEnv: TOKEN_ENV,
       sessionTtlMinutes: 5
-    },
-    workspaces: [{
-      id: "e2e",
-      name: "E2E",
-      cwd: process.cwd(),
-      shell: "custom",
-      shellPath: process.execPath,
-      args: []
-    }]
+    }
   });
   mutate?.(config);
 
@@ -182,7 +175,17 @@ async function startHarness(
   const workerSpawner = new EmbeddedWorkerSpawner(pty);
   liveSpawners.add(workerSpawner);
   const app = await buildApp(config, {
-    sessionManager: { runtimeDir, workerSpawner }
+    sessionManager: { runtimeDir, workerSpawner },
+    workspaceStore: new MemoryWorkspaceStore([{
+      id: "e2e",
+      name: "E2E",
+      cwd: process.cwd(),
+      runtime: {
+        kind: "host",
+        shell: process.execPath,
+        args: []
+      }
+    }])
   });
   liveApps.add(app);
   const address = await app.listen({ host: "127.0.0.1", port: 0 });
