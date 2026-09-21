@@ -64,7 +64,7 @@ On a configured PalmTTY host, before `dev`/`start` or release validation:
 pnpm run preflight
 ~~~
 
-This requires the intended PalmTTY config and authentication environment. It is not a generic CI/contributor prerequisite. The explicit `run` form is required because pnpm 10 has its own built-in `doctor` command; PalmTTY deliberately names its host check `preflight` to avoid command dispatch ambiguity.
+This requires the intended PalmTTY config and authentication environment. The preflight should report all detected auth/security/workspace launch failures together so host setup can be corrected in one pass. It is not a generic CI/contributor prerequisite. The explicit `run` form is required because pnpm 10 has its own built-in `doctor` command; PalmTTY deliberately names its host check `preflight` to avoid command dispatch ambiguity.
 
 ## Manual Windows validation before a release
 
