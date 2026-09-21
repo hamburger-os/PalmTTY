@@ -45,8 +45,19 @@ describe("workspace store", () => {
     expect(document.version).toBe(1);
     expect(document.workspaces[0]?.name).toBe("Renamed");
 
+    const reloaded = new FileWorkspaceStore(filePath);
+    await reloaded.initialize();
+    expect(reloaded.get("main")?.name).toBe("Renamed");
+
     await store.delete("main");
     expect(store.list()).toEqual([]);
+  });
+
+  it("rejects duplicate workspace ids in initialized state", async () => {
+    expect(() => new MemoryWorkspaceStore([
+      workspace("same"),
+      { ...workspace("same"), name: "Duplicate" }
+    ])).toThrow("Duplicate workspace id");
   });
 
   it("keeps memory store values isolated from caller mutation", async () => {
