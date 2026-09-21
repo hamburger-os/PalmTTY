@@ -430,8 +430,18 @@ button.icon-button {
   gap: var(--space-2);
 }
 
+.workspace-input-action > .glass-input {
+  min-width: 0;
+}
+
 .workspace-input-action > button {
   white-space: nowrap;
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: var(--text-xs);
+  line-height: 1.4;
 }
 
 .preset-row {
@@ -586,6 +596,22 @@ button.directory-choose {
 .terminal-header {
   min-height: 48px;
   padding: 7px 9px;
+}
+
+.terminal-header-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-2);
+}
+
+.terminal-restart-error {
+  max-width: min(32vw, 220px);
+  overflow: hidden;
+  color: var(--danger);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .connection {
