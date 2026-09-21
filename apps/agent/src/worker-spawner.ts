@@ -39,7 +39,7 @@ export class ProcessWorkerSpawner implements WorkerSpawner {
   async spawn(bootstrap: WorkerBootstrap): Promise<void> {
     const traceWindowsSpawn =
       process.platform === "win32" &&
-      process.env.PALMTTY_WINDOWS_SPAWN_TRACE === "1";
+      bootstrap.traceWindowsSpawn === true;
     if (traceWindowsSpawn) {
       console.info(
         `[PalmTTY] windows spawn trace ${bootstrap.sessionId}: worker.spawn.begin`
