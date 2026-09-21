@@ -14,7 +14,7 @@
 - Workspace 对话框由 React 状态控制开关，原生 `dialog` 的激活逻辑可重复执行，兼容开发环境 StrictMode；
 - Host / WSL runtime 选择与运行目标校验；
 - 工作目录支持在网页内浏览并选择 Agent 宿主机或所选 WSL 发行版中的目录；这是远端目录浏览，不调用浏览器本机文件选择器；
-- Workspace 弹窗只保留表单自身一个纵向滚动容器，避免 `dialog` 与表单同时滚动；
+- Workspace 弹窗只保留表单自身一个纵向滚动容器，避免 `dialog` 与表单同时滚动；删除确认使用统一主题确认框，不再调用浏览器原生 `confirm()`；
 - Shell 参数提供按运行环境区分的示例快捷按钮；每行仍代表一个独立 argv；
 - 启动命令下提供常用终端 Agent 快捷项，目前包括 Codex、Claude Code、Antigravity、Gemini CLI、OpenCode、Aider，点击只填写命令，不负责安装工具；
 - 新建会话；
@@ -23,6 +23,19 @@
 - 重新进入或终止会话；
 - 登录/退出；
 - 中文 / English 语言切换并在浏览器本地保存偏好。
+
+## 视觉系统
+
+当前 Web UI 使用 PalmTTY 自己的主题域，不把 TauTerm 组件或桌面布局直接搬入移动端：
+
+- 视觉实现分为设计 token、共享透明玻璃物理、主题 veil、语义 surface 四层；
+- 提供炫彩流光（Spectrum）、黑曜石（Obsidian）、白霜（Frosted）三套主题，三者共享同一材质物理，只通过 veil 与对比度令牌形成身份；
+- 提供效果优先 / 性能优先两档。性能优先保留完整四色环境，但停止装饰动画并移除 shell backdrop sampling；
+- 系统请求 reduced motion 时停止装饰动画，并在外观控制中显示状态；
+- 大面积终端/面板不使用实时 backdrop blur；只有小面积 shell surface 在效果优先模式允许有限采样；
+- xterm 调色板属于主题层，主题变化只原位更新 xterm options，不重建终端、不重连 WebSocket，也不触碰 Worker/recovery 状态；
+- 主题与性能档仅保存在浏览器本地，属于展示偏好，不进入 Agent 配置、Workspace 或 Session 权限模型；
+- 主题规范唯一来源为 `.agents/skills/palmtty-theme/SKILL.md`，审查流程为 `.agents/skills/palmtty-theme-review/SKILL.md`；本文不复制颜色/材质参数。
 
 终端页提供：
 
