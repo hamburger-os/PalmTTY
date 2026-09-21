@@ -1,0 +1,209 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { parseConfig } from "@palmtty/config";
+import type { SessionPublic } from "@palmtty/protocol";
+import { buildApp } from "./app.js";
+import { SessionWorkerServer } from "./session-worker.js";
+import type { PtyFactory, PtyHandle } from "./session-runtime.js";
+import type { WorkerBootstrap } from "./worker-protocol.js";
+import type { WorkerSpawner } from "./worker-spawner.js";
+import { MemoryWorkspaceStore } from "./workspace-store.js";
+
+const ORIGIN = "http://127.0.0.1:7688";
+
+class ControlledPty implements PtyHandle {
+  readonly pid = 61_001;
+  private readonly exitListeners = new Set<
+    (event: { exitCode: number; signal?: number }) => void
+  >();
+  killCount = 0;
+  private exited = false;
+
+  write(): void {}
+  resize(): void {}
+  onData(): { dispose(): void } {
+    return { dispose() {} };
+  }
+
+  kill(): void {
+    if (this.exited) return;
+    this.killCount += 1;
+  }
+
+  onExit(
+    listener: (event: { exitCode: number; signal?: number }) => void
+  ): { dispose(): void } {
+    this.exitListeners.add(listener);
+    return { dispose: () => this.exitListeners.delete(listener) };
+  }
+
+  emitExit(exitCode = 0): void {
+    if (this.exited) return;
+    this.exited = true;
+    for (const listener of [...this.exitListeners]) listener({ exitCode });
+  }
+}
+
+class EmbeddedWorkerSpawner implements WorkerSpawner {
+  readonly pty = new ControlledPty();
+  private readonly servers: SessionWorkerServer[] = [];
+  readonly factory: PtyFactory = () => this.pty;
+
+  async spawn(bootstrap: WorkerBootstrap): Promise<void> {
+    const server = new SessionWorkerServer(bootstrap, {
+      ptyFactory: this.factory
+    });
+    await server.start();
+    this.servers.push(server);
+  }
+
+  async closeAll(): Promise<void> {
+    await Promise.all(this.servers.map((server) =>
+      server.shutdown({ killPty: true, cleanupState: true })
+    ));
+    this.servers.length = 0;
+  }
+}
+
+const apps = new Set<Awaited<ReturnType<typeof buildApp>>>();
+const spawners = new Set<EmbeddedWorkerSpawner>();
+const runtimeDirs = new Set<string>();
+
+afterEach(async () => {
+  for (const app of apps) {
+    await app.close().catch(() => undefined);
+  }
+  apps.clear();
+
+  for (const spawner of spawners) {
+    await spawner.closeAll().catch(() => undefined);
+  }
+  spawners.clear();
+
+  for (const runtimeDir of runtimeDirs) {
+    await rm(runtimeDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+  runtimeDirs.clear();
+});
+
+async function waitUntil(
+  predicate: () => boolean | Promise<boolean>,
+  timeoutMs = 2_000
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await predicate())) {
+    if (Date.now() >= deadline) throw new Error("Timed out waiting for session state");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+async function buildHarness() {
+  const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-lifecycle-"));
+  runtimeDirs.add(runtimeDir);
+
+  const spawner = new EmbeddedWorkerSpawner();
+  spawners.add(spawner);
+
+  const config = parseConfig({
+    server: {
+      host: "127.0.0.1",
+      port: 7688,
+      trustedOrigins: [ORIGIN],
+      secureCookies: false
+    },
+    auth: { enabled: false }
+  });
+
+  const app = await buildApp(config, {
+    sessionManager: { runtimeDir, workerSpawner: spawner },
+    workspaceStore: new MemoryWorkspaceStore([{
+      id: "lifecycle",
+      name: "Lifecycle",
+      cwd: process.cwd(),
+      runtime: {
+        kind: "host",
+        shell: process.execPath,
+        args: []
+      }
+    }])
+  });
+  apps.add(app);
+
+  return { app, spawner };
+}
+
+describe("session lifecycle API", () => {
+  it("separates termination from retained-session removal", async () => {
+    const { app, spawner } = await buildHarness();
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions",
+      headers: { origin: ORIGIN },
+      payload: { workspaceId: "lifecycle", cols: 80, rows: 24 }
+    });
+    expect(created.statusCode).toBe(201);
+    const session = created.json().session as SessionPublic;
+
+    const prematureClear = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/sessions/${session.id}`,
+      headers: { origin: ORIGIN }
+    });
+    expect(prematureClear.statusCode).toBe(409);
+    expect(prematureClear.json()).toEqual({ error: "session_not_stopped" });
+
+    const terminated = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${session.id}/terminate`,
+      headers: { origin: ORIGIN }
+    });
+    expect(terminated.statusCode).toBe(202);
+    expect(terminated.json().session).toMatchObject({
+      id: session.id,
+      state: "stopping"
+    });
+    expect(spawner.pty.killCount).toBe(1);
+
+    const duplicateTerminate = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${session.id}/terminate`,
+      headers: { origin: ORIGIN }
+    });
+    expect(duplicateTerminate.statusCode).toBe(202);
+    expect(duplicateTerminate.json().session.state).toBe("stopping");
+    expect(spawner.pty.killCount).toBe(1);
+
+    const clearWhileStopping = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/sessions/${session.id}`,
+      headers: { origin: ORIGIN }
+    });
+    expect(clearWhileStopping.statusCode).toBe(409);
+
+    spawner.pty.emitExit(0);
+    await waitUntil(async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/v1/sessions/${session.id}`
+      });
+      return response.statusCode === 200 &&
+        response.json().session.state === "exited";
+    });
+
+    const cleared = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/sessions/${session.id}`,
+      headers: { origin: ORIGIN }
+    });
+    expect(cleared.statusCode).toBe(204);
+
+    const gone = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${session.id}`
+    });
+    expect(gone.statusCode).toBe(404);
+  });
+});
