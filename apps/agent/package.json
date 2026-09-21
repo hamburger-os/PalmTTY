@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/index.ts --development",
     "preflight": "tsx src/index.ts --preflight",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",

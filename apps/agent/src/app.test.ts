@@ -162,33 +162,42 @@ describe("HTTP security boundary", () => {
     await app.close();
   });
 
-  it("rejects the configured login-token variable from workspace environment", async () => {
+  it("rejects PalmTTY control variables from workspace environment", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
     const app = await buildTestApp();
     const cookie = await loginCookie(app);
+    const headers = { cookie, origin: ORIGIN };
 
-    const response = await app.inject({
-      method: "POST",
-      url: "/api/v1/workspaces",
-      headers: { cookie, origin: ORIGIN },
-      payload: {
-        name: "Reserved",
-        cwd: process.cwd(),
-        runtime: {
-          kind: "host",
-          shell: process.execPath,
-          args: []
-        },
-        environment: {
-          PALMTTY_TEST_TOKEN: "must-not-be-persisted"
+    for (const reserved of [
+      "PALMTTY_TEST_TOKEN",
+      "PALMTTY_CONFIG",
+      "PALMTTY_DEV_TRUSTED_ORIGINS",
+      "PALMTTY_WINDOWS_SPAWN_TRACE",
+      "PALMTTY_FUTURE_CONTROL"
+    ]) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/v1/workspaces",
+        headers,
+        payload: {
+          name: "Reserved",
+          cwd: process.cwd(),
+          runtime: {
+            kind: "host",
+            shell: process.execPath,
+            args: []
+          },
+          environment: {
+            [reserved]: "must-not-be-persisted"
+          }
         }
-      }
-    });
+      });
 
-    expect(response.statusCode).toBe(400);
-    expect(response.json()).toMatchObject({
-      error: "workspace_invalid"
-    });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: "workspace_invalid"
+      });
+    }
 
     const listed = await app.inject({
       method: "GET",

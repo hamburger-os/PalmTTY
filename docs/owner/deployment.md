@@ -2,13 +2,21 @@
 
 ## 本机开发
 
-默认推荐：
+`pnpm dev` 的默认开发拓扑现在是：
 
 ```text
-浏览器 -> 127.0.0.1:7688 -> PalmTTY
+本机浏览器 / 同一私有局域网手机
+        │ http://<开发机-LAN-IP>:5173
+        ▼
+Vite dev server（默认 0.0.0.0:5173）
+        │ 本机代理 /api + WebSocket
+        ▼
+PalmTTY Agent（仍使用配置中的 host/port；示例配置保持 127.0.0.1:17688）
 ```
 
-此模式可以使用非 Secure Cookie，但仍建议启用 access token。Agent 启动后再通过 Web UI 管理 Workspace；Workspace 不写入 `palmtty.local.yaml`，而是保存到当前用户应用数据目录。
+根开发启动器会枚举当前机器的 RFC1918、IPv4 link-local 和 100.64/10 私有/overlay 地址，把对应的 `http://<address>:5173` **精确 Origin** 只在本次 development Agent 进程内追加到 allowlist；不会写回配置文件，也不会把 Origin 放宽成通配符。默认仍要求 access token。设置 `PALMTTY_WEB_HOST=127.0.0.1` 可以显式退回仅本机 Vite 监听。
+
+Windows 如果另一台局域网设备访问 5173 超时，应允许 Node.js/PalmTTY 的 TCP 5173 通过 **Private** 网络防火墙；PalmTTY 不会自动提权修改防火墙。Agent 启动后再通过 Web UI 管理 Workspace；Workspace 不写入 `palmtty.local.yaml`，而是保存到当前用户应用数据目录。
 
 ## 家庭局域网 / QNAP
 

@@ -52,9 +52,11 @@ $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
 pnpm dev
 ~~~
 
-`pnpm dev` runs the same Agent preflight before starting the Agent and Vite. The root launcher derives the local Agent URL from the validated config and injects it as `PALMTTY_AGENT_URL`; Vite uses strict port 5173. Add `http://127.0.0.1:5173` to `trustedOrigins` while using development mode.
+`pnpm dev` runs the same Agent preflight before starting the Agent and Vite. The root launcher derives the local Agent URL from the validated config and injects it as `PALMTTY_AGENT_URL`. Vite listens on `0.0.0.0:5173` by default, so the development UI is immediately reachable from the same private LAN. The launcher enumerates the machine's RFC1918, IPv4 link-local and 100.64/10 private/overlay IPv4 addresses and adds only those exact `http://<address>:5173` Origins to the development Agent in memory. The Agent itself still listens on the endpoint in `palmtty.local.yaml`; the example config remains loopback-only. You do not need to persist the current LAN IP in `trustedOrigins` for `pnpm dev`.
 
-For phone access, do **not** expose the development configuration directly to the Internet. Use a private network or the authenticated HTTPS reverse-proxy configuration described in [security.md](security.md).
+Vite prints the reachable LAN URLs. On Windows, if another device still times out, allow Node.js/PalmTTY TCP 5173 on the **Private** network profile; PalmTTY does not elevate itself or edit firewall rules. To opt out of LAN development listening, set `PALMTTY_WEB_HOST=127.0.0.1` before `pnpm dev`.
+
+Do **not** expose the Vite development server directly to the Internet. For remote/non-development access, use a private overlay or the authenticated HTTPS reverse-proxy configuration described in [security.md](security.md).
 
 ## 中文
 
@@ -107,6 +109,8 @@ $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
 pnpm dev
 ~~~
 
-`pnpm dev` 会先执行同一套 Agent preflight，再启动 Agent 与 Vite。根启动器从已验证配置推导本地 Agent URL，并通过 `PALMTTY_AGENT_URL` 注入 Vite；Vite 固定使用 5173 且开启 strict port。开发模式下需要把 `http://127.0.0.1:5173` 加入 `trustedOrigins`。
+`pnpm dev` 会先执行同一套 Agent preflight，再启动 Agent 与 Vite。根启动器从已验证配置推导本地 Agent URL，并通过 `PALMTTY_AGENT_URL` 注入 Vite。Vite 默认监听 `0.0.0.0:5173`，因此同一私有局域网里的手机/电脑可以直接访问。启动器会枚举当前机器的 RFC1918、IPv4 link-local 与 100.64/10 私有/overlay IPv4 地址，只把对应的 `http://<address>:5173` **精确 Origin** 临时加入 development Agent 内存 allowlist；Agent 本身仍按 `palmtty.local.yaml` 的 endpoint 监听，示例配置仍保持 loopback。使用 `pnpm dev` 时不需要把当前局域网 IP 持久化到 `trustedOrigins`。
 
-手机访问时不要把开发配置直接暴露到公网。应使用私有网络，或采用 [security.md](security.md) 中描述的 HTTPS 认证反向代理方案。
+Vite 会打印可访问的 LAN URL。Windows 上如果其他设备仍然超时，请允许 Node.js/PalmTTY 的 TCP 5173 通过 **专用网络（Private）** 防火墙；PalmTTY 不会自行提权或修改防火墙。若要关闭默认 LAN 开发监听，可在 `pnpm dev` 前设置 `PALMTTY_WEB_HOST=127.0.0.1`。
+
+不要把 Vite 开发服务器直接暴露到公网。正式/远程访问应使用私有组网，或采用 [security.md](security.md) 中描述的 HTTPS 认证反向代理方案。

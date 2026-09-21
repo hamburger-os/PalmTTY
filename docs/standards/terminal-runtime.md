@@ -1,6 +1,6 @@
 # Terminal runtime references
 
-Last reviewed: 2026-09-21.
+Last reviewed: 2026-09-22.
 
 ## Microsoft Windows Pseudoconsole (ConPTY)
 
@@ -56,7 +56,9 @@ Upstream source: https://github.com/microsoft/node-pty
 
 PalmTTY relies on node-pty for PTY spawn, input, output, resize and termination. On modern Windows this maps to ConPTY. The PTY child process inherits the normal-user launch context carried into the Session Worker, which is why PalmTTY must not be launched elevated by default.
 
-For node-pty 1.1.0, the default Windows ConPTY `kill()` path forks an internal `conpty_console_list_agent` helper before tearing down the pseudoconsole. Upstream issue #952 documents a teardown race in that helper path, and issue #937 tracks the lack of a `windowsHide`-style option for ConPTY child-process windows. PalmTTY therefore selects node-pty's bundled ConPTY DLL path on Windows (`useConptyDll: true`), which avoids that explicit-kill console-list helper while retaining real PTY semantics. This remains an upstream-specific integration choice: Windows CI must exercise it, and release validation must still confirm on a real desktop that explicit termination does not flash a visible console window.
+For node-pty 1.1.0, the default Windows ConPTY `kill()` path forks an internal `conpty_console_list_agent` helper before tearing down the pseudoconsole. Upstream issue #952 documents a teardown race in that helper path. PalmTTY therefore selects node-pty's bundled ConPTY DLL path on Windows (`useConptyDll: true`), which avoids that explicit-kill console-list helper while retaining real PTY semantics.
+
+That choice does **not** provide a general hidden-window guarantee for ConPTY process creation. Upstream issue #937 explicitly tracks the missing `windowsHide`-style option for ConPTY child processes and reports brief visible console windows during background PTY spawn. PalmTTY cannot faithfully replace a real PTY with ordinary pipes just to hide that window. Development mode therefore emits content-free runtime/Worker/PTTY phase markers so owner-host testing can distinguish runtime probes, Worker creation and `pty.spawn` without logging shell arguments, environment values or terminal I/O. Windows CI must exercise the ConPTY DLL path, while release validation must still confirm visible-window behavior on a real desktop for both creation and termination.
 
 Additional node-pty references:
 

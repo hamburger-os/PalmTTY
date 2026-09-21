@@ -7,6 +7,7 @@ A coding agent should not declare a repository-wide task complete before the rel
 ~~~text
 pnpm docs:check
 pnpm typecheck
+pnpm scripts:check
 ~~~
 
 ## Tests
@@ -17,7 +18,7 @@ pnpm test
 
 Security, session and reconnect changes should include or update tests for:
 
-- exact Origin rejection
+- exact Origin rejection, including generated development-LAN Origins remaining exact rather than wildcarded
 - authentication failure
 - required WebSocket subprotocol
 - resume-before-input/resize ordering
@@ -44,13 +45,14 @@ Security, session and reconnect changes should include or update tests for:
 - workspace CRUD requires authentication + exact Origin
 - workspace persistence round-trip and duplicate-ID rejection
 - workspace deletion blocked while a Session is active, but allowed after exit even during retention
-- Host runtime executable/cwd validation, Windows fresh Machine/User environment rebuilding, workspace-environment override/exclusion behavior, and configured login-token removal before Worker bootstrap
+- Host runtime executable/cwd validation, Windows fresh Machine/User environment rebuilding, workspace-environment override/exclusion behavior, and removal/reservation of PalmTTY control variables before Worker bootstrap
 - bounded unified terminal-profile discovery with exact-Origin authentication, known Host-shell detection, WSL distribution enumeration without distro startup, and a manual Custom fallback in the Web editor
 - WSL argv construction without shell-string interpolation, preservation of colon-delimited `WSLENV` entries/flags while forwarding workspace variables, and non-Windows rejection
 - Web workspace editor activation remains idempotent under repeated/StrictMode-style effect setup and does not depend on runtime capability probing to open
 - workspace directory browsing requires authentication + exact Origin, returns directories only, and remains bounded
 - workspace environment editing accepts bounded `NAME=value` input, rejects duplicate/reserved/unbalanced-quote input, normalizes balanced outer quotes, and persists only through workspace CRUD
 - Host directory picker navigation returns absolute selectable paths without exposing files
+- development Origin parsing accepts only exact HTTP(S) Origins, deduplicates generated LAN values, and does not change the configured Agent bind address
 
 The Agent suite includes:
 
@@ -100,6 +102,8 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 ## Manual Windows validation before a release
 
 - run `pnpm run preflight` with the intended config/token and confirm the Agent TCP endpoint is bindable;
+- run `pnpm dev`, confirm Vite reports the workstation's private-LAN URL on port 5173, and open that exact URL from another LAN device while the Agent itself remains on the configured loopback endpoint;
+- on Windows, if LAN access times out after Vite reports a LAN URL, confirm the OS firewall permits Node.js/PalmTTY TCP 5173 on the Private network profile rather than weakening PalmTTY Origin checks;
 - create a Host workspace in the Web UI and confirm Store/MSIX PowerShell resolves through the current-user WindowsApps App Execution Alias where applicable;
 - when WSL is installed, create a WSL workspace and confirm distribution/cwd/shell validation succeeds;
 - switch the UI between 中文 and English and reload to confirm the preference persists;
@@ -107,7 +111,7 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 - run a Unicode/CJK command;
 - start Codex CLI;
 - Ctrl+C a foreground command;
-- terminate a running Session from the list and confirm it visibly transitions/finishes without a console-window flash on the Windows desktop;
+- create/restart and terminate a running Session while watching the development `windows spawn trace`; if a console window still flashes, record whether it occurs between `runtime.resolve.begin`, `runtime.resolve.ready`, `worker.spawn.begin`, `pty.spawn.begin`, `pty.spawn.ready`, `worker.ipc.ready`, and `worker.spawn.ready` rather than claiming the flash is fixed without desktop evidence;
 - clear the exited Session and confirm the retained card/history disappears immediately;
 - resize the browser;
 - close/reopen the browser view without losing PTY;

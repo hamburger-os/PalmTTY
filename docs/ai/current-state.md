@@ -10,6 +10,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Agent/Web/protocol/config packages
 - committed pnpm lockfile with frozen-lockfile CI installs
 - Windows + Ubuntu CI passing
+- root-script syntax checks plus Node built-in tests for private-LAN address/origin discovery
 - Windows ConPTY smoke coverage that prefers PowerShell 7 locally, falls back to Windows PowerShell for generic host checks, and is forced to PowerShell 7 in repository Windows CI
 - end-to-end Fastify HTTP/WebSocket/Worker IPC lifecycle coverage with deterministic PTY adapters
 - detached-process integration coverage proving a Worker survives the creator Agent process exit and can be rediscovered with replay intact
@@ -26,14 +27,14 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - random in-memory login session cookie with bounded active-session count
 - exact Origin allowlist and non-loopback startup safety gate
 - bounded login/session-create rate limiting
-- Session creation/restart remain workspace-authority operations; Web workspace mutation may persist a bounded environment map except the configured login-token variable, while Session requests cannot inject ad-hoc cwd/shell/environment overrides
+- Session creation/restart remain workspace-authority operations; Web workspace mutation may persist a bounded environment map except the reserved `PALMTTY_*` control namespace and any separately configured login-token variable, while Session requests cannot inject ad-hoc cwd/shell/environment overrides
 - runtime preflight for auth/security exposure and configured Agent TCP bindability, exposed as the unambiguous `pnpm run preflight` package script
 - workspace create/update plus Session creation both validate runtime launch targets
 - authenticated + exact-Origin runtime-aware directory browsing for workspace selection plus unified terminal-profile discovery; directory responses expose directories only, while terminal profiles enumerate known Host shells and registered WSL distributions without starting the distributions; both surfaces are bounded and rate-limited
 - host runtime adapter with absolute executable normalization, including current-user Windows App Execution Aliases for Store/MSIX PowerShell; each new/restarted Windows terminal refreshes Machine/User environment variables from Windows before resolving the shell and PATH
 - Windows WSL runtime adapter using structured `wsl.exe` argv for distribution/cwd/shell rather than shell-string interpolation; configured workspace environment variables are forwarded by preserving existing colon-delimited `WSLENV` entries/flags and appending bounded names
 - Linux host runtime exercised by Ubuntu CI; macOS shares the host adapter but is not covered by repository CI
-- root development launcher derives the Agent target from the validated PalmTTY config, injects it into host-independent Vite tooling, and Vite refuses silent dev-port fallback
+- root development launcher derives the Agent target from the validated PalmTTY config, keeps the Agent on its configured endpoint (the example remains loopback), and exposes Vite on `0.0.0.0:5173` by default for private-LAN development; it enumerates current RFC1918/link-local/100.64/10 IPv4 addresses and adds only those exact `http://<address>:5173` Origins to the development Agent in memory, while Vite still refuses silent dev-port fallback; `PALMTTY_WEB_HOST` can override the development listener
 - bounded client message size and terminal dimensions
 - no intentional terminal I/O logging
 - Agent is a replaceable control plane and no longer owns PTYs or canonical terminal state
@@ -43,7 +44,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - one independent detached Worker process per Session
 - Worker owns node-pty/ConPTY, headless xterm, sequence number, replay history and exited-session retention
 - Windows Named Pipe IPC; Unix-domain-socket IPC on current non-Windows CI hosts
-- Windows PTY creation uses node-pty's bundled ConPTY DLL path; this avoids node-pty 1.1.0's separate console-list helper on explicit kill, which can surface a transient console window and has upstream teardown races
+- Windows PTY creation uses node-pty's bundled ConPTY DLL path; this avoids node-pty 1.1.0's separate console-list helper on explicit kill, which can surface a transient console window and has upstream teardown races; root `pnpm dev` also enables content-free runtime/Worker/PTTY phase tracing (`runtime.resolve.begin`, `runtime.resolve.ready`, `worker.spawn.begin`, `pty.spawn.begin`, `pty.spawn.ready`, `worker.ipc.ready`, `worker.spawn.ready`) so real-host flash reports can be localized without logging argv, environment values or terminal I/O
 - length-prefixed bounded JSON frames
 - per-session 256-bit Worker secret
 - bootstrap delivered over anonymous stdin, never argv/URL
@@ -56,7 +57,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - failed rediscovery alone does not delete potentially-live recovery state; definitely-dead recorded processes can be reclaimed without PID-based killing
 - Worker-owned recovery metadata is republished when missing; conflicting record/secret ownership fails closed
 - stale/dangling artifacts are cleaned without treating persisted PIDs as kill authority
-- login-token environment variable is removed before Worker bootstrap, from the Worker process environment, and again from the PTY environment
+- the reserved `PALMTTY_*` environment namespace plus any separately configured login-token variable is removed from the normalized Workspace before Worker bootstrap and from the Worker process environment, preventing development-control state or auth material from leaking into the user shell
 - terminal input is bounded to the same 64 KiB limit at browser and Worker IPC boundaries
 - concurrent Session creation is counted against maxSessions
 
@@ -84,7 +85,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 
 ### Test coverage
 
-- authentication, exact Origin and WebSocket subprotocol
+- authentication, exact Origin and WebSocket subprotocol, including exact dynamically generated private-LAN development Origins and rejection of neighboring/unlisted LAN Origins
 - resume-before-input/resize
 - ordered resize/input
 - browser disconnect + replay
@@ -137,7 +138,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - No multi-user ACL.
 - Reverse-proxy/Tailscale examples are documentation/configuration, not automated setup.
 - Real owner workstation + mobile Safari/Chrome + long-running Codex validation remains required.
-- Windows explicit-termination “no visible console flash” remains a real-host visual acceptance check; CI exercises the bundled ConPTY DLL path but cannot assert desktop window visibility.
+- Windows “no visible console flash” remains a real-host visual acceptance check for both PTY creation and explicit termination; CI exercises the bundled ConPTY DLL path but cannot assert desktop window visibility. Development spawn-phase tracing narrows the responsible stage but does not claim to remove an upstream ConPTY/node-pty window if one is still shown.
 - Potentially-live but unreachable recovery records are deliberately preserved when process death cannot be proven; this favors terminal survival over aggressive metadata reclamation.
 - No Git/file preview subsystem yet.
 - WSL support is implemented but still needs real owner-host/long-running validation, including distribution enumeration, default-shell launch semantics, directory selection, and workspace-variable forwarding through `WSLENV`; repository CI does not provide a real WSL environment.
