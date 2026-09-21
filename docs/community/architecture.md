@@ -61,7 +61,7 @@ Login sessions remain in Agent memory, so after Agent restart the user signs in 
 
 On Windows the Agent and Worker communicate through a named pipe. Current non-Windows CI uses Unix domain sockets.
 
-Every Worker has an independent 256-bit secret. The secret is sent to the Worker once through anonymous stdin at creation time and persisted only in the local runtime recovery area; it never reaches the browser. IPC frames and socket backlog are bounded.
+Every Worker has an independent 256-bit secret. The secret is sent to the Worker once through anonymous stdin at creation time and persisted only in the local runtime recovery area; it never reaches the browser. Recovery state is isolated by private Worker IPC generation; the current protocol v2 uses a `runtime-v2` directory and does not rediscover previous-generation runtime state. IPC frames and socket backlog are bounded.
 
 Persisted PIDs are diagnostic metadata only. PalmTTY never treats an old PID as sufficient authority to kill a process. A failed Agent connection is also not proof that a Worker is dead: potentially-live recovery metadata is preserved, and an adopted Worker retries control-plane reconnection instead of converting an IPC outage into PTY loss. Missing Worker-owned recovery files are republished by the Worker; conflicting recovery authority fails closed.
 
