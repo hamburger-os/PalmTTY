@@ -267,7 +267,7 @@ export function WorkspaceDialog({
     const currentKey = runtimeKey(kind, distribution);
     cwdDraftsRef.current.set(currentKey, cwd);
 
-    const nextDistribution = nextKind === "wsl" ? "" : "";
+    const nextDistribution = "";
     const nextKey = runtimeKey(nextKind, nextDistribution);
     setKind(nextKind);
     setDistribution(nextDistribution);
@@ -437,7 +437,7 @@ export function WorkspaceDialog({
             </div>
 
             {profileChoice === "custom" && (
-              <div className="workspace-advanced glass-content">
+              <div className="workspace-advanced">
                 <label>
                   <span>{t("workspace.customRuntime")}</span>
                   <select
