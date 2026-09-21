@@ -11,6 +11,7 @@ export const STARTUP_COMMAND_PRESETS = [
 
 export type ShellArgumentPreset = {
   id: "pwsh-default" | "pwsh-clean" | "login-shell" | "cmd-quiet";
+  shell?: string;
   args: string[];
 };
 
@@ -19,14 +20,14 @@ export function shellArgumentPresets(
   platform: RuntimeCapabilities["platform"] | null
 ): ShellArgumentPreset[] {
   if (runtime === "wsl") {
-    return [{ id: "login-shell", args: ["-l"] }];
+    return [{ id: "login-shell", shell: "/bin/bash", args: ["-l"] }];
   }
 
   if (platform === "win32") {
     return [
-      { id: "pwsh-default", args: ["-NoLogo"] },
-      { id: "pwsh-clean", args: ["-NoLogo", "-NoProfile"] },
-      { id: "cmd-quiet", args: ["/Q"] }
+      { id: "pwsh-default", shell: "pwsh.exe", args: ["-NoLogo"] },
+      { id: "pwsh-clean", shell: "pwsh.exe", args: ["-NoLogo", "-NoProfile"] },
+      { id: "cmd-quiet", shell: "cmd.exe", args: ["/Q"] }
     ];
   }
 
@@ -35,7 +36,7 @@ export function shellArgumentPresets(
   }
 
   return [
-    { id: "pwsh-default", args: ["-NoLogo"] },
+    { id: "pwsh-default", shell: "pwsh.exe", args: ["-NoLogo"] },
     { id: "login-shell", args: ["-l"] }
   ];
 }
