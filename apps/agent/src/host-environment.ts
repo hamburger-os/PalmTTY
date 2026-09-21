@@ -46,13 +46,16 @@ function setEnvironmentValue(
 
 function expandEnvironmentValue(
   value: string,
-  environment: StringEnvironment
+  environment: StringEnvironment,
+  activeKey?: string
 ): string {
   let current = value;
+  const active = activeKey?.toLowerCase();
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const next = current.replace(/%([^%]+)%/g, (match, name: string) => (
-      environmentValue(environment, name) ?? match
-    ));
+    const next = current.replace(/%([^%]+)%/g, (match, name: string) => {
+      if (active && name.toLowerCase() === active) return match;
+      return environmentValue(environment, name) ?? match;
+    });
     if (next === current) break;
     current = next;
   }
@@ -75,13 +78,22 @@ export function mergeWindowsEnvironment(
     setEnvironmentValue(merged, key, value);
   }
 
-  const machinePath = environmentValue(machine, "Path") ?? "";
-  const userPath = environmentValue(user, "Path") ?? "";
-  const freshPath = [machinePath, userPath].filter(Boolean).join(";");
+  const machinePathRaw = environmentValue(machine, "Path") ?? "";
+  const userPathRaw = environmentValue(user, "Path") ?? "";
+  const machinePath = expandEnvironmentValue(machinePathRaw, merged, "path");
+
+  const pathExpansionEnvironment = { ...merged };
+  if (machinePath) setEnvironmentValue(pathExpansionEnvironment, "Path", machinePath);
+  const userPath = expandEnvironmentValue(userPathRaw, pathExpansionEnvironment);
+  const userReferencesPath = /%path%/i.test(userPathRaw);
+  const freshPath = userReferencesPath
+    ? userPath
+    : [machinePath, userPath].filter(Boolean).join(";");
   if (freshPath) setEnvironmentValue(merged, "Path", freshPath);
 
   for (const key of Object.keys(merged)) {
-    merged[key] = expandEnvironmentValue(merged[key] ?? "", merged);
+    if (key.toLowerCase() === "path") continue;
+    merged[key] = expandEnvironmentValue(merged[key] ?? "", merged, key);
   }
   return merged;
 }
@@ -235,13 +247,31 @@ export function addWslEnvironmentForwarding(
   if (names.length === 0) return result;
 
   const existing = environmentValue(result, "WSLENV") ?? "";
-  const entries = existing.split("/").filter(Boolean);
-  const seen = new Set(entries.map((entry) => entry.split(":")[0]?.toLowerCase()));
+  const entries = existing.split(":").filter(Boolean);
+  const seen = new Set(
+    entries.map((entry) => entry.split("/", 1)[0]?.toLowerCase())
+  );
   for (const name of names) {
     if (seen.has(name.toLowerCase())) continue;
     entries.push(name);
     seen.add(name.toLowerCase());
   }
-  setEnvironmentValue(result, "WSLENV", entries.join("/"));
+  setEnvironmentValue(result, "WSLENV", entries.join(":"));
+  return result;
+}
+
+export function withoutEnvironmentKeys(
+  environment: Record<string, string>,
+  keys: string[]
+): StringEnvironment {
+  const result = normalizedEnvironment(environment);
+  for (const key of keys) {
+    if (process.platform !== "win32") {
+      delete result[key];
+      continue;
+    }
+    const existing = findEnvironmentKey(result, key);
+    if (existing) delete result[existing];
+  }
   return result;
 }
