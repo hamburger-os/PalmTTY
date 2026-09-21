@@ -20,6 +20,7 @@ import {
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import { AUTH_COOKIE, AuthService } from "./auth.js";
+import { controlEnvironmentKeys, isReservedControlEnvironmentKey } from "./control-environment.js";
 import { browseWorkspaceDirectory } from "./workspace-directory-browser.js";
 import { detectTerminalProfiles } from "./terminal-profiles.js";
 import { FixedWindowLimiter, isTrustedOrigin } from "./security.js";
@@ -85,11 +86,8 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     environment: Record<string, string> | undefined
   ): boolean {
     if (!environment) return false;
-    const reserved = config.auth.tokenEnv;
     return Object.keys(environment).some((key) => (
-      process.platform === "win32"
-        ? key.toLowerCase() === reserved.toLowerCase()
-        : key === reserved
+      isReservedControlEnvironmentKey(key, config.auth.tokenEnv)
     ));
   }
 
@@ -202,7 +200,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     workspaceStore,
     requireAuth,
     requireOrigin,
-    sensitiveEnvironmentKeys: [config.auth.tokenEnv]
+    sensitiveEnvironmentKeys: controlEnvironmentKeys(config.auth.tokenEnv)
   });
 
   app.get("/api/v1/workspaces", { preHandler: requireAuth }, async () => ({
@@ -223,7 +221,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       if (workspaceUsesReservedEnvironment(parsed.data.environment)) {
         return reply.code(400).send({
           error: "workspace_invalid",
-          message: `Environment variable "${config.auth.tokenEnv}" is reserved by PalmTTY authentication`
+          message: "PalmTTY control environment variables are reserved"
         });
       }
 
@@ -261,7 +259,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       if (workspaceUsesReservedEnvironment(parsed.data.environment)) {
         return reply.code(400).send({
           error: "workspace_invalid",
-          message: `Environment variable "${config.auth.tokenEnv}" is reserved by PalmTTY authentication`
+          message: "PalmTTY control environment variables are reserved"
         });
       }
 

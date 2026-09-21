@@ -4,6 +4,7 @@ import path from "node:path";
 import type { WorkerBootstrap } from "./worker-protocol.js";
 
 const WORKER_READY_LINE = "PALMTTY_WORKER_READY";
+const WORKER_TRACE_PREFIX = "PALMTTY_WORKER_TRACE ";
 const WORKER_START_TIMEOUT_MS = 8_000;
 const MAX_STARTUP_STDERR_BYTES = 8 * 1024;
 
@@ -36,6 +37,15 @@ function removeEnvironmentKey(
 
 export class ProcessWorkerSpawner implements WorkerSpawner {
   async spawn(bootstrap: WorkerBootstrap): Promise<void> {
+    const traceWindowsSpawn =
+      process.platform === "win32" &&
+      bootstrap.traceWindowsSpawn === true;
+    if (traceWindowsSpawn) {
+      console.info(
+        `[PalmTTY] windows spawn trace ${bootstrap.sessionId}: worker.spawn.begin`
+      );
+    }
+
     const environment = { ...process.env };
     for (const key of bootstrap.excludedEnvKeys) {
       removeEnvironmentKey(environment, key);
@@ -92,7 +102,27 @@ export class ProcessWorkerSpawner implements WorkerSpawner {
         stdout += chunk.toString();
         const lines = stdout.split(/\r?\n/);
         stdout = lines.pop() ?? "";
-        if (lines.some((line) => line.trim() === WORKER_READY_LINE)) finish();
+
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (
+            traceWindowsSpawn &&
+            line.startsWith(WORKER_TRACE_PREFIX)
+          ) {
+            const event = line.slice(WORKER_TRACE_PREFIX.length);
+            console.info(
+              `[PalmTTY] windows spawn trace ${bootstrap.sessionId}: ${event}`
+            );
+          }
+          if (line === WORKER_READY_LINE) {
+            if (traceWindowsSpawn) {
+              console.info(
+                `[PalmTTY] windows spawn trace ${bootstrap.sessionId}: worker.spawn.ready`
+              );
+            }
+            finish();
+          }
+        }
       };
 
       const timer = setTimeout(() => {

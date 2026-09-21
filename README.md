@@ -118,7 +118,7 @@ Open `http://127.0.0.1:7688`, sign in with the access token, then create a works
 
 `pnpm run preflight` validates the authentication environment, security exposure rules and configured Agent TCP listen endpoint before the Agent starts. Workspace directories and shells are validated when a workspace is created/updated and again when a Session starts or is explicitly restarted. Windows Store/MSIX PowerShell is supported through the current user's App Execution Alias, and resolved host shells are normalized to absolute launch paths before Worker creation. Each new/restarted Windows Host terminal rebuilds its environment from current Machine/User values before Workspace overrides are applied, so a CLI added to the user's PATH after the PalmTTY Agent started can be picked up by **Restart terminal** without restarting the Agent.
 
-For development, run `pnpm dev`. It invokes PalmTTY's `preflight` package script explicitly before Vite and the Agent are launched, so a bad token or Agent endpoint fails once with an actionable startup error instead of leaving the frontend proxy retrying a dead Agent. The script is intentionally not named `doctor` because pnpm 10 already owns `pnpm doctor` as a package-manager diagnostic command. The example development configuration already includes the Vite origin required by the exact Origin check. In development, the root `pnpm dev` launcher reads the same `PALMTTY_CONFIG`, derives the local Agent URL from `server.host`/`server.port`, and injects it into Vite as `PALMTTY_AGENT_URL`; an explicitly supplied `PALMTTY_AGENT_URL` still overrides the derived target. Vite uses strict port 5173 so it cannot silently move to a different untrusted Origin.
+For development, run `pnpm dev`. It invokes PalmTTY's `preflight` package script explicitly before Vite and the Agent are launched, so a bad token or Agent endpoint fails once with an actionable startup error instead of leaving the frontend proxy retrying a dead Agent. The script is intentionally not named `doctor` because pnpm 10 already owns `pnpm doctor` as a package-manager diagnostic command. The root launcher reads the same `PALMTTY_CONFIG`, derives the local Agent URL from `server.host`/`server.port`, and injects it into Vite as `PALMTTY_AGENT_URL`; an explicitly supplied `PALMTTY_AGENT_URL` still overrides the derived target. **Vite now listens on `0.0.0.0:5173` by default**, while the Agent remains on its configured endpoint (the example config stays loopback-only). The launcher enumerates current private/overlay IPv4 addresses and adds only those exact `http://<address>:5173` Origins to the development Agent in memory, so a phone on the same LAN can use the printed Network URL without editing `trustedOrigins`. Set `PALMTTY_WEB_HOST=127.0.0.1` to opt out of LAN development listening. On Windows, if another LAN device still times out, allow Node.js/PalmTTY TCP 5173 on the Private network profile; PalmTTY never elevates itself or edits firewall rules. Vite keeps strict port 5173 so it cannot silently move to a different untrusted Origin.
 
 ## Secure remote access / 安全远程访问
 
@@ -144,6 +144,7 @@ Every repository-wide change is expected to pass:
 ```powershell
 pnpm docs:check
 pnpm typecheck
+pnpm scripts:check
 pnpm test
 pnpm build
 

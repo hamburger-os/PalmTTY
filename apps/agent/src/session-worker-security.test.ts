@@ -204,7 +204,7 @@ describe("session worker security boundary", () => {
     second.close();
   });
 
-  it("strips the configured login token from Worker bootstrap environment", async () => {
+  it("strips PalmTTY control variables from Worker bootstrap environment", async () => {
     const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-env-"));
     runtimeDirs.add(runtimeDir);
 
@@ -229,7 +229,10 @@ describe("session worker security boundary", () => {
     const definition = workspace();
     definition.environment = {
       PALMTTY_TEST_ACCESS_TOKEN: "must-not-cross-bootstrap",
-      PALMTTY_VISIBLE: "yes"
+      PALMTTY_CONFIG: "must-not-cross-bootstrap",
+      PALMTTY_DEV_TRUSTED_ORIGINS: "must-not-cross-bootstrap",
+      PALMTTY_WINDOWS_SPAWN_TRACE: "must-not-cross-bootstrap",
+      USER_VISIBLE: "yes"
     };
     const manager = new SessionManager(config, {
       runtimeDir,
@@ -243,7 +246,18 @@ describe("session worker security boundary", () => {
       expect(capturedBootstrap).toBeDefined();
       expect(capturedBootstrap!.workspace.env.PALMTTY_TEST_ACCESS_TOKEN)
         .toBeUndefined();
-      expect(capturedBootstrap!.workspace.env.PALMTTY_VISIBLE).toBe("yes");
+      expect(capturedBootstrap!.workspace.env.PALMTTY_CONFIG).toBeUndefined();
+      expect(capturedBootstrap!.workspace.env.PALMTTY_DEV_TRUSTED_ORIGINS)
+        .toBeUndefined();
+      expect(capturedBootstrap!.workspace.env.PALMTTY_WINDOWS_SPAWN_TRACE)
+        .toBeUndefined();
+      expect(capturedBootstrap!.excludedEnvKeys).toEqual(expect.arrayContaining([
+        "PALMTTY_TEST_ACCESS_TOKEN",
+        "PALMTTY_CONFIG",
+        "PALMTTY_DEV_TRUSTED_ORIGINS",
+        "PALMTTY_WINDOWS_SPAWN_TRACE"
+      ]));
+      expect(capturedBootstrap!.workspace.env.USER_VISIBLE).toBe("yes");
     } finally {
       await manager.close();
     }

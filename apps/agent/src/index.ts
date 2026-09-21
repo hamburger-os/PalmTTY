@@ -2,6 +2,7 @@ import path from "node:path";
 import { configPathFromEnvironment, loadConfig } from "@palmtty/config";
 import { buildApp } from "./app.js";
 import { preflightRuntime } from "./preflight.js";
+import { withDevelopmentTrustedOrigins } from "./development-origins.js";
 import { describeServerBindError } from "./server-endpoint.js";
 import { runSessionWorkerFromStdin } from "./session-worker.js";
 
@@ -19,7 +20,13 @@ async function main() {
   }
 
   const configPath = configPathFromArgs();
-  const config = await loadConfig(configPath);
+  const loadedConfig = await loadConfig(configPath);
+  const config = process.argv.includes("--development")
+    ? withDevelopmentTrustedOrigins(
+        loadedConfig,
+        process.env.PALMTTY_DEV_TRUSTED_ORIGINS
+      )
+    : loadedConfig;
   await preflightRuntime(config);
 
   if (config.server.unsafeAllowInsecureLan) {

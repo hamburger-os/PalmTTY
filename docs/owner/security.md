@@ -6,7 +6,7 @@ PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。安全失
 
 ## 外部访问边界
 
-默认监听 127.0.0.1。非 loopback 正常模式必须同时开启认证、Secure Cookie 和明确 trustedOrigins，否则 Agent 拒绝启动。unsafeAllowInsecureLan 仅作为显式开发逃生口。
+生产/正常 Agent 的默认监听仍是 127.0.0.1。非 loopback 正常模式必须同时开启认证、Secure Cookie 和明确 trustedOrigins，否则 Agent 拒绝启动。`pnpm dev` 是单独的开发拓扑：Vite 默认监听 `0.0.0.0:5173` 供私有 LAN 调试，但 Agent 仍使用配置中的 endpoint（示例仍是 loopback）；开发启动器只把实际检测到的私有/overlay IPv4 对应 5173 Origin 作为**精确值**追加到当前 development Agent 内存 allowlist。它不启用 Origin 通配、不写回配置，也不改变生产启动。`unsafeAllowInsecureLan` 仍只作为显式逃生口。
 
 ## 浏览器认证
 
@@ -17,7 +17,7 @@ PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。安全失
 - Cookie 使用 HttpOnly、SameSite=Strict，正常非 loopback 部署要求 Secure；
 - 登录 Session 有绝对过期和数量上限；
 - 已建立 terminal WebSocket 到期后也会被主动关闭；
-- Origin 与认证始终是独立控制。
+- Origin 与认证始终是独立控制；开发 LAN Vite 也必须同时通过登录认证与动态生成的精确 Origin，不能因为流量由本机 Vite 反代就重写/伪造 Origin 绕过校验。
 
 登录 Session 不持久化，所以 Agent 重启后需要重新登录。
 
@@ -29,7 +29,7 @@ PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。安全失
 
 - secret 只通过 Worker 创建时的一次性匿名 stdin bootstrap 传递；
 - secret 不放 argv、URL、浏览器协议或普通日志；
-- PalmTTY 登录 token 对应的环境变量在启动 Worker 前删除，并再次从 PTY 环境删除；Windows 下删除按环境变量名大小写不敏感语义处理；
+- `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量，在 Worker bootstrap 前从规范化 Workspace 环境剔除，并从 Worker 进程环境删除；Windows 下按环境变量名大小写不敏感语义处理；
 - Worker 先验证 protocol version + secret，未认证连接不能 attach/input/resize/terminate/retire；
 - 新 Agent 只有持有 recovery secret 才能接管控制连接；
 - Worker secret 在用户 runtime 目录单独保存；
@@ -60,14 +60,14 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 - Workspace CRUD 是显式高权限配置面，只有认证成功且 Origin 精确匹配的请求可以修改当前用户的持久化 workspace。
 - Workspace 目录选择器也是“认证 + 精确 Origin”保护的显式 API，但只读且只枚举目录名称/绝对路径，不返回文件内容；Host/WSL 浏览均有限流、返回数量上限，WSL 还限制子进程输出与执行时间。
 - 会话工作台的 Files 与 Git 是与目录选择器、终端 WebSocket 分离的只读检查面，全部要求认证 + 精确 Origin，并有独立限流。Files API 只接收规范化 Workspace 相对路径，Host 使用 `realpath`/symlink containment 防止越过 Workspace 根目录，WSL 在发行版内再次解析 physical path 并做根目录前缀检查；目录最多返回 512 项，文本预览最多 512 KiB，二进制内容不解码。
-- Git API 只暴露 status/diff，不提供 stage/commit/push/pull。Git 命令使用结构化 argv、输出/超时上限和 `--` pathspec 分隔；diff 禁止 external diff/textconv，status 禁用 fsmonitor，以避免一次“查看”动作隐式执行仓库配置中的外部程序。Git/WSL 辅助子进程会从环境中剔除 PalmTTY 登录 token 对应的配置变量。
-- Web workspace 可以配置 cwd、runtime、Shell、Shell args、有界 environment 与启动命令。Environment 是当前用户应用数据中的持久化配置，可能敏感但不是 secret vault；默认日志不得记录其值。当前认证 token 对应的环境变量名属于保留项，Workspace mutation 会拒绝持久化它；Worker bootstrap 和 PTY 仍继续执行剔除作为纵深防御。
+- Git API 只暴露 status/diff，不提供 stage/commit/push/pull。Git 命令使用结构化 argv、输出/超时上限和 `--` pathspec 分隔；diff 禁止 external diff/textconv，status 禁用 fsmonitor，以避免一次“查看”动作隐式执行仓库配置中的外部程序。Git/WSL 辅助子进程会从环境中剔除 `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量。
+- Web workspace 可以配置 cwd、runtime、Shell、Shell args、有界 environment 与启动命令。Environment 是当前用户应用数据中的持久化配置，可能敏感但不是 secret vault；默认日志不得记录其值。`PALMTTY_*` 整个命名空间以及单独配置的认证 token 环境变量属于保留项，Workspace mutation 会拒绝持久化它们；Worker bootstrap 和 PTY 仍继续剔除作为纵深防御。
 - Session 创建与重启都只使用已持久化的 workspace authority，不允许用一次 Session 请求临时注入 cwd/shell/env。
 - Workspace 新建/更新会验证运行目标，Session 创建/重启前再次验证；Host Shell 解析为绝对 executable，Windows 新终端先刷新 Machine/User 环境再应用 Workspace environment；WSL 通过结构化 argv 调用 `wsl.exe`，并仅通过 `WSLENV` 名称列表转发 workspace variables，不做用户命令字符串拼接。
 - 终端 Profile 发现与目录浏览一样要求认证 + 精确 Origin，并具有独立限流、输出与超时边界；Host 侧只返回已知 Shell Profile，Windows WSL 侧通过 `wsl.exe --list --quiet` 枚举已注册发行版，不进入发行版执行探测脚本，也不提供任意命令执行。
 - Agent/Worker 默认不提权；
 - PTY 继承普通用户权限；
-- 默认日志不记录 terminal I/O、token、Worker secret 或 workspace env。
+- 默认日志不记录 terminal I/O、token、Worker secret 或 workspace env；Windows development spawn trace 只记录 Worker/PTTY 阶段名称和 Session ID，不记录 argv、环境变量值、启动命令或终端内容。
 
 ## 资源限制
 
@@ -85,6 +85,6 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 1. Workspace CRUD、目录浏览、终端 Profile 与 Git/Files 工作台是否仍受认证 + 精确 Origin 保护；Files 是否始终约束在 Workspace 根目录；Git 是否保持只读、有界并禁止 external diff/textconv/fsmonitor；Session 创建/重启是否仍只消费持久化 Workspace authority，而不是接收临时 cwd/shell/env？
 2. 是否让 secret/终端内容进入日志、URL、argv 或浏览器？
-3. 是否破坏认证 + Origin + HTTPS 外部边界？
+3. 是否破坏认证 + Origin + HTTPS 外部边界？尤其检查 `pnpm dev` 的 LAN 暴露是否仍只动态加入精确私有 Origin，且没有把 production Agent 改成默认非 loopback。
 4. 是否允许未认证本地 IPC 控制 Worker？
 5. 是否把 persisted PID 当成 kill authority？

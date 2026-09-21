@@ -8,6 +8,7 @@ import {
   type ServerMessage
 } from "@palmtty/protocol";
 import type WebSocket from "ws";
+import { controlEnvironmentKeys } from "./control-environment.js";
 import { WorkerClient } from "./worker-client.js";
 import { WORKER_PROTOCOL_VERSION, type WorkerBootstrap } from "./worker-protocol.js";
 import { ProcessWorkerSpawner, type WorkerSpawner } from "./worker-spawner.js";
@@ -47,6 +48,15 @@ const CREATE_CONNECT_DELAYS_MS = [0, 50, 100, 200, 400, 800, 1200, 1600];
 const REDISCOVER_CONNECT_DELAYS_MS = [0, 100, 250, 500, 1000, 2000, 4000];
 const RECONNECT_DELAYS_MS = [100, 250, 500, 1000, 2000, 5000];
 const RESTART_EXIT_TIMEOUT_MS = 10_000;
+
+function traceWindowsSpawn(scope: string, event: string): void {
+  if (
+    process.platform === "win32" &&
+    process.env.PALMTTY_WINDOWS_SPAWN_TRACE === "1"
+  ) {
+    console.info(`[PalmTTY] windows spawn trace ${scope}: ${event}`);
+  }
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -162,7 +172,9 @@ export class SessionManager {
 
     const release = this.reserveCreate(workspaceId);
     try {
+      traceWindowsSpawn(`workspace:${workspaceId}`, "runtime.resolve.begin");
       const workspace = await resolveRuntimeWorkspace(definition);
+      traceWindowsSpawn(`workspace:${workspaceId}`, "runtime.resolve.ready");
       return await this.spawnSession(workspace, cols, rows);
     } finally {
       release();
@@ -207,7 +219,16 @@ export class SessionManager {
     const endpoint = endpointId();
     const secret = workerSecret();
     const createdAt = new Date().toISOString();
-    const excludedEnvKeys = [this.config.auth.tokenEnv];
+    const excludedEnvKeys = controlEnvironmentKeys(
+      this.config.auth.tokenEnv,
+      {
+        ...process.env,
+        ...workspace.env
+      }
+    );
+    const traceWindowsSpawnEnabled =
+      process.platform === "win32" &&
+      process.env.PALMTTY_WINDOWS_SPAWN_TRACE === "1";
     const workerWorkspace: RuntimeWorkspace = {
       ...workspace,
       env: withoutEnvironmentKeys(workspace.env, excludedEnvKeys)
@@ -219,6 +240,7 @@ export class SessionManager {
       endpointId: endpoint,
       secret,
       excludedEnvKeys,
+      ...(traceWindowsSpawnEnabled ? { traceWindowsSpawn: true } : {}),
       createdAt,
       workspace: workerWorkspace,
       session: {
@@ -347,7 +369,9 @@ export class SessionManager {
       // Validate and resolve the replacement before destroying the current PTY.
       // This keeps an exited retained Session available when its workspace was
       // deleted or its launch target became invalid.
+      traceWindowsSpawn(`workspace:${workspaceId}`, "runtime.resolve.begin");
       const replacement = await resolveRuntimeWorkspace(definition);
+      traceWindowsSpawn(`workspace:${workspaceId}`, "runtime.resolve.ready");
 
       if (isActiveSessionState(managed.session.state)) {
         await managed.worker.terminate();
