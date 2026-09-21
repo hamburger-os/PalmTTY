@@ -138,6 +138,10 @@ export class WorkerClient {
     await this.request({ type: "terminate" });
   }
 
+  async retire(): Promise<void> {
+    await this.request({ type: "retire" });
+  }
+
   close(): void {
     if (this.closed) return;
     this.framed.destroy();
