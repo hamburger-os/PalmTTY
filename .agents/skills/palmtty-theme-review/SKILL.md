@@ -3,7 +3,7 @@ name: palmtty-theme-review
 description: "Audit PalmTTY Web UI for theme SSOT compliance, mobile rendering quality, semantic surface ownership, terminal lifecycle isolation, and visual performance regressions."
 license: Apache-2.0
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # PalmTTY theme and rendering review
@@ -31,7 +31,7 @@ rg 'window\.(alert|confirm|prompt)' apps/web/src
 rg 'filter:\s*blur|mix-blend-mode|will-change|transition:\s*all' apps/web/src --glob '*.css' --glob '*.tsx'
 rg 'backdrop-filter' apps/web/src
 rg '#[0-9a-fA-F]{3,8}|rgba?\(' apps/web/src --glob '*.css' --glob '*.tsx'
-rg 'glass-(shell|panel|content|control|card)' apps/web/src
+rg 'glass-(shell|modal|panel|content|control|card)|terminal-surface' apps/web/src
 rg 'data-theme|data-performance|data-motion|prefers-reduced-motion' apps/web/src
 rg 'new Terminal|options\.theme|new WebSocket|lastSeq' apps/web/src/TerminalView.tsx
 ```
@@ -46,14 +46,14 @@ For each relevant combination inspect:
 
 1. loading/login;
 2. home with empty and populated workspaces/sessions;
-3. workspace create/edit;
+3. workspace create/edit, including a form tall enough to scroll while header/footer remain reachable;
 4. directory picker;
 5. destructive confirmation;
-6. terminal connected/reconnecting/closed;
+6. terminal connected/reconnecting/closed, checking that the host gutter and xterm canvas read as one surface;
 7. portrait;
 8. short landscape.
 
-Theme switching while a terminal is live must not recreate xterm or WebSocket state.
+Theme switching while a terminal is live must not recreate xterm or WebSocket state. Presentation-state changes must not be wired into the terminal transport lifecycle.
 
 ## Review priorities
 
@@ -64,7 +64,8 @@ CRITICAL:
 
 HIGH:
 - large-area backdrop blur;
-- duplicate/nested glass ownership;
+- duplicate/nested glass ownership, including a generic glass surface behind xterm;
+- modal content transparency high enough that background cards/actions compete with form text;
 - theme-specific material forks instead of veil/tokens;
 - Performance mode still runs decorative continuous animation;
 - browser-native confirm/alert/prompt used as product UI.
@@ -73,6 +74,7 @@ MEDIUM:
 - component-owned hard-coded palette;
 - reduced-motion ignored;
 - controls/touch targets become unreachable;
+- long modal scroll moves its header/footer actions out of reach;
 - Frosted/Obsidian/Spectrum identity collapses.
 
 LOW:
