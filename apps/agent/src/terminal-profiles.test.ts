@@ -29,12 +29,12 @@ describe("terminal profile discovery", () => {
     ]);
   });
 
-  it("deduplicates distribution names and tolerates a default marker", () => {
+  it("deduplicates distribution names, tolerates a default marker, and hides utility distros", () => {
     expect(parseWslDistributionList(
-      "* Ubuntu\nubuntu\nDocker-Desktop\n"
+      "* Ubuntu\nubuntu\nDocker-Desktop\nrancher-desktop-data\nDebian\n"
     )).toEqual([
       "Ubuntu",
-      "Docker-Desktop"
+      "Debian"
     ]);
   });
 });
