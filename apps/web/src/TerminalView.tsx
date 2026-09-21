@@ -51,6 +51,12 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
     translateRef.current = t;
   }, [t]);
 
+  useEffect(() => {
+    terminalThemeRef.current = terminalTheme;
+    const terminal = terminalRef.current;
+    if (terminal) terminal.options.theme = terminalTheme;
+  }, [terminalTheme]);
+
   const terminalSurfaceStyle = terminalTheme.background
     ? ({ "--terminal-background": terminalTheme.background } as CSSProperties)
     : undefined;
@@ -321,12 +327,6 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
       terminalRef.current = null;
     };
   }, [sessionId]);
-
-  useEffect(() => {
-    terminalThemeRef.current = terminalTheme;
-    const terminal = terminalRef.current;
-    if (terminal) terminal.options.theme = terminalTheme;
-  }, [terminalTheme]);
 
   const toggleCtrl = () => {
     if (connection !== "connected") return;
