@@ -6,6 +6,7 @@
 
 server:
   host: 127.0.0.1
+  # If preflight reports this port is reserved/excluded or already in use, choose another free port.
   port: 7688
   trustedOrigins:
     - http://127.0.0.1:7688
