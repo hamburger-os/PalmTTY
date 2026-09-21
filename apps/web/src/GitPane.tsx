@@ -44,8 +44,15 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
         setStatus(result);
         setSelection((current) => {
           if (!current) return null;
-          const stillPresent = result.entries.some((entry) => entry.path === current.path);
-          return stillPresent ? current : null;
+          const entry = result.entries.find((item) => item.path === current.path);
+          if (!entry) return null;
+          const stillPresent = current.staged ? entry.staged : entry.unstaged;
+          if (!stillPresent) return null;
+          return {
+            path: current.path,
+            staged: current.staged,
+            untracked: entry.untracked
+          };
         });
       })
       .catch((cause) => {
