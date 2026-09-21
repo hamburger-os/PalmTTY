@@ -78,6 +78,18 @@ pnpm run preflight
 
 This requires the intended PalmTTY config and authentication environment. The preflight reports auth/security/server-bind failures. Workspace launch validation is intentionally performed when a workspace is created/updated and again when a Session starts, so a stale project path cannot prevent the Agent control plane from starting. It is not a generic CI/contributor prerequisite. The explicit `run` form is required because pnpm 10 has its own built-in `doctor` command; PalmTTY deliberately names its host check `preflight` to avoid command dispatch ambiguity.
 
+## Web visual validation
+
+For theme or broad Web UI changes, run the `.agents/skills/palmtty-theme-review/SKILL.md` procedure and manually cover:
+
+- Spectrum / Obsidian / Frosted;
+- Quality / Performance;
+- system reduced motion;
+- login/loading/home/workspace dialog/directory picker/confirmation;
+- terminal connected/reconnecting/closed;
+- portrait and short landscape layouts;
+- a live terminal while changing appearance, confirming there is no xterm/WebSocket recreation or recovery reset.
+
 ## Manual Windows validation before a release
 
 - run `pnpm run preflight` with the intended config/token and confirm the Agent TCP endpoint is bindable;
