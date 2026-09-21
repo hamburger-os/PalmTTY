@@ -26,7 +26,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - random in-memory login session cookie with bounded active-session count
 - exact Origin allowlist and non-loopback startup safety gate
 - bounded login/session-create rate limiting
-- Session creation/restart remain workspace-authority operations; Web workspace mutation may persist a bounded environment map, while Session requests cannot inject ad-hoc cwd/shell/environment overrides
+- Session creation/restart remain workspace-authority operations; Web workspace mutation may persist a bounded environment map except the configured login-token variable, while Session requests cannot inject ad-hoc cwd/shell/environment overrides
 - runtime preflight for auth/security exposure and configured Agent TCP bindability, exposed as the unambiguous `pnpm run preflight` package script
 - workspace create/update plus Session creation both validate runtime launch targets
 - authenticated + exact-Origin runtime-aware directory browsing for workspace selection; responses expose directories only and are bounded by request rate, 512 returned entries, subprocess output, and timeout
