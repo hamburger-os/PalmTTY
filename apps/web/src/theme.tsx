@@ -64,8 +64,19 @@ function applyDocumentAppearance(
   document.documentElement.dataset.performance = performanceMode;
 }
 
+function applyDocumentMotionState(reducedMotion: boolean): void {
+  document.documentElement.dataset.motion = document.hidden
+    ? "paused"
+    : reducedMotion
+      ? "reduced"
+      : "full";
+}
+
 export function initializeThemeDocument(): void {
   applyDocumentAppearance(storedTheme(), storedPerformanceMode());
+  applyDocumentMotionState(
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
 }
 
 const TERMINAL_THEMES: Record<ThemeId, ITheme> = {
@@ -168,11 +179,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     const applyMotionState = () => {
       setReducedMotion(media.matches);
-      document.documentElement.dataset.motion = document.hidden
-        ? "paused"
-        : media.matches
-          ? "reduced"
-          : "full";
+      applyDocumentMotionState(media.matches);
     };
 
     applyMotionState();
