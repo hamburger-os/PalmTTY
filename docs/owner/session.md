@@ -81,7 +81,7 @@ Workspace 不再写入 `palmtty.local.yaml`，而是 Agent 当前用户应用数
 
 Workspace 定义包含显示名称、工作目录、runtime、Shell、Shell args 与可选启动命令。Web 模型不开放 env 覆盖。Host runtime 在创建/修改与启动 Session 时验证本机目录和 Shell，并把 Shell 解析成绝对 executable。Windows WSL runtime 使用 `wsl.exe`，把 distribution、Linux cwd、Shell/args 作为结构化 argv 交给 PTY，不通过字符串插值拼命令。
 
-正在创建、运行或保留期内的 Session 会阻止删除对应 workspace；编辑只影响后续新建 Session，已经运行的 Worker 保留创建时的规范化运行规格。
+正在创建或运行中的 Session 会阻止删除对应 workspace；Session 退出后即使仍处于 retention，也可以删除 launch template，已退出 Session 继续由 Worker 自己完成 retention/清理。编辑只影响后续新建 Session，已经运行的 Worker 保留创建时的规范化运行规格。
 
 ## 你审查时重点看
 
