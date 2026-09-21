@@ -45,7 +45,7 @@ Security, session and reconnect changes should include or update tests for:
 - workspace CRUD requires authentication + exact Origin
 - workspace persistence round-trip and duplicate-ID rejection
 - workspace deletion blocked while a Session is active, but allowed after exit even during retention
-- Host runtime executable/cwd validation, Windows fresh Machine/User environment rebuilding, workspace-environment override/exclusion behavior, and configured login-token removal before Worker bootstrap
+- Host runtime executable/cwd validation, Windows fresh Machine/User environment rebuilding, workspace-environment override/exclusion behavior, and removal/reservation of PalmTTY control variables before Worker bootstrap
 - bounded unified terminal-profile discovery with exact-Origin authentication, known Host-shell detection, WSL distribution enumeration without distro startup, and a manual Custom fallback in the Web editor
 - WSL argv construction without shell-string interpolation, preservation of colon-delimited `WSLENV` entries/flags while forwarding workspace variables, and non-Windows rejection
 - Web workspace editor activation remains idempotent under repeated/StrictMode-style effect setup and does not depend on runtime capability probing to open
