@@ -10,16 +10,64 @@ function utf8ByteLength(value: string): number {
   return encoder.encode(value).byteLength;
 }
 
+const WorkspaceIdSchema = z.string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9-]*$/);
+
+const HostRuntimeSchema = z.object({
+  kind: z.literal("host"),
+  shell: z.string().min(1).max(1024).optional(),
+  args: z.array(z.string().max(4096)).max(32).default([])
+}).strict();
+
+const WslRuntimeSchema = z.object({
+  kind: z.literal("wsl"),
+  distribution: z.string().min(1).max(128).optional(),
+  shell: z.string().min(1).max(1024).optional(),
+  args: z.array(z.string().max(4096)).max(32).default([])
+}).strict().superRefine((runtime, ctx) => {
+  if (runtime.args.length > 0 && !runtime.shell) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["shell"],
+      message: "WSL shell arguments require an explicit shell"
+    });
+  }
+});
+
+export const WorkspaceRuntimeSchema = z.discriminatedUnion("kind", [
+  HostRuntimeSchema,
+  WslRuntimeSchema
+]);
+export type WorkspaceRuntime = z.infer<typeof WorkspaceRuntimeSchema>;
+
+export const WorkspaceDefinitionSchema = z.object({
+  id: WorkspaceIdSchema,
+  name: z.string().trim().min(1).max(100),
+  cwd: z.string().trim().min(1).max(4096),
+  runtime: WorkspaceRuntimeSchema,
+  startupCommand: z.string().max(8192).optional()
+}).strict();
+export type WorkspaceDefinition = z.infer<typeof WorkspaceDefinitionSchema>;
+
+export const CreateWorkspaceSchema = WorkspaceDefinitionSchema.omit({ id: true });
+export type CreateWorkspaceInput = z.infer<typeof CreateWorkspaceSchema>;
+
+export const WorkspacePublicSchema = WorkspaceDefinitionSchema;
+export type WorkspacePublic = WorkspaceDefinition;
+
+export const RuntimeCapabilitiesSchema = z.object({
+  platform: z.enum(["win32", "linux", "darwin", "other"]),
+  runtimes: z.object({
+    host: z.literal(true),
+    wsl: z.boolean()
+  }).strict()
+}).strict();
+export type RuntimeCapabilities = z.infer<typeof RuntimeCapabilitiesSchema>;
+
 export const SessionStateSchema = z.enum(["starting", "running", "exited", "failed"]);
 export type SessionState = z.infer<typeof SessionStateSchema>;
-
-export const WorkspacePublicSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  shell: z.string(),
-  startupCommand: z.string().optional()
-});
-export type WorkspacePublic = z.infer<typeof WorkspacePublicSchema>;
 
 export const SessionPublicSchema = z.object({
   id: z.string(),
@@ -35,7 +83,7 @@ export const SessionPublicSchema = z.object({
 export type SessionPublic = z.infer<typeof SessionPublicSchema>;
 
 export const CreateSessionSchema = z.object({
-  workspaceId: z.string().min(1).max(64),
+  workspaceId: WorkspaceIdSchema,
   cols: z.number().int().min(2).max(500).default(80),
   rows: z.number().int().min(1).max(200).default(24)
 });
