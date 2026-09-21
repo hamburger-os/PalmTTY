@@ -420,7 +420,7 @@ describe("terminal WebSocket integration", () => {
   });
 
 
-  it("prevents deleting a workspace while a Session is retained", async () => {
+  it("prevents deleting a workspace while a Session is active", async () => {
     const harness = await startHarness();
     const cookie = await login(harness);
     await createSession(harness, cookie);
