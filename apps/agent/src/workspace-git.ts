@@ -169,7 +169,11 @@ function parseBranchHeader(header: string): {
   let behind = 0;
   const trackingIndex = value.indexOf("...");
   if (trackingIndex === -1) {
-    return { branch: value || undefined, ahead, behind };
+    return {
+      ...(value ? { branch: value } : {}),
+      ahead,
+      behind
+    };
   }
 
   const branch = value.slice(0, trackingIndex);
@@ -188,8 +192,8 @@ function parseBranchHeader(header: string): {
   }
 
   return {
-    branch: branch || undefined,
-    upstream: upstream || undefined,
+    ...(branch ? { branch } : {}),
+    ...(upstream ? { upstream } : {}),
     ahead,
     behind
   };
