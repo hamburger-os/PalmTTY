@@ -62,6 +62,11 @@ async function resolveWindowsTestShell(): Promise<string> {
   );
 }
 
+function requiredWindowsShellPath(shellPath?: string): string {
+  if (!shellPath) throw new Error("Windows shell path is required");
+  return shellPath;
+}
+
 function testConfig(windowsShellPath?: string) {
   const workspace = process.platform === "win32"
     ? {
@@ -69,7 +74,7 @@ function testConfig(windowsShellPath?: string) {
         name: "Process worker",
         cwd: process.cwd(),
         shell: "custom" as const,
-        shellPath: windowsShellPath ?? (() => { throw new Error("Windows shell path is required"); })(),
+        shellPath: requiredWindowsShellPath(windowsShellPath),
         args: ["-NoLogo", "-NoProfile"]
       }
     : {
