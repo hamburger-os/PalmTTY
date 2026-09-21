@@ -58,3 +58,12 @@ Windows Worker IPC uses Node's named-pipe support. Recovery does not rely on pip
 Current non-Windows CI uses Unix domain sockets with the runtime directory and socket mode restricted to the current user.
 
 PalmTTY intentionally does not use a persisted PID as process identity. A recovery record is accepted only after the Agent reaches the recorded endpoint and authenticates the Worker with the matching session secret. This avoids PID-reuse mistakes during stale-state cleanup.
+
+## Windows TCP endpoint availability
+
+Authoritative sources:
+
+- https://learn.microsoft.com/windows-server/networking/technologies/netsh/netsh-interface-portproxy
+- https://learn.microsoft.com/troubleshoot/windows-server/networking/error-10013-wsaeacces-is-returned
+
+Windows exposes TCP excluded-port ranges through `netsh interface ipv4/ipv6 show excludedportrange`. Microsoft documents WSAEACCES/10013 as a possible bind failure for excluded ports. PalmTTY does not assume every Windows `EACCES` has that single cause: preflight probes the configured Agent endpoint and reports excluded/reserved ranges, exclusive listeners, and local policy as diagnostic possibilities.
