@@ -204,7 +204,7 @@ describe("session worker security boundary", () => {
     second.close();
   });
 
-  it("strips the configured login token from Worker bootstrap environment", async () => {
+  it("strips PalmTTY control variables from Worker bootstrap environment", async () => {
     const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-env-"));
     runtimeDirs.add(runtimeDir);
 
