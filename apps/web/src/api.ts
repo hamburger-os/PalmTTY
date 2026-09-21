@@ -1,4 +1,9 @@
-import type { SessionPublic, WorkspacePublic } from "@palmtty/protocol";
+import type {
+  CreateWorkspaceInput,
+  RuntimeCapabilities,
+  SessionPublic,
+  WorkspacePublic
+} from "@palmtty/protocol";
 
 async function responseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -37,10 +42,53 @@ export async function logout() {
   }));
 }
 
+export async function runtimeCapabilities() {
+  return responseJson<RuntimeCapabilities>(
+    await fetch("/api/v1/capabilities", { credentials: "same-origin" })
+  );
+}
+
 export async function listWorkspaces() {
   return responseJson<{ workspaces: WorkspacePublic[] }>(
     await fetch("/api/v1/workspaces", { credentials: "same-origin" })
   );
+}
+
+export async function createWorkspace(input: CreateWorkspaceInput) {
+  return responseJson<{ workspace: WorkspacePublic }>(await fetch(
+    "/api/v1/workspaces",
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input)
+    }
+  ));
+}
+
+export async function updateWorkspace(
+  id: string,
+  input: CreateWorkspaceInput
+) {
+  return responseJson<{ workspace: WorkspacePublic }>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(id)}`,
+    {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input)
+    }
+  ));
+}
+
+export async function deleteWorkspace(id: string) {
+  return responseJson<void>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
+      credentials: "same-origin"
+    }
+  ));
 }
 
 export async function listSessions() {
