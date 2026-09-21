@@ -3,7 +3,6 @@ import {
   BrowseDirectoryRequestSchema,
   CreateSessionSchema,
   GitDiffRequestSchema,
-  GitPathActionRequestSchema,
   WorkspaceFileListRequestSchema,
   WorkspaceFileReadRequestSchema,
   DetectTerminalProfilesRequestSchema,
@@ -109,9 +108,6 @@ describe("protocol", () => {
     expect(GitDiffRequestSchema.parse({ path: "apps/web/src/App.tsx" })).toEqual({
       path: "apps/web/src/App.tsx",
       staged: false
-    });
-    expect(GitPathActionRequestSchema.parse({ path: "README.md" })).toEqual({
-      path: "README.md"
     });
   });
 
