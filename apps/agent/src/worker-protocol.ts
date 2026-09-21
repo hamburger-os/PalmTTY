@@ -9,7 +9,7 @@ import {
   TerminalRowsSchema
 } from "@palmtty/protocol";
 
-export const WORKER_PROTOCOL_VERSION = 3 as const;
+export const WORKER_PROTOCOL_VERSION = 4 as const;
 export const MAX_WORKER_FRAME_BYTES = 64 * 1024 * 1024;
 
 const SessionWorkerConfigSchema = z.object({
@@ -75,6 +75,10 @@ export const WorkerRequestSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("terminate"),
+    requestId: RequestIdSchema
+  }),
+  z.object({
+    type: z.literal("retire"),
     requestId: RequestIdSchema
   }),
   z.object({
