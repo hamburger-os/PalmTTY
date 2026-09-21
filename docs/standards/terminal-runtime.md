@@ -44,7 +44,7 @@ Authoritative sources:
 - https://learn.microsoft.com/windows/wsl/basic-commands
 - https://learn.microsoft.com/windows/wsl/filesystems
 
-PalmTTY's WSL runtime is a Windows-host adapter around `wsl.exe`. It passes distribution selection, Linux working directory and an optional executable as distinct argv values. It does not construct one interpolated shell command for launch. The selected Linux path and optional shell are validated through WSL before the workspace is persisted and again before Session creation/restart.
+PalmTTY's WSL runtime is a Windows-host adapter around `wsl.exe`. Terminal-profile discovery enumerates registered distributions with `wsl.exe --list --quiet` and does not enter/start each distribution merely to populate the selector. A selected WSL profile therefore represents the distribution itself; unless Custom overrides it, launch uses that distribution's default shell. Distribution selection, Linux working directory and any optional explicit executable are passed as distinct argv values. PalmTTY does not construct one interpolated shell command for launch. The selected Linux path and optional shell are validated through WSL before the workspace is persisted and again before Session creation/restart.
 
 Microsoft documents `WSLENV` as a **colon-delimited** list of variable names; each entry may carry slash flags such as `/p`, `/l`, `/u`, or `/w`. PalmTTY preserves existing entries/flags and appends configured Workspace variable names as additional colon-delimited entries when launching WSL. Workspace values are already expressed for the target Linux environment, so PalmTTY does not add path-translation flags implicitly.
 
