@@ -378,6 +378,11 @@ export function TerminalView({
           ← {t("terminal.back")}
         </button>
         <div className="terminal-header-actions">
+          {restartError && (
+            <span className="terminal-restart-error" title={restartError}>
+              {restartError}
+            </span>
+          )}
           <button
             type="button"
             className="ghost compact"
@@ -391,8 +396,6 @@ export function TerminalView({
           </span>
         </div>
       </header>
-
-      {restartError && <div className="error-banner terminal-error">{restartError}</div>}
 
       <div
         ref={hostRef}
