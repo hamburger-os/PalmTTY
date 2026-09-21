@@ -21,14 +21,17 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 ### Agent and security
 
 - Fastify HTTP/WebSocket service
-- PowerShell 7 / custom-shell workspace configuration
+- versioned per-user persistent workspace store managed through authenticated + exact-Origin CRUD API
 - built-in single-user bootstrap-token login
 - random in-memory login session cookie with bounded active-session count
 - exact Origin allowlist and non-loopback startup safety gate
 - bounded login/session-create rate limiting
-- workspace ID allowlist
-- runtime preflight for auth/security exposure, configured Agent TCP bindability, workspace directories and shell executable resolution, exposed as the unambiguous `pnpm run preflight` package script and aggregating all detected host-configuration failures
-- normalized per-workspace launch specs with absolute shell launch paths before Worker bootstrap, including current-user Windows App Execution Aliases for Store/MSIX PowerShell
+- Session creation remains workspace-ID-only; Web workspace mutation does not expose environment-variable injection
+- runtime preflight for auth/security exposure and configured Agent TCP bindability, exposed as the unambiguous `pnpm run preflight` package script
+- workspace create/update plus Session creation both validate runtime launch targets
+- host runtime adapter with absolute executable normalization, including current-user Windows App Execution Aliases for Store/MSIX PowerShell
+- Windows WSL runtime adapter using structured `wsl.exe` argv for distribution/cwd/shell rather than shell-string interpolation
+- Linux host runtime exercised by Ubuntu CI; macOS shares the host adapter but is not covered by repository CI
 - root development launcher derives the Agent target from the validated PalmTTY config, injects it into host-independent Vite tooling, and Vite refuses silent dev-port fallback
 - bounded client message size and terminal dimensions
 - no intentional terminal I/O logging
@@ -95,6 +98,8 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 ### Web/mobile
 
 - token login
+- English / Simplified Chinese UI with persisted browser language preference
+- workspace create/edit/delete UI plus Host/WSL runtime form
 - workspace launcher
 - running-session list
 - xterm.js terminal
@@ -104,6 +109,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - one-shot Ctrl/Alt modifier
 - multiline composer
 - responsive/safe-area layout
+- terminal line-height and bottom spacing tuned so the last rendered row is not clipped by the lower controls
 - PWA manifest and non-caching service worker
 
 ## Known gaps
@@ -117,7 +123,8 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Real owner workstation + mobile Safari/Chrome + long-running Codex validation remains required.
 - Potentially-live but unreachable recovery records are deliberately preserved when process death cannot be proven; this favors terminal survival over aggressive metadata reclamation.
 - No Git/file preview subsystem yet.
-- Linux/macOS/WSL are not first-class supported hosts yet.
+- WSL support is implemented but still needs real owner-host/long-running validation; repository CI does not provide a real WSL environment.
+- Linux host runtime is exercised on Ubuntu CI. macOS uses the same host adapter but remains unverified because there is no macOS CI job.
 - Windows Worker runtime file ACL behavior relies on the current-user application-data boundary and still merits dedicated real-host review.
 - The current xterm 6 package is loaded through an isolated CommonJS boundary in the Node Worker because the published headless package is not reliably consumable through native Node ESM named exports; re-review this when upgrading xterm.
 - GitHub Dependency Review remains unavailable while Dependency graph is disabled; pnpm audit --prod is enforced instead.
