@@ -58,14 +58,13 @@ for (const [directory, name] of requiredSkills) {
     continue;
   }
 
-  const skill = await readFile(skillPath, "utf8");
+  const skill = (await readFile(skillPath, "utf8")).replaceAll("\r\n", "\n");
   const frontmatter = skill.match(/^---\n([\s\S]*?)\n---/);
-  const hasName = frontmatter?.[1]
-    .split("\n")
-    .some((line) => line.trim() === `name: ${name}`);
-  const hasDescription = frontmatter?.[1]
-    .split("\n")
-    .some((line) => line.trim().startsWith("description:"));
+  const lines = frontmatter?.[1].split("\n") ?? [];
+  const hasName = lines.some((line) => line.trim() === `name: ${name}`);
+  const hasDescription = lines.some(
+    (line) => line.trim().startsWith("description:")
+  );
 
   if (!frontmatter || !hasName || !hasDescription) {
     failures.push(
