@@ -233,6 +233,7 @@ export function WorkspaceDialog({
 
         {directoryPickerOpen && (
           <DirectoryPicker
+            key={`${kind}:${distribution.trim()}`}
             kind={kind}
             {...(kind === "wsl" && distribution.trim()
               ? { distribution: distribution.trim() }
