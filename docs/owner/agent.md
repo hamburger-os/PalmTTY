@@ -72,6 +72,16 @@ Agent 启动前的 runtime preflight 只处理认证环境、外部暴露规则�
 
 PalmTTY 登录 token 对应的环境变量会从 Worker 环境和最终 PTY 环境中移除。
 
+## Session 生命周期 API
+
+Session 创建仍是 `POST /api/v1/sessions`。生命周期修改不再复用一个含义模糊的 DELETE：
+
+- `POST /api/v1/sessions/:id/terminate`：请求 Worker 终止 PTY，状态先进入 `stopping`，最终由 PTY exit 事件推进为 `exited`；重复调用是幂等的。
+- `DELETE /api/v1/sessions/:id`：只删除已经 `exited/failed` 的 retained Session。活动或 `stopping` Session 返回冲突；成功时由 Worker 通过 authenticated IPC 执行 retirement 和 recovery-state 清理。
+- Session lifecycle mutation 使用独立限流，不与创建或 workspace mutation 共用计数器。
+
+这样 HTTP 资源语义与 UI 一致：Terminate 是进程动作，Delete/Clear 是 retained resource disposal。
+
 ## 重要边界
 
 - Agent/Worker 默认都不应以管理员身份运行。
