@@ -26,6 +26,7 @@ export function registerWorkspaceToolRoutes(
     workspaceStore: WorkspaceStore;
     requireAuth: Guard;
     requireOrigin: Guard;
+    sensitiveEnvironmentKeys: string[];
   }
 ): void {
   const readLimiter = new FixedWindowLimiter(240, 60_000);
@@ -48,7 +49,11 @@ export function registerWorkspaceToolRoutes(
         return reply.code(400).send({ error: "invalid_workspace_file_request" });
       }
       try {
-        return await listWorkspaceFiles(workspace, parsed.data.path);
+        return await listWorkspaceFiles(
+          workspace,
+          parsed.data.path,
+          options.sensitiveEnvironmentKeys
+        );
       } catch (error) {
         return reply.code(400).send({
           error: "workspace_file_unavailable",
@@ -72,7 +77,11 @@ export function registerWorkspaceToolRoutes(
         return reply.code(400).send({ error: "invalid_workspace_file_request" });
       }
       try {
-        return await readWorkspaceFile(workspace, parsed.data.path);
+        return await readWorkspaceFile(
+          workspace,
+          parsed.data.path,
+          options.sensitiveEnvironmentKeys
+        );
       } catch (error) {
         return reply.code(400).send({
           error: "workspace_file_unavailable",
@@ -92,7 +101,10 @@ export function registerWorkspaceToolRoutes(
       const workspace = workspaceFor(request.params.id);
       if (!workspace) return reply.code(404).send({ error: "workspace_not_found" });
       try {
-        return await getWorkspaceGitStatus(workspace);
+        return await getWorkspaceGitStatus(
+          workspace,
+          options.sensitiveEnvironmentKeys
+        );
       } catch (error) {
         return reply.code(400).send({
           error: "git_unavailable",
@@ -119,7 +131,8 @@ export function registerWorkspaceToolRoutes(
         return await getWorkspaceGitDiff(
           workspace,
           parsed.data.path,
-          parsed.data.staged
+          parsed.data.staged,
+          options.sensitiveEnvironmentKeys
         );
       } catch (error) {
         return reply.code(400).send({
