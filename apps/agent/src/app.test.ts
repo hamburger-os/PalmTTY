@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -150,9 +150,13 @@ describe("HTTP security boundary", () => {
       payload: { kind: "host", path: root }
     });
     expect(browsed.statusCode).toBe(200);
+    const canonicalRoot = await realpath(root);
     expect(browsed.json()).toMatchObject({
-      currentPath: root,
-      directories: [{ label: "project", path: path.join(root, "project") }]
+      currentPath: canonicalRoot,
+      directories: [{
+        label: "project",
+        path: path.join(canonicalRoot, "project")
+      }]
     });
 
     await app.close();
