@@ -117,15 +117,23 @@ describe("workspace tool HTTP boundary", () => {
     const { app, cookie } = await fixture();
 
     const denied = await app.inject({
-      method: "GET",
-      url: "/api/v1/workspaces/workspace-1/git/status"
+      method: "POST",
+      url: "/api/v1/workspaces/workspace-1/git/status",
+      headers: { origin: ORIGIN }
     });
     expect(denied.statusCode).toBe(401);
 
-    const status = await app.inject({
-      method: "GET",
+    const wrongOrigin = await app.inject({
+      method: "POST",
       url: "/api/v1/workspaces/workspace-1/git/status",
-      headers: { cookie }
+      headers: { cookie, origin: "https://evil.invalid" }
+    });
+    expect(wrongOrigin.statusCode).toBe(403);
+
+    const status = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspaces/workspace-1/git/status",
+      headers: { cookie, origin: ORIGIN }
     });
     expect(status.statusCode).toBe(200);
     expect(status.json()).toMatchObject({ available: false });
