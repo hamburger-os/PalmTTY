@@ -80,7 +80,7 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, selectedPath, translateError]);
+  }, [workspaceId, selectedPath, refreshVersion, translateError]);
 
   const openFile = (filePath: string) => {
     setSelectedPath(filePath);
