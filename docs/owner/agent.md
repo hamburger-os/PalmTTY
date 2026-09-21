@@ -55,7 +55,7 @@ Agent 正常关闭、升级或异常退出时：
 
 ## Worker 创建
 
-Agent 启动前先执行 runtime preflight：认证环境与外部暴露规则必须有效，所有 workspace `cwd` 必须是真实目录，Shell 必须能解析为绝对启动路径。Windows 当前用户 `%LOCALAPPDATA%\\Microsoft\\WindowsApps` 下的 App Execution Alias 采用专门识别逻辑，以兼容 Store/MSIX PowerShell 的 reparse point；其他可执行路径继续执行严格文件校验。解析后的规范化运行规格才会进入 Worker bootstrap，因此 PTY 启动不依赖 node-pty 自己的 PATH 查找。
+Agent 启动前先执行 runtime preflight：认证环境与外部暴露规则必须有效，所有 workspace `cwd` 必须是真实目录，Shell 必须能解析为绝对启动路径。Windows 当前用户 `%LOCALAPPDATA%\Microsoft\WindowsApps` 下的 App Execution Alias 采用专门识别逻辑，以兼容 Store/MSIX PowerShell 的 reparse point；其他可执行路径继续执行严格文件校验。解析后的规范化运行规格才会进入 Worker bootstrap，因此 PTY 启动不依赖 node-pty 自己的 PATH 查找。
 
 创建 Session 时 Agent：
 
