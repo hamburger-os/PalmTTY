@@ -7,6 +7,7 @@ PalmTTY Agent 是开发电脑上的 Web/API 控制面，负责：
 - 提供 HTTP 与 WebSocket API；
 - 登录认证和 Origin 安全检查；
 - 管理当前用户的持久化 workspace 目录与运行时验证；
+- 为 Workspace 编辑器提供受认证 + 精确 Origin 保护的只读目录浏览；
 - 创建、发现并认证独立 Session Worker；
 - 把浏览器 WebSocket 转发到对应 Worker；
 - 托管编译后的手机端 PWA。
@@ -54,6 +55,8 @@ Agent 正常关闭、升级或异常退出时：
 登录 Cookie 仍属于 Agent 内存状态，所以 Agent 重启后需要重新登录。终端本身不会因此结束。
 
 ## Worker 创建
+
+目录浏览与 Workspace 持久化分离：浏览接口只返回目录，不返回文件内容；Host 默认从当前用户 home 开始并可浏览可访问盘符，WSL 使用固定 shell 脚本并把用户路径作为独立 argv 传入，不拼接到命令字符串。目录结果最多返回 512 项，WSL 子进程另有输出大小与超时上限，并对浏览请求单独限流。
 
 Agent 启动前的 runtime preflight 只处理认证环境、外部暴露规则和 Agent TCP host/port 可绑定性，不再遍历 workspace。Workspace 是独立的 per-user 持久化状态；新建/修改时通过认证 + 精确 Origin 保护的 API 验证，创建 Session 时再次验证。Agent 启动后异步探测一次 runtime capabilities 并在本进程生命周期内复用结果，避免每次 Web 查询都重复启动 WSL 探测进程；该探测不是创建 Host workspace 的前置条件。Host runtime 会把 Shell 解析为绝对启动路径；Windows 当前用户 `%LOCALAPPDATA%\Microsoft\WindowsApps` 下的 App Execution Alias 有专门处理。WSL runtime 只在 Windows Agent 上启用，解析 `wsl.exe`，并把发行版、Linux cwd、Shell/args 作为结构化参数传入。只有规范化后的运行规格才进入 Worker bootstrap。
 
