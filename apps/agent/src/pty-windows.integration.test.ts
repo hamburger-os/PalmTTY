@@ -35,7 +35,10 @@ describe("Windows ConPTY smoke test", () => {
         cols: 80,
         rows: 24,
         cwd: process.cwd(),
-        env: process.env
+        env: process.env,
+        // PalmTTY uses node-pty's bundled ConPTY DLL on Windows so explicit
+        // termination does not fork the visible console-list helper.
+        useConptyDll: true
       });
 
       const timeout = setTimeout(() => {
