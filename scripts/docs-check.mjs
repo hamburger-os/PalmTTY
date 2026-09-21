@@ -15,7 +15,9 @@ if (!(await exists(docsIndexPath))) {
 } else {
   const docsIndex = await readFile(docsIndexPath, "utf8");
   for (const layer of layers) {
-    if (!docsIndex.includes(`${layer}/README.md`)) failures.push(`docs/README.md does not index ${layer}/README.md`);
+    if (!docsIndex.includes(`${layer}/README.md`)) {
+      failures.push(`docs/README.md does not index ${layer}/README.md`);
+    }
   }
 }
 
@@ -27,21 +29,48 @@ for (const layer of layers) {
     continue;
   }
   const index = await readFile(indexPath, "utf8");
-  const entries = (await readdir(dir)).filter((name) => name.endsWith(".md") && name !== "README.md");
+  const entries = (await readdir(dir))
+    .filter((name) => name.endsWith(".md") && name !== "README.md");
   for (const entry of entries) {
-    if (!index.includes(entry)) failures.push(`docs/${layer}/README.md does not index ${entry}`);
+    if (!index.includes(entry)) {
+      failures.push(`docs/${layer}/README.md does not index ${entry}`);
+    }
     const content = await readFile(path.join(dir, entry), "utf8");
-    if (layer === "owner" && !/[\u3400-\u9fff]/u.test(content)) failures.push(`docs/owner/${entry} should be written in Chinese`);
-    if (layer === "community" && !content.includes("<!-- bilingual -->")) failures.push(`docs/community/${entry} is missing the bilingual marker`);
+    if (layer === "owner" && !/[\u3400-\u9fff]/u.test(content)) {
+      failures.push(`docs/owner/${entry} should be written in Chinese`);
+    }
+    if (layer === "community" && !content.includes("<!-- bilingual -->")) {
+      failures.push(`docs/community/${entry} is missing the bilingual marker`);
+    }
   }
 }
 
-const skillPath = path.join(root, ".agents", "skills", "docs-sync", "SKILL.md");
-if (!(await exists(skillPath))) {
-  failures.push(".agents/skills/docs-sync/SKILL.md is missing");
-} else {
-  const skill = await readFile(skillPath, "utf8");
-  if (!/^---[\s\S]*?name:\s*docs-sync[\s\S]*?description:[\s\S]*?---/m.test(skill)) failures.push("docs-sync SKILL.md is missing required Agent Skills frontmatter");
+const requiredSkills = [
+  ["docs-sync", "docs-sync"],
+  ["palmtty-theme", "palmtty-theme"],
+  ["palmtty-theme-review", "palmtty-theme-review"]
+];
+
+for (const [directory, name] of requiredSkills) {
+  const skillPath = path.join(root, ".agents", "skills", directory, "SKILL.md");
+  if (!(await exists(skillPath))) {
+    failures.push(`.agents/skills/${directory}/SKILL.md is missing`);
+    continue;
+  }
+
+  const skill = (await readFile(skillPath, "utf8")).replaceAll("\r\n", "\n");
+  const frontmatter = skill.match(/^---\n([\s\S]*?)\n---/);
+  const lines = frontmatter?.[1].split("\n") ?? [];
+  const hasName = lines.some((line) => line.trim() === `name: ${name}`);
+  const hasDescription = lines.some(
+    (line) => line.trim().startsWith("description:")
+  );
+
+  if (!frontmatter || !hasName || !hasDescription) {
+    failures.push(
+      `.agents/skills/${directory}/SKILL.md is missing required Agent Skills frontmatter`
+    );
+  }
 }
 
 if (failures.length) {
@@ -49,4 +78,5 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
+
 console.log("Documentation contract check passed.");

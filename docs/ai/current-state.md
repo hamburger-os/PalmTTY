@@ -108,13 +108,15 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - native workspace dialog activation is idempotent under React StrictMode, with React state remaining the owner of open/close lifecycle
 - token login
 - English / Simplified Chinese UI with persisted browser language preference
+- client-side Spectrum / Obsidian / Frosted visual themes with persisted browser preference, plus Quality / Performance rendering modes and reduced-motion-aware decorative animation
+- PalmTTY-owned semantic glass surface system and four-color ambient field; visual rules live in `.agents/skills/palmtty-theme/SKILL.md` rather than component-local palettes
 - workspace create/edit/delete UI plus Host/WSL runtime form
 - Host/WSL remote directory picker that selects directories on the Agent runtime rather than the browser device
 - single-scroll workspace dialog layout, shell-argument example chips, and startup-command presets for Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, and Aider
 - workspace launcher
 - Session list with explicit text actions: active Sessions use “Terminate”, retained exited/failed Sessions use “Clear”; the ambiguous red × control is removed
 - stopping Sessions remain non-interactive in the terminal view
-- xterm.js terminal
+- xterm.js terminal with theme-specific palette updates applied in place without recreating the terminal or reconnecting the Session
 - reconnect loop with retained lastSeq
 - gap detection forces snapshot recovery
 - browser terminal writes are serialized during recovery, fitting is frozen until recovery completes, and terminal/composer input is blocked rather than discarded while disconnected or recovering

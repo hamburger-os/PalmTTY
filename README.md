@@ -34,6 +34,7 @@ PalmTTY is **alpha**. Each terminal now runs in an independent durable Session W
 | macOS host runtime | Architecture implemented; no repository macOS CI yet |
 | Web workspace management | Persistent create/edit/delete via authenticated same-origin API |
 | UI languages | English and Simplified Chinese |
+| Visual themes | Spectrum / Obsidian / Frosted with Quality / Performance rendering modes |
 | Browser or network disconnect | PTY survives while the Agent stays alive |
 | Reconnect | Sequence replay + server-side terminal snapshot fallback |
 | Session lifecycle | Explicit terminate → retained exited state → clear; no ambiguous close/kill control |
@@ -188,6 +189,8 @@ docs/
   ai/
 .agents/
   skills/docs-sync/SKILL.md
+  skills/palmtty-theme/SKILL.md
+  skills/palmtty-theme-review/SKILL.md
 ```
 
 ## License

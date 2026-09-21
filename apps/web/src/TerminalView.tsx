@@ -7,8 +7,14 @@ import {
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { useI18n } from "./i18n.js";
+import { useTheme } from "./theme.js";
 
-type ConnectionState = "connecting" | "connected" | "reconnecting" | "stopping" | "closed";
+type ConnectionState =
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "stopping"
+  | "closed";
 
 function websocketUrl(sessionId: string) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -24,6 +30,7 @@ function controlCharacter(value: string): string | undefined {
 
 export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack: () => void }) {
   const { t } = useI18n();
+  const { terminalTheme } = useTheme();
   const hostRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -60,7 +67,8 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
       lineHeight: 1.15,
       fontFamily: '"Cascadia Mono", "SFMono-Regular", Consolas, monospace',
       scrollback: 10000,
-      allowProposedApi: false
+      allowProposedApi: false,
+      theme: terminalTheme
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
@@ -304,6 +312,11 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
     };
   }, [sessionId, t]);
 
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (terminal) terminal.options.theme = terminalTheme;
+  }, [terminalTheme]);
+
   const toggleCtrl = () => {
     if (connection !== "connected") return;
     ctrlRef.current = !ctrlRef.current;
@@ -337,7 +350,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
 
   return (
     <main className="terminal-page">
-      <header className="terminal-header">
+      <header className="terminal-header glass-panel">
         <button className="ghost compact" onClick={onBack}>
           ← {t("terminal.back")}
         </button>
@@ -346,9 +359,9 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
         </span>
       </header>
 
-      <div ref={hostRef} className="terminal-host" />
+      <div ref={hostRef} className="terminal-host glass-content" />
 
-      <div className="keybar" aria-label={t("terminal.specialKeys")}>
+      <div className="keybar glass-panel" aria-label={t("terminal.specialKeys")}>
         {key("Esc", "\u001b")}
         {key("Tab", "\t")}
         <button
@@ -373,13 +386,14 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
         {key("Ctrl+L", "\u000c")}
       </div>
 
-      <form className="composer" onSubmit={(event) => {
+      <form className="composer glass-panel" onSubmit={(event) => {
         event.preventDefault();
         if (!composer || !sendInput(composer + "\r")) return;
         setComposer("");
         terminalRef.current?.focus();
       }}>
         <textarea
+          className="glass-input"
           value={composer}
           onChange={(event) => setComposer(event.target.value)}
           placeholder={t("terminal.composer")}
@@ -387,6 +401,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
         />
         <button
           type="submit"
+          className="prism-primary"
           disabled={!composer || connection !== "connected"}
         >
           {t("terminal.send")}

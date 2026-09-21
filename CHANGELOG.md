@@ -14,6 +14,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - Persistent Web-managed workspace catalog with authenticated create/edit/delete, separate from operator YAML configuration.
 - Host runtime adapter for Windows/Linux/macOS design, plus a structured Windows WSL adapter; Ubuntu CI exercises the Linux host path.
 - English and Simplified Chinese Web UI with persisted language preference.
+- PalmTTY-owned Spectrum / Obsidian / Frosted visual themes, Quality / Performance rendering modes, reduced-motion handling, semantic liquid-glass surfaces, and matching theme/review Agent Skills.
 - Runtime-aware remote directory picker for Host/WSL workspaces, plus shell-argument examples and one-click startup presets for common terminal coding agents.
 - Explicit Session lifecycle actions: terminate active Sessions through `stopping → exited`, retain exited terminal state for review, and clear retained Sessions independently.
 
@@ -30,6 +31,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 
 ### Fixed
 
+- Replaced the workspace browser-native delete confirmation with the shared themed confirmation flow and kept theme changes isolated from xterm/WebSocket recovery state.
 - Made terminal recovery geometry-aware: the browser now sends its fitted rows/columns in the resume handshake, the Worker resizes canonical PTY/xterm state before recovery, and geometry changes force a fresh snapshot so refresh/reconnect cannot restore a snapshot into a mismatched viewport.
 - Treat the terminal recovery `hello` as a completion boundary, serialize browser xterm writes, freeze fitting while recovery is in flight, and prevent disconnected/recovering input from being silently dropped.
 - Removed the duplicate workspace-dialog scrollbar by making the form the single vertical scroll owner.

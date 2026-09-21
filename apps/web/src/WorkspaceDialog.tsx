@@ -10,6 +10,7 @@ import type {
   RuntimeCapabilities,
   WorkspacePublic
 } from "@palmtty/protocol";
+import { ConfirmDialog } from "./ConfirmDialog.js";
 import { DirectoryPicker } from "./DirectoryPicker.js";
 import { ensureModalDialogOpen } from "./dialog-controller.js";
 import { useI18n } from "./i18n.js";
@@ -81,6 +82,7 @@ export function WorkspaceDialog({
     workspace?.startupCommand ?? ""
   );
   const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -136,9 +138,10 @@ export function WorkspaceDialog({
   };
 
   return (
+    <>
     <dialog
       ref={dialogRef}
-      className="workspace-dialog"
+      className="workspace-dialog glass-panel"
       aria-labelledby="workspace-dialog-title"
       onCancel={(event) => {
         event.preventDefault();
@@ -164,6 +167,7 @@ export function WorkspaceDialog({
         <label>
           <span>{t("workspace.name")}</span>
           <input
+            className="glass-input"
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder={t("workspace.namePlaceholder")}
@@ -176,6 +180,7 @@ export function WorkspaceDialog({
         <label>
           <span>{t("workspace.runtime")}</span>
           <select
+            className="glass-input glass-select"
             value={kind}
             onChange={(event) => setKind(event.target.value as "host" | "wsl")}
           >
@@ -195,6 +200,7 @@ export function WorkspaceDialog({
           <label>
             <span>{t("workspace.distribution")}</span>
             <input
+              className="glass-input"
               value={distribution}
               onChange={(event) => setDistribution(event.target.value)}
               placeholder={t("workspace.distributionPlaceholder")}
@@ -208,6 +214,7 @@ export function WorkspaceDialog({
           <label htmlFor="workspace-cwd">{t("workspace.cwd")}</label>
           <div className="workspace-input-action">
             <input
+              className="glass-input"
               id="workspace-cwd"
               value={cwd}
               onChange={(event) => setCwd(event.target.value)}
@@ -250,6 +257,7 @@ export function WorkspaceDialog({
         <label>
           <span>{t("workspace.shell")}</span>
           <input
+            className="glass-input"
             value={shell}
             onChange={(event) => setShell(event.target.value)}
             placeholder={shellPlaceholder}
@@ -260,6 +268,7 @@ export function WorkspaceDialog({
         <div className="workspace-field">
           <label htmlFor="workspace-shell-args">{t("workspace.shellArgs")}</label>
           <textarea
+            className="glass-input"
             id="workspace-shell-args"
             value={shellArgs}
             onChange={(event) => setShellArgs(event.target.value)}
@@ -303,6 +312,7 @@ export function WorkspaceDialog({
         <div className="workspace-field">
           <label htmlFor="workspace-startup-command">{t("workspace.startupCommand")}</label>
           <input
+            className="glass-input"
             id="workspace-startup-command"
             value={startupCommand}
             onChange={(event) => setStartupCommand(event.target.value)}
@@ -343,10 +353,7 @@ export function WorkspaceDialog({
               type="button"
               className="danger-outline"
               disabled={busy}
-              onClick={() => {
-                if (!window.confirm(t("workspaces.deleteConfirm"))) return;
-                void onDelete();
-              }}
+              onClick={() => setDeleteConfirmOpen(true)}
             >
               {busy ? t("workspace.deleting") : t("workspace.delete")}
             </button>
@@ -361,12 +368,27 @@ export function WorkspaceDialog({
             >
               {t("workspace.cancel")}
             </button>
-            <button type="submit" disabled={busy || !name.trim() || !cwd.trim()}>
+            <button className="prism-primary" type="submit" disabled={busy || !name.trim() || !cwd.trim()}>
               {busy ? t("workspace.saving") : t("workspace.save")}
             </button>
           </div>
         </div>
       </form>
     </dialog>
+      {deleteConfirmOpen && workspace && onDelete && (
+        <ConfirmDialog
+          title={t("workspace.deleteTitle")}
+          message={t("workspaces.deleteConfirm")}
+          confirmLabel={busy ? t("workspace.deleting") : t("workspace.delete")}
+          danger
+          busy={busy}
+          onCancel={() => setDeleteConfirmOpen(false)}
+          onConfirm={() => {
+            setDeleteConfirmOpen(false);
+            void onDelete();
+          }}
+        />
+      )}
+    </>
   );
 }

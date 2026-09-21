@@ -22,6 +22,8 @@ import {
   terminateSession,
   updateWorkspace
 } from "./api.js";
+import { AppearanceControls } from "./AppearanceControls.js";
+import { ConfirmDialog } from "./ConfirmDialog.js";
 import { useI18n } from "./i18n.js";
 import { TerminalView } from "./TerminalView.js";
 import {
@@ -31,6 +33,10 @@ import {
 
 type AuthState = { enabled: boolean; authenticated: boolean };
 type WorkspaceEditor = WorkspacePublic | "new" | null;
+type SessionAction =
+  | { kind: "terminate"; session: SessionPublic }
+  | { kind: "clear"; session: SessionPublic }
+  | null;
 
 function formatError(
   cause: unknown,
@@ -56,6 +62,7 @@ export function App() {
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
+  const [sessionAction, setSessionAction] = useState<SessionAction>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshCatalog = useCallback(async () => {
@@ -102,8 +109,8 @@ export function App() {
 
   if (auth === null) {
     return (
-      <main className="center-card">
-        <div className="login-toolbar"><LanguageSwitcher /></div>
+      <main className="center-card glass-shell">
+        <div className="login-toolbar"><AppearanceControls compact /><LanguageSwitcher /></div>
         <h1>PalmTTY</h1>
         <p>{t("auth.connecting")}</p>
       </main>
@@ -152,19 +159,18 @@ export function App() {
   };
 
   const sessionDetail = (session: SessionPublic) => {
-    if (session.state === "exited" || session.state === "failed") {
+    if (isTerminalSessionState(session.state)) {
       return session.exitCode === undefined
         ? stateLabel(session.state)
-        : `${stateLabel(session.state)} · ${t("sessions.exitCode", { code: session.exitCode })}`;
+        : `${stateLabel(session.state)} · ${t("sessions.exitCode", {
+            code: session.exitCode
+          })}`;
     }
     return `${stateLabel(session.state)} · ${connections(session.connections)}`;
   };
 
   const stopSession = async (session: SessionPublic) => {
     if (!isActiveSessionState(session.state) || session.state === "stopping") return;
-    if (!window.confirm(t("sessions.terminateConfirm", {
-      count: session.connections
-    }))) return;
 
     setSessionBusyId(session.id);
     setError(null);
@@ -180,7 +186,6 @@ export function App() {
 
   const clearSession = async (session: SessionPublic) => {
     if (!isTerminalSessionState(session.state)) return;
-    if (!window.confirm(t("sessions.clearConfirm"))) return;
 
     setSessionBusyId(session.id);
     setError(null);
@@ -239,12 +244,13 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
+      <header className="topbar glass-shell">
         <div>
           <div className="eyebrow">{t("app.eyebrow")}</div>
           <h1>PalmTTY</h1>
         </div>
         <div className="topbar-actions">
+          <AppearanceControls compact />
           <LanguageSwitcher />
           {auth.enabled && (
             <button
@@ -272,7 +278,7 @@ export function App() {
             <span>{workspaces.length}</span>
           </div>
           <button
-            className="ghost compact"
+            className="prism-primary compact"
             onClick={() => {
               setWorkspaceError(null);
               setWorkspaceEditor("new");
@@ -283,11 +289,11 @@ export function App() {
         </div>
 
         {workspaces.length === 0 ? (
-          <div className="empty workspace-empty">{t("workspaces.empty")}</div>
+          <div className="empty workspace-empty glass-content">{t("workspaces.empty")}</div>
         ) : (
           <div className="card-grid">
             {workspaces.map((workspace) => (
-              <article key={workspace.id} className="workspace-card">
+              <article key={workspace.id} className="workspace-card glass-card">
                 <div className="workspace-card-heading">
                   <strong>{workspace.name}</strong>
                   <button
@@ -316,7 +322,7 @@ export function App() {
                 )}
                 <button
                   type="button"
-                  className="workspace-launch"
+                  className="workspace-launch prism-primary"
                   onClick={() => void (async () => {
                     setError(null);
                     try {
@@ -355,7 +361,7 @@ export function App() {
             const active = isActiveSessionState(session.state);
             const busy = sessionBusyId === session.id;
             return (
-              <div className="session-row" key={session.id}>
+              <div className="session-row glass-card" key={session.id}>
                 <button
                   className="session-main"
                   onClick={() => setActiveSession(session.id)}
@@ -373,9 +379,9 @@ export function App() {
                 {active ? (
                   <button
                     type="button"
-                    className="danger compact"
+                    className="session-action danger-outline compact"
                     disabled={sessionBusyId !== null || session.state === "stopping"}
-                    onClick={() => void stopSession(session)}
+                    onClick={() => setSessionAction({ kind: "terminate", session })}
                   >
                     {busy || session.state === "stopping"
                       ? t("sessions.terminating")
@@ -384,9 +390,9 @@ export function App() {
                 ) : (
                   <button
                     type="button"
-                    className="danger compact"
+                    className="session-action danger-outline compact"
                     disabled={sessionBusyId !== null}
-                    onClick={() => void clearSession(session)}
+                    onClick={() => setSessionAction({ kind: "clear", session })}
                   >
                     {busy ? t("sessions.clearing") : t("sessions.clear")}
                   </button>
@@ -409,6 +415,34 @@ export function App() {
           onSave={saveWorkspace}
         />
       )}
+
+      {sessionAction && (
+        <ConfirmDialog
+          title={sessionAction.kind === "terminate"
+            ? t("sessions.terminateTitle")
+            : t("sessions.clearTitle")}
+          message={sessionAction.kind === "terminate"
+            ? t("sessions.terminateConfirm", {
+                count: sessionAction.session.connections
+              })
+            : t("sessions.clearConfirm")}
+          confirmLabel={sessionAction.kind === "terminate"
+            ? t("sessions.terminate")
+            : t("sessions.clear")}
+          danger
+          busy={sessionBusyId === sessionAction.session.id}
+          onCancel={() => setSessionAction(null)}
+          onConfirm={() => {
+            const action = sessionAction;
+            setSessionAction(null);
+            if (action.kind === "terminate") {
+              void stopSession(action.session);
+            } else {
+              void clearSession(action.session);
+            }
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -420,6 +454,7 @@ function LanguageSwitcher() {
       <span className="sr-only">{t("app.language")}</span>
       <select
         aria-label={t("app.language")}
+        className="glass-input glass-select language-select"
         value={locale}
         onChange={(event) => setLocale(event.target.value as "en" | "zh-CN")}
       >
@@ -442,8 +477,8 @@ function Login({
   const [busy, setBusy] = useState(false);
 
   return (
-    <main className="center-card">
-      <div className="login-toolbar"><LanguageSwitcher /></div>
+    <main className="center-card glass-shell">
+      <div className="login-toolbar"><AppearanceControls compact /><LanguageSwitcher /></div>
       <div className="palm-mark">⌁</div>
       <h1>PalmTTY</h1>
       <p>{t("auth.description")}</p>
@@ -454,13 +489,14 @@ function Login({
       }}>
         <input
           type="password"
+          className="glass-input"
           autoComplete="current-password"
           value={token}
           onChange={(event) => setToken(event.target.value)}
           placeholder={t("auth.token")}
           autoFocus
         />
-        <button type="submit" disabled={busy || token.length === 0}>
+        <button className="prism-primary" type="submit" disabled={busy || token.length === 0}>
           {busy ? t("auth.signingIn") : t("auth.signIn")}
         </button>
       </form>

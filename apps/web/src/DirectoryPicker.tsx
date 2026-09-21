@@ -87,7 +87,7 @@ export function DirectoryPicker({
   }, [browse, startingPath]);
 
   return (
-    <div className="directory-picker" aria-label={t("workspace.directoryPicker")}>
+    <div className="directory-picker glass-control" aria-label={t("workspace.directoryPicker")}>
       <div className="directory-picker-heading">
         <div>
           <strong>{t("workspace.directoryPicker")}</strong>
@@ -119,7 +119,7 @@ export function DirectoryPicker({
             ))}
           </div>
 
-          <div className="directory-current">
+          <div className="directory-current glass-content">
             <code title={listing.currentPath}>{listing.currentPath}</code>
             <div className="directory-current-actions">
               <button
@@ -170,7 +170,7 @@ export function DirectoryPicker({
 
           <button
             type="button"
-            className="directory-choose"
+            className="directory-choose prism-primary"
             disabled={busy}
             onClick={() => onChoose(listing.currentPath)}
           >
