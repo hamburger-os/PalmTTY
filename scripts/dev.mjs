@@ -23,7 +23,8 @@ function isPrivateIpv4(address) {
     a === 10 ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
-    (a === 169 && b === 254)
+    (a === 169 && b === 254) ||
+    (a === 100 && b >= 64 && b <= 127)
   );
 }
 
@@ -90,6 +91,12 @@ async function main() {
   if (lanOrigins.length > 0) {
     console.log("[PalmTTY] LAN development URLs:");
     for (const value of lanOrigins) console.log(`  - ${value}`);
+    if (process.platform === "win32") {
+      console.log(
+        "[PalmTTY] If another LAN device times out, allow Node.js/PalmTTY " +
+        "TCP 5173 on Windows Private networks."
+      );
+    }
   } else if (webHost === DEFAULT_WEB_HOST) {
     console.warn(
       "[PalmTTY] no private IPv4 LAN address was detected; " +
