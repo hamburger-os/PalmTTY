@@ -157,8 +157,8 @@ export type DirectoryListing = z.infer<typeof DirectoryListingSchema>;
 
 export const WorkspaceRelativePathSchema = z.string()
   .max(4096)
-  .refine((value) => !value.includes("\\0"), "path must not contain NUL")
-  .refine((value) => !value.includes("\\\\"), "workspace paths use forward slashes")
+  .refine((value) => !value.includes("\0"), "path must not contain NUL")
+  .refine((value) => !value.includes("\\"), "workspace paths use forward slashes")
   .refine(
     (value) => !value.startsWith("/") && !/^[A-Za-z]:/.test(value),
     "workspace path must be relative"
