@@ -8,12 +8,15 @@
 
 首页提供：
 
-- Workspace 列表；
+- Workspace 列表与数量；
+- 在网页端创建、编辑、删除持久化 Workspace；
+- Host / WSL runtime 选择与运行目标校验；
 - 新建会话；
 - 已运行会话列表；
 - 会话状态和连接数；
 - 重新进入或终止会话；
-- 登录/退出。
+- 登录/退出；
+- 中文 / English 语言切换并在浏览器本地保存偏好。
 
 终端页提供：
 
@@ -24,11 +27,13 @@
 - 适合粘贴和语音输入的多行 Composer；
 - 竖屏/横屏布局；
 - Safe Area 处理；
+- xterm 使用略大的 lineHeight 与终端底部内边距，避免最后一行字形下缘贴住/被底部工具栏视觉遮挡；
 - PWA manifest。
 
 ## 设计边界
 
 - Composer 最终仍然把文本作为终端输入发送，不建立 Codex 专用 API。
+- Workspace 修改走独立持久化 API；Session 创建不接收临时 cwd/shell/env。
 - 浏览器丢失状态时以服务端 snapshot 为准。
 - Service Worker 不缓存 API 或终端 WebSocket 数据。
 - 终端输出只交给 xterm 渲染，不作为 HTML 注入页面。
