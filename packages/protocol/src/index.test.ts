@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   BrowseDirectoryRequestSchema,
   CreateSessionSchema,
+  DetectShellProfilesRequestSchema,
   CreateWorkspaceSchema,
   MAX_INPUT_BYTES,
   WorkspaceDefinitionSchema,
+  WorkspaceEnvironmentSchema,
   isActiveSessionState,
   isTerminalSessionState,
   parseClientMessage
@@ -37,6 +39,33 @@ describe("protocol", () => {
         args: ["-l"]
       }
     }).runtime.kind).toBe("wsl");
+  });
+
+  it("parses bounded workspace environment and shell detection requests", () => {
+    expect(WorkspaceEnvironmentSchema.parse({
+      HTTPS_PROXY: "http://127.0.0.1:10808",
+      HTTP_PROXY: "http://127.0.0.1:10808"
+    })).toMatchObject({
+      HTTPS_PROXY: "http://127.0.0.1:10808"
+    });
+    expect(() => WorkspaceEnvironmentSchema.parse({
+      TERM: "xterm"
+    })).toThrow();
+    expect(() => WorkspaceEnvironmentSchema.parse({
+      Path: "one",
+      PATH: "two"
+    })).toThrow();
+
+    expect(DetectShellProfilesRequestSchema.parse({ kind: "host" })).toEqual({
+      kind: "host"
+    });
+    expect(DetectShellProfilesRequestSchema.parse({
+      kind: "wsl",
+      distribution: "Ubuntu-24.04"
+    })).toEqual({
+      kind: "wsl",
+      distribution: "Ubuntu-24.04"
+    });
   });
 
   it("parses bounded Host and WSL directory browse requests", () => {
