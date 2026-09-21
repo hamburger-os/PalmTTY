@@ -1,7 +1,19 @@
-import { describe, expect, it } from "vitest";
-import { parseConfig } from "./index.js";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { configPathFromEnvironment, parseConfig } from "./index.js";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("configuration", () => {
+  it("uses PALMTTY_CONFIG as the shared explicit config path", () => {
+    vi.stubEnv("PALMTTY_CONFIG", "./palmtty.test.yaml");
+    expect(configPathFromEnvironment()).toBe(
+      path.resolve("./palmtty.test.yaml")
+    );
+  });
+
   it("applies safe local defaults", () => {
     const config = parseConfig({
       workspaces: [{ id: "main", name: "Main", cwd: "C:\\Code", shell: "pwsh" }]
