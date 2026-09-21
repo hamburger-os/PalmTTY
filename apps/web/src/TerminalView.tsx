@@ -30,6 +30,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
   const lastSeqRef = useRef(0);
   const intentionalCloseRef = useRef(false);
   const sessionExitedRef = useRef(false);
+  const inputReadyRef = useRef(false);
   const ctrlRef = useRef(false);
   const altRef = useRef(false);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
@@ -37,11 +38,13 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
   const [alt, setAlt] = useState(false);
   const [composer, setComposer] = useState("");
 
-  function sendInput(data: string) {
+  function sendInput(data: string): boolean {
     const socket = socketRef.current;
-    if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: "input", data }));
+    if (!inputReadyRef.current || socket?.readyState !== WebSocket.OPEN) {
+      return false;
     }
+    socket.send(JSON.stringify({ type: "input", data }));
+    return true;
   }
 
   useEffect(() => {
@@ -49,6 +52,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
     if (!host) return;
     intentionalCloseRef.current = false;
     sessionExitedRef.current = false;
+    inputReadyRef.current = false;
 
     const terminal = new Terminal({
       cursorBlink: true,
@@ -61,49 +65,100 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     terminal.open(host);
+    fit.fit();
     terminalRef.current = terminal;
 
     const dataDisposable = terminal.onData((raw) => {
       let data = raw;
-      if (ctrlRef.current) {
+      const usedCtrl = ctrlRef.current;
+      const usedAlt = altRef.current;
+
+      if (usedCtrl) {
         const control = controlCharacter(raw);
         if (control) data = control;
+      }
+      if (usedAlt) data = "\u001b" + data;
+
+      if (!sendInput(data)) return;
+
+      if (usedCtrl) {
         ctrlRef.current = false;
         setCtrl(false);
       }
-      if (altRef.current) {
-        data = "\u001b" + data;
+      if (usedAlt) {
         altRef.current = false;
         setAlt(false);
       }
-      sendInput(data);
     });
 
     let reconnectTimer: number | undefined;
     let heartbeatTimer: number | undefined;
+    let resizeFrame: number | undefined;
     let attempt = 0;
     let ready = false;
     let lastPongAt = Date.now();
+    let lastSentCols = terminal.cols;
+    let lastSentRows = terminal.rows;
+    let terminalWritePipeline = Promise.resolve();
 
-    const sendResize = () => {
+    const enqueueTerminalWrite = (data: string, reset = false): Promise<void> => {
+      const run = terminalWritePipeline.then(() => {
+        if (reset) terminal.reset();
+        if (data.length === 0) return;
+        return new Promise<void>((resolve) => terminal.write(data, resolve));
+      });
+      terminalWritePipeline = run.catch(() => undefined);
+      return run;
+    };
+
+    const sendCurrentResize = () => {
+      if (!ready) return;
       fit.fit();
+
+      const cols = terminal.cols;
+      const rows = terminal.rows;
+      if (cols === lastSentCols && rows === lastSentRows) return;
+
       const socket = socketRef.current;
-      if (ready && socket?.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "resize", cols: terminal.cols, rows: terminal.rows }));
-      }
+      if (socket?.readyState !== WebSocket.OPEN) return;
+      socket.send(JSON.stringify({ type: "resize", cols, rows }));
+      lastSentCols = cols;
+      lastSentRows = rows;
+    };
+
+    const scheduleResize = () => {
+      if (resizeFrame !== undefined) return;
+      resizeFrame = window.requestAnimationFrame(() => {
+        resizeFrame = undefined;
+        sendCurrentResize();
+      });
     };
 
     const connect = () => {
       if (intentionalCloseRef.current) return;
+      ready = false;
+      inputReadyRef.current = false;
       setConnection(attempt === 0 ? "connecting" : "reconnecting");
 
       const socket = new WebSocket(websocketUrl(sessionId), WS_SUBPROTOCOL);
       socketRef.current = socket;
 
       socket.addEventListener("open", () => {
-        ready = false;
+        if (socketRef.current !== socket) return;
+
+        // Recovery snapshots are geometry-sensitive. Fit exactly once before
+        // resume, then keep that local geometry stable until hello marks the
+        // recovery boundary complete.
+        fit.fit();
+        lastSentCols = terminal.cols;
+        lastSentRows = terminal.rows;
         lastPongAt = Date.now();
-        socket.send(JSON.stringify({ type: "resume", lastSeq: lastSeqRef.current }));
+        socket.send(JSON.stringify({
+          type: "resume",
+          lastSeq: lastSeqRef.current,
+          cols: terminal.cols,
+          rows: terminal.rows
+        }));
       });
 
       socket.addEventListener("message", (event) => {
@@ -115,19 +170,9 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
           return;
         }
 
-        if (message.type === "hello") {
-          attempt = 0;
-          ready = true;
-          lastPongAt = Date.now();
-          setConnection("connected");
-          window.setTimeout(sendResize, 0);
-          return;
-        }
-
         if (message.type === "snapshot") {
-          terminal.reset();
-          terminal.write(message.data);
           lastSeqRef.current = message.seq;
+          void enqueueTerminalWrite(message.data, true);
           return;
         }
 
@@ -137,8 +182,35 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
             lastSeqRef.current = 0;
             return;
           }
-          terminal.write(message.data);
           lastSeqRef.current = message.seq;
+          void enqueueTerminalWrite(message.data);
+          return;
+        }
+
+        if (message.type === "hello") {
+          if (message.cols !== terminal.cols || message.rows !== terminal.rows) {
+            lastSeqRef.current = 0;
+            socket.close(1012, "Recovery geometry mismatch");
+            return;
+          }
+
+          // Capture the recovery render barrier before live output can extend
+          // the write pipeline. Input is enabled only after snapshot/replay
+          // parsing is complete in the browser terminal.
+          const recoveryRendered = terminalWritePipeline;
+          void recoveryRendered.then(() => {
+            if (
+              socketRef.current !== socket ||
+              intentionalCloseRef.current ||
+              sessionExitedRef.current
+            ) return;
+            attempt = 0;
+            ready = true;
+            inputReadyRef.current = true;
+            lastPongAt = Date.now();
+            setConnection("connected");
+            scheduleResize();
+          });
           return;
         }
 
@@ -150,22 +222,27 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
         if (message.type === "exit") {
           sessionExitedRef.current = true;
           ready = false;
-          terminal.write(
+          inputReadyRef.current = false;
+          void enqueueTerminalWrite(
             `\r\n\u001b[90m${t("terminal.sessionExited", {
               code: message.exitCode === undefined ? "" : ` (${message.exitCode})`
             })}\u001b[0m\r\n`
           );
           setConnection("closed");
+          return;
         }
 
         if (message.type === "error") {
-          terminal.write(`\r\n\u001b[31m[PalmTTY] ${message.message}\u001b[0m\r\n`);
+          void enqueueTerminalWrite(
+            `\r\n\u001b[31m[PalmTTY] ${message.message}\u001b[0m\r\n`
+          );
         }
       });
 
       socket.addEventListener("close", (event) => {
         if (socketRef.current === socket) socketRef.current = null;
         ready = false;
+        inputReadyRef.current = false;
         if (intentionalCloseRef.current || sessionExitedRef.current) {
           setConnection("closed");
           return;
@@ -186,7 +263,9 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
     };
 
     const observer = new ResizeObserver(() => {
-      window.requestAnimationFrame(sendResize);
+      // Do not mutate the browser terminal geometry during snapshot/replay.
+      // hello will schedule a fresh fit once recovery is complete.
+      if (ready) scheduleResize();
     });
     observer.observe(host);
 
@@ -201,12 +280,13 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
       }
       socket.send(JSON.stringify({ type: "ping", id: String(now) }));
     }, 15_000);
-    window.setTimeout(sendResize, 0);
 
     return () => {
       intentionalCloseRef.current = true;
+      inputReadyRef.current = false;
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
       if (heartbeatTimer !== undefined) window.clearInterval(heartbeatTimer);
+      if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
       observer.disconnect();
       dataDisposable.dispose();
       socketRef.current?.close(1000, "Leaving terminal view");
@@ -217,26 +297,34 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
   }, [sessionId, t]);
 
   const toggleCtrl = () => {
+    if (connection !== "connected") return;
     ctrlRef.current = !ctrlRef.current;
     setCtrl(ctrlRef.current);
     terminalRef.current?.focus();
   };
 
   const toggleAlt = () => {
+    if (connection !== "connected") return;
     altRef.current = !altRef.current;
     setAlt(altRef.current);
     terminalRef.current?.focus();
   };
 
   const key = (label: string, data: string) => (
-    <button type="button" onClick={() => {
-      ctrlRef.current = false;
-      altRef.current = false;
-      setCtrl(false);
-      setAlt(false);
-      sendInput(data);
-      terminalRef.current?.focus();
-    }}>{label}</button>
+    <button
+      type="button"
+      disabled={connection !== "connected"}
+      onClick={() => {
+        if (!sendInput(data)) return;
+        ctrlRef.current = false;
+        altRef.current = false;
+        setCtrl(false);
+        setAlt(false);
+        terminalRef.current?.focus();
+      }}
+    >
+      {label}
+    </button>
   );
 
   return (
@@ -255,8 +343,20 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
       <div className="keybar" aria-label={t("terminal.specialKeys")}>
         {key("Esc", "\u001b")}
         {key("Tab", "\t")}
-        <button className={ctrl ? "armed" : ""} onClick={toggleCtrl}>Ctrl</button>
-        <button className={alt ? "armed" : ""} onClick={toggleAlt}>Alt</button>
+        <button
+          className={ctrl ? "armed" : ""}
+          disabled={connection !== "connected"}
+          onClick={toggleCtrl}
+        >
+          Ctrl
+        </button>
+        <button
+          className={alt ? "armed" : ""}
+          disabled={connection !== "connected"}
+          onClick={toggleAlt}
+        >
+          Alt
+        </button>
         {key("↑", "\u001b[A")}
         {key("↓", "\u001b[B")}
         {key("←", "\u001b[D")}
@@ -267,8 +367,7 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
 
       <form className="composer" onSubmit={(event) => {
         event.preventDefault();
-        if (!composer) return;
-        sendInput(composer + "\r");
+        if (!composer || !sendInput(composer + "\r")) return;
         setComposer("");
         terminalRef.current?.focus();
       }}>
@@ -278,7 +377,12 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
           placeholder={t("terminal.composer")}
           rows={2}
         />
-        <button type="submit" disabled={!composer}>{t("terminal.send")}</button>
+        <button
+          type="submit"
+          disabled={!composer || connection !== "connected"}
+        >
+          {t("terminal.send")}
+        </button>
       </form>
     </main>
   );

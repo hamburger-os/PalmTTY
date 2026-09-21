@@ -55,7 +55,7 @@ PalmTTY uses:
 - @xterm/addon-serialize for a reconnectable terminal-state snapshot;
 - @xterm/addon-fit for browser sizing.
 
-The xterm.js project explicitly lists a server-side headless terminal plus serialize addon as a remote-reconnect use case.
+The xterm.js project explicitly lists a server-side headless terminal plus serialize addon as a remote-reconnect use case. The serialize addon restores state by writing its serialized escape-sequence stream back into a terminal, while terminal resizing changes buffer geometry/reflow. PalmTTY therefore treats terminal geometry as part of the recovery boundary: the Worker and browser must agree on rows/columns before a snapshot is serialized/restored, and a geometry change invalidates raw replay as the preferred recovery path.
 
 PalmTTY enables allowProposedApi on the Worker's headless terminal because current serialize-addon usage with headless xterm depends on xterm APIs behind that opt-in. The Node Worker also isolates the current xterm 6 CommonJS-loading workaround behind session-runtime.ts because native Node ESM named imports are not reliable with the published headless package. Re-review both assumptions when upgrading xterm.
 

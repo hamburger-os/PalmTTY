@@ -369,16 +369,21 @@ export class SessionWorkerServer {
           return;
 
         case "attach":
-          await this.runtime.recover(request.lastSeq, (messages) => {
-            for (const message of messages) {
-              connection.send({
-                type: "deliver",
-                clientId: request.clientId,
-                message
-              });
+          await this.runtime.recover(
+            request.lastSeq,
+            request.cols,
+            request.rows,
+            (messages) => {
+              for (const message of messages) {
+                connection.send({
+                  type: "deliver",
+                  clientId: request.clientId,
+                  message
+                });
+              }
+              this.attachedClients.add(request.clientId);
             }
-            this.attachedClients.add(request.clientId);
-          });
+          );
           this.respond(connection, request.requestId, { attached: true });
           this.publishStatus();
           return;

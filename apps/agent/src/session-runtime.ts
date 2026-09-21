@@ -186,10 +186,44 @@ export class SessionRuntime {
 
   async recover(
     lastSeq: number,
+    cols: number,
+    rows: number,
     commit: (messages: ServerMessage[]) => void
   ): Promise<void> {
     await this.enqueue(() => {
-      const messages: ServerMessage[] = [{
+      const geometryChanged = cols !== this.cols || rows !== this.rows;
+      if (geometryChanged) {
+        if (this.state === "running" || this.state === "starting") {
+          this.child.resize(cols, rows);
+        }
+        this.mirror.resize(cols, rows);
+        this.cols = cols;
+        this.rows = rows;
+      }
+
+      const messages: ServerMessage[] = [];
+      const firstSeq = this.history[0]?.seq;
+      if (!geometryChanged && canReplayFrom(lastSeq, this.seq, firstSeq)) {
+        for (const frame of this.history) {
+          if (frame.seq > lastSeq) {
+            messages.push({ type: "output", seq: frame.seq, data: frame.data });
+          }
+        }
+      } else {
+        // Serialized terminal state is geometry-sensitive. When the attaching
+        // viewport changed size, resize the canonical PTY/mirror first and
+        // recover from that state instead of replaying bytes produced for the
+        // previous geometry.
+        messages.push({
+          type: "snapshot",
+          seq: this.seq,
+          data: this.seq === 0 ? "" : this.serializer.serialize()
+        });
+      }
+
+      // hello is the recovery-complete boundary. The browser may accept input
+      // only after every snapshot/replay frame before it has been rendered.
+      messages.push({
         type: "hello",
         protocol: PROTOCOL_VERSION,
         sessionId: this.id,
@@ -197,22 +231,7 @@ export class SessionRuntime {
         cols: this.cols,
         rows: this.rows,
         latestSeq: this.seq
-      }];
-
-      const firstSeq = this.history[0]?.seq;
-      if (canReplayFrom(lastSeq, this.seq, firstSeq)) {
-        for (const frame of this.history) {
-          if (frame.seq > lastSeq) {
-            messages.push({ type: "output", seq: frame.seq, data: frame.data });
-          }
-        }
-      } else {
-        messages.push({
-          type: "snapshot",
-          seq: this.seq,
-          data: this.seq === 0 ? "" : this.serializer.serialize()
-        });
-      }
+      });
 
       if (this.state === "exited") {
         messages.push({

@@ -25,6 +25,8 @@ Security, session and reconnect changes should include or update tests for:
 - browser disconnect without PTY termination
 - reconnect sequence replay
 - stale-history snapshot fallback
+- reconnect with a changed viewport resizes canonical Worker state before recovery and uses a snapshot instead of replaying bytes produced for the old geometry
+- recovery `hello` is emitted only after recovery frames and browser input remains blocked until those frames are rendered
 - Agent restart without PTY termination
 - Worker rediscovery using authenticated local IPC
 - wrong Worker secret rejection

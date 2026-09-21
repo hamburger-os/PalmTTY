@@ -113,8 +113,13 @@ export class WorkerClient {
     await this.request({ type: "adopt" });
   }
 
-  async attach(clientId: string, lastSeq: number): Promise<void> {
-    await this.request({ type: "attach", clientId, lastSeq });
+  async attach(
+    clientId: string,
+    lastSeq: number,
+    cols: number,
+    rows: number
+  ): Promise<void> {
+    await this.request({ type: "attach", clientId, lastSeq, cols, rows });
   }
 
   async detach(clientId: string): Promise<void> {

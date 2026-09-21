@@ -47,7 +47,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - per-session 256-bit Worker secret
 - bootstrap delivered over anonymous stdin, never argv/URL
 - startup READY handshake: Session creation succeeds only after the Worker has published recovery state and is listening
-- Worker secret and minimal record persisted in a per-user runtime directory isolated by private Worker IPC generation; protocol v2 uses `runtime-v2`
+- Worker secret and minimal record persisted in a per-user runtime directory isolated by private Worker IPC generation; protocol v3 uses `runtime-v3`
 - Agent startup rediscovers Workers in parallel and authenticates them
 - Agent normal shutdown/restart disconnects control only and does not kill PTYs
 - Worker creation uses an authenticated idempotent adoption transaction: READY is not yet durable; adoption responses can be retried across a fresh IPC connection, while an unadopted Worker has a short creation lease and self-cleans its PTY/recovery state if the creator disappears
@@ -67,6 +67,8 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - serialize snapshot plus bounded sequenced replay lives in the Worker
 - replay when lastSeq is retained
 - snapshot fallback when browser state is new/stale
+- resume handshake carries the browser's fitted terminal geometry; the Worker applies geometry to the canonical PTY/headless mirror before recovery and forces a snapshot when geometry changed
+- recovery frames precede `hello`, which is the browser-visible recovery-complete boundary
 - no recovery gap between replay/snapshot generation and live subscription
 - per-WebSocket backpressure cutoff
 - Agent↔Worker IPC backlog cutoff
@@ -110,6 +112,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - xterm.js terminal
 - reconnect loop with retained lastSeq
 - gap detection forces snapshot recovery
+- browser terminal writes are serialized during recovery, fitting is frozen until recovery completes, and terminal/composer input is blocked rather than discarded while disconnected or recovering
 - Esc/Tab/arrows/Ctrl+C/Ctrl+L
 - one-shot Ctrl/Alt modifier
 - multiline composer

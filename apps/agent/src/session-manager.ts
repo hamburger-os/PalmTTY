@@ -234,12 +234,18 @@ export class SessionManager {
     }
   }
 
-  async attach(id: string, socket: WebSocket, lastSeq: number): Promise<void> {
+  async attach(
+    id: string,
+    socket: WebSocket,
+    lastSeq: number,
+    cols: number,
+    rows: number
+  ): Promise<void> {
     const managed = this.requireManaged(id);
     const clientId = randomBytes(12).toString("base64url");
     managed.clients.set(clientId, socket);
     try {
-      await managed.worker.attach(clientId, lastSeq);
+      await managed.worker.attach(clientId, lastSeq, cols, rows);
     } catch (error) {
       managed.clients.delete(clientId);
       throw error;

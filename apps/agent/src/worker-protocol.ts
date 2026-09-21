@@ -1,9 +1,15 @@
 import net from "node:net";
 import { z } from "zod";
 import { RuntimeWorkspaceSchema } from "./workspace-runtime.js";
-import { MAX_INPUT_BYTES, ServerMessageSchema, SessionPublicSchema } from "@palmtty/protocol";
+import {
+  MAX_INPUT_BYTES,
+  ServerMessageSchema,
+  SessionPublicSchema,
+  TerminalColumnsSchema,
+  TerminalRowsSchema
+} from "@palmtty/protocol";
 
-export const WORKER_PROTOCOL_VERSION = 2 as const;
+export const WORKER_PROTOCOL_VERSION = 3 as const;
 export const MAX_WORKER_FRAME_BYTES = 64 * 1024 * 1024;
 
 const SessionWorkerConfigSchema = z.object({
@@ -44,7 +50,9 @@ export const WorkerRequestSchema = z.discriminatedUnion("type", [
     type: z.literal("attach"),
     requestId: RequestIdSchema,
     clientId: z.string().min(1).max(128),
-    lastSeq: z.number().int().nonnegative()
+    lastSeq: z.number().int().nonnegative(),
+    cols: TerminalColumnsSchema,
+    rows: TerminalRowsSchema
   }),
   z.object({
     type: z.literal("detach"),

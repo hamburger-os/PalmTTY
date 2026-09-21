@@ -198,7 +198,9 @@ describe("detached session worker process", () => {
     await secondManager.attach(
       session.id,
       secondSocket as unknown as WebSocket,
-      0
+      0,
+      80,
+      24
     );
     const resumeFrom = maxSeq(secondSocket.messages);
 
@@ -228,7 +230,9 @@ describe("detached session worker process", () => {
     await thirdManager.attach(
       session.id,
       thirdSocket as unknown as WebSocket,
-      resumeFrom
+      resumeFrom,
+      80,
+      24
     );
 
     await waitFor(() =>

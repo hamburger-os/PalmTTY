@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 1 as const;
-export const WS_SUBPROTOCOL = "palmtty.v1";
+export const PROTOCOL_VERSION = 2 as const;
+export const WS_SUBPROTOCOL = "palmtty.v2";
 export const MAX_INPUT_BYTES = 64 * 1024;
 export const MAX_MESSAGE_BYTES = 80 * 1024;
 
@@ -101,13 +101,16 @@ export type DirectoryListing = z.infer<typeof DirectoryListingSchema>;
 export const SessionStateSchema = z.enum(["starting", "running", "exited", "failed"]);
 export type SessionState = z.infer<typeof SessionStateSchema>;
 
+export const TerminalColumnsSchema = z.number().int().min(2).max(500);
+export const TerminalRowsSchema = z.number().int().min(1).max(200);
+
 export const SessionPublicSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
   state: SessionStateSchema,
   createdAt: z.string(),
-  cols: z.number().int().min(2).max(500),
-  rows: z.number().int().min(1).max(200),
+  cols: TerminalColumnsSchema,
+  rows: TerminalRowsSchema,
   connections: z.number().int().nonnegative(),
   pid: z.number().int().positive().optional(),
   exitCode: z.number().int().optional()
@@ -116,14 +119,16 @@ export type SessionPublic = z.infer<typeof SessionPublicSchema>;
 
 export const CreateSessionSchema = z.object({
   workspaceId: WorkspaceIdSchema,
-  cols: z.number().int().min(2).max(500).default(80),
-  rows: z.number().int().min(1).max(200).default(24)
+  cols: TerminalColumnsSchema.default(80),
+  rows: TerminalRowsSchema.default(24)
 });
 export type CreateSessionInput = z.infer<typeof CreateSessionSchema>;
 
 export const ResumeMessageSchema = z.object({
   type: z.literal("resume"),
-  lastSeq: z.number().int().nonnegative()
+  lastSeq: z.number().int().nonnegative(),
+  cols: TerminalColumnsSchema,
+  rows: TerminalRowsSchema
 });
 
 export const InputMessageSchema = z.object({
@@ -137,8 +142,8 @@ export const InputMessageSchema = z.object({
 
 export const ResizeMessageSchema = z.object({
   type: z.literal("resize"),
-  cols: z.number().int().min(2).max(500),
-  rows: z.number().int().min(1).max(200)
+  cols: TerminalColumnsSchema,
+  rows: TerminalRowsSchema
 });
 
 export const PingMessageSchema = z.object({
@@ -159,8 +164,8 @@ export const HelloMessageSchema = z.object({
   protocol: z.literal(PROTOCOL_VERSION),
   sessionId: z.string(),
   state: SessionStateSchema,
-  cols: z.number().int(),
-  rows: z.number().int(),
+  cols: TerminalColumnsSchema,
+  rows: TerminalRowsSchema,
   latestSeq: z.number().int().nonnegative()
 });
 
