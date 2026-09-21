@@ -35,7 +35,7 @@ export function ConfirmDialog({
   return (
     <dialog
       ref={dialogRef}
-      className="confirm-dialog glass-shell"
+      className="confirm-dialog glass-modal"
       aria-labelledby="confirm-dialog-title"
       onCancel={(event) => {
         event.preventDefault();

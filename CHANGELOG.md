@@ -31,6 +31,8 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 
 ### Fixed
 
+- Refined Web surface ownership: Workspace/confirmation dialogs now use a dedicated readability-first modal material, long Workspace forms keep fixed header/footer actions around one scrolling body, and mobile touch targets use shared sizing tokens.
+- Removed the terminal's double-surface visual seam by making the host gutter and xterm canvas share the active theme background, softened the Spectrum terminal field, and isolated locale/theme presentation updates from the terminal transport lifecycle.
 - Replaced the workspace browser-native delete confirmation with the shared themed confirmation flow and kept theme changes isolated from xterm/WebSocket recovery state.
 - Made terminal recovery geometry-aware: the browser now sends its fitted rows/columns in the resume handshake, the Worker resizes canonical PTY/xterm state before recovery, and geometry changes force a fresh snapshot so refresh/reconnect cannot restore a snapshot into a mismatched viewport.
 - Treat the terminal recovery `hello` as a completion boundary, serialize browser xterm writes, freeze fitting while recovery is in flight, and prevent disconnected/recovering input from being silently dropped.

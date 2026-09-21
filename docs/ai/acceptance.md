@@ -88,9 +88,11 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 - Quality / Performance;
 - system reduced motion;
 - login/loading/home/workspace dialog/directory picker/confirmation;
-- terminal connected/reconnecting/closed;
+- a long workspace form, confirming header/footer actions remain reachable while only the body owns primary dialog scrolling;
+- terminal connected/reconnecting/closed, confirming the host gutter and xterm canvas use one terminal surface;
 - portrait and short landscape layouts;
-- a live terminal while changing appearance, confirming there is no xterm/WebSocket recreation or recovery reset.
+- a live terminal while changing appearance, confirming there is no xterm/WebSocket recreation or recovery reset;
+- static theme contract checks confirming locale/presentation state is not a terminal transport-lifecycle dependency.
 
 ## Manual Windows validation before a release
 

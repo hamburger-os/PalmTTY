@@ -109,14 +109,14 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - token login
 - English / Simplified Chinese UI with persisted browser language preference
 - client-side Spectrum / Obsidian / Frosted visual themes with persisted browser preference, plus Quality / Performance rendering modes and reduced-motion-aware decorative animation
-- PalmTTY-owned semantic glass surface system and four-color ambient field; visual rules live in `.agents/skills/palmtty-theme/SKILL.md` rather than component-local palettes
+- PalmTTY-owned semantic glass surface system and four-color ambient field; visual rules live in `.agents/skills/palmtty-theme/SKILL.md` rather than component-local palettes, with dedicated modal and terminal surface ownership instead of stacking generic glass under those regions
 - workspace create/edit/delete UI plus Host/WSL runtime form
 - Host/WSL remote directory picker that selects directories on the Agent runtime rather than the browser device
-- single-scroll workspace dialog layout, shell-argument example chips, and startup-command presets for Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, and Aider
+- workspace dialog uses a dedicated readability-first modal surface with a fixed header/footer and one scrollable form body; the bounded directory list may scroll independently; shell-argument example chips and startup-command presets cover Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, and Aider
 - workspace launcher
 - Session list with explicit text actions: active Sessions use “Terminate”, retained exited/failed Sessions use “Clear”; the ambiguous red × control is removed
 - stopping Sessions remain non-interactive in the terminal view
-- xterm.js terminal with theme-specific palette updates applied in place without recreating the terminal or reconnecting the Session
+- xterm.js terminal uses one theme-owned opaque viewport surface: the host gutter receives the active xterm background from the same theme value, while theme updates apply in place without recreating the terminal or reconnecting the Session; locale/presentation updates are isolated from the transport lifecycle
 - reconnect loop with retained lastSeq
 - gap detection forces snapshot recovery
 - browser terminal writes are serialized during recovery, fitting is frozen until recovery completes, and terminal/composer input is blocked rather than discarded while disconnected or recovering
