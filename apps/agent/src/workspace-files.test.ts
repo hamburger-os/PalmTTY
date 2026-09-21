@@ -78,4 +78,19 @@ describe("workspace file access", () => {
     expect(file.truncated).toBe(true);
     expect(Buffer.byteLength(file.content, "utf8")).toBe(512 * 1024);
   });
+
+  it("keeps truncated UTF-8 text classified as text", async () => {
+    const definition = await workspace();
+    const prefix = "x".repeat(512 * 1024 - 1);
+    await writeFile(
+      path.join(definition.cwd, "unicode.txt"),
+      prefix + "中" + "tail",
+      "utf8"
+    );
+
+    const file = await readWorkspaceFile(definition, "unicode.txt");
+    expect(file.binary).toBe(false);
+    expect(file.truncated).toBe(true);
+    expect(file.content.endsWith("�")).toBe(false);
+  });
 });
