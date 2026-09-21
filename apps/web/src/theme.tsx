@@ -81,10 +81,10 @@ export function initializeThemeDocument(): void {
 
 const TERMINAL_THEMES: Record<ThemeId, ITheme> = {
   spectrum: {
-    background: "#0b0e12",
+    background: "#111820",
     foreground: "#f1f4f8",
     cursor: "#ffffff",
-    cursorAccent: "#0b0e12",
+    cursorAccent: "#111820",
     selectionBackground: "#0b8aff55",
     black: "#11161c",
     red: "#fe5b58",
