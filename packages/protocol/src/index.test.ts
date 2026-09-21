@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  BrowseDirectoryRequestSchema,
   CreateSessionSchema,
   CreateWorkspaceSchema,
   MAX_INPUT_BYTES,
@@ -34,6 +35,21 @@ describe("protocol", () => {
         args: ["-l"]
       }
     }).runtime.kind).toBe("wsl");
+  });
+
+  it("parses bounded Host and WSL directory browse requests", () => {
+    expect(BrowseDirectoryRequestSchema.parse({ kind: "host" })).toEqual({
+      kind: "host"
+    });
+    expect(BrowseDirectoryRequestSchema.parse({
+      kind: "wsl",
+      distribution: "Ubuntu-24.04",
+      path: "/home/dev"
+    })).toEqual({
+      kind: "wsl",
+      distribution: "Ubuntu-24.04",
+      path: "/home/dev"
+    });
   });
 
   it("requires a WSL shell when shell arguments are configured", () => {
