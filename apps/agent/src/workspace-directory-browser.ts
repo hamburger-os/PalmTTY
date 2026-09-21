@@ -32,7 +32,9 @@ function uniqueLocations(entries: DirectoryLocation[]): DirectoryLocation[] {
   });
 }
 
-async function hostLocations(home: string): Promise<DirectoryLocation[]> {
+let hostLocationsPromise: Promise<DirectoryLocation[]> | undefined;
+
+async function computeHostLocations(home: string): Promise<DirectoryLocation[]> {
   if (process.platform !== "win32") {
     return uniqueLocations([
       { label: "~", path: home },
@@ -57,6 +59,11 @@ async function hostLocations(home: string): Promise<DirectoryLocation[]> {
     { label: "~", path: home },
     ...roots.filter((entry): entry is DirectoryLocation => Boolean(entry))
   ]);
+}
+
+function hostLocations(): Promise<DirectoryLocation[]> {
+  hostLocationsPromise ??= computeHostLocations(os.homedir());
+  return hostLocationsPromise;
 }
 
 async function browseHostDirectory(
@@ -99,7 +106,7 @@ async function browseHostDirectory(
   return DirectoryListingSchema.parse({
     currentPath,
     parentPath: parent === currentPath ? null : parent,
-    locations: await hostLocations(os.homedir()),
+    locations: await hostLocations(),
     directories: sortLocations(directories),
     truncated
   });
