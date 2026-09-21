@@ -9,7 +9,12 @@ import { Terminal } from "@xterm/xterm";
 import { useI18n } from "./i18n.js";
 import { useTheme } from "./theme.js";
 
-type ConnectionState = "connecting" | "connected" | "reconnecting" | "closed";
+type ConnectionState =
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "stopping"
+  | "closed";
 
 function websocketUrl(sessionId: string) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -208,11 +213,19 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
               sessionExitedRef.current
             ) return;
             attempt = 0;
-            ready = true;
-            inputReadyRef.current = true;
+            ready = message.state === "running";
+            inputReadyRef.current = ready;
             lastPongAt = Date.now();
-            setConnection("connected");
-            scheduleResize();
+            setConnection(
+              message.state === "running"
+                ? "connected"
+                : message.state === "stopping"
+                  ? "stopping"
+                  : message.state === "starting"
+                    ? "connecting"
+                    : "closed"
+            );
+            if (ready) scheduleResize();
           });
           return;
         }
