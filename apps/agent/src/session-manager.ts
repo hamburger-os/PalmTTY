@@ -42,6 +42,7 @@ export type SessionManagerOptions = {
 const CREATE_CONNECT_DELAYS_MS = [0, 50, 100, 200, 400, 800, 1200, 1600];
 const REDISCOVER_CONNECT_DELAYS_MS = [0, 100, 250, 500, 1000, 2000, 4000];
 const RECONNECT_DELAYS_MS = [100, 250, 500, 1000, 2000, 5000];
+const RESTART_EXIT_TIMEOUT_MS = 10_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -74,6 +75,7 @@ export class SessionManager {
   private readonly workspaceStore: WorkspaceStore;
   private readonly sessions = new Map<string, ManagedWorker>();
   private readonly pendingByWorkspace = new Map<string, number>();
+  private readonly restartInFlight = new Map<string, Promise<SessionPublic>>();
   private pendingCreates = 0;
   private initialized = false;
   private closing = false;
@@ -278,6 +280,54 @@ export class SessionManager {
     if (!managed) return undefined;
     await managed.worker.terminate();
     return this.publicSession(managed);
+  }
+
+  async restart(id: string): Promise<SessionPublic | undefined> {
+    const existing = this.restartInFlight.get(id);
+    if (existing) return existing;
+
+    const managed = this.sessions.get(id);
+    if (!managed) return undefined;
+
+    const run = this.restartManaged(id, managed);
+    this.restartInFlight.set(id, run);
+    try {
+      return await run;
+    } finally {
+      if (this.restartInFlight.get(id) === run) {
+        this.restartInFlight.delete(id);
+      }
+    }
+  }
+
+  private async restartManaged(
+    id: string,
+    managed: ManagedWorker
+  ): Promise<SessionPublic> {
+    const { workspaceId, cols, rows } = managed.session;
+
+    if (isActiveSessionState(managed.session.state)) {
+      await managed.worker.terminate();
+      const deadline = Date.now() + RESTART_EXIT_TIMEOUT_MS;
+      while (
+        this.sessions.get(id) === managed &&
+        isActiveSessionState(managed.session.state)
+      ) {
+        if (Date.now() >= deadline) {
+          throw new Error("Timed out waiting for the terminal to exit during restart");
+        }
+        await sleep(50);
+      }
+    }
+
+    if (this.sessions.get(id) === managed) {
+      const removed = await this.remove(id);
+      if (removed === "active") {
+        throw new Error("Terminal remained active during restart");
+      }
+    }
+
+    return this.create(workspaceId, cols, rows);
   }
 
   async remove(id: string): Promise<"removed" | "not_found" | "active"> {
