@@ -1,15 +1,20 @@
 import { parseConfig } from "@palmtty/config";
 import { SessionManager } from "./session-manager.js";
 
-function configForProcessWorker() {
+function requiredWindowsShellPath(): string {
   const shellPath = process.argv[3];
+  if (!shellPath) throw new Error("Windows shell path argument is required");
+  return shellPath;
+}
+
+function configForProcessWorker() {
   const workspace = process.platform === "win32"
     ? {
         id: "process",
         name: "Process worker",
         cwd: process.cwd(),
         shell: "custom" as const,
-        shellPath: shellPath ?? (() => { throw new Error("Windows shell path argument is required"); })(),
+        shellPath: requiredWindowsShellPath(),
         args: ["-NoLogo", "-NoProfile"]
       }
     : {
