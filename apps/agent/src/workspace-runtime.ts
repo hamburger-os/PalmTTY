@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, realpath, stat } from "node:fs/promises";
+import { access, lstat, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import type { WorkspaceConfig } from "@palmtty/config";
 import { z } from "zod";
@@ -40,7 +40,69 @@ function executableExtensions(
   return ["", ...values];
 }
 
-async function usableFile(candidate: string): Promise<string | undefined> {
+function normalizedWindowsPath(value: string): string {
+  return path.resolve(value).toLowerCase();
+}
+
+function userWindowsAppsDirectory(
+  env: NodeJS.ProcessEnv | Record<string, string>
+): string | undefined {
+  if (process.platform !== "win32") return undefined;
+  const localAppData = environmentValue(env, "LOCALAPPDATA");
+  if (!localAppData) return undefined;
+  return path.join(localAppData, "Microsoft", "WindowsApps");
+}
+
+function isUserWindowsAppsEntry(
+  candidate: string,
+  env: NodeJS.ProcessEnv | Record<string, string>
+): boolean {
+  const windowsApps = userWindowsAppsDirectory(env);
+  if (!windowsApps) return false;
+  const root = normalizedWindowsPath(windowsApps);
+  const value = normalizedWindowsPath(candidate);
+  return value === root || value.startsWith(`${root}${path.sep}`);
+}
+
+function searchPathEntries(
+  env: NodeJS.ProcessEnv | Record<string, string>
+): string[] {
+  const searchPath = environmentValue(env, "PATH") ?? "";
+  const entries = searchPath
+    .split(path.delimiter)
+    .map((rawEntry) => rawEntry.trim().replace(/^"(.*)"$/, "$1"))
+    .filter(Boolean);
+
+  if (process.platform !== "win32") return entries;
+
+  const windowsApps = userWindowsAppsDirectory(env);
+  if (!windowsApps) return entries;
+  const preferred = normalizedWindowsPath(windowsApps);
+
+  return [
+    ...entries.filter((entry) => normalizedWindowsPath(entry) === preferred),
+    ...entries.filter((entry) => normalizedWindowsPath(entry) !== preferred)
+  ];
+}
+
+async function usableFile(
+  candidate: string,
+  env: NodeJS.ProcessEnv | Record<string, string>
+): Promise<string | undefined> {
+  // MSIX App Execution Aliases under the current user's WindowsApps directory
+  // are special reparse points. Node's stat/access APIs can report EACCES for
+  // them even though Windows can launch the alias. lstat can inspect the alias
+  // itself, so preserve this absolute activation path instead of trying to
+  // resolve through the protected package target.
+  if (process.platform === "win32" && isUserWindowsAppsEntry(candidate, env)) {
+    try {
+      const info = await lstat(candidate);
+      if (!info.isDirectory()) return path.resolve(candidate);
+    } catch {
+      return undefined;
+    }
+  }
+
   try {
     await access(
       candidate,
@@ -73,16 +135,16 @@ export async function resolveExecutable(
       ? program
       : path.resolve(options.cwd, program);
     for (const extension of extensions) {
-      const resolved = await usableFile(`${base}${extension}`);
+      const resolved = await usableFile(`${base}${extension}`, env);
       if (resolved) return resolved;
     }
   } else {
-    const searchPath = environmentValue(env, "PATH") ?? "";
-    for (const rawEntry of searchPath.split(path.delimiter)) {
-      const entry = rawEntry.trim().replace(/^"(.*)"$/, "$1");
-      if (!entry) continue;
+    for (const entry of searchPathEntries(env)) {
       for (const extension of extensions) {
-        const resolved = await usableFile(path.join(entry, `${program}${extension}`));
+        const resolved = await usableFile(
+          path.join(entry, `${program}${extension}`),
+          env
+        );
         if (resolved) return resolved;
       }
     }
@@ -90,7 +152,7 @@ export async function resolveExecutable(
 
   throw new Error(
     `Shell executable "${program}" was not found. ` +
-    `Install it, add it to PATH, or configure an explicit shellPath.`
+    "Install it, add it to PATH, or configure an explicit shellPath."
   );
 }
 
@@ -111,18 +173,30 @@ function mergedEnvironment(workspace: WorkspaceConfig): NodeJS.ProcessEnv {
   return merged;
 }
 
+async function workspaceDirectoryState(
+  cwd: string
+): Promise<"directory" | "not-directory" | "unavailable"> {
+  try {
+    return (await stat(cwd)).isDirectory() ? "directory" : "not-directory";
+  } catch {
+    try {
+      return (await lstat(cwd)).isDirectory() ? "directory" : "not-directory";
+    } catch {
+      return "unavailable";
+    }
+  }
+}
+
 export async function resolveRuntimeWorkspace(
   workspace: WorkspaceConfig
 ): Promise<RuntimeWorkspace> {
-  let info;
-  try {
-    info = await stat(workspace.cwd);
-  } catch {
+  const cwdState = await workspaceDirectoryState(workspace.cwd);
+  if (cwdState === "unavailable") {
     throw new Error(
       `Workspace "${workspace.id}" directory is unavailable: ${workspace.cwd}`
     );
   }
-  if (!info.isDirectory()) {
+  if (cwdState === "not-directory") {
     throw new Error(
       `Workspace "${workspace.id}" is not a directory: ${workspace.cwd}`
     );
