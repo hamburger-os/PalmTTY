@@ -172,7 +172,8 @@ describe("HTTP security boundary", () => {
       "PALMTTY_TEST_TOKEN",
       "PALMTTY_CONFIG",
       "PALMTTY_DEV_TRUSTED_ORIGINS",
-      "PALMTTY_WINDOWS_SPAWN_TRACE"
+      "PALMTTY_WINDOWS_SPAWN_TRACE",
+      "PALMTTY_FUTURE_CONTROL"
     ]) {
       const response = await app.inject({
         method: "POST",
