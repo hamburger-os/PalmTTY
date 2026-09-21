@@ -141,7 +141,7 @@ export function WorkspaceDialog({
     <>
     <dialog
       ref={dialogRef}
-      className="workspace-dialog glass-shell"
+      className="workspace-dialog glass-panel"
       aria-labelledby="workspace-dialog-title"
       onCancel={(event) => {
         event.preventDefault();
