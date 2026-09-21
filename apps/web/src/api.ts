@@ -129,7 +129,12 @@ export async function readWorkspaceFile(
 export async function workspaceGitStatus(workspaceId: string) {
   return responseJson<GitStatusResponse>(await fetch(
     `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/git/status`,
-    { credentials: "same-origin" }
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    }
   ));
 }
 
