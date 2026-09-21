@@ -219,7 +219,13 @@ export class SessionManager {
     const endpoint = endpointId();
     const secret = workerSecret();
     const createdAt = new Date().toISOString();
-    const excludedEnvKeys = controlEnvironmentKeys(this.config.auth.tokenEnv);
+    const excludedEnvKeys = controlEnvironmentKeys(
+      this.config.auth.tokenEnv,
+      {
+        ...process.env,
+        ...workspace.env
+      }
+    );
     const traceWindowsSpawnEnabled =
       process.platform === "win32" &&
       process.env.PALMTTY_WINDOWS_SPAWN_TRACE === "1";
