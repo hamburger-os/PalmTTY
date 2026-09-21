@@ -244,4 +244,24 @@ describe("workspace runtime resolution", () => {
       "-l"
     ]);
   });
+
+  it("lets a WSL distribution profile launch its configured default shell", () => {
+    const workspace: WorkspaceDefinition = {
+      id: "ubuntu-default",
+      name: "Ubuntu",
+      cwd: "/home/dev/project",
+      runtime: {
+        kind: "wsl",
+        distribution: "Ubuntu-24.04",
+        args: []
+      }
+    };
+
+    expect(buildWslLaunchArgs(workspace)).toEqual([
+      "--distribution",
+      "Ubuntu-24.04",
+      "--cd",
+      "/home/dev/project"
+    ]);
+  });
 });
