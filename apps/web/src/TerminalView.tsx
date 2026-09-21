@@ -6,6 +6,7 @@ import {
 } from "@palmtty/protocol";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
+import { ConfirmDialog } from "./ConfirmDialog.js";
 import { useI18n } from "./i18n.js";
 import { useTheme } from "./theme.js";
 
@@ -28,7 +29,15 @@ function controlCharacter(value: string): string | undefined {
   return undefined;
 }
 
-export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack: () => void }) {
+export function TerminalView({
+  sessionId,
+  onBack,
+  onRestart
+}: {
+  sessionId: string;
+  onBack: () => void;
+  onRestart: () => Promise<void>;
+}) {
   const { t } = useI18n();
   const { terminalTheme } = useTheme();
   const translateRef = useRef(t);
@@ -46,6 +55,8 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
   const [composer, setComposer] = useState("");
+  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
+  const [restarting, setRestarting] = useState(false);
 
   useEffect(() => {
     translateRef.current = t;
@@ -362,12 +373,22 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
   return (
     <main className="terminal-page">
       <header className="terminal-header glass-panel">
-        <button className="ghost compact" onClick={onBack}>
+        <button className="ghost compact" onClick={onBack} disabled={restarting}>
           ← {t("terminal.back")}
         </button>
-        <span className={`connection ${connection}`}>
-          {t(`terminal.connection.${connection}`)}
-        </span>
+        <div className="terminal-header-actions">
+          <button
+            type="button"
+            className="ghost compact"
+            disabled={restarting || connection === "stopping"}
+            onClick={() => setRestartConfirmOpen(true)}
+          >
+            {restarting ? t("terminal.restarting") : t("terminal.restart")}
+          </button>
+          <span className={`connection ${connection}`}>
+            {t(`terminal.connection.${connection}`)}
+          </span>
+        </div>
       </header>
 
       <div
@@ -422,6 +443,21 @@ export function TerminalView({ sessionId, onBack }: { sessionId: string; onBack:
           {t("terminal.send")}
         </button>
       </form>
+
+      {restartConfirmOpen && (
+        <ConfirmDialog
+          title={t("terminal.restartTitle")}
+          message={t("terminal.restartConfirm")}
+          confirmLabel={t("terminal.restart")}
+          busy={restarting}
+          onCancel={() => setRestartConfirmOpen(false)}
+          onConfirm={() => {
+            setRestartConfirmOpen(false);
+            setRestarting(true);
+            void onRestart().finally(() => setRestarting(false));
+          }}
+        />
+      )}
     </main>
   );
 }
