@@ -278,7 +278,7 @@ export function App() {
             <span>{workspaces.length}</span>
           </div>
           <button
-            className="prism-primary compact"
+            className="compact"
             onClick={() => {
               setWorkspaceError(null);
               setWorkspaceEditor("new");
@@ -355,7 +355,7 @@ export function App() {
         </div>
         <div className="session-list">
           {sessions.length === 0 && (
-            <div className="empty">{t("sessions.empty")}</div>
+            <div className="empty session-empty glass-content">{t("sessions.empty")}</div>
           )}
           {sessions.map((session) => {
             const active = isActiveSessionState(session.state);
