@@ -137,10 +137,12 @@ export class SessionManager {
     return this.sessions.has(id);
   }
 
-  hasWorkspaceSessions(workspaceId: string): boolean {
+  hasActiveWorkspaceSessions(workspaceId: string): boolean {
     if ((this.pendingByWorkspace.get(workspaceId) ?? 0) > 0) return true;
     return [...this.sessions.values()].some(
-      ({ session }) => session.workspaceId === workspaceId
+      ({ session }) =>
+        session.workspaceId === workspaceId &&
+        (session.state === "starting" || session.state === "running")
     );
   }
 
