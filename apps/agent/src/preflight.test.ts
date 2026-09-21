@@ -43,6 +43,34 @@ describe("runtime preflight", () => {
     expect(message).toContain('Workspace "missing" directory is unavailable');
   });
 
+  it("does not bind an endpoint rejected by the exposure gate", async () => {
+    const serverProbe = vi.fn(async () => undefined);
+    const config = parseConfig({
+      server: {
+        host: "0.0.0.0",
+        port: 7688,
+        secureCookies: false,
+        unsafeAllowInsecureLan: false
+      },
+      auth: { enabled: false },
+      workspaces: [
+        {
+          id: "node",
+          name: "Node",
+          cwd: process.cwd(),
+          shell: "custom",
+          shellPath: process.execPath,
+          args: []
+        }
+      ]
+    });
+
+    await expect(
+      preflightRuntime(config, { serverProbe })
+    ).rejects.toThrow("Refusing non-loopback bind without authentication");
+    expect(serverProbe).not.toHaveBeenCalled();
+  });
+
   it("aggregates a server bind failure with other host errors", async () => {
     vi.stubEnv("PALMTTY_TEST_ACCESS_TOKEN", "short");
 
