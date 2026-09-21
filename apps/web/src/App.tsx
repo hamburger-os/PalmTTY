@@ -385,7 +385,7 @@ function Login({
 
   return (
     <main className="center-card glass-shell">
-      <div className="login-toolbar"><LanguageSwitcher /></div>
+      <div className="login-toolbar"><AppearanceControls compact /><LanguageSwitcher /></div>
       <div className="palm-mark">⌁</div>
       <h1>PalmTTY</h1>
       <p>{t("auth.description")}</p>
