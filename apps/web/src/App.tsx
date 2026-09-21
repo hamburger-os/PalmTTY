@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   isActiveSessionState,
+  isTerminalSessionState,
   type CreateWorkspaceInput,
   type RuntimeCapabilities,
   type SessionPublic,
@@ -176,7 +177,7 @@ export function App() {
   };
 
   const clearSession = async (session: SessionPublic) => {
-    if (isActiveSessionState(session.state)) return;
+    if (!isTerminalSessionState(session.state)) return;
     if (!window.confirm(t("sessions.clearConfirm"))) return;
 
     setSessionBusyId(session.id);
@@ -371,7 +372,7 @@ export function App() {
                   <button
                     type="button"
                     className="danger compact"
-                    disabled={busy || session.state === "stopping"}
+                    disabled={sessionBusyId !== null || session.state === "stopping"}
                     onClick={() => void stopSession(session)}
                   >
                     {busy || session.state === "stopping"
@@ -382,7 +383,7 @@ export function App() {
                   <button
                     type="button"
                     className="danger compact"
-                    disabled={busy}
+                    disabled={sessionBusyId !== null}
                     onClick={() => void clearSession(session)}
                   >
                     {busy ? t("sessions.clearing") : t("sessions.clear")}
