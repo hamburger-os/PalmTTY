@@ -128,14 +128,30 @@ async function listHostFiles(
   });
 }
 
-function decodeText(buffer: Buffer): { binary: boolean; content: string } {
+function decodeText(
+  buffer: Buffer,
+  truncatedTail = false
+): { binary: boolean; content: string } {
   if (buffer.includes(0)) return { binary: true, content: "" };
+  const decoder = () => new TextDecoder("utf-8", { fatal: true });
   try {
     return {
       binary: false,
-      content: new TextDecoder("utf-8", { fatal: true }).decode(buffer)
+      content: decoder().decode(buffer)
     };
   } catch {
+    if (truncatedTail) {
+      for (let trim = 1; trim <= Math.min(3, buffer.length); trim += 1) {
+        try {
+          return {
+            binary: false,
+            content: decoder().decode(buffer.subarray(0, buffer.length - trim))
+          };
+        } catch {
+          // A truncated UTF-8 code point can span up to four bytes.
+        }
+      }
+    }
     return { binary: true, content: "" };
   }
 }
@@ -155,7 +171,7 @@ async function readHostFile(
     const { bytesRead } = await handle.read(buffer, 0, requested, 0);
     const truncated = info.size > MAX_FILE_BYTES;
     const payload = buffer.subarray(0, Math.min(bytesRead, MAX_FILE_BYTES));
-    const decoded = decodeText(payload);
+    const decoded = decodeText(payload, truncated);
     return WorkspaceFileReadResponseSchema.parse({
       path: relativePath,
       size: info.size,
@@ -332,13 +348,14 @@ async function readWslFile(
     separator + 1,
     Math.min(result.stdout.length, separator + 1 + MAX_FILE_BYTES)
   );
-  const decoded = decodeText(body);
+  const truncated = size > MAX_FILE_BYTES || result.stdoutTruncated;
+  const decoded = decodeText(body, truncated);
   return WorkspaceFileReadResponseSchema.parse({
     path: relativePath,
     size,
     binary: decoded.binary,
     content: decoded.content,
-    truncated: size > MAX_FILE_BYTES || result.stdoutTruncated
+    truncated
   });
 }
 
