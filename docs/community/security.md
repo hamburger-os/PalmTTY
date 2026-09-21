@@ -14,11 +14,12 @@ PalmTTY provides shell access with the privileges of the OS user running it. Tre
 - Successful login creates an in-memory HttpOnly, SameSite=Strict session cookie; Secure is required for normal non-loopback deployment.
 - Authentication and Origin are separate controls.
 - Workspace management is an explicit authenticated, exact-Origin-protected mutation surface. The directory picker and terminal-profile discovery endpoint are separate authenticated + exact-Origin bounded inspection APIs. Profile discovery checks only known Host shells and enumerates registered WSL distributions without starting them; it does not expose file contents or arbitrary command execution.
+- Session-workbench Files/Git inspection uses separate authenticated + exact-Origin APIs rather than the terminal WebSocket. Files accepts canonical Workspace-relative paths, contains Host/WSL symlinks inside the persisted Workspace root, limits directory entries and caps UTF-8 preview at 512 KiB. Git is read-only status/diff, bounds process output/time, disables external diff/textconv/fsmonitor execution, and strips the configured PalmTTY login-token environment key from helper subprocesses.
 - The browser may persist cwd/runtime/shell, a bounded workspace environment map, and startup input. Session creation and restart do not accept ad-hoc cwd/shell/environment overrides; they resolve the persisted workspace authority by ID.
 - Workspace create/update validates the selected runtime. Host shells are resolved to absolute executables. On Windows, each new/restarted Host terminal refreshes current Machine/User environment values before applying workspace overrides. WSL launch data is passed as structured argv, and configured workspace variable names are forwarded with `WSLENV`. Session creation/restart validates the stored workspace again before Worker creation.
 - Workspace environment values are local persistent configuration and may be sensitive, but PalmTTY does not treat the workspace catalog as a secret vault. The configured PalmTTY login-token variable name is reserved and rejected from Workspace environment mutations.
 - Terminal I/O, login tokens, Worker secrets and workspace environment values are excluded from default logs.
-- Login attempts, Session creation/lifecycle mutations, terminal-profile discovery, terminal dimensions, input size, replay state, exited-session retention and socket backpressure are bounded.
+- Login attempts, Session creation/lifecycle mutations, directory/profile/workbench inspection, terminal dimensions, input size, replay state, exited-session retention and socket backpressure are bounded.
 
 ### Session Worker boundary
 
@@ -61,11 +62,12 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 - 登录 Cookie 使用 HttpOnly、SameSite=Strict；正常非 loopback 部署要求 Secure。
 - 认证与 Origin 是独立控制。
 - Workspace 目录选择器与终端 Profile 发现使用独立的“已认证 + 精确 Origin”有界 API；前者只返回目录名称/路径，后者只探测已知 Host Shell 并枚举已注册 WSL 发行版，不启动发行版，也不提供文件内容或任意命令执行。
+- Session Workbench 的 Files/Git 也使用独立“已认证 + 精确 Origin”API，不扩展终端 WebSocket。Files 只接收规范化 Workspace 相对路径，Host/WSL 都会把 symlink 约束在持久 Workspace 根目录内，并限制目录项与 512 KiB UTF-8 预览。Git 当前只读 status/diff，限制子进程输出/时间，禁用 external diff/textconv/fsmonitor，并从辅助进程环境剔除配置的 PalmTTY 登录 token 变量。
 - Workspace 管理是显式的高权限修改面，可以持久化 cwd、运行环境、Shell、有界环境变量与启动输入；真正创建或重启 Session 时不接受临时 cwd/shell/env 覆盖，而是按 workspace ID 解析持久化配置。
 - 新建/修改 workspace 时会验证运行目标；Host Shell 解析为绝对可执行文件。Windows 每个新建/重启终端会重新读取 Machine/User 环境后再应用 Workspace environment；WSL 参数按结构化 argv 传递，并通过 `WSLENV` 转发配置变量名；创建/重启 Session 前还会再次验证持久化 workspace。
 - Workspace environment 是本机持久化配置，值可能敏感，但 PalmTTY 不把 Workspace 目录当作密钥保险箱。当前 PalmTTY 登录 token 对应的环境变量名属于保留项，Workspace mutation 会直接拒绝。
 - 默认日志不记录终端 I/O、登录 token、Worker secret 或 workspace 环境变量。
-- 登录、Session 创建/生命周期修改、终端 Profile 发现、终端尺寸、输入、replay、退出保留和 socket backlog 都有资源上限。
+- 登录、Session 创建/生命周期修改、目录/Profile/Workbench 检查、终端尺寸、输入、replay、退出保留和 socket backlog 都有资源上限。
 
 ### Session Worker 安全边界
 
