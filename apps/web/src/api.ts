@@ -1,11 +1,10 @@
 import type {
   BrowseDirectoryRequest,
   CreateWorkspaceInput,
-  DetectShellProfilesRequest,
   DirectoryListing,
   RuntimeCapabilities,
   SessionPublic,
-  ShellProfile,
+  TerminalProfile,
   WorkspacePublic
 } from "@palmtty/protocol";
 
@@ -67,16 +66,14 @@ export async function runtimeCapabilities() {
   );
 }
 
-export async function detectShellProfiles(
-  input: DetectShellProfilesRequest
-) {
-  return responseJson<{ profiles: ShellProfile[] }>(await fetch(
-    "/api/v1/shell-profiles",
+export async function detectTerminalProfiles() {
+  return responseJson<{ profiles: TerminalProfile[] }>(await fetch(
+    "/api/v1/terminal-profiles",
     {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(input)
+      body: "{}"
     }
   ));
 }

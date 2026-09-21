@@ -15,6 +15,22 @@ describe("workspace environment", () => {
     });
   });
 
+  it("normalizes balanced outer quotes from copied proxy assignments", () => {
+    expect(parseWorkspaceEnvironment(
+      'HTTP_PROXY="http://127.0.0.1:10808"\n' +
+      "HTTPS_PROXY='http://127.0.0.1:10808'\n"
+    )).toEqual({
+      HTTP_PROXY: "http://127.0.0.1:10808",
+      HTTPS_PROXY: "http://127.0.0.1:10808"
+    });
+  });
+
+  it("rejects unbalanced outer quotes instead of persisting a broken proxy URL", () => {
+    expect(() => parseWorkspaceEnvironment(
+      'HTTP_PROXY="http://127.0.0.1:10808'
+    )).toThrow(WorkspaceEnvironmentParseError);
+  });
+
   it("formats persisted values without shell syntax", () => {
     expect(formatWorkspaceEnvironment({
       HTTPS_PROXY: "http://127.0.0.1:10808",

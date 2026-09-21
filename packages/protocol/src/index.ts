@@ -106,32 +106,21 @@ export const RuntimeCapabilitiesSchema = z.object({
 }).strict();
 export type RuntimeCapabilities = z.infer<typeof RuntimeCapabilitiesSchema>;
 
-const HostShellProfilesRequestSchema = z.object({
-  kind: z.literal("host")
-}).strict();
+export const DetectTerminalProfilesRequestSchema = z.object({}).strict();
+export type DetectTerminalProfilesRequest = z.infer<
+  typeof DetectTerminalProfilesRequestSchema
+>;
 
-const WslShellProfilesRequestSchema = z.object({
-  kind: z.literal("wsl"),
-  distribution: z.string().trim().min(1).max(128).optional()
-}).strict();
-
-export const DetectShellProfilesRequestSchema = z.discriminatedUnion("kind", [
-  HostShellProfilesRequestSchema,
-  WslShellProfilesRequestSchema
-]);
-export type DetectShellProfilesRequest = z.infer<typeof DetectShellProfilesRequestSchema>;
-
-export const ShellProfileSchema = z.object({
-  id: z.string().min(1).max(64),
-  label: z.string().min(1).max(128),
-  shell: z.string().min(1).max(4096),
-  args: z.array(z.string().max(4096)).max(32),
+export const TerminalProfileSchema = z.object({
+  id: z.string().min(1).max(256),
+  label: z.string().min(1).max(256),
+  runtime: WorkspaceRuntimeSchema,
   recommended: z.boolean()
 }).strict();
-export type ShellProfile = z.infer<typeof ShellProfileSchema>;
+export type TerminalProfile = z.infer<typeof TerminalProfileSchema>;
 
-export const ShellProfilesResponseSchema = z.object({
-  profiles: z.array(ShellProfileSchema).max(32)
+export const TerminalProfilesResponseSchema = z.object({
+  profiles: z.array(TerminalProfileSchema).max(64)
 }).strict();
 
 const BrowseHostDirectorySchema = z.object({

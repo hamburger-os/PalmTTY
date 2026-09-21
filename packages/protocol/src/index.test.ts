@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   BrowseDirectoryRequestSchema,
   CreateSessionSchema,
-  DetectShellProfilesRequestSchema,
+  DetectTerminalProfilesRequestSchema,
+  TerminalProfileSchema,
   CreateWorkspaceSchema,
   MAX_INPUT_BYTES,
   WorkspaceDefinitionSchema,
@@ -41,7 +42,7 @@ describe("protocol", () => {
     }).runtime.kind).toBe("wsl");
   });
 
-  it("parses bounded workspace environment and shell detection requests", () => {
+  it("parses bounded workspace environment and terminal profiles", () => {
     expect(WorkspaceEnvironmentSchema.parse({
       HTTPS_PROXY: "http://127.0.0.1:10808",
       HTTP_PROXY: "http://127.0.0.1:10808"
@@ -56,16 +57,20 @@ describe("protocol", () => {
       PATH: "two"
     })).toThrow();
 
-    expect(DetectShellProfilesRequestSchema.parse({ kind: "host" })).toEqual({
-      kind: "host"
-    });
-    expect(DetectShellProfilesRequestSchema.parse({
-      kind: "wsl",
-      distribution: "Ubuntu-24.04"
-    })).toEqual({
-      kind: "wsl",
-      distribution: "Ubuntu-24.04"
-    });
+    expect(DetectTerminalProfilesRequestSchema.parse({})).toEqual({});
+    expect(() => DetectTerminalProfilesRequestSchema.parse({ kind: "host" }))
+      .toThrow();
+
+    expect(TerminalProfileSchema.parse({
+      id: "wsl:Ubuntu-24.04",
+      label: "Ubuntu-24.04",
+      runtime: {
+        kind: "wsl",
+        distribution: "Ubuntu-24.04",
+        args: []
+      },
+      recommended: false
+    }).runtime.kind).toBe("wsl");
   });
 
   it("parses bounded Host and WSL directory browse requests", () => {

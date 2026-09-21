@@ -32,7 +32,7 @@ PalmTTY is **alpha**. Each terminal now runs in an independent durable Session W
 | Linux host runtime | Implemented and exercised on Ubuntu CI |
 | WSL runtime | Implemented with runtime validation; real-owner-host validation still required |
 | macOS host runtime | Architecture implemented; no repository macOS CI yet |
-| Web workspace management | Persistent create/edit/delete with detected Shell profiles, bounded environment variables and multiline startup input |
+| Web workspace management | Persistent create/edit/delete with unified terminal profiles (Host shells + WSL distributions), bounded environment variables and multiline startup input |
 | UI languages | English and Simplified Chinese |
 | Visual themes | Spectrum / Obsidian / Frosted with Quality / Performance rendering modes |
 | Browser or network disconnect | PTY survives while the Agent stays alive |
@@ -91,7 +91,7 @@ Requirements:
 - Windows 11
 - Node.js 22.11+
 - Corepack / pnpm
-- PowerShell 7 (`pwsh`) is the preferred Windows host shell; the Workspace editor detects installed Host shells and also supports Windows PowerShell, Command Prompt, Nushell, WSL shells and a Custom fallback
+- PowerShell 7 (`pwsh`) is the preferred Windows host shell; the Workspace editor exposes one terminal-profile selector containing detected Host shells plus registered WSL distributions, with a Custom fallback for explicit runtime/shell details
 
 ```powershell
 git clone https://github.com/hamburger-os/PalmTTY.git
@@ -110,7 +110,7 @@ pnpm check
 pnpm start
 ```
 
-Open `http://127.0.0.1:7688`, sign in with the access token, then create a workspace from the Web UI. Workspaces are stored separately from `palmtty.local.yaml`. On Windows, choose **Host** or **WSL**, then select one of the Shell profiles PalmTTY detects in that runtime. Use **Custom** only when an explicit executable/argv is required. Workspace environment entries use `NAME=value` lines and are applied before the Shell starts; the startup field accepts multiple lines sent after startup.
+Open `http://127.0.0.1:7688`, sign in with the access token, then create a workspace from the Web UI. Workspaces are stored separately from `palmtty.local.yaml`. Choose a **Terminal environment** directly: Host shells such as PowerShell 7 and registered WSL distributions such as `Ubuntu-22.04` appear in one selector. Use **Custom** only when explicit runtime/executable/argv control is required. Workspace environment entries use `NAME=value` lines and are applied before the Shell starts; balanced outer quotes are normalized, so copied forms such as `HTTP_PROXY="http://127.0.0.1:10808"` save the same value as the unquoted URL. The startup field accepts multiple lines sent after startup.
 
 `pnpm run preflight` validates the authentication environment, security exposure rules and configured Agent TCP listen endpoint before the Agent starts. Workspace directories and shells are validated when a workspace is created/updated and again when a Session starts or is explicitly restarted. Windows Store/MSIX PowerShell is supported through the current user's App Execution Alias, and resolved host shells are normalized to absolute launch paths before Worker creation. Each new/restarted Windows Host terminal rebuilds its environment from current Machine/User values before Workspace overrides are applied, so a CLI added to the user's PATH after the PalmTTY Agent started can be picked up by **Restart terminal** without restarting the Agent.
 

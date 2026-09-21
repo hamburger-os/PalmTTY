@@ -3,6 +3,7 @@ export type WorkspaceEnvironmentParseErrorCode =
   | "invalid_name"
   | "duplicate_name"
   | "reserved_name"
+  | "unbalanced_quotes"
   | "too_many"
   | "value_too_long";
 
@@ -17,6 +18,29 @@ export class WorkspaceEnvironmentParseError extends Error {
 }
 
 const ENVIRONMENT_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function normalizeEnvironmentValue(
+  value: string,
+  line: number
+): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+
+  const startsQuoted = trimmed.startsWith('"') || trimmed.startsWith("'");
+  const endsQuoted = trimmed.endsWith('"') || trimmed.endsWith("'");
+  if (!startsQuoted && !endsQuoted) return value;
+
+  const quote = trimmed[0];
+  if (
+    (quote !== '"' && quote !== "'") ||
+    trimmed.length < 2 ||
+    trimmed[trimmed.length - 1] !== quote
+  ) {
+    throw new WorkspaceEnvironmentParseError("unbalanced_quotes", line);
+  }
+
+  return trimmed.slice(1, -1);
+}
 
 export function formatWorkspaceEnvironment(
   environment: Record<string, string> | undefined
@@ -43,7 +67,10 @@ export function parseWorkspaceEnvironment(
     }
 
     const name = rawLine.slice(0, separator).trim();
-    const value = rawLine.slice(separator + 1);
+    const value = normalizeEnvironmentValue(
+      rawLine.slice(separator + 1),
+      line
+    );
     if (!ENVIRONMENT_NAME.test(name)) {
       throw new WorkspaceEnvironmentParseError("invalid_name", line);
     }

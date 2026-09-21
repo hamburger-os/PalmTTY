@@ -31,7 +31,7 @@ Any behavior-changing PR must use the documentation-sync workflow in `.agents/sk
 - Keep the terminal core vendor-neutral; Codex is a supported workload, not a protocol dependency.
 - Prefer small, testable boundaries.
 - Do not add terminal I/O logging for debugging.
-- Treat workspace CRUD as a high-trust remote mutation surface; keep authentication, exact Origin checks, persistence validation and Session creation/restart bound to persisted workspace authority rather than per-Session overrides.
+- Treat workspace CRUD as a high-trust remote mutation surface; keep authentication, exact Origin checks, persistence validation and Session creation/restart bound to persisted workspace authority rather than per-Session overrides. Terminal-profile discovery must remain bounded enumeration: known Host shells plus registered WSL distributions, not arbitrary command execution.
 - Workspace environment is intentionally supported but bounded and persisted; do not broaden it into arbitrary process execution or a secret-management feature without an architecture/security review.
 - Distinguish implemented platform adapters from platforms actually exercised in CI.
 
@@ -65,6 +65,6 @@ pnpm build
 - 终端核心保持厂商无关；Codex 是支持的工作负载，不是协议依赖。
 - 优先建立小而可测试的边界。
 - 不要为了调试增加终端 I/O 日志。
-- Workspace CRUD 属于高信任远程修改面，必须保持认证、精确 Origin、持久化验证以及“Session 创建/重启只消费持久化 Workspace authority”的边界。
+- Workspace CRUD 属于高信任远程修改面，必须保持认证、精确 Origin、持久化验证以及“Session 创建/重启只消费持久化 Workspace authority”的边界。终端 Profile 发现必须继续只是“已知 Host Shell + 已注册 WSL 发行版”的有界枚举，不能退化成任意命令执行。
 - Workspace environment 已作为有界持久化配置开放；如果要继续扩大到任意进程执行或密钥管理，必须先进行架构与安全审查。
 - 必须区分“已经实现的平台适配器”与“已进入 CI 实机路径的平台”。

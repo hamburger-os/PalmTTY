@@ -29,7 +29,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Session creation/restart remain workspace-authority operations; Web workspace mutation may persist a bounded environment map except the configured login-token variable, while Session requests cannot inject ad-hoc cwd/shell/environment overrides
 - runtime preflight for auth/security exposure and configured Agent TCP bindability, exposed as the unambiguous `pnpm run preflight` package script
 - workspace create/update plus Session creation both validate runtime launch targets
-- authenticated + exact-Origin runtime-aware directory browsing for workspace selection; responses expose directories only and are bounded by request rate, 512 returned entries, subprocess output, and timeout
+- authenticated + exact-Origin runtime-aware directory browsing for workspace selection plus unified terminal-profile discovery; directory responses expose directories only, while terminal profiles enumerate known Host shells and registered WSL distributions without starting the distributions; both surfaces are bounded and rate-limited
 - host runtime adapter with absolute executable normalization, including current-user Windows App Execution Aliases for Store/MSIX PowerShell; each new/restarted Windows terminal refreshes Machine/User environment variables from Windows before resolving the shell and PATH
 - Windows WSL runtime adapter using structured `wsl.exe` argv for distribution/cwd/shell rather than shell-string interpolation; configured workspace environment variables are forwarded by preserving existing colon-delimited `WSLENV` entries/flags and appending bounded names
 - Linux host runtime exercised by Ubuntu CI; macOS shares the host adapter but is not covered by repository CI
@@ -111,9 +111,9 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - English / Simplified Chinese UI with persisted browser language preference
 - client-side Spectrum / Obsidian / Frosted visual themes with persisted browser preference, plus Quality / Performance rendering modes and reduced-motion-aware decorative animation
 - PalmTTY-owned semantic glass surface system and four-color ambient field; visual rules live in `.agents/skills/palmtty-theme/SKILL.md` rather than component-local palettes, with dedicated modal and terminal surface ownership instead of stacking generic glass under those regions
-- workspace create/edit/delete UI plus Host/WSL runtime form
+- workspace create/edit/delete UI with terminal profiles as the primary choice; Host/WSL runtime details are hidden behind the Custom advanced path
 - Host/WSL remote directory picker that selects directories on the Agent runtime rather than the browser device
-- workspace dialog uses a dedicated readability-first modal surface with a fixed header/footer and one scrollable form body; the bounded directory list may scroll independently; installed Host/WSL shells are detected into a profile selector with an explicit Custom fallback; workspace environment variables use structured `NAME=value` editing; startup commands are multiline and retain presets for Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, and Aider
+- workspace dialog uses a dedicated readability-first modal surface with a fixed header/footer and one scrollable form body; the bounded directory list may scroll independently; installed Host shells and registered WSL distributions appear in one terminal-profile selector with an explicit Custom fallback; Host/WSL working-directory drafts are kept separate; workspace environment variables use structured `NAME=value` editing with balanced outer quote normalization; startup commands are multiline and retain presets for Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, and Aider
 - workspace launcher
 - Session list with explicit text actions: active Sessions use “Terminate”, retained exited/failed Sessions use “Clear”; the terminal header also exposes an explicit confirmed “Restart terminal” replacement action; the ambiguous red × control is removed
 - stopping Sessions remain non-interactive in the terminal view
@@ -140,7 +140,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Windows explicit-termination “no visible console flash” remains a real-host visual acceptance check; CI exercises the bundled ConPTY DLL path but cannot assert desktop window visibility.
 - Potentially-live but unreachable recovery records are deliberately preserved when process death cannot be proven; this favors terminal survival over aggressive metadata reclamation.
 - No Git/file preview subsystem yet.
-- WSL support is implemented but still needs real owner-host/long-running validation, including shell-profile detection and workspace-variable forwarding through `WSLENV`; repository CI does not provide a real WSL environment.
+- WSL support is implemented but still needs real owner-host/long-running validation, including distribution enumeration, default-shell launch semantics, directory selection, and workspace-variable forwarding through `WSLENV`; repository CI does not provide a real WSL environment.
 - Linux host runtime is exercised on Ubuntu CI. macOS uses the same host adapter but remains unverified because there is no macOS CI job.
 - Windows Worker runtime file ACL behavior relies on the current-user application-data boundary and still merits dedicated real-host review.
 - The current xterm 6 package is loaded through an isolated CommonJS boundary in the Node Worker because the published headless package is not reliably consumable through native Node ESM named exports; re-review this when upgrading xterm.

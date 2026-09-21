@@ -9,7 +9,7 @@ import type { PalmTTYConfig } from "@palmtty/config";
 import {
   BrowseDirectoryRequestSchema,
   CreateSessionSchema,
-  DetectShellProfilesRequestSchema,
+  DetectTerminalProfilesRequestSchema,
   CreateWorkspaceSchema,
   MAX_MESSAGE_BYTES,
   WS_SUBPROTOCOL,
@@ -21,7 +21,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import { AUTH_COOKIE, AuthService } from "./auth.js";
 import { browseWorkspaceDirectory } from "./workspace-directory-browser.js";
-import { detectShellProfiles } from "./workspace-shells.js";
+import { detectTerminalProfiles } from "./terminal-profiles.js";
 import { FixedWindowLimiter, isTrustedOrigin } from "./security.js";
 import { SessionManager, type SessionManagerOptions } from "./session-manager.js";
 import {
@@ -74,7 +74,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   const sessionMutationLimiter = new FixedWindowLimiter(60, 60_000);
   const workspaceMutationLimiter = new FixedWindowLimiter(60, 60_000);
   const directoryBrowseLimiter = new FixedWindowLimiter(120, 60_000);
-  const shellProbeLimiter = new FixedWindowLimiter(60, 60_000);
+  const terminalProfileLimiter = new FixedWindowLimiter(60, 60_000);
 
   function authenticated(request: FastifyRequest): boolean {
     return auth.isAuthenticated(request.cookies[AUTH_COOKIE]);
@@ -150,24 +150,24 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   ));
 
   app.post(
-    "/api/v1/shell-profiles",
+    "/api/v1/terminal-profiles",
     { preHandler: [requireOrigin, requireAuth] },
     async (request, reply) => {
-      if (!shellProbeLimiter.allow(request.ip)) {
-        return reply.code(429).send({ error: "too_many_shell_profile_requests" });
+      if (!terminalProfileLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_terminal_profile_requests" });
       }
-      const parsed = DetectShellProfilesRequestSchema.safeParse(request.body);
+      const parsed = DetectTerminalProfilesRequestSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: "invalid_shell_profile_request" });
+        return reply.code(400).send({ error: "invalid_terminal_profile_request" });
       }
       try {
-        return { profiles: await detectShellProfiles(parsed.data) };
+        return { profiles: await detectTerminalProfiles() };
       } catch (error) {
         return reply.code(400).send({
-          error: "shell_profile_detection_failed",
+          error: "terminal_profile_detection_failed",
           message: error instanceof Error
             ? error.message
-            : "Shell detection failed"
+            : "Terminal profile discovery failed"
         });
       }
     }
