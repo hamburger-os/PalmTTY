@@ -32,12 +32,12 @@ PalmTTY is **alpha**. Each terminal now runs in an independent durable Session W
 | Linux host runtime | Implemented and exercised on Ubuntu CI |
 | WSL runtime | Implemented with runtime validation; real-owner-host validation still required |
 | macOS host runtime | Architecture implemented; no repository macOS CI yet |
-| Web workspace management | Persistent create/edit/delete via authenticated same-origin API |
+| Web workspace management | Persistent create/edit/delete with detected Shell profiles, bounded environment variables and multiline startup input |
 | UI languages | English and Simplified Chinese |
 | Visual themes | Spectrum / Obsidian / Frosted with Quality / Performance rendering modes |
 | Browser or network disconnect | PTY survives while the Agent stays alive |
 | Reconnect | Sequence replay + server-side terminal snapshot fallback |
-| Session lifecycle | Explicit terminate → retained exited state → clear; no ambiguous close/kill control |
+| Session lifecycle | Explicit terminate / restart-as-replacement / retained clear; no ambiguous close/kill control |
 | Mobile terminal | xterm.js PWA, special-key bar, multiline composer |
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
 | Internet exposure | HTTPS/private-network deployment only |
@@ -51,7 +51,7 @@ PalmTTY is intentionally narrower than a browser IDE:
 
 - **Keep the real shell on your workstation.** A per-session Worker owns the PTY; the Agent and browser are replaceable clients/control planes.
 - **Survive mobile reality.** WebSocket reconnect, bounded replay, snapshot recovery and application heartbeat are built around Wi-Fi/cellular switching and backgrounded tabs.
-- **Keep remote authority explicit.** Workspace changes are persistent authenticated mutations, not ad-hoc Session parameters. Session creation still accepts only a workspace ID; environment injection is not exposed by the Web API.
+- **Keep remote authority explicit.** Workspace changes are persistent authenticated mutations, not ad-hoc Session parameters. A Workspace may contain bounded environment variables, but Session creation/restart cannot inject temporary cwd/shell/env overrides.
 - **Stay AI-vendor-neutral.** Codex, Claude Code, OpenCode and other terminal tools are workloads, not protocol dependencies.
 - **Remain self-hosted.** No cloud relay is required by the core architecture.
 
@@ -91,7 +91,7 @@ Requirements:
 - Windows 11
 - Node.js 22.11+
 - Corepack / pnpm
-- PowerShell 7 (`pwsh`) for the default Windows host-shell experience; WSL or another explicit shell is optional
+- PowerShell 7 (`pwsh`) is the preferred Windows host shell; the Workspace editor detects installed Host shells and also supports Windows PowerShell, Command Prompt, Nushell, WSL shells and a Custom fallback
 
 ```powershell
 git clone https://github.com/hamburger-os/PalmTTY.git
@@ -110,9 +110,9 @@ pnpm check
 pnpm start
 ```
 
-Open `http://127.0.0.1:7688`, sign in with the access token, then create a workspace from the Web UI. Workspaces are stored separately from `palmtty.local.yaml`. On Windows, choose **Host** for PowerShell/other Windows shells or **WSL** for a Linux distribution; on Linux/macOS use the Host runtime.
+Open `http://127.0.0.1:7688`, sign in with the access token, then create a workspace from the Web UI. Workspaces are stored separately from `palmtty.local.yaml`. On Windows, choose **Host** or **WSL**, then select one of the Shell profiles PalmTTY detects in that runtime. Use **Custom** only when an explicit executable/argv is required. Workspace environment entries use `NAME=value` lines and are applied before the Shell starts; the startup field accepts multiple lines sent after startup.
 
-`pnpm run preflight` validates the authentication environment, security exposure rules and configured Agent TCP listen endpoint before the Agent starts. Workspace directories and shells are validated when a workspace is created/updated and again when a Session starts. Windows Store/MSIX PowerShell is supported through the current user's App Execution Alias, and resolved host shells are normalized to absolute launch paths before Worker creation.
+`pnpm run preflight` validates the authentication environment, security exposure rules and configured Agent TCP listen endpoint before the Agent starts. Workspace directories and shells are validated when a workspace is created/updated and again when a Session starts or is explicitly restarted. Windows Store/MSIX PowerShell is supported through the current user's App Execution Alias, and resolved host shells are normalized to absolute launch paths before Worker creation. Each new/restarted Windows Host terminal rebuilds its environment from current Machine/User values before Workspace overrides are applied, so a CLI added to the user's PATH after the PalmTTY Agent started can be picked up by **Restart terminal** without restarting the Agent.
 
 For development, run `pnpm dev`. It invokes PalmTTY's `preflight` package script explicitly before Vite and the Agent are launched, so a bad token or Agent endpoint fails once with an actionable startup error instead of leaving the frontend proxy retrying a dead Agent. The script is intentionally not named `doctor` because pnpm 10 already owns `pnpm doctor` as a package-manager diagnostic command. The example development configuration already includes the Vite origin required by the exact Origin check. In development, the root `pnpm dev` launcher reads the same `PALMTTY_CONFIG`, derives the local Agent URL from `server.host`/`server.port`, and injects it into Vite as `PALMTTY_AGENT_URL`; an explicitly supplied `PALMTTY_AGENT_URL` still overrides the derived target. Vite uses strict port 5173 so it cannot silently move to a different untrusted Origin.
 
