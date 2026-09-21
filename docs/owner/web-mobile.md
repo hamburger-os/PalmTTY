@@ -57,7 +57,7 @@
 ## 设计边界
 
 - Composer 最终仍然把文本作为终端输入发送，不建立 Codex 专用 API。
-- Workspace 修改走独立持久化 API；Session 创建/重启不接收临时 cwd/shell/env。Shell 探测只是受保护、有界的运行环境读取 API，不是通用命令执行接口。
+- Workspace 修改走独立持久化 API；Session 创建/重启不接收临时 cwd/shell/env。终端 Profile 发现只是受保护、有界的运行环境读取 API，不是通用命令执行接口。
 - 目录选择器只读取目录名称/路径，不读取文件内容；Host/WSL 浏览都由受保护的 Agent API 完成。
 - 浏览器丢失状态时以服务端 snapshot 为准。
 - `stopping` Session 可以继续被查看，但终端输入、resize 与 Composer 发送保持禁用，直到 Worker 报告最终退出。
