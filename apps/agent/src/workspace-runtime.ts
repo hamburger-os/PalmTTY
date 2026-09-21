@@ -64,25 +64,26 @@ function isUserWindowsAppsEntry(
   return value === root || value.startsWith(`${root}${path.sep}`);
 }
 
+function isProtectedWindowsAppsEntry(
+  candidate: string,
+  env: NodeJS.ProcessEnv | Record<string, string>
+): boolean {
+  if (process.platform !== "win32") return false;
+  const programFiles = environmentValue(env, "ProgramFiles");
+  if (!programFiles) return false;
+  const root = normalizedWindowsPath(path.join(programFiles, "WindowsApps"));
+  const value = normalizedWindowsPath(candidate);
+  return value === root || value.startsWith(`${root}${path.sep}`);
+}
+
 function searchPathEntries(
   env: NodeJS.ProcessEnv | Record<string, string>
 ): string[] {
   const searchPath = environmentValue(env, "PATH") ?? "";
-  const entries = searchPath
+  return searchPath
     .split(path.delimiter)
     .map((rawEntry) => rawEntry.trim().replace(/^"(.*)"$/, "$1"))
     .filter(Boolean);
-
-  if (process.platform !== "win32") return entries;
-
-  const windowsApps = userWindowsAppsDirectory(env);
-  if (!windowsApps) return entries;
-  const preferred = normalizedWindowsPath(windowsApps);
-
-  return [
-    ...entries.filter((entry) => normalizedWindowsPath(entry) === preferred),
-    ...entries.filter((entry) => normalizedWindowsPath(entry) !== preferred)
-  ];
 }
 
 async function usableFile(
@@ -141,10 +142,14 @@ export async function resolveExecutable(
   } else {
     for (const entry of searchPathEntries(env)) {
       for (const extension of extensions) {
-        const resolved = await usableFile(
-          path.join(entry, `${program}${extension}`),
-          env
-        );
+        const candidate = path.join(entry, `${program}${extension}`);
+        // PATH entries may contain the protected MSIX package install
+        // directory. That path is not the user activation boundary and can
+        // fail when spawned outside package identity. Skip it during PATH
+        // discovery and allow the normal current-user App Execution Alias to
+        // win later in PATH. An explicit shellPath remains authoritative.
+        if (isProtectedWindowsAppsEntry(candidate, env)) continue;
+        const resolved = await usableFile(candidate, env);
         if (resolved) return resolved;
       }
     }
