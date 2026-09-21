@@ -121,3 +121,17 @@ export function configPathFromEnvironment(): string {
     ? path.resolve(process.env.PALMTTY_CONFIG)
     : defaultConfigPath();
 }
+
+export function localAgentUrl(
+  config: Pick<PalmTTYConfig, "server">
+): string {
+  const normalized = config.server.host.trim().replace(/^\[|\]$/g, "");
+  const host = normalized === "0.0.0.0"
+    ? "127.0.0.1"
+    : normalized === "::"
+      ? "[::1]"
+      : normalized.includes(":")
+        ? `[${normalized}]`
+        : normalized;
+  return `http://${host}:${config.server.port}`;
+}
