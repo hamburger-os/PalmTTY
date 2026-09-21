@@ -17,7 +17,7 @@ PalmTTY provides shell access with the privileges of the OS user running it. Tre
 - Workspace management is an explicit authenticated, exact-Origin-protected mutation surface. The directory picker and terminal-profile discovery endpoint are separate authenticated + exact-Origin bounded inspection APIs. Profile discovery checks only known Host shells and enumerates registered WSL distributions without starting them; it does not expose file contents or arbitrary command execution.
 - The browser may persist cwd/runtime/shell, a bounded workspace environment map, and startup input. Session creation and restart do not accept ad-hoc cwd/shell/environment overrides; they resolve the persisted workspace authority by ID.
 - Workspace create/update validates the selected runtime. Host shells are resolved to absolute executables. On Windows, each new/restarted Host terminal refreshes current Machine/User environment values before applying workspace overrides. WSL launch data is passed as structured argv, and configured workspace variable names are forwarded with `WSLENV`. Session creation/restart validates the stored workspace again before Worker creation.
-- Workspace environment values are local persistent configuration and may be sensitive, but PalmTTY does not treat the workspace catalog as a secret vault. PalmTTY's own control-variable names—including the configured/default login token and development-control variables—are reserved and rejected from Workspace environment mutations.
+- Workspace environment values are local persistent configuration and may be sensitive, but PalmTTY does not treat the workspace catalog as a secret vault. The `PALMTTY_*` namespace plus any separately configured login-token variable is reserved and rejected from Workspace environment mutations.
 - Terminal I/O, login tokens, Worker secrets and workspace environment values are excluded from default logs.
 - Login attempts, Session creation/lifecycle mutations, terminal-profile discovery, terminal dimensions, input size, replay state, exited-session retention and socket backpressure are bounded.
 
@@ -29,7 +29,7 @@ Each terminal Session runs in an independent detached Worker.
 - The Agent can restart without terminating the Worker.
 - Agent↔Worker IPC requires a per-session 256-bit secret.
 - The Worker secret is delivered only through anonymous stdin during creation and never reaches the browser, argv or URL.
-- PalmTTY control environment variables (authentication token, config path, development proxy/origin/listener controls, and Windows spawn-trace control) are reserved from Workspace mutation and removed before Worker bootstrap/from the Worker process environment so they do not leak into the user shell.
+- the entire `PALMTTY_*` control namespace plus any separately configured login-token variable is reserved from Workspace mutation and removed before Worker bootstrap/from the Worker process environment so they do not leak into the user shell.
 - Worker terminal input is independently limited to the same 64 KiB bound as browser input.
 - IPC frames and queued socket bytes are bounded.
 - Wrong Worker secrets are rejected before control commands are accepted.
@@ -65,7 +65,7 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 - Workspace 目录选择器与终端 Profile 发现使用独立的“已认证 + 精确 Origin”有界 API；前者只返回目录名称/路径，后者只探测已知 Host Shell 并枚举已注册 WSL 发行版，不启动发行版，也不提供文件内容或任意命令执行。
 - Workspace 管理是显式的高权限修改面，可以持久化 cwd、运行环境、Shell、有界环境变量与启动输入；真正创建或重启 Session 时不接受临时 cwd/shell/env 覆盖，而是按 workspace ID 解析持久化配置。
 - 新建/修改 workspace 时会验证运行目标；Host Shell 解析为绝对可执行文件。Windows 每个新建/重启终端会重新读取 Machine/User 环境后再应用 Workspace environment；WSL 参数按结构化 argv 传递，并通过 `WSLENV` 转发配置变量名；创建/重启 Session 前还会再次验证持久化 workspace。
-- Workspace environment 是本机持久化配置，值可能敏感，但 PalmTTY 不把 Workspace 目录当作密钥保险箱。PalmTTY 自身控制变量名（包括配置的/默认登录 token 与开发控制变量）属于保留项，Workspace mutation 会直接拒绝。
+- Workspace environment 是本机持久化配置，值可能敏感，但 PalmTTY 不把 Workspace 目录当作密钥保险箱。`PALMTTY_*` 命名空间以及单独配置的认证 token 环境变量属于保留项，Workspace mutation 会直接拒绝。
 - 默认日志不记录终端 I/O、登录 token、Worker secret 或 workspace 环境变量。
 - 登录、Session 创建/生命周期修改、终端 Profile 发现、终端尺寸、输入、replay、退出保留和 socket backlog 都有资源上限。
 
@@ -77,7 +77,7 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 - Agent 重启不会终止 Worker；
 - Agent↔Worker IPC 必须使用每 Session 独立的 256-bit secret；
 - Worker secret 创建时只经匿名 stdin 传入，不进入浏览器、argv 或 URL；
-- PalmTTY 控制环境变量（认证 token、配置路径、开发代理/Origin/监听参数、Windows spawn trace 开关）属于 Workspace 保留项，并会在 Worker bootstrap 前从规范化 Workspace 环境剔除、从 Worker 进程环境删除，避免泄漏到用户 Shell；
+- `PALMTTY_*` 整个控制环境命名空间以及单独配置的认证 token 环境变量属于 Workspace 保留项，并会在 Worker bootstrap 前从规范化 Workspace 环境剔除、从 Worker 进程环境删除，避免泄漏到用户 Shell；
 - Worker IPC 的终端输入再次限制为 64 KiB；
 - IPC frame 与 socket 积压均有硬上限；
 - 错误 Worker secret 在接受任何控制命令前就会被拒绝。
