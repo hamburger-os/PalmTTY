@@ -1,5 +1,7 @@
 import { parseConfig } from "@palmtty/config";
+import type { WorkspaceDefinition } from "@palmtty/protocol";
 import { SessionManager } from "./session-manager.js";
+import { MemoryWorkspaceStore } from "./workspace-store.js";
 
 function requiredWindowsShellPath(): string {
   const shellPath = process.argv[3];
@@ -7,39 +9,40 @@ function requiredWindowsShellPath(): string {
   return shellPath;
 }
 
-function configForProcessWorker() {
-  const workspace = process.platform === "win32"
+function workspaceForProcessWorker(): WorkspaceDefinition {
+  return process.platform === "win32"
     ? {
         id: "process",
         name: "Process worker",
         cwd: process.cwd(),
-        shell: "custom" as const,
-        shellPath: requiredWindowsShellPath(),
-        args: ["-NoLogo", "-NoProfile"]
+        runtime: {
+          kind: "host",
+          shell: requiredWindowsShellPath(),
+          args: ["-NoLogo", "-NoProfile"]
+        }
       }
     : {
         id: "process",
         name: "Process worker",
         cwd: process.cwd(),
-        shell: "custom" as const,
-        shellPath: "/bin/sh",
-        args: ["-i"]
+        runtime: {
+          kind: "host",
+          shell: "/bin/sh",
+          args: ["-i"]
+        }
       };
-
-  const config = parseConfig({
-    server: { host: "127.0.0.1", port: 7688 },
-    auth: { enabled: false },
-    workspaces: [workspace]
-  });
-  config.sessions.exitedRetentionMinutes = 0.01;
-  return config;
 }
 
 async function main() {
   const runtimeDir = process.argv[2];
   if (!runtimeDir) throw new Error("runtime directory argument is required");
 
-  const manager = new SessionManager(configForProcessWorker(), { runtimeDir });
+  const config = parseConfig({ server: { host: "127.0.0.1", port: 7688 }, auth: { enabled: false } });
+  config.sessions.exitedRetentionMinutes = 0.01;
+  const manager = new SessionManager(config, {
+    runtimeDir,
+    workspaceStore: new MemoryWorkspaceStore([workspaceForProcessWorker()])
+  });
   await manager.initialize();
   const session = await manager.create("process", 80, 24);
   process.stdout.write(`${JSON.stringify(session)}\n`);
