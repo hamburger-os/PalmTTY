@@ -80,7 +80,7 @@ This requires the intended PalmTTY config and authentication environment. The pr
 
 ## Web visual validation
 
-For theme or broad Web UI changes, run the `.agents/skills/palmtty-theme-review/SKILL.md` procedure and manually cover:
+For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then run the `.agents/skills/palmtty-theme-review/SKILL.md` procedure and manually cover:
 
 - Spectrum / Obsidian / Frosted;
 - Quality / Performance;
