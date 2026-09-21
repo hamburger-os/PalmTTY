@@ -15,7 +15,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - Host runtime adapter for Windows/Linux/macOS design, plus a structured Windows WSL adapter; Ubuntu CI exercises the Linux host path.
 - English and Simplified Chinese Web UI with persisted language preference.
 - PalmTTY-owned Spectrum / Obsidian / Frosted visual themes, Quality / Performance rendering modes, reduced-motion handling, semantic liquid-glass surfaces, and matching theme/review Agent Skills.
-- Runtime-aware remote directory picker for Host/WSL workspaces, automatic installed-Shell profiles with a Custom fallback, bounded Workspace environment variables, and one-click startup presets for common terminal coding agents.
+- Runtime-aware remote directory picker for Host/WSL workspaces, unified terminal profiles that expose known Host shells and registered WSL distributions directly, a Custom advanced fallback, bounded Workspace environment variables, and one-click startup presets for common terminal coding agents.
 - Explicit Session lifecycle actions: terminate active Sessions through `stopping → exited`, restart a terminal by replacing its PTY/Session from the latest validated Workspace, retain exited terminal state for review, and clear retained Sessions independently.
 
 - Windows-first PowerShell 7 terminal sessions through node-pty / ConPTY.
@@ -31,6 +31,9 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 
 ### Fixed
 
+- Normalize balanced outer single/double quotes in Web Workspace environment values, so proxy entries copied as `HTTP_PROXY="http://127.0.0.1:10808"` reach child processes as `http://127.0.0.1:10808` instead of a URL containing literal quote characters; reject unmatched outer quotes.
+- Enumerate WSL distributions with `wsl.exe --list --quiet` for terminal profiles instead of starting a distro and probing its shells, removing the cold-start-dependent first-scan failure mode.
+- Keep Host and WSL working-directory drafts separate in the Workspace editor so a Windows path is not silently reused as a WSL cwd.
 - Refresh Windows Machine/User environment values for every new/restarted Host terminal so CLIs installed into the user PATH after Agent startup become available without restarting PalmTTY.
 - Preserve existing `WSLENV` entries/flags while forwarding Workspace variables with the documented colon-delimited syntax.
 - Preflight terminal restart before terminating the current PTY, so an invalid/deleted Workspace does not destroy an otherwise usable Session.
@@ -54,7 +57,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 
 - Directory browsing is an authenticated + exact-Origin read-only API that returns directories only, with rate, entry-count, process-output, and timeout bounds.
 - Workspace mutation is an explicit authenticated + exact-Origin-protected API; bounded Workspace environment variables are persistent configuration, while Session creation/restart do not accept ad-hoc cwd/shell/env overrides.
-- Directory and installed-Shell inspection APIs require authentication + exact Origin and remain bounded; Shell detection does not expose arbitrary command execution.
+- Directory and terminal-profile inspection APIs require authentication + exact Origin and remain bounded; terminal-profile discovery is limited to known Host shells and registered WSL distributions and does not expose arbitrary command execution.
 - Worker secrets never reach the browser and are excluded from argv/URL/default logs; the login-token environment variable is stripped before Worker bootstrap and again from Worker/PTTY environments.
 - Stale Worker records are cleaned without PID-based process killing, avoiding PID-reuse hazards.
 - Worker IPC terminal input and frames/backpressure are bounded.
