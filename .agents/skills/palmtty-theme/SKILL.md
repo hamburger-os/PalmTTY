@@ -138,6 +138,8 @@ The xterm palette is owned by `theme.tsx`. The terminal host receives the active
 
 Theme work must preserve the reconnect/recovery invariants in `docs/ai/invariants.md`. Presentation state such as theme or locale must not be a dependency of the xterm/WebSocket transport lifecycle.
 
+The Session workbench's Terminal / Git / Files selection is also presentation state. Switching away from Terminal must keep the live terminal mounted, suppress hidden-pane geometry propagation, and safely refit when Terminal becomes active again; it must not reconnect merely because another pane was viewed.
+
 Terminal text contrast wins over decorative transparency. The terminal viewport stays opaque and theme-aligned rather than making xterm transparent merely to expose the ambient field.
 
 ## 9. Mobile-first constraints
