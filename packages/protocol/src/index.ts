@@ -66,6 +66,38 @@ export const RuntimeCapabilitiesSchema = z.object({
 }).strict();
 export type RuntimeCapabilities = z.infer<typeof RuntimeCapabilitiesSchema>;
 
+const BrowseHostDirectorySchema = z.object({
+  kind: z.literal("host"),
+  path: z.string().trim().min(1).max(4096).optional()
+}).strict();
+
+const BrowseWslDirectorySchema = z.object({
+  kind: z.literal("wsl"),
+  distribution: z.string().trim().min(1).max(128).optional(),
+  path: z.string().trim().min(1).max(4096).optional()
+}).strict();
+
+export const BrowseDirectoryRequestSchema = z.discriminatedUnion("kind", [
+  BrowseHostDirectorySchema,
+  BrowseWslDirectorySchema
+]);
+export type BrowseDirectoryRequest = z.infer<typeof BrowseDirectoryRequestSchema>;
+
+export const DirectoryLocationSchema = z.object({
+  label: z.string().min(1).max(512),
+  path: z.string().min(1).max(4096)
+}).strict();
+export type DirectoryLocation = z.infer<typeof DirectoryLocationSchema>;
+
+export const DirectoryListingSchema = z.object({
+  currentPath: z.string().min(1).max(4096),
+  parentPath: z.string().min(1).max(4096).nullable(),
+  locations: z.array(DirectoryLocationSchema).max(64),
+  directories: z.array(DirectoryLocationSchema).max(512),
+  truncated: z.boolean()
+}).strict();
+export type DirectoryListing = z.infer<typeof DirectoryListingSchema>;
+
 export const SessionStateSchema = z.enum(["starting", "running", "exited", "failed"]);
 export type SessionState = z.infer<typeof SessionStateSchema>;
 

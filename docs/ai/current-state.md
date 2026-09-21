@@ -29,6 +29,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Session creation remains workspace-ID-only; Web workspace mutation does not expose environment-variable injection
 - runtime preflight for auth/security exposure and configured Agent TCP bindability, exposed as the unambiguous `pnpm run preflight` package script
 - workspace create/update plus Session creation both validate runtime launch targets
+- authenticated + exact-Origin runtime-aware directory browsing for workspace selection; responses expose directories only and are bounded by request rate, 512 returned entries, subprocess output, and timeout
 - host runtime adapter with absolute executable normalization, including current-user Windows App Execution Aliases for Store/MSIX PowerShell
 - Windows WSL runtime adapter using structured `wsl.exe` argv for distribution/cwd/shell rather than shell-string interpolation
 - Linux host runtime exercised by Ubuntu CI; macOS shares the host adapter but is not covered by repository CI
@@ -102,6 +103,8 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - token login
 - English / Simplified Chinese UI with persisted browser language preference
 - workspace create/edit/delete UI plus Host/WSL runtime form
+- Host/WSL remote directory picker that selects directories on the Agent runtime rather than the browser device
+- single-scroll workspace dialog layout, shell-argument example chips, and startup-command presets for Codex, Claude Code, Antigravity, Gemini CLI, OpenCode, and Aider
 - workspace launcher
 - running-session list
 - xterm.js terminal

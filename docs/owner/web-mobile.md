@@ -13,6 +13,10 @@
 - “新建工作区”不等待可选运行环境探测即可打开；Host 始终可配置，WSL 选项在能力探测完成后按结果显示；
 - Workspace 对话框由 React 状态控制开关，原生 `dialog` 的激活逻辑可重复执行，兼容开发环境 StrictMode；
 - Host / WSL runtime 选择与运行目标校验；
+- 工作目录支持在网页内浏览并选择 Agent 宿主机或所选 WSL 发行版中的目录；这是远端目录浏览，不调用浏览器本机文件选择器；
+- Workspace 弹窗只保留表单自身一个纵向滚动容器，避免 `dialog` 与表单同时滚动；
+- Shell 参数提供按运行环境区分的示例快捷按钮；每行仍代表一个独立 argv；
+- 启动命令下提供常用终端 Agent 快捷项，目前包括 Codex、Claude Code、Antigravity、Gemini CLI、OpenCode、Aider，点击只填写命令，不负责安装工具；
 - 新建会话；
 - 已运行会话列表；
 - 会话状态和连接数；
@@ -36,6 +40,7 @@
 
 - Composer 最终仍然把文本作为终端输入发送，不建立 Codex 专用 API。
 - Workspace 修改走独立持久化 API；Session 创建不接收临时 cwd/shell/env。
+- 目录选择器只读取目录名称/路径，不读取文件内容；Host/WSL 浏览都由受保护的 Agent API 完成。
 - 浏览器丢失状态时以服务端 snapshot 为准。
 - Service Worker 不缓存 API 或终端 WebSocket 数据。
 - 终端输出只交给 xterm 渲染，不作为 HTML 注入页面。

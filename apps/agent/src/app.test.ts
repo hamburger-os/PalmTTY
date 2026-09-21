@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -115,6 +115,49 @@ describe("HTTP security boundary", () => {
       }
     });
     expect(wrongOrigin.statusCode).toBe(403);
+
+    await app.close();
+  });
+
+  it("protects and serves bounded host directory browsing", async () => {
+    process.env.PALMTTY_TEST_TOKEN = TOKEN;
+    const app = await buildTestApp();
+    const unauthenticated = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspace-directories/browse",
+      headers: { origin: ORIGIN },
+      payload: { kind: "host", path: process.cwd() }
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const cookie = await loginCookie(app);
+    const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-browse-api-"));
+    runtimeDirs.add(root);
+    await mkdir(path.join(root, "project"));
+
+    const wrongOrigin = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspace-directories/browse",
+      headers: { cookie, origin: "https://evil.invalid" },
+      payload: { kind: "host", path: root }
+    });
+    expect(wrongOrigin.statusCode).toBe(403);
+
+    const browsed = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspace-directories/browse",
+      headers: { cookie, origin: ORIGIN },
+      payload: { kind: "host", path: root }
+    });
+    expect(browsed.statusCode).toBe(200);
+    const canonicalRoot = await realpath(root);
+    expect(browsed.json()).toMatchObject({
+      currentPath: canonicalRoot,
+      directories: [{
+        label: "project",
+        path: path.join(canonicalRoot, "project")
+      }]
+    });
 
     await app.close();
   });

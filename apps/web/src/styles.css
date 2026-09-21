@@ -198,14 +198,17 @@ button.icon-button { min-width: 38px; font-size: 20px; line-height: 1; }
   background: #15191f;
   color: #f5f7fa;
   box-shadow: 0 24px 80px rgba(0, 0, 0, .55);
+  overflow: hidden;
 }
 .workspace-dialog::backdrop { background: rgba(0, 0, 0, .66); }
 .workspace-form {
   display: grid;
   gap: 16px;
   padding: 20px;
-  overflow: auto;
-  max-height: inherit;
+  max-height: min(760px, calc(100dvh - 32px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 .dialog-heading {
   display: flex;
@@ -213,13 +216,13 @@ button.icon-button { min-width: 38px; font-size: 20px; line-height: 1; }
   justify-content: space-between;
   gap: 12px;
 }
-.workspace-form label {
+.workspace-form label, .workspace-field {
   display: grid;
   gap: 7px;
   color: #dce3ec;
   font-size: 14px;
 }
-.workspace-form label > small {
+.workspace-form label > small, .workspace-field > small {
   color: #8f9aaa;
   line-height: 1.45;
 }
@@ -227,6 +230,99 @@ button.icon-button { min-width: 38px; font-size: 20px; line-height: 1; }
   font-size: 16px;
 }
 .workspace-form textarea { resize: vertical; min-height: 68px; }
+.workspace-input-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.workspace-input-action > button { white-space: nowrap; }
+
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 2px;
+}
+.preset-caption {
+  color: #8f9aaa;
+  font-size: 12px;
+}
+button.chip {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #101318;
+  color: #cbd4df;
+  font-size: 12px;
+  line-height: 1.25;
+}
+button.chip:hover { background: #232933; }
+
+.directory-picker {
+  display: grid;
+  gap: 11px;
+  border: 1px solid #303844;
+  border-radius: 12px;
+  background: #101318;
+  padding: 12px;
+}
+.directory-picker-heading,
+.directory-current {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.directory-picker-heading > div {
+  display: grid;
+  gap: 4px;
+}
+.directory-picker-heading small,
+.directory-loading,
+.directory-warning,
+.directory-empty {
+  color: #8f9aaa;
+}
+.directory-locations,
+.directory-current-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.directory-current {
+  padding: 9px 10px;
+  border: 1px solid #2a313b;
+  border-radius: 9px;
+  background: #0b0d10;
+}
+.directory-current code {
+  min-width: 0;
+  color: #dce3ec;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.directory-list {
+  display: grid;
+  gap: 4px;
+}
+button.directory-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  background: transparent;
+  text-align: left;
+}
+button.directory-row:hover { background: #1b2028; }
+.directory-row-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+button.directory-choose {
+  justify-self: end;
+}
 .dialog-actions {
   display: flex;
   align-items: center;
@@ -305,6 +401,10 @@ button.icon-button { min-width: 38px; font-size: 20px; line-height: 1; }
   .dialog-primary-actions { width: 100%; }
   .dialog-primary-actions > button { flex: 1; }
   button.danger-outline { width: 100%; }
+  .workspace-input-action { grid-template-columns: 1fr; }
+  .directory-picker-heading,
+  .directory-current { align-items: stretch; flex-direction: column; }
+  button.directory-choose { justify-self: stretch; }
 }
 
 @media (orientation: landscape) and (max-height: 520px) {

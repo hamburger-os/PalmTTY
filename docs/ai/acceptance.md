@@ -42,6 +42,8 @@ Security, session and reconnect changes should include or update tests for:
 - Host runtime executable/cwd validation
 - WSL argv construction without shell-string interpolation and non-Windows rejection
 - Web workspace editor activation remains idempotent under repeated/StrictMode-style effect setup and does not depend on runtime capability probing to open
+- workspace directory browsing requires authentication + exact Origin, returns directories only, and remains bounded
+- Host directory picker navigation returns absolute selectable paths without exposing files
 
 The Agent suite includes:
 

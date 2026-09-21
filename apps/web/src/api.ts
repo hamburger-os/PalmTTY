@@ -1,5 +1,7 @@
 import type {
+  BrowseDirectoryRequest,
   CreateWorkspaceInput,
+  DirectoryListing,
   RuntimeCapabilities,
   SessionPublic,
   WorkspacePublic
@@ -61,6 +63,20 @@ export async function runtimeCapabilities() {
   return responseJson<RuntimeCapabilities>(
     await fetch("/api/v1/capabilities", { credentials: "same-origin" })
   );
+}
+
+export async function browseWorkspaceDirectory(
+  input: BrowseDirectoryRequest
+) {
+  return responseJson<DirectoryListing>(await fetch(
+    "/api/v1/workspace-directories/browse",
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input)
+    }
+  ));
 }
 
 export async function listWorkspaces() {
