@@ -103,12 +103,15 @@ describe("protocol", () => {
     expect(() => WorkspaceFileListRequestSchema.parse({ path: "/etc" })).toThrow();
     expect(() => WorkspaceFileListRequestSchema.parse({ path: "C:/Windows" })).toThrow();
     expect(() => WorkspaceFileListRequestSchema.parse({ path: "src\\index.ts" })).toThrow();
+    expect(() => WorkspaceFileListRequestSchema.parse({ path: "src//index.ts" })).toThrow();
     expect(() => WorkspaceFileReadRequestSchema.parse({ path: "" })).toThrow();
 
     expect(GitDiffRequestSchema.parse({ path: "apps/web/src/App.tsx" })).toEqual({
       path: "apps/web/src/App.tsx",
       staged: false
     });
+    expect(() => GitDiffRequestSchema.parse({ path: "../outside" })).toThrow();
+    expect(() => GitDiffRequestSchema.parse({ path: "src\\index.ts" })).toThrow();
   });
 
   it("requires a WSL shell when shell arguments are configured", () => {
