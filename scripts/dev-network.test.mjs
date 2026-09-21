@@ -25,6 +25,7 @@ test("private development IPv4 classification is bounded", () => {
     "172.32.0.1",
     "100.63.255.255",
     "100.128.0.1",
+    "10..1.2",
     "not-an-ip"
   ]) {
     assert.equal(isPrivateDevelopmentIpv4(address), false, address);
