@@ -17,7 +17,7 @@ PalmTTY provides shell access with the privileges of the OS user running it. Tre
 - The browser may persist cwd/runtime/shell/startup-command choices, but Session creation still accepts only a workspace ID and the Web model does not expose arbitrary environment-variable injection.
 - Workspace create/update validates the selected runtime. Host shells are resolved to absolute executables; WSL launch data is passed as structured argv. Session creation validates the stored workspace again before Worker creation.
 - Terminal I/O, login tokens, Worker secrets and workspace environment values are excluded from default logs.
-- Login attempts, Session creation, terminal dimensions, input size, replay state, exited-session retention and socket backpressure are bounded.
+- Login attempts, Session creation/lifecycle mutations, terminal dimensions, input size, replay state, exited-session retention and socket backpressure are bounded.
 
 ### Session Worker boundary
 
@@ -31,6 +31,7 @@ Each terminal Session runs in an independent detached Worker.
 - Worker terminal input is independently limited to the same 64 KiB bound as browser input.
 - IPC frames and queued socket bytes are bounded.
 - Wrong Worker secrets are rejected before control commands are accepted.
+- Terminate and retained-session retirement are authenticated Worker controls. Retirement is accepted only after the Session is exited/failed, so the Agent cannot delete recovery state behind a live Worker's back.
 
 Recovery files are local-user state. Unix runtime directories/files are tightened to 0700/0600. On Windows they live below the current user's application-data location and still require application-layer Worker-secret authentication.
 
@@ -62,7 +63,7 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 - Workspace 管理是显式的高权限修改面，只能通过“已认证 + 精确 Origin”保护的 API 持久化 cwd、运行环境、Shell 与启动命令；真正创建 Session 时仍只接受 workspace ID，Web 模型不开放任意环境变量注入。
 - 新建/修改 workspace 时会验证运行目标；Host Shell 解析为绝对可执行文件，WSL 参数按结构化 argv 传递；创建 Session 前还会再次验证持久化 workspace。
 - 默认日志不记录终端 I/O、登录 token、Worker secret 或 workspace 环境变量。
-- 登录、Session 创建、终端尺寸、输入、replay、退出保留和 socket backlog 都有资源上限。
+- 登录、Session 创建/生命周期修改、终端尺寸、输入、replay、退出保留和 socket backlog 都有资源上限。
 
 ### Session Worker 安全边界
 
@@ -76,6 +77,7 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 - Worker IPC 的终端输入再次限制为 64 KiB；
 - IPC frame 与 socket 积压均有硬上限；
 - 错误 Worker secret 在接受任何控制命令前就会被拒绝。
+- “终止”和 retained-session retirement 都属于认证后的 Worker 控制；只有 `exited/failed` 会话可以 retirement，Agent 不能绕过活 Worker 直接删 recovery state。
 
 Recovery 文件属于当前用户本地状态。Unix 使用 0700/0600；Windows 放在当前用户应用数据目录，并继续要求 Worker secret 应用层认证。
 
