@@ -32,16 +32,18 @@ Worker + PTY running
   ├─ 浏览器断开 ──> 仍 running
   ├─ Agent 退出/重启 ──> 仍 running
   ├─ 新 Agent 认证并发现 ──> 同一 Session
-  └─ Shell 退出/用户终止
-              ↓
-            exited
-              ↓
-         retention 到期
-              ↓
-        Worker 自清理并退出
+  └─ Shell 自然退出 ───────────────────────┐
+  └─ 用户请求“终止” → stopping → exited ─┤
+                                           ↓
+                                      retention
+                              ┌────────────┴────────────┐
+                              │                         │
+                         用户“清除”                retention 到期
+                              │                         │
+                              └────> Worker 自清理并退出┘
 ~~~
 
-当前会话实现浏览器断线持久化和 Agent 重启持久化。
+当前会话实现浏览器断线持久化和 Agent 重启持久化。产品动作严格区分“终止”和“清除”：终止只结束 PTY/进程并进入 `stopping → exited`，退出后的 snapshot/replay 仍按 retention 保留；清除只允许用于 `exited/failed` Session，并要求 Worker 立即释放 terminal state、recovery metadata 后退出。HTTP API 因此使用独立的 terminate action，而 `DELETE /api/v1/sessions/:id` 只表示删除已经停止的 retained Session。
 
 明确不承诺：
 
@@ -51,7 +53,7 @@ Worker + PTY running
 
 ## Recovery metadata
 
-每个 Worker 在与私有 Worker IPC generation 对齐的用户 runtime 目录保存最小恢复状态。当前 `WORKER_PROTOCOL_VERSION = 3` 使用 `runtime-v3`；升级内部 Worker 协议 generation 时必须同步切换 runtime generation，不读取上一代 recovery state。
+每个 Worker 在与私有 Worker IPC generation 对齐的用户 runtime 目录保存最小恢复状态。当前 `WORKER_PROTOCOL_VERSION = 4` 使用 `runtime-v4`；本代加入显式 `stopping` 与 retained-session retirement 控制。升级内部 Worker 协议 generation 时必须同步切换 runtime generation，不读取上一代 recovery state。
 
 - Session ID；
 - endpoint ID；
@@ -72,7 +74,7 @@ Recovery metadata 属于 Worker 自己的 canonical lifecycle state。Worker 会
 - resize 采用最后一次有效尺寸。
 - 并发 Session 数量由配置限制，并发创建也计入限制。
 - Session ID 和 endpoint ID 使用随机值，不暴露目录、用户名或 PID。
-- 已退出 Session 默认保留 30 分钟，之后 Worker 释放 xterm、replay 和 metadata 并退出。
+- 已退出 Session 默认保留 30 分钟；用户可在 retention 内重新进入查看最后状态，也可以显式“清除”立即让 Worker 释放 xterm、replay 和 metadata 并退出。
 - 登录会话属于 Agent 内存；Agent 重启后终端仍在，但浏览器需要重新登录。
 
 ## Workspace
@@ -88,3 +90,5 @@ Workspace 定义包含显示名称、工作目录、runtime、Shell、Shell args
 Workspace CRUD 属于明确的高权限配置操作。允许网页管理 cwd/Shell 是这次有意扩大后的产品边界，但不能继续退化成 Session 创建接口直接接受任意 cwd/shell/env；env 仍不属于 Web workspace 模型。
 
 任何把 canonical terminal state 从 Worker 复制回 Agent 的设计，都需要重新论证 Agent 重启一致性。
+
+会话按钮语义也属于生命周期契约：运行中的 Session 使用明确“终止”动作，已退出 Session 使用明确“清除”动作，不再用一个含义模糊的 × 同时承担关闭、杀进程或删除资源。
