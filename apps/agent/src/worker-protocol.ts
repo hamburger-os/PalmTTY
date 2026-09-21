@@ -78,6 +78,10 @@ export const WorkerRequestSchema = z.discriminatedUnion("type", [
     requestId: RequestIdSchema
   }),
   z.object({
+    type: z.literal("retire"),
+    requestId: RequestIdSchema
+  }),
+  z.object({
     type: z.literal("ping"),
     requestId: RequestIdSchema
   })
