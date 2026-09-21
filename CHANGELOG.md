@@ -17,9 +17,10 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - PalmTTY-owned Spectrum / Obsidian / Frosted visual themes, Quality / Performance rendering modes, reduced-motion handling, semantic liquid-glass surfaces, and matching theme/review Agent Skills.
 - Runtime-aware remote directory picker for Host/WSL workspaces, unified terminal profiles that expose known Host shells and registered WSL distributions directly, a Custom advanced fallback, bounded Workspace environment variables, and one-click startup presets for common terminal coding agents.
 - Explicit Session lifecycle actions: terminate active Sessions through `stopping → exited`, restart a terminal by replacing its PTY/Session from the latest validated Workspace, retain exited terminal state for review, and clear retained Sessions independently.
+- Lightweight Session workbench with Terminal / Git / Files tabs. Terminal transport remains mounted while switching panes; Git exposes bounded read-only status/diff and Files exposes Workspace-root-scoped read-only browsing/UTF-8 preview.
 
 - Windows-first PowerShell 7 terminal sessions through node-pty / ConPTY.
-- Mobile React + xterm.js PWA with special-key controls and multiline composer.
+- Mobile React + xterm.js PWA with touch special-key controls and an on-demand long-text input dialog.
 - Server-side headless terminal snapshot plus bounded sequenced replay.
 - Single-user bootstrap-token authentication with HttpOnly session cookies.
 - Exact Origin checks, non-loopback safety gates, bounded rate-limit/session state and socket backpressure.
@@ -58,6 +59,7 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - Directory browsing is an authenticated + exact-Origin read-only API that returns directories only, with rate, entry-count, process-output, and timeout bounds.
 - Workspace mutation is an explicit authenticated + exact-Origin-protected API; bounded Workspace environment variables are persistent configuration, while Session creation/restart do not accept ad-hoc cwd/shell/env overrides.
 - Directory and terminal-profile inspection APIs require authentication + exact Origin and remain bounded; terminal-profile discovery is limited to known Host shells and registered WSL distributions and does not expose arbitrary command execution.
+- Workspace Files/Git inspection APIs require authentication + exact Origin and independent rate limits. File paths are canonical Workspace-relative paths with Host/WSL symlink containment and 512 KiB text-preview limits; Git is read-only, disables external diff/textconv/fsmonitor execution, bounds output, and strips the configured PalmTTY login-token environment key from helper subprocesses.
 - Worker secrets never reach the browser and are excluded from argv/URL/default logs; the login-token environment variable is stripped before Worker bootstrap and again from Worker/PTTY environments.
 - Stale Worker records are cleaned without PID-based process killing, avoiding PID-reuse hazards.
 - Worker IPC terminal input and frames/backpressure are bounded.
