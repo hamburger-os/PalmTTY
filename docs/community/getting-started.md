@@ -20,7 +20,6 @@ Copy-Item examples/palmtty.example.yaml palmtty.local.yaml
 $env:PALMTTY_CONFIG = "$PWD\palmtty.local.yaml"
 $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
 pnpm run preflight
-pnpm run preflight
 pnpm check
 pnpm start
 ```
@@ -59,6 +58,7 @@ pnpm install
 Copy-Item examples/palmtty.example.yaml palmtty.local.yaml
 $env:PALMTTY_CONFIG = "$PWD\palmtty.local.yaml"
 $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
+pnpm run preflight
 pnpm check
 pnpm start
 ```
