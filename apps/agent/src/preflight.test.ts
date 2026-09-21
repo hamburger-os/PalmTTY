@@ -43,6 +43,38 @@ describe("runtime preflight", () => {
     expect(message).toContain('Workspace "missing" directory is unavailable');
   });
 
+  it("aggregates a server bind failure with other host errors", async () => {
+    vi.stubEnv("PALMTTY_TEST_ACCESS_TOKEN", "short");
+
+    const config = parseConfig({
+      server: { host: "127.0.0.1", port: 7688 },
+      auth: {
+        enabled: true,
+        tokenEnv: "PALMTTY_TEST_ACCESS_TOKEN"
+      },
+      workspaces: [
+        {
+          id: "node",
+          name: "Node",
+          cwd: process.cwd(),
+          shell: "custom",
+          shellPath: process.execPath,
+          args: []
+        }
+      ]
+    });
+
+    await expect(
+      preflightRuntime(config, {
+        serverProbe: async () => {
+          throw new Error("Server endpoint 127.0.0.1:7688 is not bindable");
+        }
+      })
+    ).rejects.toThrow(
+      /PALMTTY_TEST_ACCESS_TOKEN[\s\S]*Server endpoint 127\.0\.0\.1:7688 is not bindable/
+    );
+  });
+
   it("returns normalized workspaces when the host is launchable", async () => {
     const config = parseConfig({
       server: { host: "127.0.0.1", port: 7688 },
