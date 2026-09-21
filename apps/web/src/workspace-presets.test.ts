@@ -20,10 +20,11 @@ describe("workspace presets", () => {
 
   it("offers runtime-appropriate shell argument examples", () => {
     expect(shellArgumentPresets("wsl", "win32")).toEqual([
-      { id: "login-shell", args: ["-l"] }
+      { id: "login-shell", shell: "/bin/bash", args: ["-l"] }
     ]);
     expect(shellArgumentPresets("host", "win32")).toContainEqual({
       id: "pwsh-clean",
+      shell: "pwsh.exe",
       args: ["-NoLogo", "-NoProfile"]
     });
   });
