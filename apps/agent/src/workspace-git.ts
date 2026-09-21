@@ -186,18 +186,30 @@ function parseStatus(
     }
 
     const status = record.slice(0, 2);
-    const path = record.slice(3);
-    if (!path) continue;
+    const rawPath = record.slice(3);
+    if (!rawPath) continue;
     const indexState = status[0] ?? " ";
     const worktreeState = status[1] ?? " ";
     const renamed = indexState === "R" || indexState === "C" ||
       worktreeState === "R" || worktreeState === "C";
-    const originalPath = renamed ? records[index + 1] : undefined;
+    const rawOriginalPath = renamed ? records[index + 1] : undefined;
     if (renamed) index += 1;
+
+    let gitPath: string;
+    let originalPath: string | undefined;
+    try {
+      gitPath = validateGitPath(rawPath);
+      originalPath = rawOriginalPath
+        ? validateGitPath(rawOriginalPath)
+        : undefined;
+    } catch {
+      truncated = true;
+      continue;
+    }
 
     const untracked = status === "??";
     entries.push({
-      path,
+      path: gitPath,
       ...(originalPath ? { originalPath } : {}),
       index: indexState,
       worktree: worktreeState,
