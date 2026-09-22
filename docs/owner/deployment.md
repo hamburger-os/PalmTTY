@@ -33,7 +33,9 @@ PalmTTY Agent（配置 endpoint；示例为 127.0.0.1:17688）
 - 触发器：当前用户登录；
 - LogonType：`InteractiveToken`；
 - RunLevel：`LeastPrivilege`；
-- 安装阶段：使用系统 Windows PowerShell 5.1 的 `Add-Type -OutputType WindowsApplication` 一次性把 `scripts/windows-autostart-host.cs` 编译为 `%LOCALAPPDATA%\\PalmTTY\\autostart\\palmtty-autostart-host.exe`；运行阶段不依赖 PowerShell；\n- Action：Task Scheduler 直接执行上述 GUI-subsystem host，并只传 `--installation <...\\installation.json>`；task XML 不再携带 Node/Agent/config/env-file 等仓库细节；\n- native host：读取 installation manifest，用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 创建 Node Agent，先加入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` Job Object，再恢复、等待并传递退出码；
+- 安装阶段：使用系统 Windows PowerShell 5.1 的 `Add-Type -OutputType WindowsApplication` 一次性把 `scripts/windows-autostart-host.cs` 编译为 `%LOCALAPPDATA%\\PalmTTY\\autostart\\palmtty-autostart-host.exe`；运行阶段不依赖 PowerShell；
+- Action：Task Scheduler 直接执行上述 GUI-subsystem host，并只传 `--installation <...\\installation.json>`；task XML 不再携带 Node/Agent/config/env-file 等仓库细节；
+- native host：读取 installation manifest，用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 创建 Node Agent，先加入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` Job Object，再恢复、等待并传递退出码；
 - WorkingDirectory、Agent、config 与可选 env-file 都使用安装时的绝对路径；
 - 安装会先结束旧任务实例、更新任务定义并立即启动新实例；
 - 失败 Agent 由 Task Scheduler 做有限次数重启；Job Object 的 kill-on-close 保证 Task Scheduler `/End` 或包装进程结束时 Agent 也随之退出，不留下占用端口的孤儿控制面；`SILENT_BREAKAWAY_OK` 让 Agent 创建的独立 Session Worker 脱离该 Job，从而继续满足 `Agent lifetime != Worker lifetime`；
