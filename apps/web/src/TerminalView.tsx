@@ -9,6 +9,7 @@ import { Terminal } from "@xterm/xterm";
 import { ensureModalDialogOpen } from "./dialog-controller.js";
 import { useI18n } from "./i18n.js";
 import { useTheme } from "./theme.js";
+import { attachTerminalTouchScroll } from "./terminal-touch-scroll.js";
 
 export type ConnectionState =
   | "connecting"
@@ -172,6 +173,7 @@ export function TerminalView({
     terminal.loadAddon(fit);
     terminal.open(host);
     fit.fit();
+    const touchScroll = attachTerminalTouchScroll(host, terminal);
     terminalRef.current = terminal;
 
     const dataDisposable = terminal.onData((raw) => {
@@ -396,6 +398,7 @@ export function TerminalView({
       if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
       observer.disconnect();
       dataDisposable.dispose();
+      touchScroll.dispose();
       socketRef.current?.close(1000, "Leaving terminal view");
       socketRef.current = null;
       terminal.dispose();

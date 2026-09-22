@@ -603,6 +603,7 @@ button.directory-choose {
   padding: 7px 5px 8px;
   overflow: hidden;
   border-radius: var(--radius-lg);
+  touch-action: none;
 }
 
 .terminal-host .xterm {

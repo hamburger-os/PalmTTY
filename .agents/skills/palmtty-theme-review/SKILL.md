@@ -3,7 +3,7 @@ name: palmtty-theme-review
 description: "Audit PalmTTY Web UI for theme SSOT compliance, mobile rendering quality, semantic surface ownership, terminal lifecycle isolation, and visual performance regressions."
 license: Apache-2.0
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 # PalmTTY theme and rendering review
@@ -49,7 +49,7 @@ For each relevant combination inspect:
 3. workspace create/edit, including a form tall enough to scroll while header/footer remain reachable;
 4. directory picker;
 5. destructive confirmation;
-6. Session workbench in Terminal / Git / Files views; terminal connected/reconnecting/closed, checking that pane switching does not recreate xterm/WebSocket state and that the host gutter and xterm canvas read as one surface; generate more than one viewport of output on a touch device/emulation and verify one-finger vertical swipes scroll terminal history without dragging the page;
+6. Session workbench in Terminal / Git / Files views; terminal connected/reconnecting/closed, checking that pane switching does not recreate xterm/WebSocket state and that the host gutter and xterm canvas read as one surface; generate more than one viewport of normal-buffer output on a real touch device/emulation and verify one-finger vertical swipes scroll terminal history while the page stays fixed, then verify an alternate-buffer/mouse-tracking application still receives xterm-owned touch behavior rather than PalmTTY scrollback interception;
 7. Files list + preview and Git status + diff in narrow/mobile and desktop layouts;
 8. portrait;
 9. short landscape.

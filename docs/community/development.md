@@ -28,7 +28,7 @@ For a repository-wide change, `pnpm check` runs the static/test/build acceptance
 
 ### Terminal dependency policy
 
-`terminal-stack.json` is the repository source of truth for the browser/Worker xterm family. Every `@xterm/*` entry in `apps/web` and `apps/agent` is exact-pinned and checked by `pnpm terminal:check`; dependency-manifest changes must update the frozen lockfile in the same commit. The browser currently uses `@xterm/xterm 6.1.0-beta.304` with `@xterm/addon-fit 0.12.0-beta.301` because xterm 6.0.0 has an upstream touch-scroll regression. The Worker intentionally remains on stable `@xterm/headless 6.0.0` + `@xterm/addon-serialize 0.14.0` until a separate recovery/snapshot qualification justifies moving it. Do not replace this with an application-level document touch handler or a second scroll viewport.
+`terminal-stack.json` is the repository source of truth for the browser/Worker xterm family. Every `@xterm/*` entry in `apps/web` and `apps/agent` is exact-pinned and checked by `pnpm terminal:check`; dependency-manifest changes must update the frozen lockfile in the same commit. The browser currently uses `@xterm/xterm 6.1.0-beta.304` with `@xterm/addon-fit 0.12.0-beta.301` because xterm 6.0.0 has an upstream touch-scroll regression. The Worker intentionally remains on stable `@xterm/headless 6.0.0` + `@xterm/addon-serialize 0.14.0` until a separate recovery/snapshot qualification justifies moving it. Real-device testing also requires PalmTTY's narrow `.xterm-screen`-local normal-buffer fallback in `terminal-touch-scroll.ts`; keep it limited to normal buffer + no mouse tracking and xterm's public scrolling API. Do not expand it into a document-level touch handler or a second scroll viewport.
 
 Any behavior-changing PR must use the documentation-sync workflow in `.agents/skills/docs-sync/SKILL.md`. Security, session lifecycle, reconnect behavior, protocol and configuration changes always require a documentation review.
 
@@ -71,7 +71,7 @@ pnpm build
 
 ### 终端依赖策略
 
-根目录 `terminal-stack.json` 是浏览器/Worker xterm 家族的版本真源。`apps/web` 与 `apps/agent` 中所有 `@xterm/*` 依赖都必须精确锁版本，并由 `pnpm terminal:check` 检查；修改依赖清单时必须在同一变更中同步 frozen lockfile。浏览器当前使用 `@xterm/xterm 6.1.0-beta.304` + `@xterm/addon-fit 0.12.0-beta.301`，原因是 xterm 6.0.0 存在上游触摸滚动回归；Worker 刻意继续使用稳定的 `@xterm/headless 6.0.0` + `@xterm/addon-serialize 0.14.0`，直到单独完成 snapshot/replay/geometry recovery 验证。不要用全局 document touch handler 或第二层 DOM 滚动容器代替这一边界。
+根目录 `terminal-stack.json` 是浏览器/Worker xterm 家族的版本真源。`apps/web` 与 `apps/agent` 中所有 `@xterm/*` 依赖都必须精确锁版本，并由 `pnpm terminal:check` 检查；修改依赖清单时必须在同一变更中同步 frozen lockfile。浏览器当前使用 `@xterm/xterm 6.1.0-beta.304` + `@xterm/addon-fit 0.12.0-beta.301`，原因是 xterm 6.0.0 存在上游触摸滚动回归；Worker 刻意继续使用稳定的 `@xterm/headless 6.0.0` + `@xterm/addon-serialize 0.14.0`，直到单独完成 snapshot/replay/geometry recovery 验证。真实手机验证还要求保留 `terminal-touch-scroll.ts` 中仅绑定 `.xterm-screen` 的窄范围 fallback：只处理 normal buffer + 未启用 mouse tracking，并只调用 xterm 公共滚动 API。不要把它扩大成 document 级 touch handler 或第二层 DOM 滚动容器。
 
 任何影响行为的 PR 都必须按 `.agents/skills/docs-sync/SKILL.md` 同步文档。安全、会话生命周期、重连、协议、配置的变更始终需要文档审查。
 
