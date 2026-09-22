@@ -44,7 +44,7 @@ PalmTTY 当前是单维护者、AI 主维护项目。强制人工 approval 会�
 - AI 不能直接 push `main`；
 - 所有改动必须留下 PR 记录；
 - Windows 与 Ubuntu CI 必须通过；
-- 生产依赖漏洞审计必须通过；
+- 生产依赖漏洞审计与 license policy 检查必须通过；
 - CodeQL 必须通过；
 - review conversation 必须处理完；
 - 主干不能被删除或 force push；
@@ -97,11 +97,26 @@ PR 在合并前必须基于最新 `main` 重新满足 required checks。这个�
 - Windows CI；
 - Ubuntu CI；
 - CodeQL；
-- `pnpm audit --prod --audit-level high`；
+- `pnpm audit --prod --audit-level high`；\n- `pnpm license:check` 生产依赖许可证 fail-closed 检查；
 - frozen lockfile；
 - GitHub Actions 固定到不可变 commit SHA。
 
-GitHub Dependency Review 曾因 Dependency graph 未开启而无法运行，因此当前使用 portable `pnpm audit`。Dependency graph / Dependency Review、Private vulnerability reporting、Dependabot security updates、Secret scanning / Push protection 都可以作为以后增强项，但**不属于当前 Ruleset 完成条件**。
+GitHub Dependency Review 曾因 Dependency graph 未开启而无法运行，因此当前使用 portable `pnpm audit`，并通过 `pnpm license:check` 独立检查生产依赖许可证元数据。Dependency graph / Dependency Review、Private vulnerability reporting、Dependabot security updates、Secret scanning / Push protection 都可以作为以后增强项，但**不属于当前 Ruleset 完成条件**。
+
+## Release 治理
+
+正式发布使用 `.github/workflows/release.yml` 的手动 `workflow_dispatch`，不允许 workflow 自己修改 `main`：
+
+- release PR 先通过普通 Ruleset 合入版本与 CHANGELOG；
+- root `package.json` 是唯一版本源，workspace 私有包不再维护重复 version；
+- 触发 Release 时必须从 `main` 运行，并显式确认真实设备/部署验收；
+- workflow 锁定远端 `main` SHA，并针对该 SHA 重跑 Windows/Ubuntu CI、Security Audit（漏洞 + license）和 CodeQL；
+- 发布过程中只要 `main` 前进就 fail closed，要求重新触发；
+- Tag 必须不存在且不可覆盖；workflow 创建 annotated `vX.Y.Z` Tag；
+- GitHub Release 先以 Draft 创建并校验，校验通过后才转为 Published；
+- finalization 之前失败会删除本次创建的 Release/Tag，避免半发布状态。
+
+这套流程沿用 TauTerm 的“锁定源码 → 重新资格验证 → 原子化发布”原则，但 PalmTTY 当前没有桌面安装包，因此只发布 Git Tag / GitHub Release 与 GitHub 自动生成的源码归档，不引入无意义的平台打包步骤。
 
 ## AI 维护原则
 
