@@ -179,7 +179,7 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
     status = (await mutateWorkspaceGit(workspace, {
       expectedState: status.repository!.stateToken,
       allowRepositoryCodeExecution: true,
-      operation: { type: "commit", message: "test: Git workbench commit", amend: false }
+      operation: { type: "commit", message: "test: Git workbench commit" }
     })).status;
     expect(status.changes).toHaveLength(0);
 
