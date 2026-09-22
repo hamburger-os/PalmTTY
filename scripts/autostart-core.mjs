@@ -144,7 +144,7 @@ export function buildWindowsHostCompilePowerShellCommand({ sourcePath, outputPat
     `  -Path ${quotePowerShellLiteral(sourcePath)} \``,
     `  -OutputAssembly ${quotePowerShellLiteral(outputPath)} \``,
     "  -OutputType WindowsApplication `",
-    "  -ReferencedAssemblies 'System.Runtime.Serialization.dll'"
+    "  -ReferencedAssemblies 'System.dll','System.Core.dll','System.Runtime.Serialization.dll','System.Xml.dll'"
   ].join("\n");
 }
 
