@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseConfig } from "@palmtty/config";
+import { exposureOrigins, parseConfig } from "@palmtty/config";
 import { FixedWindowLimiter, assertSecureExposure, isTrustedOrigin } from "./security.js";
 
 function config(overrides: object = {}) {
@@ -9,18 +9,42 @@ function config(overrides: object = {}) {
 }
 
 describe("security boundary", () => {
-  it("allows loopback with local origin", () => {
+  it("allows local exposure with exact local origins", () => {
     const value = config();
-    expect(isTrustedOrigin("http://127.0.0.1:7688", value)).toBe(true);
+    const origins = exposureOrigins(value);
+    expect(isTrustedOrigin("http://127.0.0.1:7688", origins)).toBe(true);
+    expect(isTrustedOrigin("http://127.0.0.1:7689", origins)).toBe(false);
     expect(() => assertSecureExposure(value)).not.toThrow();
   });
 
-  it("requires auth, secure cookies, and origins for non-loopback binds", () => {
+  it("requires authentication for LAN exposure", () => {
     const value = config({
-      server: { host: "0.0.0.0" },
+      server: { exposure: { mode: "lan" } },
       auth: { enabled: false }
     });
-    expect(() => assertSecureExposure(value)).toThrow();
+    expect(() => assertSecureExposure(value)).toThrow("without authentication");
+  });
+
+  it("accepts authenticated LAN mode as an explicit insecure-private profile", () => {
+    const value = config({
+      server: { exposure: { mode: "lan" } },
+      auth: { enabled: true }
+    });
+    expect(() => assertSecureExposure(value)).not.toThrow();
+  });
+
+  it("uses exact origin matching", () => {
+    const value = config({
+      server: {
+        exposure: {
+          mode: "reverseProxy",
+          origins: ["https://dev.example.com"]
+        }
+      }
+    });
+    const origins = exposureOrigins(value);
+    expect(isTrustedOrigin("https://dev.example.com", origins)).toBe(true);
+    expect(isTrustedOrigin("https://dev.example.com.evil.invalid", origins)).toBe(false);
   });
 
   it("bounds rate-limiter bucket state while preserving limits", () => {
@@ -31,17 +55,5 @@ describe("security boundary", () => {
     expect(limiter.allow("c", 1)).toBe(true);
     expect(limiter.allow("c", 2)).toBe(false);
     expect(limiter.allow("a", 2)).toBe(true);
-  });
-
-  it("uses exact origin matching", () => {
-    const value = config({
-      server: {
-        host: "0.0.0.0",
-        secureCookies: true,
-        trustedOrigins: ["https://dev.example.com"]
-      }
-    });
-    expect(isTrustedOrigin("https://dev.example.com", value)).toBe(true);
-    expect(isTrustedOrigin("https://dev.example.com.evil.invalid", value)).toBe(false);
   });
 });
