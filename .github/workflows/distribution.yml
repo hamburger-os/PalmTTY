@@ -1,0 +1,137 @@
+name: Distribution
+
+on:
+  pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact commit SHA to package
+        required: true
+        type: string
+      version:
+        description: Release version; empty on ordinary PR validation
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: distribution-${{ inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Distribution / Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Build and smoke installed runtime
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.ref || github.sha }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = $env:INPUT_VERSION
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          }
+          $env:GITHUB_SHA = $env:SOURCE_SHA
+
+          $runtime = Join-Path $PWD "dist/PalmTTY-$version-win-x64"
+          node scripts/package-runtime.mjs --out "$runtime" --platform win32 --arch x64
+          node scripts/package-smoke.mjs --root "$runtime"
+
+          $assets = Join-Path $PWD "dist/distribution-windows"
+          New-Item -ItemType Directory -Force $assets | Out-Null
+          Copy-Item (Join-Path $runtime "sbom.cdx.json") (Join-Path $assets "PalmTTY-$version-win-x64.sbom.cdx.json")
+          Compress-Archive -Path (Join-Path $runtime "*") -DestinationPath (Join-Path $assets "PalmTTY-$version-win-x64.zip") -CompressionLevel Optimal
+
+          $iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6/ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            throw "Inno Setup 6 is unavailable on the GitHub Windows runner: $iscc"
+          }
+          & $iscc "/DVersion=$version" "/DSourceDir=$runtime" "/DOutputDir=$assets" "packaging/windows/PalmTTY.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+
+          $expected = @(
+            "PalmTTY-Setup-$version-win-x64.exe",
+            "PalmTTY-$version-win-x64.zip",
+            "PalmTTY-$version-win-x64.sbom.cdx.json"
+          )
+          $actual = @(Get-ChildItem $assets -File | Select-Object -ExpandProperty Name | Sort-Object)
+          if (Compare-Object ($expected | Sort-Object) $actual) {
+            throw "Windows distribution assets do not match expected set: $($actual -join ', ')"
+          }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: distribution-windows-x64
+          path: dist/distribution-windows/*
+          if-no-files-found: error
+          compression-level: 0
+
+  linux:
+    name: Distribution / Linux x64
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Build and smoke installed runtime
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.ref || github.sha }}
+        run: |
+          set -euo pipefail
+          version="$INPUT_VERSION"
+          if [ -z "$version" ]; then
+            version="$(node -p "require('./package.json').version")"
+          fi
+          export GITHUB_SHA="$SOURCE_SHA"
+
+          runtime="$PWD/dist/PalmTTY-$version-linux-x64"
+          assets="$PWD/dist/distribution-linux"
+          mkdir -p "$assets"
+
+          node scripts/package-runtime.mjs --out "$runtime" --platform linux --arch x64
+          node scripts/package-smoke.mjs --root "$runtime"
+          cp "$runtime/sbom.cdx.json" "$assets/PalmTTY-$version-linux-x64.sbom.cdx.json"
+          tar -C "$runtime" -czf "$assets/PalmTTY-$version-linux-x64.tar.gz" .
+          node scripts/package-linux-deb.mjs             --root "$runtime"             --out "$assets/palmtty_${version}_amd64.deb"
+
+          expected=(
+            "PalmTTY-$version-linux-x64.tar.gz"
+            "PalmTTY-$version-linux-x64.sbom.cdx.json"
+            "palmtty_${version}_amd64.deb"
+          )
+          mapfile -t actual < <(find "$assets" -maxdepth 1 -type f -printf '%f\n' | sort)
+          printf '%s\n' "${expected[@]}" | sort > /tmp/expected-assets.txt
+          printf '%s\n' "${actual[@]}" > /tmp/actual-assets.txt
+          diff -u /tmp/expected-assets.txt /tmp/actual-assets.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: distribution-linux-x64
+          path: dist/distribution-linux/*
+          if-no-files-found: error
+          compression-level: 0
