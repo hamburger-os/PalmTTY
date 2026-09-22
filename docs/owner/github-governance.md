@@ -97,7 +97,8 @@ PR 在合并前必须基于最新 `main` 重新满足 required checks。这个�
 - Windows CI；
 - Ubuntu CI；
 - CodeQL；
-- `pnpm audit --prod --audit-level high`；\n- `pnpm license:check` 生产依赖许可证 fail-closed 检查；
+- `pnpm audit --prod --audit-level high`；
+- `pnpm license:check` 生产依赖许可证 fail-closed 检查；
 - frozen lockfile；
 - GitHub Actions 固定到不可变 commit SHA。
 
