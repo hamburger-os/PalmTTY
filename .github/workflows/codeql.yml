@@ -15,7 +15,9 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_call' && inputs.ref || github.ref }}
+  # Do not use github.workflow here: reusable workflows see the caller's name,
+  # which would collide with sibling release gates.
+  group: codeql-${{ inputs.ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -30,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
       - uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
