@@ -22,7 +22,7 @@ Review:
 
 ## Static scan
 
-Run `pnpm theme:check` first. It enforces the high-confidence repository guardrails for native dialogs, forbidden rendering effects, backdrop ownership, component hard-coded colors, and required theme/surface markers.
+Run `pnpm theme:check` and `pnpm terminal:check` first. It enforces the high-confidence repository guardrails for native dialogs, forbidden rendering effects, backdrop ownership, component hard-coded colors, and required theme/surface markers.
 
 Then use repository search equivalent to:
 
@@ -49,7 +49,7 @@ For each relevant combination inspect:
 3. workspace create/edit, including a form tall enough to scroll while header/footer remain reachable;
 4. directory picker;
 5. destructive confirmation;
-6. Session workbench in Terminal / Git / Files views; terminal connected/reconnecting/closed, checking that pane switching does not recreate xterm/WebSocket state and that the host gutter and xterm canvas read as one surface;
+6. Session workbench in Terminal / Git / Files views; terminal connected/reconnecting/closed, checking that pane switching does not recreate xterm/WebSocket state and that the host gutter and xterm canvas read as one surface; generate more than one viewport of output on a touch device/emulation and verify one-finger vertical swipes scroll terminal history without dragging the page;
 7. Files list + preview and Git status + diff in narrow/mobile and desktop layouts;
 8. portrait;
 9. short landscape.
@@ -99,6 +99,7 @@ Write the report in Chinese:
 ## 验证
 - pnpm docs:check:
 - pnpm theme:check:
+- pnpm terminal:check:
 - pnpm typecheck:
 - pnpm test:
 - pnpm build:

@@ -13,11 +13,13 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Changed
 
+- Govern the browser/Worker xterm family through exact pins in `terminal-stack.json` plus `pnpm terminal:check`. Browser xterm/fit move to the exact 6.1 beta pair containing the upstream touch-scroll fix, while Worker headless/serialize remain on the exact stable 6.0/0.14 pair pending separate recovery qualification.
 - Replace Windows Task Scheduler's long-lived PowerShell supervisor with a console-free native GUI-subsystem host compiled during install into the current user's Local AppData. The host supervises only the Agent through a kill-on-close/silent-breakaway Job Object, creates Node with `CREATE_NO_WINDOW`, and propagates Agent exit status while independent Session Workers retain their separate lifetime.
 - Replace the low-level `server.host`, `trustedOrigins`, `secureCookies`, and `unsafeAllowInsecureLan` configuration with the exposure-profile model. Removed fields are rejected rather than silently migrated.
 
 ### Fixed
 
+- Restore one-finger mobile terminal scrollback by moving the browser terminal off xterm 6.0.0's upstream touch-scroll regression and containing terminal/workbench overscroll so terminal-owned gestures no longer become page movement.
 - Keep Windows scheduled-task status locale-independent by querying structured UTF-8 data instead of forwarding localized `schtasks /FO LIST /V` text, and make normal build/start/autostart documentation explicit that port `5173` belongs only to Vite development.
 
 <!-- Add changes here after the latest release. Publishing requires this section to be empty. -->

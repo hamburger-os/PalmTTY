@@ -140,6 +140,8 @@ Theme work must preserve the reconnect/recovery invariants in `docs/ai/invariant
 
 The Session workbench's Terminal / Git / Files selection is also presentation state. Switching away from Terminal must keep the live terminal mounted, suppress hidden-pane geometry propagation, and safely refit when Terminal becomes active again; it must not reconnect merely because another pane was viewed.
 
+On touch devices, a one-finger vertical drag that starts inside the terminal surface belongs to xterm scrollback, not to the surrounding page. The terminal stack version is governed by `terminal-stack.json`; do not add a second DOM scroll viewport or a document-level touchmove shim that competes with xterm focus, IME, mouse protocols, or selection. Workbench/terminal containers should only contain overscroll so an already-owned terminal gesture cannot chain into page movement.
+
 Terminal text contrast wins over decorative transparency. The terminal viewport stays opaque and theme-aligned rather than making xterm transparent merely to expose the ambient field.
 
 ## 9. Mobile-first constraints
@@ -147,7 +149,7 @@ Terminal text contrast wins over decorative transparency. The terminal viewport 
 PalmTTY is primarily operated from a phone.
 
 - Preserve safe-area insets.
-- Keep terminal viewport ownership simple: one content surface around xterm.
+- Keep terminal viewport ownership simple: one content surface around xterm; terminal scrollback is the vertical touch-scroll owner inside that surface.
 - Controls must remain reachable in portrait and short landscape layouts.
 - Workspace dialogs keep one intentional body scroll owner with header/footer actions always reachable; nested data regions may scroll only when bounded.
 - High-frequency touch targets use the shared 44px target where space allows; compact secondary controls use the shared compact target rather than ad-hoc geometry.

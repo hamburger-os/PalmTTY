@@ -8,6 +8,7 @@ A coding agent should not declare a repository-wide task complete before the rel
 pnpm docs:check
 pnpm typecheck
 pnpm scripts:check
+pnpm terminal:check
 ~~~
 
 ## Tests
@@ -53,6 +54,7 @@ Security, session and reconnect changes should include or update tests for:
 - workspace environment editing accepts bounded `NAME=value` input, rejects duplicate/reserved/unbalanced-quote input, normalizes balanced outer quotes, and persists only through workspace CRUD
 - Host directory picker navigation returns absolute selectable paths without exposing files
 - Session workbench tab changes keep the terminal/xterm/WebSocket mounted, do not reset `lastSeq`, and do not emit hidden-pane geometry changes; returning to Terminal performs a safe refit
+- terminal stack policy rejects ranged/drifted `@xterm/*` dependencies and the known browser `@xterm/xterm 6.0.0` touch-scroll regression; frozen-lock installation must resolve the exact browser/Worker set from `terminal-stack.json`
 - workspace file list/read APIs require authentication + exact Origin, use canonical relative paths, reject traversal/symlink escape, cap listings at 512 entries, cap text preview at 512 KiB, and report binary/truncated previews explicitly
 - workspace Git APIs require authentication + exact Origin, handle non-repositories without failing the Agent, use porcelain-v2 structured status, make containing-repository scope explicit, bound status/diff/history/branch output, reject path traversal, disable external diff/textconv/fsmonitor execution for reads, and do not inherit the reserved `PALMTTY_*` control namespace or any separately configured PalmTTY auth-token environment key; typed writes must reject stale or incomplete/truncated status, serialize concurrent writes by resolved repository even when multiple Workspaces share it, preserve both old/new paths for rename-aware single-file staging, use explicit repository-wide stage-all/unstage-all operations, destructive restore must verify the loaded diff snapshot and stay unavailable for rename/untracked/conflict entries, hooks/interactive prompts stay disabled, repository filter execution requires explicit Web acknowledgement, and remote operations stay non-interactive
 - exposure tests reject removed low-level switches, derive `local`/`lan` bind+Origin behavior, verify `lan` rejects public client source addresses, require explicit HTTPS Origins for `reverseProxy`/`https`, and development Origin parsing remains runtime-only
@@ -110,6 +112,7 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 - login/loading/home/workspace dialog/directory picker/confirmation;
 - a long workspace form, confirming header/footer actions remain reachable while only the body owns primary dialog scrolling;
 - terminal connected/reconnecting/closed, confirming the host gutter and xterm canvas use one terminal surface;
+- on mobile Safari/Chrome (or touch-capable browser validation), generate more than one viewport of output, swipe upward inside the terminal and confirm xterm history moves while the page stays fixed; let new output arrive while scrolled back and confirm it does not force the viewport to the bottom, then swipe back to the live bottom; verify tap-to-focus/soft keyboard and the special-key bar still work;
 - portrait and short landscape layouts;
 - a live terminal while changing appearance, confirming there is no xterm/WebSocket recreation or recovery reset;
 - static theme contract checks confirming locale/presentation state is not a terminal transport-lifecycle dependency.

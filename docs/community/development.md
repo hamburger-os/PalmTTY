@@ -19,11 +19,16 @@ Run:
 pnpm docs:check
 pnpm typecheck
 pnpm scripts:check
+pnpm terminal:check
 pnpm test
 pnpm build
 ```
 
 For a repository-wide change, `pnpm check` runs the static/test/build acceptance path. When validating a real PalmTTY host, run `pnpm run preflight` separately; it is a machine-specific runtime preflight that depends on the local config/token and validates auth/security configuration plus Agent TCP endpoint bindability. Workspace/runtime validation belongs to the managed workspace API and Session creation path rather than Agent startup. CI installs with `pnpm install --frozen-lockfile` on Windows and Ubuntu. The Agent test suite exercises Fastify HTTP/WebSocket plus the authenticated Session Worker IPC boundary end to end, including replay/snapshot recovery, Agent restart rediscovery, explicit terminal replacement restart, wrong Worker-secret rejection, fresh workspace-environment handling, stale recovery cleanup, backpressure, auth expiry, exited-session cleanup and concurrent session limits. A separate detached-process test proves a Worker survives the complete exit of the Agent process that created it. Windows CI additionally performs a real node-pty + PowerShell 7/ConPTY Unicode smoke test. Local Windows checks prefer `pwsh.exe` when installed and otherwise use Windows PowerShell for generic ConPTY/Worker-process integration coverage, so `pnpm check` does not require an extra shell installation. Runtime executable discovery treats the current user's `%LOCALAPPDATA%\Microsoft\WindowsApps` directory specially because MSIX App Execution Aliases are reparse points that normal Node file traversal can reject even though Windows can launch them. The root development launcher reads the validated PalmTTY config after preflight, derives the local Agent URL from its exposure profile, injects it into the Web dev process as `PALMTTY_AGENT_URL`, and keeps the Agent on that profile. Vite uses strict port 5173 and listens on `0.0.0.0` by default. The launcher generates exact development Origins from current private/overlay IPv4 interfaces and injects them only into the `--development` Agent at runtime, so LAN testing does not mutate the production exposure profile. On Windows the launcher also enables content-free Worker/PTTY spawn phase tracing by default so a visible console flash can be correlated to a lifecycle stage without logging argv, environment values or terminal I/O. Web tests/build do not load host runtime config. Update `pnpm-lock.yaml` whenever dependency manifests change. Root `scripts:test` also exercises autostart task/unit generation; on Windows CI it compiles the real C# `WindowsApplication` host, verifies the PE GUI subsystem, executes a fixture Agent, checks exit-code propagation, and proves detached Worker breakaway. Agent tests cover strict environment-file parsing. Platform registration itself remains a real-host acceptance path because CI must not modify the runner's Task Scheduler/systemd user configuration.
+
+### Terminal dependency policy
+
+`terminal-stack.json` is the repository source of truth for the browser/Worker xterm family. Every `@xterm/*` entry in `apps/web` and `apps/agent` is exact-pinned and checked by `pnpm terminal:check`; dependency-manifest changes must update the frozen lockfile in the same commit. The browser currently uses `@xterm/xterm 6.1.0-beta.304` with `@xterm/addon-fit 0.12.0-beta.301` because xterm 6.0.0 has an upstream touch-scroll regression. The Worker intentionally remains on stable `@xterm/headless 6.0.0` + `@xterm/addon-serialize 0.14.0` until a separate recovery/snapshot qualification justifies moving it. Do not replace this with an application-level document touch handler or a second scroll viewport.
 
 Any behavior-changing PR must use the documentation-sync workflow in `.agents/skills/docs-sync/SKILL.md`. Security, session lifecycle, reconnect behavior, protocol and configuration changes always require a documentation review.
 
@@ -57,11 +62,16 @@ For a release PR, also run `pnpm license:check` and `pnpm release:check -- X.Y.Z
 pnpm docs:check
 pnpm typecheck
 pnpm scripts:check
+pnpm terminal:check
 pnpm test
 pnpm build
 ```
 
 仓库级代码质量门禁可以直接执行 `pnpm check`。在真实 PalmTTY 宿主机上做运行验证时，再单独执行 `pnpm run preflight`；它依赖本机 config/token，用于检查认证/安全配置与 Agent TCP 监听端点是否可绑定，不属于通用 CI 门禁。Workspace/运行环境验证由工作区管理 API 与 Session 创建路径负责，不再阻塞 Agent 启动。CI 在 Windows 和 Ubuntu 上使用 `pnpm install --frozen-lockfile` 安装依赖。Agent 测试套件通过真实 Fastify HTTP/WebSocket 与认证后的 Session Worker IPC 边界，端到端覆盖 replay/snapshot、Agent 重启 rediscovery、显式终端替换重启、工作区环境刷新、错误 Worker secret、stale recovery 清理、backpressure、登录过期、退出清理和并发 Session 上限；独立的真实进程测试还验证创建 Worker 的 Agent 进程彻底退出后 Worker 仍存活。Windows CI 另行通过真实 node-pty 强制启动 PowerShell 7/ConPTY 并验证 Unicode 往返。本机 Windows 质量门禁会优先使用 `pwsh.exe`，未安装时退回系统 Windows PowerShell，仅用于通用 ConPTY/Worker 进程集成测试，因此 `pnpm check` 不再要求额外安装 PowerShell 7。运行时可执行文件解析会专门识别当前用户的 `%LOCALAPPDATA%\Microsoft\WindowsApps`；MSIX App Execution Alias 属于特殊 reparse point，Node 的普通文件遍历可能拒绝它，但 Windows 本身仍可通过该 alias 启动应用。PR 还会执行生产依赖漏洞审计、license policy 检查和 CodeQL；受保护的 `main` 必须通过 PR 和四项自动检查。当前 AI 主维护治理模型有意不强制人工 approval，也不强制 Code Owner approval。根开发启动器会在 preflight 后读取已验证的 PalmTTY config，从 exposure profile 推导本地 Agent URL，并以 `PALMTTY_AGENT_URL` 注入 Web dev 进程；Agent 仍按该 profile 监听。Vite 固定使用 strict 5173，并默认监听 `0.0.0.0`。启动器根据当前私有/overlay IPv4 网卡生成精确 development Origins，只在运行时注入 `--development` Agent，因此局域网调试不会改写 production exposure profile。Windows 下根开发启动器还会默认开启不含内容的 Worker/PTTY spawn phase trace，用于把可见 console 闪窗定位到具体生命周期阶段，同时不记录 argv、环境变量值或 terminal I/O。Web 测试/构建不会读取宿主 runtime config。修改依赖清单时必须同步更新 `pnpm-lock.yaml`。根 `scripts:test` 还覆盖自启动 task/unit 生成逻辑；Windows CI 会真实编译 C# `WindowsApplication` host、检查 PE GUI subsystem、执行 fixture Agent、验证退出码传播与 detached Worker breakaway。Agent 测试覆盖严格 env-file 解析；真正向 Task Scheduler/systemd user manager 注册属于真实宿主验收路径，CI 不修改 runner 的系统服务配置。
+
+### 终端依赖策略
+
+根目录 `terminal-stack.json` 是浏览器/Worker xterm 家族的版本真源。`apps/web` 与 `apps/agent` 中所有 `@xterm/*` 依赖都必须精确锁版本，并由 `pnpm terminal:check` 检查；修改依赖清单时必须在同一变更中同步 frozen lockfile。浏览器当前使用 `@xterm/xterm 6.1.0-beta.304` + `@xterm/addon-fit 0.12.0-beta.301`，原因是 xterm 6.0.0 存在上游触摸滚动回归；Worker 刻意继续使用稳定的 `@xterm/headless 6.0.0` + `@xterm/addon-serialize 0.14.0`，直到单独完成 snapshot/replay/geometry recovery 验证。不要用全局 document touch handler 或第二层 DOM 滚动容器代替这一边界。
 
 任何影响行为的 PR 都必须按 `.agents/skills/docs-sync/SKILL.md` 同步文档。安全、会话生命周期、重连、协议、配置的变更始终需要文档审查。
 

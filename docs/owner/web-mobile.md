@@ -47,7 +47,8 @@
 - 切到 Git/文件时 Terminal 组件保持 mounted，xterm、WebSocket、`lastSeq` 与重连循环不被展示状态重建；隐藏时不传播 resize，切回终端再安全 `fit`；
 - Git 视图已经升级为轻量 Source Control 工作台：显式显示“完整仓库”作用域、分支/上游/ahead-behind、冲突、staged/unstaged/untracked；diff 使用结构化 unified diff 行渲染并支持未跟踪文件预览；无选中修改时显示最近提交；支持 rename-aware 的单文件 stage/unstage、显式仓库级 stage-all/unstage-all、带 diff 快照校验的丢弃、commit、分支创建/切换、stash，以及非交互 fetch/pull/push；status 一旦被截断或解析不完整，所有写/remote 控件立即禁用；进入页面、窗口重新聚焦/回到前台和可见页低频轮询都会刷新状态；
 - 文件视图以持久 Workspace 根目录为边界浏览目录和文件，提供 UTF-8 文本只读预览；二进制文件只显示状态，大文件预览在 512 KiB 截断；
-- xterm.js；
+- xterm.js；浏览器端 xterm/fit 由根目录 `terminal-stack.json` 精确锁定，当前浏览器栈使用包含上游触摸滚动修复的 xterm 6.1 beta，而 Worker 端 headless/serialize 暂时保持稳定 6.0/0.14，避免把移动端输入修复与 canonical snapshot/recovery 升级绑在一起；
+- 手机单指在终端区域纵向滑动由 xterm scrollback 独占，Workbench/terminal 只做 overscroll containment，不建立第二个 DOM 滚动层，也不使用全局 `touchmove + preventDefault` 补丁；
 - 自动重连状态；
 - Esc、Tab、方向键、Ctrl+C、Ctrl+L；
 - 可切换的 Ctrl / Alt 一次性修饰键；
@@ -66,6 +67,7 @@
 - 目录选择器仍只读取目录名称/路径，不读取文件内容；会话工作台的文件浏览/预览是另一组独立受保护 API，使用相对 Workspace 路径并在 Agent 端做 canonical/symlink containment 检查，不能复用目录选择器绕开边界。
 - Git 工作台只通过独立、有界、typed 的 Agent API 工作，不把 Git 命令塞进终端 WebSocket，也不进入 Session Worker。读取面使用 porcelain v2 status、diff/history/branches，禁止 external diff/textconv/fsmonitor；working-tree diff 会先解析该路径的 filter attribute，并在本次 diff 中中和 clean/process/required，避免查看动作触发内容过滤程序。写面只接受固定 operation union，不接受浏览器提供任意 argv。所有写操作携带当前 state token，破坏性丢弃还必须匹配刚加载的 diff snapshot；Web 默认关闭写按钮，用户在当前 Session workbench 确认“信任仓库”后才发送写请求，该确认在终端/Git/文件页签切换间保留，离开 Session 页面后失效。PalmTTY 禁用 Git hooks、编辑器/credential 交互提示，但正常 Git filter 仍可能在 stage/switch/stash/pull 等语义中执行，因此这一确认是能力边界提示而不是沙箱。辅助子进程继续剔除 `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量。
 - 浏览器丢失状态时以服务端 snapshot 为准。
+- 终端依赖升级必须把 `terminal-stack.json`、两个 package manifest 与 frozen lockfile 作为一个变更集，并通过 `pnpm terminal:check`；浏览器 xterm 与 Worker headless 可以为了明确的浏览器修复暂时处在同一 major 的不同 minor/pre-release，但 Worker 端升级必须单独验证 serialize/replay/geometry recovery。
 - `stopping` Session 可以继续被查看，但终端输入、resize 与长文本发送保持禁用，直到 Worker 报告最终退出。
 - Service Worker 不缓存 API 或终端 WebSocket 数据。
 - 终端输出只交给 xterm 渲染，不作为 HTML 注入页面。

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "browser": {
+    "@xterm/xterm": "6.1.0-beta.304",
+    "@xterm/addon-fit": "0.12.0-beta.301"
+  },
+  "worker": {
+    "@xterm/headless": "6.0.0",
+    "@xterm/addon-serialize": "0.14.0"
+  }
+}

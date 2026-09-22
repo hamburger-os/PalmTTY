@@ -609,8 +609,14 @@ button.directory-choose {
   height: 100%;
 }
 
-.terminal-host .xterm-viewport {
+.terminal-host,
+.terminal-host .xterm,
+.terminal-host .xterm-viewport,
+.terminal-host .xterm-scrollable-element {
   overscroll-behavior: contain;
+}
+
+.terminal-host .xterm-viewport {
   scrollbar-gutter: stable;
 }
 
@@ -757,6 +763,7 @@ button.directory-choose {
     max(7px, env(safe-area-inset-bottom))
     max(7px, env(safe-area-inset-left));
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .workbench-header {
