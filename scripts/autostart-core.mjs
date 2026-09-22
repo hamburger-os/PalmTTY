@@ -19,6 +19,14 @@ export function defaultLinuxUnitPath(env = process.env, home = os.homedir()) {
   return path.join(env.XDG_CONFIG_HOME ?? path.join(home, ".config"), "systemd", "user", LINUX_UNIT_NAME);
 }
 
+export function defaultWindowsPowerShellPath(env = process.env) {
+  const systemRoot = env.SystemRoot ?? env.WINDIR;
+  if (!systemRoot) {
+    throw new Error("Windows SystemRoot/WINDIR is unavailable");
+  }
+  return path.win32.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+}
+
 export function parseAutostartArgs(argv) {
   const args = [...argv];
   const command = args.shift();
@@ -101,15 +109,58 @@ export function buildAgentArguments({ agentPath, configPath, envFile }) {
   return args;
 }
 
-export function buildWindowsTaskXml({ userSid, nodePath, agentPath, repoRoot, configPath, envFile }) {
-  for (const [name, value] of Object.entries({ userSid, nodePath, agentPath, repoRoot, configPath })) {
+export function quotePowerShellLiteral(value) {
+  assertSingleLine(value, "PowerShell argument");
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+export function encodePowerShellCommand(command) {
+  return Buffer.from(command, "utf16le").toString("base64");
+}
+
+export function buildWindowsAgentPowerShellCommand({ nodePath, agentPath, configPath, envFile }) {
+  const invocation = [nodePath, ...buildAgentArguments({ agentPath, configPath, envFile })]
+    .map(quotePowerShellLiteral)
+    .join(" ");
+  return `$ErrorActionPreference = 'Stop'\n& ${invocation}\nexit $LASTEXITCODE`;
+}
+
+export function buildWindowsTaskXml({
+  userSid,
+  powershellPath,
+  nodePath,
+  agentPath,
+  repoRoot,
+  configPath,
+  envFile
+}) {
+  for (const [name, value] of Object.entries({
+    userSid,
+    powershellPath,
+    nodePath,
+    agentPath,
+    repoRoot,
+    configPath
+  })) {
     assertSingleLine(value, name);
   }
   if (envFile) assertSingleLine(envFile, "envFile");
 
-  const argumentsText = buildAgentArguments({ agentPath, configPath, envFile })
-    .map(quoteWindowsArg)
-    .join(" ");
+  const launcherCommand = buildWindowsAgentPowerShellCommand({
+    nodePath,
+    agentPath,
+    configPath,
+    envFile
+  });
+  const argumentsText = [
+    "-NoLogo",
+    "-NoProfile",
+    "-NonInteractive",
+    "-WindowStyle",
+    "Hidden",
+    "-EncodedCommand",
+    encodePowerShellCommand(launcherCommand)
+  ].map(quoteWindowsArg).join(" ");
 
   return `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -154,13 +205,62 @@ export function buildWindowsTaskXml({ userSid, nodePath, agentPath, repoRoot, co
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>${escapeXml(nodePath)}</Command>
+      <Command>${escapeXml(powershellPath)}</Command>
       <Arguments>${escapeXml(argumentsText)}</Arguments>
       <WorkingDirectory>${escapeXml(repoRoot)}</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>
 `;
+}
+
+export function buildWindowsTaskStatusPowerShellCommand(taskName = WINDOWS_TASK_NAME) {
+  const taskNameLiteral = quotePowerShellLiteral(taskName);
+  return `[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)\n` +
+    `$task = Get-ScheduledTask -TaskName ${taskNameLiteral} -ErrorAction SilentlyContinue\n` +
+    `if ($null -eq $task) {\n` +
+    `  [PSCustomObject]@{ installed = $false } | ConvertTo-Json -Compress\n` +
+    `  exit 0\n` +
+    `}\n` +
+    `$info = Get-ScheduledTaskInfo -TaskName ${taskNameLiteral}\n` +
+    `$lastRunTime = $null\n` +
+    `if ($info.LastRunTime -ne [datetime]::MinValue) { $lastRunTime = $info.LastRunTime.ToUniversalTime().ToString('o') }\n` +
+    `$nextRunTime = $null\n` +
+    `if ($info.NextRunTime -ne [datetime]::MinValue) { $nextRunTime = $info.NextRunTime.ToUniversalTime().ToString('o') }\n` +
+    `[PSCustomObject]@{\n` +
+    `  installed = $true\n` +
+    `  state = [string]$task.State\n` +
+    `  lastRunTime = $lastRunTime\n` +
+    `  nextRunTime = $nextRunTime\n` +
+    `} | ConvertTo-Json -Compress`;
+}
+
+export function parseWindowsTaskStatus(output) {
+  let parsed;
+  try {
+    parsed = JSON.parse(output.trim());
+  } catch {
+    throw new Error("Windows Task Scheduler returned an invalid status payload");
+  }
+  if (!parsed || typeof parsed !== "object" || typeof parsed.installed !== "boolean") {
+    throw new Error("Windows Task Scheduler returned an invalid status payload");
+  }
+  if (!parsed.installed) return { installed: false };
+  if (typeof parsed.state !== "string" || parsed.state.length === 0) {
+    throw new Error("Windows Task Scheduler returned an invalid task state");
+  }
+  for (const key of ["lastRunTime", "nextRunTime"]) {
+    const value = parsed[key];
+    if (value !== null && value !== undefined && typeof value !== "string") {
+      throw new Error(`Windows Task Scheduler returned an invalid ${key}`);
+    }
+  }
+  return {
+    installed: true,
+    state: parsed.state.toLowerCase(),
+    lastRunTime: parsed.lastRunTime ?? null,
+    nextRunTime: parsed.nextRunTime ?? null
+  };
 }
 
 export function quoteSystemdArg(value) {
