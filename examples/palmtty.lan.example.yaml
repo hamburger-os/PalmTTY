@@ -1,0 +1,22 @@
+# Explicit private-LAN HTTP example.
+# This is convenient for a trusted home/development LAN, but traffic is
+# unencrypted. Authentication remains mandatory. Use HTTPS/reverseProxy for
+# normal remote use.
+
+server:
+  port: 17688
+  exposure:
+    mode: lan
+
+auth:
+  enabled: true
+  tokenEnv: PALMTTY_ACCESS_TOKEN
+  maxLoginSessions: 32
+  sessionTtlMinutes: 720
+
+sessions:
+  maxSessions: 8
+  exitedRetentionMinutes: 30
+  scrollbackLines: 10000
+  replayBytes: 2097152
+  maxSocketBufferedBytes: 2097152
