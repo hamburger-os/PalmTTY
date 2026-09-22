@@ -31,11 +31,12 @@ function option(args, name) {
   return value;
 }
 
-function run(command, args, cwd = repoRoot) {
+function run(command, args, cwd = repoRoot, options = {}) {
   const result = spawnSync(command, args, {
     cwd,
     stdio: "inherit",
-    windowsHide: true
+    windowsHide: true,
+    shell: options.shell === true
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
@@ -242,7 +243,7 @@ async function main() {
     "deploy",
     "--legacy",
     appRoot
-  ]);
+  ], repoRoot, { shell: process.platform === "win32" });
 
   await cp(
     path.join(repoRoot, "apps", "web", "dist"),
