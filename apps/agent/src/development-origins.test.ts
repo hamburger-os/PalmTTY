@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseConfig } from "@palmtty/config";
-import {
-  parseDevelopmentTrustedOrigins,
-  withDevelopmentTrustedOrigins
-} from "./development-origins.js";
+import { parseDevelopmentTrustedOrigins } from "./development-origins.js";
 import { isTrustedOrigin } from "./security.js";
 
 describe("development trusted origins", () => {
@@ -28,29 +24,12 @@ describe("development trusted origins", () => {
     ]))).toThrow("http or https");
   });
 
-  it("merges generated LAN origins without weakening configured origins", () => {
-    const config = parseConfig({
-      server: {
-        host: "127.0.0.1",
-        port: 17688,
-        trustedOrigins: ["http://127.0.0.1:5173"]
-      }
-    });
-
-    const merged = withDevelopmentTrustedOrigins(
-      config,
-      JSON.stringify([
-        "http://127.0.0.1:5173",
-        "http://192.168.31.3:5173"
-      ])
-    );
-
-    expect(merged.server.host).toBe("127.0.0.1");
-    expect(merged.server.trustedOrigins).toEqual([
+  it("adds only explicit runtime development origins", () => {
+    const generated = parseDevelopmentTrustedOrigins(JSON.stringify([
       "http://127.0.0.1:5173",
       "http://192.168.31.3:5173"
-    ]);
-    expect(isTrustedOrigin("http://192.168.31.3:5173", merged)).toBe(true);
-    expect(isTrustedOrigin("http://192.168.31.4:5173", merged)).toBe(false);
+    ]));
+    expect(isTrustedOrigin("http://192.168.31.3:5173", generated)).toBe(true);
+    expect(isTrustedOrigin("http://192.168.31.4:5173", generated)).toBe(false);
   });
 });
