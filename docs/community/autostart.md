@@ -15,6 +15,8 @@ pnpm autostart uninstall
 
 The command records absolute paths to the current Node executable, repository, built Agent and config. Re-run `pnpm autostart install ...` after moving the repository or changing to a Node installation with a different executable path.
 
+After `pnpm build`, normal `pnpm start` and autostart do **not** run Vite. The Agent serves the compiled Web UI itself on the configured Agent endpoint; with `examples/palmtty.example.yaml` that is `http://127.0.0.1:17688/`. Port `5173` belongs only to `pnpm dev` and exists only while the Vite development server is running. `pnpm autostart status` also prints PalmTTY-owned UTF-8 status fields instead of forwarding localized `schtasks` text.
+
 ### Environment file
 
 `--env-file` is optional. It is useful for the bootstrap token because the secret value stays out of the scheduled-task/systemd command line. The Agent loads strict `NAME=value` entries before it loads PalmTTY config; blank lines and `#` comments are allowed, balanced outer single/double quotes are removed, duplicate/invalid names fail startup, and shell expansion is intentionally not performed.
@@ -35,7 +37,7 @@ pnpm autostart install --config "$PWD\palmtty.local.yaml" --env-file "$env:APPDA
 pnpm autostart status
 ~~~
 
-The task starts when that user signs in and is also started immediately by the install command. PalmTTY does not currently install a pre-login Windows service. Local policy may restrict Task Scheduler registration. Real Windows release acceptance must still check that sign-in startup does not surface an unwanted console window on the owner workstation.
+The task starts when that user signs in and is also started immediately by the install command. The Task Scheduler action uses the system Windows PowerShell host with `-WindowStyle Hidden`. That wrapper starts the built Node Agent suspended, assigns it to a Windows Job Object with kill-on-close supervision, then resumes and waits for it. Session Worker children silently break away from that Job Object, so ending/restarting the scheduled Agent stops the control plane without reclassifying durable Workers as Agent children. The Agent exit code is propagated back to Task Scheduler, and no persistent Node console window is left on the desktop. PalmTTY does not currently install a pre-login Windows service. Local policy may restrict Task Scheduler registration. Real Windows release acceptance should still check for any transient desktop flash because CI cannot observe window visibility.
 
 ### Linux
 
@@ -77,6 +79,8 @@ pnpm autostart uninstall
 
 该命令会记录当前 Node 可执行文件、仓库、已编译 Agent 和配置文件的绝对路径。移动仓库或切换到不同 Node 安装路径后，应重新执行 `pnpm autostart install ...`。
 
+`pnpm build` 之后，正常 `pnpm start` 与 autostart **不会**启动 Vite；编译后的 Web UI 由 Agent 自己在配置的 Agent endpoint 提供。使用 `examples/palmtty.example.yaml` 时应打开 `http://127.0.0.1:17688/`。端口 `5173` 只属于 `pnpm dev`，只有 Vite 开发服务器运行期间才存在。`pnpm autostart status` 也会输出 PalmTTY 自己的 UTF-8 状态字段，不再直接转发本地化的 `schtasks` 文本。
+
 ### 环境文件
 
 `--env-file` 可选，适合保存 bootstrap token，因为 secret 的**值**不会进入计划任务/systemd 命令行。Agent 会在读取 PalmTTY 配置前加载严格的 `NAME=value`；允许空行与 `#` 注释，成对最外层单双引号会去除，重复/非法变量名会直接失败，并且不会做 shell 展开。
@@ -97,7 +101,7 @@ pnpm autostart install --config "$PWD\palmtty.local.yaml" --env-file "$env:APPDA
 pnpm autostart status
 ~~~
 
-任务会在该用户登录时启动；安装命令也会立即启动一次。当前不提供“用户尚未登录就运行”的 Windows Service 模式。某些本机策略可能限制 Task Scheduler 注册。正式 Windows 验收仍应在真实桌面检查登录自启动是否出现不希望看到的 console 窗口。
+任务会在该用户登录时启动；安装命令也会立即启动一次。Task Scheduler 的 Action 使用系统 Windows PowerShell，并带 `-WindowStyle Hidden`。包装层会先以 suspended 状态创建编译后的 Node Agent，把它加入 kill-on-close 的 Windows Job Object，再恢复并等待 Agent；Session Worker 子进程通过 silent breakaway 脱离该 Job Object，因此结束/重启计划任务只终止控制面，不会把持久 Worker 重新变成 Agent 的普通子进程。Agent 退出码会继续传回 Task Scheduler，同时桌面不会长期挂着 Node console 窗口。当前不提供“用户尚未登录就运行”的 Windows Service 模式。某些本机策略可能限制 Task Scheduler 注册。CI 无法观察真实桌面窗口，所以正式 Windows 验收仍应检查是否存在瞬时闪框。
 
 ### Linux
 

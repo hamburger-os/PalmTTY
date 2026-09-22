@@ -80,7 +80,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 ## 自启动与密钥边界
 
-Windows/Linux 自启动始终注册为当前用户能力，不静默提权。Windows 使用 Task Scheduler `InteractiveToken` + `LeastPrivilege`；Linux 使用 `systemd --user`，不自动创建 root service，也不自动开启 linger。
+Windows/Linux 自启动始终注册为当前用户能力，不静默提权。Windows 使用 Task Scheduler `InteractiveToken` + `LeastPrivilege`；Action 由系统 Windows PowerShell 以 `-WindowStyle Hidden` 包装，使用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 启动 Node Agent，并在恢复执行前把 Agent 放入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` 的 Job Object。这样任务包装层退出时能可靠终止 Agent，但独立 Session Worker 可以脱离该 Job，继续保持既有 Worker 生命周期边界；整个过程不改变用户 token、完整性级别或提权边界。Linux 使用 `systemd --user`，不自动创建 root service，也不自动开启 linger。
 
 Agent 的 `--env-file` 只允许从本地文件载入严格 `NAME=value`，不会进行 shell expansion；task/unit argv 中只出现文件路径，不出现 token 值。Linux autostart 安装要求 env-file 没有 group/world 权限。Windows env-file 仍依赖当前用户文件 ACL，属于后续实机安全审查范围。
 

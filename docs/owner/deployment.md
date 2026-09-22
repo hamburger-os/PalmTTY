@@ -24,6 +24,8 @@ PalmTTY Agent（配置 endpoint；示例为 127.0.0.1:17688）
 
 开发启动器只把检测到的 RFC1918、IPv4 link-local 和 100.64/10 私有/overlay 地址对应的 5173 Origin 作为**精确值**临时注入 development Agent，不写回配置、不启用通配 Origin。Windows 若 LAN 访问超时，应按 Private 网络配置防火墙，不由 PalmTTY 自动提权修改。
 
+正常构建运行与 autostart 不包含 Vite：`pnpm build` 后 Agent 直接托管 `apps/web/dist`，浏览器访问配置中的 Agent endpoint。示例配置对应 `http://127.0.0.1:17688/`；`http://<LAN-IP>:5173` 只在 `pnpm dev` 运行时存在。
+
 ## Windows 当前用户自启动
 
 `pnpm autostart install` 在 Windows 注册 Task Scheduler 登录任务：
@@ -31,14 +33,15 @@ PalmTTY Agent（配置 endpoint；示例为 127.0.0.1:17688）
 - 触发器：当前用户登录；
 - LogonType：`InteractiveToken`；
 - RunLevel：`LeastPrivilege`；
-- Action：当前 Node 可执行文件 + 已编译 `apps/agent/dist/index.js`；
+- Action：系统 Windows PowerShell（`System32\\WindowsPowerShell\\v1.0\\powershell.exe`）以 `-WindowStyle Hidden -File <repo>\\scripts\\windows-autostart-supervisor.ps1` 运行专用监督脚本；脚本用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 创建安装时的 Node 可执行文件 + 已编译 `apps/agent/dist/index.js`，先加入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` 的 Windows Job Object，再恢复并等待 Agent；Node 退出码继续传回 Task Scheduler；
 - WorkingDirectory、Agent、config 与可选 env-file 都使用安装时的绝对路径；
 - 安装会先结束旧任务实例、更新任务定义并立即启动新实例；
-- 失败 Agent 由 Task Scheduler 做有限次数重启。
+- 失败 Agent 由 Task Scheduler 做有限次数重启；Job Object 的 kill-on-close 保证 Task Scheduler `/End` 或包装进程结束时 Agent 也随之退出，不留下占用端口的孤儿控制面；`SILENT_BREAKAWAY_OK` 让 Agent 创建的独立 Session Worker 脱离该 Job，从而继续满足 `Agent lifetime != Worker lifetime`；
+- `pnpm autostart status` 通过 `Get-ScheduledTask` / `Get-ScheduledTaskInfo` 生成 UTF-8 JSON，再由 PalmTTY 输出稳定字段，不再直接打印随 Windows 语言/code page 变化的 `schtasks /FO LIST /V` 文本。
 
 不使用 LocalSystem/S4U 的原因是 PalmTTY 的 Shell、Git/SSH credential、PATH、WindowsApps App Execution Alias 都属于真实开发用户。当前不实现“用户未登录时的 Windows Service 模式”。
 
-Windows 的真实发布验收必须继续检查登录自启动是否出现不希望看到的 console 窗口；Task Scheduler 的“Hidden”属性只控制任务在 UI 中的可见性，不能被当成窗口隐藏保证。
+Windows 登录自启动不再直接启动 console-subsystem 的 `node.exe`，因此不会长期保留 Node console 窗口；窗口隐藏由 PowerShell 的 `-WindowStyle Hidden` 负责，而 Task Scheduler 的 `Hidden` 属性仍不承担这个语义。CI 无法观察真实桌面，所以发布验收仍需确认登录/任务重启时没有瞬时闪框。
 
 ## Linux 当前用户自启动
 

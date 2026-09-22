@@ -8,15 +8,20 @@ import {
   LINUX_UNIT_NAME,
   WINDOWS_TASK_NAME,
   buildSystemdUserUnit,
+  buildWindowsTaskStatusPowerShellCommand,
   buildWindowsTaskXml,
   defaultConfigPath,
   defaultLinuxUnitPath,
-  parseAutostartArgs
+  defaultWindowsPowerShellPath,
+  encodePowerShellCommand,
+  parseAutostartArgs,
+  parseWindowsTaskStatus
 } from "./autostart-core.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const agentPath = path.join(repoRoot, "apps", "agent", "dist", "index.js");
+const windowsSupervisorPath = path.join(scriptDir, "windows-autostart-supervisor.ps1");
 
 function run(command, args, { acceptedExitCodes = [0] } = {}) {
   const result = spawnSync(command, args, {
@@ -81,8 +86,13 @@ function runRollback(action, command, args, options) {
 
 async function installWindows(inputs) {
   const userSid = currentWindowsSid();
+  const powershellPath = defaultWindowsPowerShellPath();
+  await requireRegularFile(powershellPath, "Windows PowerShell");
+  await requireRegularFile(windowsSupervisorPath, "Windows autostart supervisor");
   const xml = buildWindowsTaskXml({
     userSid,
+    powershellPath,
+    supervisorPath: windowsSupervisorPath,
     nodePath: process.execPath,
     agentPath,
     repoRoot,
@@ -98,14 +108,29 @@ async function installWindows(inputs) {
   } finally {
     await rm(tempPath, { force: true }).catch(() => undefined);
   }
-  console.log(`[PalmTTY] installed Windows sign-in task: ${WINDOWS_TASK_NAME}`);
+  console.log(`[PalmTTY] installed Windows background sign-in task: ${WINDOWS_TASK_NAME}`);
   console.log(`[PalmTTY] config: ${inputs.configPath}`);
   if (inputs.envFile) console.log(`[PalmTTY] environment file: ${inputs.envFile}`);
 }
 
 function statusWindows() {
-  const result = run("schtasks.exe", ["/Query", "/TN", WINDOWS_TASK_NAME, "/FO", "LIST", "/V"]);
-  process.stdout.write(result.stdout);
+  const command = buildWindowsTaskStatusPowerShellCommand();
+  const result = run(defaultWindowsPowerShellPath(), [
+    "-NoLogo",
+    "-NoProfile",
+    "-NonInteractive",
+    "-EncodedCommand",
+    encodePowerShellCommand(command)
+  ]);
+  const status = parseWindowsTaskStatus(result.stdout);
+  console.log("[PalmTTY] autostart status");
+  console.log("platform: windows");
+  console.log(`task: ${WINDOWS_TASK_NAME}`);
+  console.log(`installed: ${status.installed ? "yes" : "no"}`);
+  if (!status.installed) return;
+  console.log(`state: ${status.state}`);
+  if (status.lastRunTime) console.log(`lastRunTime: ${status.lastRunTime}`);
+  if (status.nextRunTime) console.log(`nextRunTime: ${status.nextRunTime}`);
 }
 
 function restartWindows() {

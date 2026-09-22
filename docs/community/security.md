@@ -48,7 +48,7 @@ PalmTTY does not claim persistence across OS reboot, user logoff or Worker-proce
 
 ### Autostart boundary
 
-PalmTTY autostart is always current-user scoped: Windows Task Scheduler uses an interactive user token and least privilege; Linux uses `systemd --user`. PalmTTY does not install a LocalSystem/root service or silently enable Linux lingering.
+PalmTTY autostart is always current-user scoped: Windows Task Scheduler uses an interactive user token and least privilege; Linux uses `systemd --user`. The Windows task uses the system Windows PowerShell host with a hidden window only as a presentation/lifecycle wrapper. It creates the Node Agent inside a kill-on-close Job Object and allows child processes to break away, so task termination supervises the Agent while independent Session Workers keep their separate lifetime. This does not change the user token or elevation boundary. PalmTTY does not install a LocalSystem/root service or silently enable Linux lingering.
 
 The optional Agent `--env-file` keeps bootstrap secret **values** out of task/unit argv. Its strict parser does not perform shell expansion. Keep real env files outside the repository and readable only by the PalmTTY user; Linux autostart installation rejects group/world-readable files. Stopping/restarting the Linux Agent service uses `KillMode=process` so independent Session Workers are not reclassified as ordinary service children. This still does not provide PTY survival across OS reboot.
 
@@ -103,7 +103,7 @@ Worker/Shell PID 只用于诊断。PalmTTY 不会因为 stale record 记录了�
 
 ### 自启动边界
 
-PalmTTY 自启动始终属于当前用户：Windows Task Scheduler 使用交互用户 token + 最低权限，Linux 使用 `systemd --user`。PalmTTY 不安装 LocalSystem/root service，也不会静默开启 Linux linger。
+PalmTTY 自启动始终属于当前用户：Windows Task Scheduler 使用交互用户 token + 最低权限，Linux 使用 `systemd --user`。Windows 任务使用系统 Windows PowerShell 的隐藏窗口模式只作为展示与生命周期包装层；它把 Node Agent 放入 kill-on-close Job Object，同时允许子进程 break away，因此计划任务终止时仍能监督 Agent，而独立 Session Worker 继续保持单独生命周期。该设计不改变用户 token，也不改变提权边界。PalmTTY 不安装 LocalSystem/root service，也不会静默开启 Linux linger。
 
 可选 Agent `--env-file` 让 bootstrap secret 的**值**不进入 task/unit argv；严格解析器不做 shell expansion。真实 env 文件应放在仓库外并只允许 PalmTTY 用户读取；Linux autostart 安装会拒绝 group/world 可读文件。Linux 停止/restart Agent service 时使用 `KillMode=process`，避免把独立 Session Worker 重新归类成普通 service child 一起终止；这仍不代表 OS reboot 后旧 PTY 能存活。
 
