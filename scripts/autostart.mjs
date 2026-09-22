@@ -150,16 +150,17 @@ async function printNetworkStatus(configPath) {
     console.log("network:");
     console.log(`  exposure: ${mode}`);
     console.log(`  listen: ${serverBindHost(config)}:${config.server.port}`);
-    console.log(`  localUrl: ${localAgentUrl(config)}`);
-
     if (mode === "local") {
+      console.log(`  browserUrl: ${localAgentUrl(config)}`);
       console.log("  lanAccess: disabled (local exposure)");
       return;
     }
 
     if (mode === "lan") {
       const urls = lanAgentUrls(config);
-      console.log("  lanAccess: enabled (unencrypted private/overlay HTTP)");
+      console.log(`  browserUrl: ${localAgentUrl(config)}`);
+      console.log("  lanAccess: enabled (authenticated, unencrypted private/overlay HTTP)");
+      console.log("  sourceAddressGate: private/overlay clients only");
       if (urls.length === 0) {
         console.log("  lanUrls: none detected");
       } else {
@@ -167,12 +168,15 @@ async function printNetworkStatus(configPath) {
         for (const url of urls) console.log(`    - ${url}`);
       }
       if (process.platform === "win32") {
-        console.log("  firewall: Windows Private-profile inbound access may still be required");
+        console.log("  firewall: keep the Agent port scoped to trusted Windows Private networks");
       }
       return;
     }
 
-    console.log("  externalOrigins:");
+    if (mode === "reverseProxy") {
+      console.log(`  upstreamUrl: ${localAgentUrl(config)}`);
+    }
+    console.log("  browserOrigins:");
     for (const origin of exposureOrigins(config)) console.log(`    - ${origin}`);
   } catch (error) {
     console.log(`network: unavailable (${error instanceof Error ? error.message : error})`);
