@@ -12,7 +12,7 @@ const ExactHttpOriginSchema = z.string().superRefine((value, ctx) => {
       ctx.addIssue({ code: "custom", message: "Origin must be an http(s) origin without credentials" });
       return;
     }
-    if (url.pathname !== "/" || url.search || url.hash || url.origin !== value.replace(/\/$/u, "")) {
+    if (url.pathname !== "/" || url.search || url.hash) {
       ctx.addIssue({ code: "custom", message: "Origin must contain only scheme, host, and optional port" });
     }
   } catch {
