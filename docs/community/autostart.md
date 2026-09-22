@@ -37,7 +37,7 @@ pnpm autostart install --config "$PWD\palmtty.local.yaml" --env-file "$env:APPDA
 pnpm autostart status
 ~~~
 
-The task starts when that user signs in and is also started immediately by the install command. The Task Scheduler action uses the system Windows PowerShell host with `-WindowStyle Hidden`; PowerShell invokes the built Node Agent synchronously and propagates its exit code, so Task Scheduler keeps supervising the Agent without leaving a persistent Node console window on the desktop. PalmTTY does not currently install a pre-login Windows service. Local policy may restrict Task Scheduler registration. Real Windows release acceptance should still check for any transient desktop flash because CI cannot observe window visibility.
+The task starts when that user signs in and is also started immediately by the install command. The Task Scheduler action uses the system Windows PowerShell host with `-WindowStyle Hidden`. That wrapper starts the built Node Agent suspended, assigns it to a Windows Job Object with kill-on-close supervision, then resumes and waits for it. Session Worker children silently break away from that Job Object, so ending/restarting the scheduled Agent stops the control plane without reclassifying durable Workers as Agent children. The Agent exit code is propagated back to Task Scheduler, and no persistent Node console window is left on the desktop. PalmTTY does not currently install a pre-login Windows service. Local policy may restrict Task Scheduler registration. Real Windows release acceptance should still check for any transient desktop flash because CI cannot observe window visibility.
 
 ### Linux
 
@@ -101,7 +101,7 @@ pnpm autostart install --config "$PWD\palmtty.local.yaml" --env-file "$env:APPDA
 pnpm autostart status
 ~~~
 
-任务会在该用户登录时启动；安装命令也会立即启动一次。Task Scheduler 的 Action 改为使用系统 Windows PowerShell，并带 `-WindowStyle Hidden`；PowerShell 会同步启动编译后的 Node Agent，并把 Agent 退出码传回 Task Scheduler，因此仍保留任务生命周期监督，同时不会在桌面长期挂着一个 Node console 窗口。当前不提供“用户尚未登录就运行”的 Windows Service 模式。某些本机策略可能限制 Task Scheduler 注册。CI 无法观察真实桌面窗口，所以正式 Windows 验收仍应检查是否存在瞬时闪框。
+任务会在该用户登录时启动；安装命令也会立即启动一次。Task Scheduler 的 Action 使用系统 Windows PowerShell，并带 `-WindowStyle Hidden`。包装层会先以 suspended 状态创建编译后的 Node Agent，把它加入 kill-on-close 的 Windows Job Object，再恢复并等待 Agent；Session Worker 子进程通过 silent breakaway 脱离该 Job Object，因此结束/重启计划任务只终止控制面，不会把持久 Worker 重新变成 Agent 的普通子进程。Agent 退出码会继续传回 Task Scheduler，同时桌面不会长期挂着 Node console 窗口。当前不提供“用户尚未登录就运行”的 Windows Service 模式。某些本机策略可能限制 Task Scheduler 注册。CI 无法观察真实桌面窗口，所以正式 Windows 验收仍应检查是否存在瞬时闪框。
 
 ### Linux
 
