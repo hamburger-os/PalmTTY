@@ -1,7 +1,9 @@
 import net from "node:net";
-import type { PalmTTYConfig } from "@palmtty/config";
 
-export type ServerEndpoint = Pick<PalmTTYConfig["server"], "host" | "port">;
+export type ServerEndpoint = {
+  host: string;
+  port: number;
+};
 
 function endpointLabel(endpoint: ServerEndpoint): string {
   const host = endpoint.host.includes(":") && !endpoint.host.startsWith("[")
@@ -34,7 +36,7 @@ export function describeServerBindError(
   if (code === "EADDRNOTAVAIL") {
     return (
       `Server host ${endpoint.host} is not available on this machine. ` +
-      "Choose a local interface address or a loopback host."
+      "Choose a valid exposure profile/listenHost."
     );
   }
 
@@ -53,7 +55,7 @@ export function describeServerBindError(
   if (code === "EACCES") {
     return (
       `Permission denied while binding server endpoint ${label}. ` +
-      "Choose a permitted host/port or adjust the local policy."
+      "Choose a permitted exposure/listenHost/port or adjust the local policy."
     );
   }
 
