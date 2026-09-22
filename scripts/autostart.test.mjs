@@ -209,7 +209,7 @@ test("Windows native host compiles as GUI, propagates Agent exit, and preserves 
     }
     assert.fail("detached Worker did not survive native host Job close");
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
