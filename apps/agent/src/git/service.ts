@@ -27,6 +27,7 @@ import {
   validateGitPath,
   validateGitPaths
 } from "./runner.js";
+import { GitStateChangedError } from "./errors.js";
 import {
   getGitStatus,
   requireExpectedGitState
@@ -44,13 +45,6 @@ const SAFE_REMOTE_PROTOCOL_ARGS = [
   "-c", "protocol.ext.allow=never",
   "-c", "protocol.file.allow=never"
 ];
-
-export class GitStateChangedError extends Error {
-  constructor(message = "Git repository changed since the page was refreshed") {
-    super(message);
-    this.name = "GitStateChangedError";
-  }
-}
 
 async function requireRepository(
   workspace: WorkspaceDefinition,
