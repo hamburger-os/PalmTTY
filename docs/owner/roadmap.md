@@ -55,6 +55,20 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 
 当前 Ruleset 继续作为本阶段正式方案。
 
+## 本阶段已完成：可安装发行链
+
+- Windows x64 per-user installer + portable zip；
+- Linux x64 Debian package + portable tar；
+- bundled Node + production-only Agent dependency deployment + compiled Web UI；
+- installed runtime manifest，生产运行不再依赖 `repoRoot`；
+- Windows release-time 预编译 GUI autostart host；
+- `palmtty init/info/start/preflight/service/version` installed CLI；
+- 脱离 checkout 的安装后 smoke；
+- CycloneDX SBOM、`SHA256SUMS` 与 GitHub build provenance；
+- Draft Release 资产逐项上传/大小校验后再 promotion。
+
+代码签名凭据仍属于发布运营配置，不应硬编码进仓库；当前流水线已经把 installer 生成与后续 signing boundary 分开，后续可在拥有签名身份时接入 Authenticode，而不需要重构 runtime/package 边界。
+
 ## 下一阶段优先级
 
 ### P0：真实设备与长期运行验证
