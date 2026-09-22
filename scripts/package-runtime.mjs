@@ -31,12 +31,11 @@ function option(args, name) {
   return value;
 }
 
-function run(command, args, cwd = repoRoot, options = {}) {
+function run(command, args, cwd = repoRoot) {
   const result = spawnSync(command, args, {
     cwd,
     stdio: "inherit",
-    windowsHide: true,
-    shell: options.shell === true
+    windowsHide: true
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
@@ -233,9 +232,15 @@ async function main() {
   await rm(outputRoot, { recursive: true, force: true });
   await mkdir(outputRoot, { recursive: true });
 
-  const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+  const pnpmCli = process.env.npm_execpath;
+  if (!pnpmCli || !path.isAbsolute(pnpmCli)) {
+    throw new Error(
+      "PalmTTY distribution packaging must be launched through pnpm package:runtime"
+    );
+  }
   const appRoot = path.join(outputRoot, "app");
-  run(pnpm, [
+  run(process.execPath, [
+    pnpmCli,
     "--config.node-linker=hoisted",
     "--filter",
     "@palmtty/agent",
@@ -243,7 +248,7 @@ async function main() {
     "deploy",
     "--legacy",
     appRoot
-  ], repoRoot, { shell: process.platform === "win32" });
+  ]);
 
   await cp(
     path.join(repoRoot, "apps", "web", "dist"),
