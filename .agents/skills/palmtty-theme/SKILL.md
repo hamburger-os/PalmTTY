@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -140,7 +140,9 @@ Theme work must preserve the reconnect/recovery invariants in `docs/ai/invariant
 
 The Session workbench's Terminal / Git / Files selection is also presentation state. Switching away from Terminal must keep the live terminal mounted, suppress hidden-pane geometry propagation, and safely refit when Terminal becomes active again; it must not reconnect merely because another pane was viewed.
 
-On touch devices, a one-finger vertical drag that starts inside the terminal surface belongs to terminal scrollback, not to the surrounding page. The terminal stack version is governed by `terminal-stack.json`. PalmTTY keeps one narrow xterm-screen-local fallback in `terminal-touch-scroll.ts`: it may own a one-finger gesture only while xterm is on the normal buffer and `mouseTrackingMode === "none"`, then scroll through xterm's public `scrollLines` API and cancel browser page panning. Alternate-buffer or active mouse-protocol gestures remain xterm-owned. Do not add a second DOM scroll viewport, a document-level touch handler, or global gesture interception. The terminal host owns browser touch panning via `touch-action`, while the fallback listens only on `.xterm-screen`; xterm's scrollbar remains pointer-owned by xterm. Terminal scroll therefore does not depend on changing the surrounding workbench geometry.
+On touch devices, a one-finger vertical drag that starts inside the terminal surface belongs to xterm, not to the surrounding page. The terminal stack version is governed by `terminal-stack.json`. PalmTTY must not translate touch pixels into terminal rows or install application-level `touchstart`/`touchmove` handlers: xterm's own Gesture/Viewport path owns continuous pixel scrolling, inertia, alternate-buffer key translation and mouse-protocol wheel reporting. Browser page panning is suppressed only at the xterm screen boundary with `touch-action: none`, while events continue through xterm's own listener path. Do not add a second DOM scroll viewport, a document-level touch handler, global gesture interception, or a competing scroll physics implementation.
+
+Fit geometry has a separate ownership rule: the visual `.terminal-frame` may own border, radius, padding and clipping, but xterm must be opened into a nested `.terminal-mount` whose box is geometry-only and has no padding or border. FitAddon measures the xterm element's parent; decorative spacing on that parent can overestimate rows and clip the final rendered line. Resize observation targets the mount, and VisualViewport resize may request a refit without becoming canonical terminal state.
 
 Terminal text contrast wins over decorative transparency. The terminal viewport stays opaque and theme-aligned rather than making xterm transparent merely to expose the ambient field.
 
@@ -149,7 +151,7 @@ Terminal text contrast wins over decorative transparency. The terminal viewport 
 PalmTTY is primarily operated from a phone.
 
 - Preserve safe-area insets.
-- Keep terminal viewport ownership simple: one content surface around xterm; the host-local touch fallback is an input adapter only and never a second scroll container.
+- Keep terminal viewport ownership simple: one decorative frame around one padding-free xterm mount; xterm remains the only terminal scroll-physics implementation.
 - Controls must remain reachable in portrait and short landscape layouts.
 - Workspace dialogs keep one intentional body scroll owner with header/footer actions always reachable; nested data regions may scroll only when bounded.
 - High-frequency touch targets use the shared 44px target where space allows; compact secondary controls use the shared compact target rather than ad-hoc geometry.
