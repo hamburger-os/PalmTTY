@@ -113,6 +113,28 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
     expect(diff.truncated).toBe(false);
   });
 
+  it("neutralizes a filter driver literally named set", async () => {
+    const workspace = await initializedWorkspace();
+    await writeFile(
+      path.join(workspace.cwd, ".gitattributes"),
+      "*.md filter=set\n",
+      "utf8"
+    );
+    runGit(workspace.cwd, ["add", "--", ".gitattributes"]);
+    runGit(workspace.cwd, ["commit", "-m", "add set filter attribute"]);
+    runGit(workspace.cwd, [
+      "config",
+      "filter.set.clean",
+      "palmtty-filter-command-that-does-not-exist"
+    ]);
+    runGit(workspace.cwd, ["config", "filter.set.required", "true"]);
+
+    await writeFile(path.join(workspace.cwd, "README.md"), "one\ntwo\n", "utf8");
+    const diff = await getWorkspaceGitDiff(workspace, "README.md", false);
+
+    expect(diff.diff).toContain("+two");
+  });
+
   it("previews untracked files without treating directories as pseudo-paths", async () => {
     const workspace = await initializedWorkspace();
     await mkdir(path.join(workspace.cwd, "notes"), { recursive: true });
