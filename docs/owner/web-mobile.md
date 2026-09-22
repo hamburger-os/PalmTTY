@@ -45,7 +45,7 @@
 
 - “终端 / Git / 文件”三个一级视图，终端始终是核心视图；
 - 切到 Git/文件时 Terminal 组件保持 mounted，xterm、WebSocket、`lastSeq` 与重连循环不被展示状态重建；隐藏时不传播 resize，切回终端再安全 `fit`；
-- Git 视图提供仓库分支、上游、ahead/behind、staged/unstaged/untracked 状态和有界文本 diff；当前刻意只读，不在 UI 中执行 stage/commit/push/pull；
+- Git 视图已经升级为轻量 Source Control 工作台：显式显示“完整仓库”作用域、分支/上游/ahead-behind、冲突、staged/unstaged/untracked；diff 使用结构化 unified diff 行渲染并支持未跟踪文件预览；无选中修改时显示最近提交；支持 stage/unstage/all、带 diff 快照校验的丢弃、commit、分支创建/切换、stash，以及非交互 fetch/pull/push；进入页面、窗口重新聚焦/回到前台和可见页低频轮询都会刷新状态；
 - 文件视图以持久 Workspace 根目录为边界浏览目录和文件，提供 UTF-8 文本只读预览；二进制文件只显示状态，大文件预览在 512 KiB 截断；
 - xterm.js；
 - 自动重连状态；
@@ -64,7 +64,7 @@
 - 长文本弹窗最终仍然把文本作为终端输入发送，不建立 Codex 专用 API。
 - Workspace 修改走独立持久化 API；Session 创建/重启不接收临时 cwd/shell/env。终端 Profile 发现只是受保护、有界的运行环境读取 API，不是通用命令执行接口。
 - 目录选择器仍只读取目录名称/路径，不读取文件内容；会话工作台的文件浏览/预览是另一组独立受保护 API，使用相对 Workspace 路径并在 Agent 端做 canonical/symlink containment 检查，不能复用目录选择器绕开边界。
-- Git 工作台只通过独立的有界 Agent API 读取 status/diff；它不是终端 WebSocket 消息，也不进入 Session Worker。为避免浏览器查看操作触发仓库脚本，Git diff 禁止 external diff/textconv，status 禁用 fsmonitor；辅助子进程会剔除 `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量。
+- Git 工作台只通过独立、有界、typed 的 Agent API 工作，不把 Git 命令塞进终端 WebSocket，也不进入 Session Worker。读取面使用 porcelain v2 status、diff/history/branches，禁止 external diff/textconv/fsmonitor；写面只接受固定 operation union，不接受浏览器提供任意 argv。所有写操作携带当前 state token，破坏性丢弃还必须匹配刚加载的 diff snapshot；Web 默认关闭写按钮，用户对当前视图确认“信任仓库”后才发送写请求。PalmTTY 禁用 Git hooks、编辑器/credential 交互提示，但正常 Git filter 仍可能在 stage/switch/stash/pull 等语义中执行，因此这一确认是能力边界提示而不是沙箱。辅助子进程继续剔除 `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量。
 - 浏览器丢失状态时以服务端 snapshot 为准。
 - `stopping` Session 可以继续被查看，但终端输入、resize 与长文本发送保持禁用，直到 Worker 报告最终退出。
 - Service Worker 不缓存 API 或终端 WebSocket 数据。
@@ -74,7 +74,7 @@
 
 - 自定义快捷键；
 - 更好的移动端剪贴板；
-- 如果真实使用确有需要，再设计受控 Git 写操作（stage/commit 等）与文件编辑；不能简单把任意 Git/文件写命令暴露成 Web API；
+- Git 写能力已经采用 typed operation + stale-state/diff-snapshot + 明确信任确认模型落地；后续如需 force push、interactive rebase/cherry-pick、reflog/submodule/LFS 管理，应继续逐项建模，不能退化成任意 Git argv API；文件编辑仍需单独设计并发修改、编码与原子写入；
 - Codex 等 AI CLI 的状态提示，但保持 CLI 厂商无关。
 
 ## 你审查时重点看
