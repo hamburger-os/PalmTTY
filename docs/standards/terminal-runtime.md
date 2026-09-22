@@ -76,6 +76,21 @@ PalmTTY uses:
 - @xterm/addon-serialize for a reconnectable terminal-state snapshot;
 - @xterm/addon-fit for browser sizing.
 
+### Pinned terminal compatibility set
+
+The repository-level `terminal-stack.json` is the source of truth for the xterm package set, and `pnpm terminal:check` requires every `@xterm/*` dependency in the browser/Worker packages to use the exact governed version rather than a semver range. The current set is:
+
+| Runtime | Package | Version |
+|---|---|---|
+| Browser | `@xterm/xterm` | `6.1.0-beta.304` |
+| Browser | `@xterm/addon-fit` | `0.12.0-beta.301` |
+| Worker | `@xterm/headless` | `6.0.0` |
+| Worker | `@xterm/addon-serialize` | `0.14.0` |
+
+Upstream issue https://github.com/xtermjs/xterm.js/issues/5489 records that touch scrolling stopped working in browser xterm 6.0.0. Upstream PR https://github.com/xtermjs/xterm.js/pull/5563 fixes that regression by restoring touch/gesture scrolling in the viewport. xterm's npm documentation describes beta builds as the channel for verifying fixes merged to master. PalmTTY therefore pins the browser pair to exact 6.1 beta builds containing that fix instead of carrying a parallel application-level touch-scrolling implementation. The Worker remains on the exact 6.0/0.14 stable pair until a separate change qualifies headless serialization, replay and geometry recovery against the newer line; a browser-only interaction regression is not sufficient reason to change canonical Worker state semantics.
+
+On touch devices, a one-finger vertical drag beginning inside the terminal belongs to xterm scrollback. PalmTTY only contains overscroll at the terminal/workbench boundary so that terminal-owned scrolling does not chain into page movement; it does not add a second DOM scroll viewport or a document-level touch handler alongside xterm.
+
 The xterm.js project explicitly lists a server-side headless terminal plus serialize addon as a remote-reconnect use case. The serialize addon restores state by writing its serialized escape-sequence stream back into a terminal, while terminal resizing changes buffer geometry/reflow. PalmTTY therefore treats terminal geometry as part of the recovery boundary: the Worker and browser must agree on rows/columns before a snapshot is serialized/restored, and a geometry change invalidates raw replay as the preferred recovery path.
 
 PalmTTY enables allowProposedApi on the Worker's headless terminal because current serialize-addon usage with headless xterm depends on xterm APIs behind that opt-in. The Node Worker also isolates the current xterm 6 CommonJS-loading workaround behind session-runtime.ts because native Node ESM named imports are not reliable with the published headless package. Re-review both assumptions when upgrading xterm.
