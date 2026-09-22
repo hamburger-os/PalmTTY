@@ -65,8 +65,8 @@ async function requireRepository(
   return repository;
 }
 
-function hashText(value: string): string {
-  return createHash("sha256").update(value, "utf8").digest("hex");
+function hashBytes(value: Uint8Array): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function safeFilterDriver(value: string): string | undefined {
@@ -168,7 +168,7 @@ export async function getWorkspaceGitDiff(
     diff,
     truncated: result.stdoutTruncated,
     binary: /(?:Binary files .* differ|GIT binary patch)/.test(diff),
-    snapshot: hashText(diff)
+    snapshot: hashBytes(result.stdout)
   });
 }
 
