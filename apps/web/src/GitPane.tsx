@@ -476,8 +476,7 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
                 }
                 onClick={() => void runMutation({
                   type: "commit",
-                  message: commitMessage.trim(),
-                  amend: false
+                  message: commitMessage.trim()
                 })}
               >
                 {t("git.commit")}
