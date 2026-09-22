@@ -27,6 +27,13 @@ Source: https://git-scm.com/docs/gitattributes
 - Filter drivers may define `clean`, `smudge`, or long-running `process` commands; `process` takes precedence when configured.
 - The clean side participates in Git's check-in conversion of working-tree content. A working-tree comparison must therefore account for filter execution separately from diff drivers/textconv.
 
+## Log signature verification
+
+Source: https://git-scm.com/docs/git-config#Documentation/git-config.txt-logshowSignature
+
+- `log.showSignature` controls whether `git log` verifies commit signatures.
+- Signature verification may invoke the configured signing program, so a read-only history surface that must avoid helper execution should override this setting.
+
 ## Hooks
 
 Source: https://git-scm.com/docs/git-config#Documentation/git-config.txt-corehooksPath
