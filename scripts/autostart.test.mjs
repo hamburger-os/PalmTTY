@@ -18,6 +18,8 @@ test("parseAutostartArgs accepts install options and resolves paths", () => {
 test("parseAutostartArgs rejects duplicate and unknown options", () => {
   assert.throws(() => parseAutostartArgs(["install", "--config", "a", "--config", "b"]), /only once/u);
   assert.throws(() => parseAutostartArgs(["install", "--wat"]), /Unknown/u);
+  assert.throws(() => parseAutostartArgs(["status", "--config", "a"]), /does not accept/u);
+  assert.throws(() => parseAutostartArgs(["restart", "--env-file", "a"]), /does not accept/u);
 });
 
 test("defaultConfigPath follows Windows and XDG conventions", () => {
@@ -48,6 +50,17 @@ test("Windows task runs as the current interactive user without elevation", () =
   assert.match(xml, /<MultipleInstancesPolicy>IgnoreNew<\/MultipleInstancesPolicy>/u);
   assert.match(xml, /--env-file/u);
   assert.doesNotMatch(xml, /PALMTTY_ACCESS_TOKEN=/u);
+  assert.match(xml, /PalmTTY config\.yaml/u);
+  assert.throws(
+    () => buildWindowsTaskXml({
+      userSid: "S-1-5-21-123",
+      nodePath: "C:\\Node\\node.exe",
+      agentPath: "C:\\PalmTTY\\agent.js",
+      repoRoot: "C:\\PalmTTY\nmalformed",
+      configPath: "C:\\PalmTTY\\config.yaml"
+    }),
+    /single line/u
+  );
 });
 
 test("systemd unit preserves independent Worker lifetime", () => {
