@@ -70,7 +70,7 @@ test("Windows supervisor is a kill-on-close job with detached-child breakaway", 
 });
 
 test("Windows supervisor compiles, propagates Agent exit code, and lets detached children break away", { skip: process.platform !== "win32" }, async () => {
-  const directory = mkdtempSync(path.join(os.tmpdir(), "palmtty-autostart-"));
+  const directory = mkdtempSync(path.join(os.tmpdir(), "palmtty autostart-"));
   const markerPath = path.join(directory, "worker-survived.txt");
   const workerPath = path.join(directory, "worker.cjs");
   const agentPath = path.join(directory, "agent.cjs");
@@ -142,7 +142,8 @@ test("Windows task runs headlessly as the current interactive user without eleva
   assert.match(xml, /-WindowStyle Hidden/u);
   assert.match(xml, /-File/u);
   assert.match(xml, /windows-autostart-supervisor\.ps1/u);
-  assert.match(xml, /-EncodedCommand/u);
+  assert.match(xml, /-EnvFile/u);
+  assert.match(xml, /PalmTTY config\.yaml/u);
   assert.doesNotMatch(xml, /<Command>C:\\Program Files\\nodejs\\node\.exe<\/Command>/u);
   assert.doesNotMatch(xml, /PALMTTY_ACCESS_TOKEN=/u);
   assert.throws(
