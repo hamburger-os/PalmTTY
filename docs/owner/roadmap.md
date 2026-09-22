@@ -25,6 +25,7 @@
 - PalmTTY 自有的三主题视觉系统（炫彩流光/黑曜石/白霜）、效果/性能两档、reduced-motion 处理与主题审查 skills；
 - Web 端持久化 Workspace CRUD，Host / WSL runtime adapter；正常 UI 使用统一终端 Profile（Host Shell + WSL 发行版），高级 runtime 细节只在 Custom 路径展开；工作区支持有界环境变量与多行启动输入，Session 创建/重启仍只消费持久化 workspace authority；
 - Ubuntu CI 已覆盖 Linux host runtime；Windows CI 保持 PowerShell 7/ConPTY 路径；macOS adapter 已按同一 Host 模型实现但尚无仓库 CI；
+- 当前用户自启动管理已实现：Windows Task Scheduler 登录任务与 Linux `systemd --user`，支持 install/status/restart/uninstall；可选 env-file 避免把 token 值写入 task/unit argv，Linux 会拒绝 group/world 可读的 env-file；
 - Windows/Ubuntu 双平台 CI；
 - 真正的 detached-process 集成测试：创建 Worker 的 Agent 进程退出后，另一个 Agent 可找回同一活终端及 replay；
 - Windows CI 实际启动 PowerShell 7/ConPTY，并验证 resize 与中文 Unicode 往返；
@@ -44,7 +45,7 @@
 
 未实现：
 
-- Windows/主机重启持久化；
+- OS reboot 后原 PTY/Worker 的持久化（Agent 本身可通过 Windows/Linux 当前用户自启动重新拉起）；
 - 用户注销后的 PTY 持久化；
 - Worker 进程自身死亡后的恢复。
 
@@ -69,7 +70,8 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 - 长时间运行后的内存、Worker 和 recovery-state 清理；
 - Windows runtime 文件 ACL 实机检查；
 - Windows 新安装 CLI 后通过“重启终端”刷新 Machine/User PATH 的真实宿主验证；
-- WSL 发行版枚举、默认 Shell 启动语义、目录选择与 `WSLENV` Workspace 环境转发的真实发行版验证。
+- WSL 发行版枚举、默认 Shell 启动语义、目录选择与 `WSLENV` Workspace 环境转发的真实发行版验证；
+- Windows 登录自启动的真实 Task Scheduler/console 可见性验证；Linux `systemd --user` restart、env-file 权限与可选 linger 的真实主机验证。
 
 ### P1：安全增强
 
