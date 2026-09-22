@@ -60,6 +60,7 @@ test("systemd unit preserves independent Worker lifetime", () => {
   });
   assert.match(unit, /^KillMode=process$/mu);
   assert.match(unit, /^Restart=on-failure$/mu);
+  assert.doesNotMatch(unit, /network-online\.target/u);
   assert.match(unit, /--env-file/u);
   assert.doesNotMatch(unit, /PALMTTY_ACCESS_TOKEN=/u);
 });
