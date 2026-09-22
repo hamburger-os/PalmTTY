@@ -158,7 +158,8 @@ export function isLoopbackHost(host: string): boolean {
 export function isPrivateIpv4(address: string): boolean {
   if (isIP(address) !== 4) return false;
   const octets = address.split(".").map(Number);
-  const [a, b] = octets;
+  const a = octets[0]!;
+  const b = octets[1]!;
   return (
     a === 10 ||
     (a === 172 && b >= 16 && b <= 31) ||
