@@ -13,6 +13,7 @@ import {
   readWorkspaceFile
 } from "./workspace-files.js";
 import {
+  GitStateChangedError,
   getWorkspaceGitBranches,
   getWorkspaceGitDiff,
   getWorkspaceGitHistory,
@@ -33,7 +34,7 @@ function gitFailure(
   code: string,
   message: string
 ) {
-  if (error instanceof Error && error.name === "GitStateChangedError") {
+  if (error instanceof GitStateChangedError) {
     return reply.code(409).send({
       error: "git_state_changed",
       message: error.message
