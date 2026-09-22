@@ -25,7 +25,7 @@ pnpm start
 
 `PALMTTY_ACCESS_TOKEN` must contain at least 16 characters; use a long random secret for real deployments. `pnpm run preflight` validates authentication/security settings and the configured Agent TCP endpoint. Workspace launch targets are no longer stored in the YAML configuration, so host startup is not blocked by a stale project path.
 
-Open the configured Agent URL, sign in, and create the first workspace in the Web UI. After `pnpm build`, both `pnpm start` and autostart serve the compiled Web UI from the Agent itself; with the example config (`server.exposure.mode: local`) the URL is `http://127.0.0.1:17688/`. Port `5173` is development-only and is available only while `pnpm dev` is running. For explicit private-LAN HTTP access, use `examples/palmtty.lan.example.yaml` or set `server.exposure.mode: lan`; the Agent then binds `0.0.0.0`, requires authentication, and accepts only exact detected private/overlay IPv4 Origins. Windows Firewall may still require a Private-profile inbound rule for the Agent port. PalmTTY stores the workspace catalog in per-user application data. The browser can create/edit/delete this persistent catalog only through authenticated, exact-Origin-protected API calls; starting a Session still sends only the selected workspace ID.
+Open the configured Agent URL, sign in, and create the first workspace in the Web UI. After `pnpm build`, both `pnpm start` and autostart serve the compiled Web UI from the Agent itself; with the example config (`server.exposure.mode: local`) the URL is `http://127.0.0.1:17688/`. Port `5173` is development-only and is available only while `pnpm dev` is running. For explicit private-LAN HTTP access, use `examples/palmtty.lan.example.yaml` or set `server.exposure.mode: lan`; the Agent then binds IPv4 `0.0.0.0`, requires authentication, rejects non-private client source addresses, and accepts only exact detected private/overlay IPv4 Origins. Windows Firewall should still scope the Agent port to the trusted Private network profile. PalmTTY stores the workspace catalog in per-user application data. The browser can create/edit/delete this persistent catalog only through authenticated, exact-Origin-protected API calls; starting a Session still sends only the selected workspace ID.
 
 ### Runtime choices
 
@@ -101,7 +101,7 @@ pnpm start
 
 `PALMTTY_ACCESS_TOKEN` 至少需要 16 个字符，实际部署应使用长随机 secret。`pnpm run preflight` 只检查认证/安全设置与 Agent TCP 监听端点。Workspace 启动目标不再写入 YAML，因此某个旧项目目录失效不会阻塞整个 Agent 启动。
 
-打开配置的 Agent 地址并登录，然后直接在 Web UI 中创建第一个工作区。`pnpm build` 之后，无论 `pnpm start` 还是 autostart，编译后的 Web UI 都由 Agent 自己提供；示例配置使用 `server.exposure.mode: local`，地址是 `http://127.0.0.1:17688/`。端口 `5173` 只用于开发。若明确需要家庭/开发局域网 HTTP 直连，可使用 `examples/palmtty.lan.example.yaml` 或把 `server.exposure.mode` 改为 `lan`；Agent 会监听 `0.0.0.0`、强制要求认证，并只接受自动检测到的私有/overlay IPv4 精确 Origin。Windows 防火墙仍可能需要为 Agent 端口开放 Private 网络入站。PalmTTY 会把工作区目录持久化到当前用户的应用数据目录。浏览器只能通过已认证且受精确 Origin 保护的 API 持久化创建/编辑/删除工作区；真正创建 Session 时仍只发送 workspace ID。
+打开配置的 Agent 地址并登录，然后直接在 Web UI 中创建第一个工作区。`pnpm build` 之后，无论 `pnpm start` 还是 autostart，编译后的 Web UI 都由 Agent 自己提供；示例配置使用 `server.exposure.mode: local`，地址是 `http://127.0.0.1:17688/`。端口 `5173` 只用于开发。若明确需要家庭/开发局域网 HTTP 直连，可使用 `examples/palmtty.lan.example.yaml` 或把 `server.exposure.mode` 改为 `lan`；Agent 会监听 IPv4 `0.0.0.0`、强制要求认证、拒绝非私有来源地址，并只接受自动检测到的私有/overlay IPv4 精确 Origin。Windows 防火墙仍应把 Agent 端口的入站范围限制在可信的 Private 网络。PalmTTY 会把工作区目录持久化到当前用户的应用数据目录。浏览器只能通过已认证且受精确 Origin 保护的 API 持久化创建/编辑/删除工作区；真正创建 Session 时仍只发送 workspace ID。
 
 ### 运行环境
 
