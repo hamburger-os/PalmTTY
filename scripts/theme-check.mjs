@@ -65,12 +65,10 @@ const themeTsPath = path.join(webSource, "theme.tsx");
 const themeCss = await readFile(themeCssPath, "utf8");
 const themeTs = await readFile(themeTsPath, "utf8");
 const terminalViewPath = path.join(webSource, "TerminalView.tsx");
-const terminalTouchScrollPath = path.join(webSource, "terminal-touch-scroll.ts");
 const stylesPath = path.join(webSource, "styles.css");
 const sessionWorkbenchPath = path.join(webSource, "SessionWorkbench.tsx");
 const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
-const terminalTouchScroll = await readFile(terminalTouchScrollPath, "utf8");
 const styles = await readFile(stylesPath, "utf8");
 const sessionWorkbench = await readFile(sessionWorkbenchPath, "utf8");
 const workspaceDialog = await readFile(workspaceDialogPath, "utf8");
@@ -97,10 +95,12 @@ for (const forbidden of [
 }
 
 for (const marker of [
-  'className="terminal-host terminal-surface"',
+  'className="terminal-frame terminal-surface"',
+  'className="terminal-mount"',
   '"--terminal-background"',
   'terminalThemeRef.current',
-  'attachTerminalTouchScroll(host, terminal)',
+  'terminal.open(mount)',
+  'window.visualViewport',
   '}, [sessionId]);'
 ]) {
   if (!terminalView.includes(marker)) {
@@ -108,21 +108,9 @@ for (const marker of [
   }
 }
 
-for (const marker of [
-  'host.querySelector<HTMLElement>(".xterm-screen")',
-  'shouldOwnTerminalTouchScroll(',
-  'terminal.buffer.active.type',
-  'terminal.modes.mouseTrackingMode',
-  'event.preventDefault()',
-  'terminal.scrollLines(step.lines)'
-]) {
-  if (!terminalTouchScroll.includes(marker)) {
-    failures.push(`apps/web/src/terminal-touch-scroll.ts [terminal-touch-contract] missing ${marker}`);
-  }
-}
-
 for (const [selector, marker] of [
-  [".terminal-host", "touch-action: none;"],
+  [".terminal-frame", "padding: 7px 5px 8px;"],
+  [".terminal-mount .xterm-screen", "touch-action: none;"],
   [".workbench-page", "overscroll-behavior: none;"]
 ]) {
   const start = styles.indexOf(`${selector} {`);
@@ -136,11 +124,27 @@ for (const [selector, marker] of [
 }
 
 for (const forbidden of [
-  'terminal-host glass-content',
+  'terminal-frame glass-content',
+  'terminal-touch-scroll',
+  'attachTerminalTouchScroll',
+  'terminal.scrollLines(',
   '}, [sessionId, t]);'
 ]) {
   if (terminalView.includes(forbidden)) {
     failures.push(`apps/web/src/TerminalView.tsx [terminal-lifecycle-contract] forbidden ${forbidden}`);
+  }
+}
+
+const terminalMountStart = styles.indexOf(".terminal-mount {");
+const terminalMountEnd = terminalMountStart === -1 ? -1 : styles.indexOf("\n}", terminalMountStart);
+const terminalMountBlock = terminalMountStart === -1 || terminalMountEnd === -1
+  ? ""
+  : styles.slice(terminalMountStart, terminalMountEnd + 2);
+for (const forbidden of ["padding:", "border:", "overflow: hidden"]) {
+  if (terminalMountBlock.includes(forbidden)) {
+    failures.push(
+      `apps/web/src/styles.css [terminal-fit-contract] .terminal-mount must stay geometry-only; found ${forbidden}`
+    );
   }
 }
 
