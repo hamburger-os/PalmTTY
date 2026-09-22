@@ -129,6 +129,8 @@ Status: **alpha foundation implemented with durable per-session workers, Windows
 - Files pane provides workspace-root-scoped directory navigation plus bounded read-only UTF-8 preview with binary/truncation states; it is a viewer, not a browser IDE/editor
 - stopping Sessions remain non-interactive in the terminal view
 - xterm.js terminal uses one theme-owned opaque viewport surface: the host gutter receives the active xterm background from the same theme value, while theme updates apply in place without recreating the terminal or reconnecting the Session; locale/presentation updates are isolated from the transport lifecycle
+- browser terminal dependencies are governed by the exact-version `terminal-stack.json` contract and `pnpm terminal:check`; browser xterm/fit are pinned to `6.1.0-beta.304` / `0.12.0-beta.301` because xterm 6.0.0 has the upstream touch-scroll regression fixed by xtermjs/xterm.js#5563, while Worker headless/serialize remain exact `6.0.0` / `0.14.0` until a separate recovery-compatibility upgrade
+- on touch devices, one-finger vertical drags inside the terminal are owned by xterm scrollback; workbench and terminal containers contain overscroll so the gesture does not become page movement, without a second DOM scroll owner or global touch shim
 - reconnect loop with retained lastSeq
 - gap detection forces snapshot recovery
 - browser terminal writes are serialized during recovery, fitting is frozen until recovery completes, and terminal input is blocked rather than discarded while disconnected or recovering; switching to Git/Files suppresses resize propagation and switching back performs a safe refit without recreating transport state
@@ -147,7 +149,7 @@ Status: **alpha foundation implemented with durable per-session workers, Windows
 - No per-device session administration.
 - No multi-user ACL.
 - Reverse-proxy/Tailscale examples are documentation/configuration, not automated setup.
-- Real owner workstation + mobile Safari/Chrome + long-running Codex validation remains required.
+- Real owner workstation + mobile Safari/Chrome + long-running Codex validation remains required; CI now guards the terminal dependency/version contract, but it does not emulate real iOS/Android gesture physics, soft-keyboard focus, or inertial scrolling.
 - Windows autostart no longer depends on console hiding: CI compiles the actual launcher as PE Windows GUI subsystem, runs it, verifies Agent exit-code propagation and detached Worker breakaway, while Node is created with `CREATE_NO_WINDOW`. Real-host visual checks remain useful for PTY/ConPTY spawn/termination behavior, but the autostart lifecycle no longer has a console-subsystem parent by design. Development spawn-phase tracing narrows PTY-stage flashes without claiming to remove an upstream ConPTY/node-pty window if one is still shown.
 - Potentially-live but unreachable recovery records are deliberately preserved when process death cannot be proven; this favors terminal survival over aggressive metadata reclamation.
 - Files remains a read-only viewer; Git now supports a bounded typed local/remote write set, but deliberately does not expose arbitrary Git commands, force push, interactive rebase/cherry-pick/reflog recovery, submodule/LFS administration, or a general browser file editor.
@@ -155,7 +157,7 @@ Status: **alpha foundation implemented with durable per-session workers, Windows
 - WSL support is implemented but still needs real owner-host/long-running validation, including distribution enumeration, default-shell launch semantics, directory selection, and workspace-variable forwarding through `WSLENV`; repository CI does not provide a real WSL environment.
 - Linux host runtime is exercised on Ubuntu CI. macOS uses the same host adapter but remains unverified because there is no macOS CI job.
 - Windows Worker runtime file ACL behavior relies on the current-user application-data boundary and still merits dedicated real-host review.
-- The current xterm 6 package is loaded through an isolated CommonJS boundary in the Node Worker because the published headless package is not reliably consumable through native Node ESM named exports; re-review this when upgrading xterm.
+- The Worker intentionally remains on `@xterm/headless 6.0.0` + `@xterm/addon-serialize 0.14.0`; headless loading is isolated behind the existing CommonJS boundary because native Node ESM named imports are not reliable for that published line. Re-review the loading boundary together with snapshot/replay/geometry compatibility before moving the Worker stack.
 - GitHub Dependency Review remains unavailable while Dependency graph is disabled; `pnpm audit --prod` plus the production dependency license-policy check are enforced instead.
 
 ## Required honesty rule
