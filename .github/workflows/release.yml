@@ -68,15 +68,6 @@ jobs:
             exit 1
           fi
 
-          EXISTING_RELEASES="$(
-            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
-              jq --arg tag "$TAG" '[.[] | select(.tag_name == $tag)] | length'
-          )"
-          if [ "$EXISTING_RELEASES" -ne 0 ]; then
-            echo "::error::A GitHub Release already exists for $TAG."
-            exit 1
-          fi
-
           PRERELEASE=false
           if [[ "$VERSION" == *-* ]]; then
             PRERELEASE=true
@@ -152,8 +143,12 @@ jobs:
             code=$?
             if [ "$code" -ne 0 ] && [ "$FINALIZED" != "true" ]; then
               echo "::warning::Release validation failed; rolling back the tag/release created by this run."
-              if [ "$CREATED_RELEASE" = "true" ] && [ -n "$RELEASE_ID" ]; then
-                gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" >/dev/null 2>&1 || true
+              if [ "$CREATED_RELEASE" = "true" ]; then
+                if [ -n "$RELEASE_ID" ]; then
+                  gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" >/dev/null 2>&1 || true
+                else
+                  gh release delete "$TAG" --yes --cleanup-tag=false >/dev/null 2>&1 || true
+                fi
               fi
               if [ "$CREATED_TAG" = "true" ]; then
                 git push origin ":refs/tags/$TAG" >/dev/null 2>&1 || true
@@ -170,15 +165,6 @@ jobs:
           fi
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
             echo "::error::$TAG already exists."
-            exit 1
-          fi
-
-          EXISTING_RELEASES="$(
-            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
-              jq --arg tag "$TAG" '[.[] | select(.tag_name == $tag)] | length'
-          )"
-          if [ "$EXISTING_RELEASES" -ne 0 ]; then
-            echo "::error::A GitHub Release already exists for $TAG."
             exit 1
           fi
 
@@ -216,14 +202,13 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
             --input /tmp/palmtty-release-create.json \
             > /tmp/palmtty-release.json
+          CREATED_RELEASE=true
 
           RELEASE_ID="$(jq -r '.id // empty' /tmp/palmtty-release.json)"
           if [ -z "$RELEASE_ID" ]; then
             echo "::error::GitHub did not return a Release ID."
             exit 1
           fi
-          CREATED_RELEASE=true
-
           jq --arg tag "$TAG" --argjson prerelease "$PRERELEASE" -e '
             .tag_name == $tag and
             .name == $tag and
