@@ -20,7 +20,8 @@ const GIT_BASE_ARGS = [
   "-c", "core.quotepath=false",
   "-c", "color.ui=false",
   "-c", "core.pager=cat",
-  "-c", "core.fsmonitor=false"
+  "-c", "core.fsmonitor=false",
+  "-c", "log.showSignature=false"
 ];
 
 const GIT_REPOSITORY_ENV_KEYS = [
