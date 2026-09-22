@@ -84,10 +84,6 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   const workspaceMutationLimiter = new FixedWindowLimiter(60, 60_000);
   const directoryBrowseLimiter = new FixedWindowLimiter(120, 60_000);
   const terminalProfileLimiter = new FixedWindowLimiter(60, 60_000);
-  const trustedOrigins = [...new Set([
-    ...exposureOrigins(config),
-    ...(options.additionalTrustedOrigins ?? [])
-  ])];
 
   function authenticated(request: FastifyRequest): boolean {
     return auth.isAuthenticated(request.cookies[AUTH_COOKIE]);
@@ -109,6 +105,10 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   }
 
   async function requireOrigin(request: FastifyRequest, reply: FastifyReply) {
+    const trustedOrigins = [
+      ...exposureOrigins(config),
+      ...(options.additionalTrustedOrigins ?? [])
+    ];
     if (!isTrustedOrigin(request.headers.origin, trustedOrigins)) {
       request.log.warn({ origin: request.headers.origin }, "Rejected untrusted origin");
       return reply.code(403).send({ error: "untrusted_origin" });
