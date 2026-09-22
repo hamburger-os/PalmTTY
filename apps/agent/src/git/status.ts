@@ -8,6 +8,7 @@ import {
   type GitStatusResponse,
   type WorkspaceDefinition
 } from "@palmtty/protocol";
+import { GitStateChangedError } from "./errors.js";
 import {
   GIT_STATUS_LIMIT_BYTES,
   MAX_GIT_STATUS_ENTRIES,
@@ -257,16 +258,12 @@ export async function requireExpectedGitState(
     throw new Error("Workspace is not inside a Git repository");
   }
   if (status.truncated) {
-    const error = new Error(
+    throw new GitStateChangedError(
       "Git status is incomplete; write operations are disabled until the repository fits the safe status bounds"
     );
-    error.name = "GitStateChangedError";
-    throw error;
   }
   if (status.repository.stateToken !== expectedState) {
-    const error = new Error("Git repository changed since the page was refreshed");
-    error.name = "GitStateChangedError";
-    throw error;
+    throw new GitStateChangedError();
   }
   return status;
 }
