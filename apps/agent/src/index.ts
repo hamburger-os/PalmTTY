@@ -1,22 +1,35 @@
 import path from "node:path";
 import { configPathFromEnvironment, loadConfig } from "@palmtty/config";
 import { buildApp } from "./app.js";
-import { preflightRuntime } from "./preflight.js";
 import { withDevelopmentTrustedOrigins } from "./development-origins.js";
+import { loadEnvironmentFile } from "./environment-file.js";
+import { preflightRuntime } from "./preflight.js";
 import { describeServerBindError } from "./server-endpoint.js";
 import { runSessionWorkerFromStdin } from "./session-worker.js";
 
+function pathFromArgs(option: string): string | undefined {
+  const index = process.argv.indexOf(option);
+  if (index < 0) return undefined;
+  const explicitPath = process.argv[index + 1];
+  if (!explicitPath || explicitPath.startsWith("--")) {
+    throw new Error(`Missing path after ${option}`);
+  }
+  return path.resolve(explicitPath);
+}
+
 function configPathFromArgs(): string {
-  const index = process.argv.indexOf("--config");
-  const explicitPath = index >= 0 ? process.argv[index + 1] : undefined;
-  if (explicitPath) return path.resolve(explicitPath);
-  return configPathFromEnvironment();
+  return pathFromArgs("--config") ?? configPathFromEnvironment();
 }
 
 async function main() {
   if (process.argv.includes("--session-worker")) {
     await runSessionWorkerFromStdin();
     return;
+  }
+
+  const environmentFilePath = pathFromArgs("--env-file");
+  if (environmentFilePath) {
+    await loadEnvironmentFile(environmentFilePath);
   }
 
   const configPath = configPathFromArgs();
