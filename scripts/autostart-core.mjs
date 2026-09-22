@@ -141,7 +141,7 @@ export function buildWindowsTaskXml({
   }
   if (envFile) assertSingleLine(envFile, "envFile");
 
-  const arguments = [
+  const taskArguments = [
     "-NoLogo",
     "-NoProfile",
     "-NonInteractive",
@@ -158,8 +158,8 @@ export function buildWindowsTaskXml({
     "-ConfigPath",
     configPath
   ];
-  if (envFile) arguments.push("-EnvFile", envFile);
-  const argumentsText = arguments.map(quoteWindowsArg).join(" ");
+  if (envFile) taskArguments.push("-EnvFile", envFile);
+  const argumentsText = taskArguments.map(quoteWindowsArg).join(" ");
 
   return `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
