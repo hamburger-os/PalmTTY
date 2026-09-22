@@ -140,12 +140,12 @@ export function buildWindowsHostCompilePowerShellCommand({ sourcePath, outputPat
   assertSingleLine(outputPath, "outputPath");
   return [
     "$ErrorActionPreference = 'Stop'",
-    "Add-Type",
-    `  -Path ${quotePowerShellLiteral(sourcePath)}`,
-    `  -OutputAssembly ${quotePowerShellLiteral(outputPath)}`,
-    "  -OutputType WindowsApplication",
+    "Add-Type `",
+    `  -Path ${quotePowerShellLiteral(sourcePath)} \``,
+    `  -OutputAssembly ${quotePowerShellLiteral(outputPath)} \``,
+    "  -OutputType WindowsApplication `",
     "  -ReferencedAssemblies 'System.Runtime.Serialization.dll'"
-  ].join(" `\n");
+  ].join("\n");
 }
 
 export function buildWindowsInstallationManifest({
