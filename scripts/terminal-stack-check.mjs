@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 const root = process.cwd();
 const exactVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -117,8 +117,7 @@ async function main() {
 
 const invokedDirectly =
   process.argv[1] &&
-  pathToFileURL(path.resolve(process.argv[1])).href ===
-    pathToFileURL(fileURLToPath(import.meta.url)).href;
+  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 
 if (invokedDirectly) {
   await main();
