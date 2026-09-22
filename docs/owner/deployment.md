@@ -24,7 +24,7 @@ PalmTTY Agent（配置 endpoint；示例为 127.0.0.1:17688）
 
 开发启动器只把检测到的 RFC1918、IPv4 link-local 和 100.64/10 私有/overlay 地址对应的 5173 Origin 作为**精确值**临时注入 development Agent，不写回配置、不启用通配 Origin。Windows 若 LAN 访问超时，应按 Private 网络配置防火墙，不由 PalmTTY 自动提权修改。
 
-正常构建运行与 autostart 不包含 Vite：`pnpm build` 后 Agent 直接托管 `apps/web/dist`。网络暴露改为 `server.exposure.mode` 一等模型：`local` 固定 loopback；`lan` 固定 `0.0.0.0` 并自动生成当前私有/overlay IPv4 的精确 HTTP Origin；`reverseProxy` 使用显式 HTTPS Origin 并自动启用 Secure Cookie；`https` 由 Agent 直接加载证书/私钥。示例配置为 `local`，对应 `http://127.0.0.1:17688/`；`http://<LAN-IP>:5173` 只在 `pnpm dev` 运行时存在。
+正常构建运行与 autostart 不包含 Vite：`pnpm build` 后 Agent 直接托管 `apps/web/dist`。网络暴露改为 `server.exposure.mode` 一等模型：`local` 固定 loopback；`lan` 固定监听 IPv4 `0.0.0.0`，但在应用入口拒绝非私有来源地址，并自动生成当前私有/overlay IPv4 的精确 HTTP Origin；`reverseProxy` 使用显式 HTTPS Origin 并自动启用 Secure Cookie；`https` 由 Agent 直接加载证书/私钥。示例配置为 `local`，对应 `http://127.0.0.1:17688/`；`http://<LAN-IP>:5173` 只在 `pnpm dev` 运行时存在。
 
 ## Windows 当前用户自启动
 
