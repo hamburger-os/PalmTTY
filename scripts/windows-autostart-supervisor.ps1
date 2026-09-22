@@ -102,7 +102,7 @@ public static class PalmTTYJobSupervisor
         public uint dwThreadId;
     }
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string lpName);
 
     [DllImport("kernel32.dll", SetLastError = true)]
