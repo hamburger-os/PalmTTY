@@ -41,6 +41,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Fixed
 
+- Fix reusable Release gate concurrency/ref handling so Security Audit and CodeQL cannot cancel each other under the caller workflow context, while each gate checks out the exact passed release SHA.
 - Remove the redundant Release workflow acceptance checkbox; real-device/deployment checks remain recommended operator evidence while publication is gated by protected `main` plus immutable-SHA CI/security/license/CodeQL checks.
 - Align quick-start documentation with the example Agent port `17688` instead of the stale `7688` URL/diagnostic example.
 - Normalize balanced outer single/double quotes in Web Workspace environment values, so proxy entries copied as `HTTP_PROXY="http://127.0.0.1:10808"` reach child processes as `http://127.0.0.1:10808` instead of a URL containing literal quote characters; reject unmatched outer quotes.
