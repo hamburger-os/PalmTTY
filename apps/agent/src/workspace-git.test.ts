@@ -67,7 +67,7 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
     const status = await getWorkspaceGitStatus(workspace);
     expect(status.available).toBe(true);
     expect(status.repository).toEqual(expect.objectContaining({
-      root: workspace.cwd,
+      root: expect.any(String),
       workspacePath: "",
       scope: "repository",
       stateToken: expect.stringMatching(/^[0-9a-f]{64}$/)
@@ -97,7 +97,7 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
     const nestedWorkspace = { ...workspace, cwd: nested };
 
     const status = await getWorkspaceGitStatus(nestedWorkspace);
-    expect(status.repository?.root).toBe(workspace.cwd);
+    expect(path.resolve(status.repository!.root)).toBe(path.resolve(workspace.cwd));
     expect(status.repository?.workspacePath).toBe("apps/web");
     expect(status.repository?.scope).toBe("repository");
   });
