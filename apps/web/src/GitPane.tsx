@@ -500,7 +500,7 @@ export function GitPane({
                   <select
                     className="glass-input"
                     value={branchSelection}
-                    disabled={!writesEnabled || busy || branches.length === 0}
+                    disabled={!writeReady || busy || branches.length === 0}
                     onChange={(event) => setBranchSelection(event.target.value)}
                   >
                     {branches.map((branch) => (
@@ -538,7 +538,7 @@ export function GitPane({
                   <button
                     type="button"
                     className="ghost compact"
-                    disabled={!writesEnabled || busy || !branchName.trim()}
+                    disabled={!writeReady || busy || !branchName.trim()}
                     onClick={() => void runMutation({
                       type: "branch.create",
                       name: branchName.trim()
@@ -556,7 +556,7 @@ export function GitPane({
                 <button
                   type="button"
                   className="ghost compact"
-                  disabled={!writesEnabled || busy || status.changes.length === 0}
+                  disabled={!writeReady || busy || status.changes.length === 0}
                   onClick={() => void runMutation({
                     type: "stash.push",
                     includeUntracked: true
