@@ -50,12 +50,14 @@ export function attachTerminalTouchScroll(
   let active = false;
   let previousClientY = 0;
   let remainderPx = 0;
+  let lineHeightPx = 0;
   let moved = false;
 
   const reset = () => {
     active = false;
     previousClientY = 0;
     remainderPx = 0;
+    lineHeightPx = 0;
     moved = false;
   };
 
@@ -67,6 +69,12 @@ export function attachTerminalTouchScroll(
 
     const touch = event.touches.item(0);
     if (!touch) {
+      reset();
+      return;
+    }
+
+    lineHeightPx = terminalLineHeight(host, terminal);
+    if (!Number.isFinite(lineHeightPx) || lineHeightPx <= 0) {
       reset();
       return;
     }
@@ -103,7 +111,7 @@ export function attachTerminalTouchScroll(
       remainderPx,
       previousClientY,
       currentClientY,
-      terminalLineHeight(host, terminal)
+      lineHeightPx
     );
     previousClientY = currentClientY;
     remainderPx = step.remainderPx;
