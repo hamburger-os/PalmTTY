@@ -12,7 +12,7 @@ Use this map after every implementation change.
 | workspace store/runtime adapters/API | `agent.md`, `session.md`, `security.md`, `roadmap.md` | `architecture.md`, `getting-started.md`, `security.md` | OS/runtime references when assumptions change |
 | workspace workbench file/Git APIs (`workspace-files.ts`, `git/*.ts`, `workspace-tool-routes.ts`) | `web-mobile.md`, `security.md`, `roadmap.md` | `architecture.md`, `development.md`, `security.md` | Git/runtime references only when external assumptions change |
 | `apps/web` | `web-mobile.md`, possibly `reconnect.md` | architecture/getting-started as needed | xterm upstream only if assumptions changed; visual/theme changes also follow `.agents/skills/palmtty-theme/SKILL.md` and its review skill |
-| deployment/reverse proxy | `deployment.md`, `security.md` | `security.md`, `getting-started.md` | security references |
+| deployment/reverse proxy/autostart | `deployment.md`, `security.md` | `security.md`, `getting-started.md`, `autostart.md` | OS service-management/security references |
 | session worker lifecycle / IPC / recovery metadata | `session.md`, `reconnect.md`, `security.md`, `roadmap.md` | `architecture.md`, `security.md` | Windows/Node runtime references |
 | GitHub workflows, dependency policy, release/governance files | `github-governance.md`, `roadmap.md` | `development.md` if contributor-visible | normally none |
 | roadmap/completion status | `roadmap.md` | README if contributor-facing | none |
