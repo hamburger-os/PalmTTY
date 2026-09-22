@@ -15,6 +15,8 @@ pnpm autostart uninstall
 
 The command records absolute paths to the current Node executable, repository, built Agent and config. Re-run `pnpm autostart install ...` after moving the repository or changing to a Node installation with a different executable path.
 
+After `pnpm build`, normal `pnpm start` and autostart do **not** run Vite. The Agent serves the compiled Web UI itself on the configured Agent endpoint; with `examples/palmtty.example.yaml` that is `http://127.0.0.1:17688/`. Port `5173` belongs only to `pnpm dev` and exists only while the Vite development server is running. `pnpm autostart status` also prints PalmTTY-owned UTF-8 status fields instead of forwarding localized `schtasks` text.
+
 ### Environment file
 
 `--env-file` is optional. It is useful for the bootstrap token because the secret value stays out of the scheduled-task/systemd command line. The Agent loads strict `NAME=value` entries before it loads PalmTTY config; blank lines and `#` comments are allowed, balanced outer single/double quotes are removed, duplicate/invalid names fail startup, and shell expansion is intentionally not performed.
@@ -57,8 +59,6 @@ pnpm autostart status
 
 The generated user unit uses `Restart=on-failure` and `KillMode=process`. The latter is intentional because the PalmTTY Agent is only the control plane; independent Session Workers must not be killed merely because the Agent service is restarted.
 
-After `pnpm build`, normal `pnpm start` and autostart do **not** run Vite. The Agent serves the compiled Web UI itself on the configured Agent endpoint; with `examples/palmtty.example.yaml` that is `http://127.0.0.1:17688/`. Port `5173` belongs only to `pnpm dev` and exists only while the Vite development server is running. `pnpm autostart status` also prints PalmTTY-owned UTF-8 status fields instead of forwarding localized `schtasks` text.
-
 A normal systemd user manager starts with the user's session. For a headless Linux host that must start the user manager at boot before interactive login, the operator may enable lingering according to host policy, for example `loginctl enable-linger "$USER"`. PalmTTY does not elevate itself or change linger policy automatically.
 
 ### Persistence boundary
@@ -78,6 +78,8 @@ pnpm autostart uninstall
 ~~~
 
 该命令会记录当前 Node 可执行文件、仓库、已编译 Agent 和配置文件的绝对路径。移动仓库或切换到不同 Node 安装路径后，应重新执行 `pnpm autostart install ...`。
+
+`pnpm build` 之后，正常 `pnpm start` 与 autostart **不会**启动 Vite；编译后的 Web UI 由 Agent 自己在配置的 Agent endpoint 提供。使用 `examples/palmtty.example.yaml` 时应打开 `http://127.0.0.1:17688/`。端口 `5173` 只属于 `pnpm dev`，只有 Vite 开发服务器运行期间才存在。`pnpm autostart status` 也会输出 PalmTTY 自己的 UTF-8 状态字段，不再直接转发本地化的 `schtasks` 文本。
 
 ### 环境文件
 
@@ -120,8 +122,6 @@ pnpm autostart status
 ~~~
 
 生成的 user unit 使用 `Restart=on-failure` 与 `KillMode=process`。后者是有意设计：Agent 只是控制面，独立 Session Worker 不应因为 Agent service 重启而被 systemd 一起清理。
-
-`pnpm build` 之后，正常 `pnpm start` 与 autostart **不会**启动 Vite；编译后的 Web UI 由 Agent 自己在配置的 Agent endpoint 提供。使用 `examples/palmtty.example.yaml` 时应打开 `http://127.0.0.1:17688/`。端口 `5173` 只属于 `pnpm dev`，只有 Vite 开发服务器运行期间才存在。`pnpm autostart status` 也会输出 PalmTTY 自己的 UTF-8 状态字段，不再直接转发本地化的 `schtasks` 文本。
 
 普通 systemd user manager 会随用户会话启动。如果无头 Linux 主机要求“尚未交互登录就启动用户 manager”，管理员可按本机策略启用 linger，例如 `loginctl enable-linger "$USER"`。PalmTTY 不会自行提权或修改 linger 策略。
 
