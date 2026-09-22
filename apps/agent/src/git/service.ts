@@ -33,6 +33,7 @@ import {
 } from "./status.js";
 
 const GIT_REMOTE_LIMIT_BYTES = 512 * 1024;
+const repositoryWritePipelines = new Map<string, Promise<void>>();
 
 const SAFE_REMOTE_PROTOCOL_ARGS = [
   "-c", "protocol.allow=never",
@@ -63,6 +64,38 @@ async function requireRepository(
     throw new Error("Workspace is not inside a Git repository");
   }
   return repository;
+}
+
+function repositoryWriteKey(
+  workspace: WorkspaceDefinition,
+  root: string
+): string {
+  const normalizedRoot = workspace.runtime.kind === "host" && process.platform === "win32"
+    ? root.toLowerCase()
+    : root;
+  if (workspace.runtime.kind === "wsl") {
+    return `wsl:${workspace.runtime.distribution ?? ""}:${normalizedRoot}`;
+  }
+  return `host:${normalizedRoot}`;
+}
+
+async function serializedRepositoryWrite<T>(
+  workspace: WorkspaceDefinition,
+  root: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  const key = repositoryWriteKey(workspace, root);
+  const previous = repositoryWritePipelines.get(key) ?? Promise.resolve();
+  const current = previous.then(operation);
+  const tail = current.then(() => undefined, () => undefined);
+  repositoryWritePipelines.set(key, tail);
+  try {
+    return await current;
+  } finally {
+    if (repositoryWritePipelines.get(key) === tail) {
+      repositoryWritePipelines.delete(key);
+    }
+  }
 }
 
 function hashBytes(value: Uint8Array): string {
@@ -313,17 +346,19 @@ export async function mutateWorkspaceGit(
   request: GitMutationRequest,
   excludedEnvironmentKeys: string[] = []
 ): Promise<GitMutationResponse> {
-  const before = await requireExpectedGitState(
-    workspace,
-    request.expectedState,
-    excludedEnvironmentKeys
-  );
-  if (!before.repository) {
-    throw new Error("Workspace is not inside a Git repository");
-  }
-  const root = before.repository.root;
+  const repository = await requireRepository(workspace, excludedEnvironmentKeys);
+  return serializedRepositoryWrite(workspace, repository.root, async () => {
+    const before = await requireExpectedGitState(
+      workspace,
+      request.expectedState,
+      excludedEnvironmentKeys
+    );
+    if (!before.repository || before.repository.root !== repository.root) {
+      throw new GitStateChangedError();
+    }
+    const root = before.repository.root;
 
-  switch (request.operation.type) {
+    switch (request.operation.type) {
     case "stage": {
       const paths = validateGitPaths(request.operation.paths);
       await runMutationCommand(
@@ -342,6 +377,26 @@ export async function mutateWorkspaceGit(
         before.repository.head.unborn
           ? ["rm", "--cached", "--ignore-unmatch", "--", ...paths]
           : ["restore", "--staged", "--", ...paths],
+        excludedEnvironmentKeys
+      );
+      break;
+    }
+    case "stage.all": {
+      await runMutationCommand(
+        workspace,
+        root,
+        ["add", "-A", "--", "."],
+        excludedEnvironmentKeys
+      );
+      break;
+    }
+    case "unstage.all": {
+      await runMutationCommand(
+        workspace,
+        root,
+        before.repository.head.unborn
+          ? ["rm", "-r", "--cached", "--ignore-unmatch", "--", "."]
+          : ["restore", "--staged", "--", "."],
         excludedEnvironmentKeys
       );
       break;
@@ -450,10 +505,11 @@ export async function mutateWorkspaceGit(
       );
       break;
     }
-  }
+    }
 
-  return GitMutationResponseSchema.parse({
-    status: await getGitStatus(workspace, excludedEnvironmentKeys)
+    return GitMutationResponseSchema.parse({
+      status: await getGitStatus(workspace, excludedEnvironmentKeys)
+    });
   });
 }
 
@@ -462,37 +518,40 @@ export async function runWorkspaceGitRemote(
   request: GitRemoteRequest,
   excludedEnvironmentKeys: string[] = []
 ): Promise<GitRemoteResponse> {
-  const before = await requireExpectedGitState(
-    workspace,
-    request.expectedState,
-    excludedEnvironmentKeys
-  );
-  if (!before.repository) {
-    throw new Error("Workspace is not inside a Git repository");
-  }
-
-  const command = request.operation === "fetch"
-    ? ["fetch", "--prune"]
-    : request.operation === "pull"
-      ? ["pull", "--ff-only"]
-      : ["push"];
-
-  await runWorkspaceGit(
-    workspace,
-    before.repository.root,
-    [
-      ...disabledHooksArgs(workspace),
-      ...SAFE_REMOTE_PROTOCOL_ARGS,
-      ...command
-    ],
-    excludedEnvironmentKeys,
-    {
-      maxStdoutBytes: GIT_REMOTE_LIMIT_BYTES,
-      timeoutMs: 60_000
+  const repository = await requireRepository(workspace, excludedEnvironmentKeys);
+  return serializedRepositoryWrite(workspace, repository.root, async () => {
+    const before = await requireExpectedGitState(
+      workspace,
+      request.expectedState,
+      excludedEnvironmentKeys
+    );
+    if (!before.repository || before.repository.root !== repository.root) {
+      throw new GitStateChangedError();
     }
-  );
 
-  return GitRemoteResponseSchema.parse({
-    status: await getGitStatus(workspace, excludedEnvironmentKeys)
+    const command = request.operation === "fetch"
+      ? ["fetch", "--prune"]
+      : request.operation === "pull"
+        ? ["pull", "--ff-only"]
+        : ["push"];
+
+    await runWorkspaceGit(
+      workspace,
+      before.repository.root,
+      [
+        ...disabledHooksArgs(workspace),
+        ...SAFE_REMOTE_PROTOCOL_ARGS,
+        ...command
+      ],
+      excludedEnvironmentKeys,
+      {
+        maxStdoutBytes: GIT_REMOTE_LIMIT_BYTES,
+        timeoutMs: 60_000
+      }
+    );
+
+    return GitRemoteResponseSchema.parse({
+      status: await getGitStatus(workspace, excludedEnvironmentKeys)
+    });
   });
 }
