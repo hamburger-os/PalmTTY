@@ -5,12 +5,30 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = process.cwd();
 const exactVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
-function packageXtermDependencies(packageJson) {
-  return Object.fromEntries(
-    Object.entries(packageJson.dependencies ?? {})
-      .filter(([name]) => name.startsWith("@xterm/"))
-      .sort(([a], [b]) => a.localeCompare(b))
-  );
+const dependencySections = [
+  "dependencies",
+  "devDependencies",
+  "optionalDependencies",
+  "peerDependencies"
+];
+
+function packageXtermDependencies(packageJson, failures) {
+  const entries = new Map();
+
+  for (const sectionName of dependencySections) {
+    for (const [name, version] of Object.entries(packageJson[sectionName] ?? {})) {
+      if (!name.startsWith("@xterm/")) continue;
+      if (entries.has(name)) {
+        failures.push(
+          `${packageJson.name} declares ${name} in more than one dependency section`
+        );
+        continue;
+      }
+      entries.set(name, version);
+    }
+  }
+
+  return Object.fromEntries([...entries].sort(([a], [b]) => a.localeCompare(b)));
 }
 
 function major(version) {
@@ -37,7 +55,7 @@ export function validateTerminalStack(stack, { webPackage, agentPackage }) {
       continue;
     }
 
-    const actual = packageXtermDependencies(packageJson);
+    const actual = packageXtermDependencies(packageJson, failures);
     const expectedNames = Object.keys(expected).sort();
     const actualNames = Object.keys(actual).sort();
 
