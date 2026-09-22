@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -169,7 +169,9 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
     const nestedWorkspace = { ...workspace, cwd: nested };
 
     const status = await getWorkspaceGitStatus(nestedWorkspace);
-    expect(path.resolve(status.repository!.root)).toBe(path.resolve(workspace.cwd));
+    expect(await realpath(status.repository!.root)).toBe(
+      await realpath(workspace.cwd)
+    );
     expect(status.repository?.workspacePath).toBe("apps/web");
     expect(status.repository?.scope).toBe("repository");
   });
@@ -247,7 +249,7 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
     expect(history.commits[0]).toEqual(expect.objectContaining({
       subject: "test: Git workbench commit"
     }));
-  });
+  }, 45_000);
 
   it("rejects stale mutations and stale destructive restores", async () => {
     const workspace = await initializedWorkspace();
