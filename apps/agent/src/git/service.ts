@@ -34,6 +34,16 @@ import {
 
 const GIT_REMOTE_LIMIT_BYTES = 512 * 1024;
 
+const SAFE_REMOTE_PROTOCOL_ARGS = [
+  "-c", "protocol.allow=never",
+  "-c", "protocol.http.allow=always",
+  "-c", "protocol.https.allow=always",
+  "-c", "protocol.ssh.allow=always",
+  "-c", "protocol.git.allow=always",
+  "-c", "protocol.ext.allow=never",
+  "-c", "protocol.file.allow=never"
+];
+
 export class GitStateChangedError extends Error {
   constructor(message = "Git repository changed since the page was refreshed") {
     super(message);
@@ -409,7 +419,11 @@ export async function runWorkspaceGitRemote(
   await runWorkspaceGit(
     workspace,
     before.repository.root,
-    [...disabledHooksArgs(workspace), ...command],
+    [
+      ...disabledHooksArgs(workspace),
+      ...SAFE_REMOTE_PROTOCOL_ARGS,
+      ...command
+    ],
     excludedEnvironmentKeys,
     {
       maxStdoutBytes: GIT_REMOTE_LIMIT_BYTES,
