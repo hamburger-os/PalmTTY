@@ -191,7 +191,7 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
     } catch (cause) {
       const code = cause instanceof ApiError ? cause.code : "git_operation_failed";
       setActionError(translateError(code));
-      if (code === "git_state_changed") await refreshAll(false);
+      await refreshAll(false);
     } finally {
       setBusy(false);
     }
@@ -222,7 +222,7 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
     } catch (cause) {
       const code = cause instanceof ApiError ? cause.code : "git_remote_failed";
       setActionError(translateError(code));
-      if (code === "git_state_changed") await refreshAll(false);
+      await refreshAll(false);
     } finally {
       setBusy(false);
     }
