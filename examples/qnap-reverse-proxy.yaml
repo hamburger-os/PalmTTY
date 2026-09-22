@@ -11,7 +11,7 @@
 # environment. Workspaces are managed after sign-in through the Web UI.
 
 server:
-  port: 7688
+  port: 17688
   exposure:
     mode: reverseProxy
     listenHost: 0.0.0.0
