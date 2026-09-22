@@ -161,7 +161,7 @@ Windows uses a current-user Task Scheduler logon trigger rather than LocalSystem
 PalmTTY uses an explicit exposure profile instead of independent low-level security switches:
 
 - `local` — default; Agent binds loopback and accepts only local Origins.
-- `lan` — binds private-LAN/overlay interfaces through `0.0.0.0`, requires authentication, discovers exact private IPv4 Origins automatically, and intentionally uses unencrypted HTTP. Use this only on a trusted LAN.
+- `lan` — listens on IPv4 `0.0.0.0`, requires authentication, rejects non-private client source addresses, discovers exact private/overlay IPv4 Origins automatically, and intentionally uses unencrypted HTTP. Keep the host firewall scoped to trusted Private networks.
 - `reverseProxy` — HTTP upstream plus explicit HTTPS browser Origins; Secure cookies are derived automatically. Use this for Tailscale Serve, Caddy, QNAP, Nginx, and similar ingress.
 - `https` — Agent terminates TLS directly using configured certificate/key files and explicit HTTPS Origins.
 
