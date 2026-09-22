@@ -121,12 +121,17 @@ for (const marker of [
   }
 }
 
-for (const marker of [
-  "touch-action: none;",
-  "overscroll-behavior: none;"
+for (const [selector, marker] of [
+  [".terminal-host", "touch-action: none;"],
+  [".workbench-page", "overscroll-behavior: none;"]
 ]) {
-  if (!styles.includes(marker)) {
-    failures.push(`apps/web/src/styles.css [mobile-terminal-scroll-contract] missing ${marker}`);
+  const start = styles.indexOf(`${selector} {`);
+  const end = start === -1 ? -1 : styles.indexOf("\n}", start);
+  const block = start === -1 || end === -1 ? "" : styles.slice(start, end + 2);
+  if (!block.includes(marker)) {
+    failures.push(
+      `apps/web/src/styles.css [mobile-terminal-scroll-contract] ${selector} missing ${marker}`
+    );
   }
 }
 
