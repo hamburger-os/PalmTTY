@@ -81,12 +81,12 @@ test("Windows launcher compiles, propagates Agent exit code, and lets detached c
   try {
     writeFileSync(
       workerPath,
-      \`const { writeFileSync } = require("node:fs");\nsetTimeout(() => { writeFileSync(\${JSON.stringify(markerPath)}, "ok"); }, 300);\n\`,
+      `const { writeFileSync } = require("node:fs");\nsetTimeout(() => { writeFileSync(${JSON.stringify(markerPath)}, "ok"); }, 300);\n`,
       "utf8"
     );
     writeFileSync(
       agentPath,
-      \`const { spawn } = require("node:child_process");\nconst child = spawn(process.execPath, [\${JSON.stringify(workerPath)}], { detached: true, windowsHide: true, stdio: "ignore" });\nchild.unref();\nprocess.exit(7);\n\`,
+      `const { spawn } = require("node:child_process");\nconst child = spawn(process.execPath, [${JSON.stringify(workerPath)}], { detached: true, windowsHide: true, stdio: "ignore" });\nchild.unref();\nprocess.exit(7);\n`,
       "utf8"
     );
 
