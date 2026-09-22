@@ -97,11 +97,13 @@ export async function runWorkspaceGit(
     maxStdoutBytes?: number;
     timeoutMs?: number;
     allowExitCodes?: number[];
+    allowTruncated?: boolean;
   } = {}
 ): Promise<BoundedProcessResult> {
   const maxStdoutBytes = options.maxStdoutBytes ?? GIT_STATUS_LIMIT_BYTES;
   const timeoutMs = options.timeoutMs ?? 10_000;
   const allowExitCodes = options.allowExitCodes ?? [0];
+  const allowTruncated = options.allowTruncated ?? false;
 
   let result: BoundedProcessResult;
   if (workspace.runtime.kind === "wsl") {
@@ -160,7 +162,7 @@ export async function runWorkspaceGit(
   }
 
   if (
-    result.stdoutTruncated ||
+    (!allowTruncated && result.stdoutTruncated) ||
     (result.code !== null && !allowExitCodes.includes(result.code))
   ) {
     const detail = result.stderr.trim();
