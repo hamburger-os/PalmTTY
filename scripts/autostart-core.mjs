@@ -118,7 +118,7 @@ export function encodePowerShellCommand(command) {
   return Buffer.from(command, "utf16le").toString("base64");
 }
 
-const WINDOWS_JOB_SUPERVISOR_SOURCE = String.raw\`
+const WINDOWS_JOB_SUPERVISOR_SOURCE = String.raw`
 using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
@@ -358,17 +358,17 @@ export function buildWindowsAgentPowerShellCommand({
   const commandLine = [nodePath, ...buildAgentArguments({ agentPath, configPath, envFile })]
     .map(quoteWindowsArg)
     .join(" ");
-  return \`$ErrorActionPreference = 'Stop'
+  return `$ErrorActionPreference = 'Stop'
 $source = @'
-\${WINDOWS_JOB_SUPERVISOR_SOURCE}
+${WINDOWS_JOB_SUPERVISOR_SOURCE}
 '@
 Add-Type -TypeDefinition $source -Language CSharp
 $exitCode = [PalmTTYJobSupervisor]::Run(
-  \${quotePowerShellLiteral(nodePath)},
-  \${quotePowerShellLiteral(commandLine)},
-  \${quotePowerShellLiteral(repoRoot)}
+  ${quotePowerShellLiteral(nodePath)},
+  ${quotePowerShellLiteral(commandLine)},
+  ${quotePowerShellLiteral(repoRoot)}
 )
-exit $exitCode\`;
+exit $exitCode`;
 }
 
 export function buildWindowsTaskXml({
