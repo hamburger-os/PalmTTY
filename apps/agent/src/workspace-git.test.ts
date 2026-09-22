@@ -90,6 +90,29 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
     expect(diff.truncated).toBe(false);
   });
 
+  it("neutralizes configured clean/process filters while reading working-tree diffs", async () => {
+    const workspace = await initializedWorkspace();
+    await writeFile(
+      path.join(workspace.cwd, ".gitattributes"),
+      "*.md filter=probe\n",
+      "utf8"
+    );
+    runGit(workspace.cwd, ["add", "--", ".gitattributes"]);
+    runGit(workspace.cwd, ["commit", "-m", "add attributes"]);
+    runGit(workspace.cwd, [
+      "config",
+      "filter.probe.clean",
+      "palmtty-filter-command-that-does-not-exist"
+    ]);
+    runGit(workspace.cwd, ["config", "filter.probe.required", "true"]);
+
+    await writeFile(path.join(workspace.cwd, "README.md"), "one\ntwo\n", "utf8");
+    const diff = await getWorkspaceGitDiff(workspace, "README.md", false);
+
+    expect(diff.diff).toContain("+two");
+    expect(diff.truncated).toBe(false);
+  });
+
   it("previews untracked files without treating directories as pseudo-paths", async () => {
     const workspace = await initializedWorkspace();
     await mkdir(path.join(workspace.cwd, "notes"), { recursive: true });
