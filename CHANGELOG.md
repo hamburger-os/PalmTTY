@@ -19,8 +19,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Fixed
 
-- Add a PalmTTY-owned host-local touch fallback for normal-buffer scrollback after real-device testing showed the upstream xterm gesture path could still hand vertical swipes to the browser page. The Session workbench is now viewport-fixed, terminal touch panning is contained locally, and alternate-buffer/mouse-tracking gestures remain xterm-owned.
-- Restore one-finger mobile terminal scrollback by moving the browser terminal off xterm 6.0.0's upstream touch-scroll regression and containing terminal/workbench overscroll so terminal-owned gestures no longer become page movement.
+- Restore one-finger mobile terminal scrollback with a narrow PalmTTY host-local fallback after real-device testing showed that upgrading beyond xterm 6.0.0's upstream touch-scroll regression plus CSS overscroll containment was still insufficient. Normal-buffer/no-mouse-tracking swipes now drive xterm's public scroll API while the Session workbench is viewport-fixed; alternate-buffer and mouse-tracking gestures remain xterm-owned.
 - Keep Windows scheduled-task status locale-independent by querying structured UTF-8 data instead of forwarding localized `schtasks /FO LIST /V` text, and make normal build/start/autostart documentation explicit that port `5173` belongs only to Vite development.
 
 <!-- Add changes here after the latest release. Publishing requires this section to be empty. -->
