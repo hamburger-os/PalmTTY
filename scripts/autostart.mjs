@@ -230,11 +230,12 @@ async function installWindows(inputs) {
     replacedFiles = true;
 
     run("schtasks.exe", ["/Create", "/TN", WINDOWS_TASK_NAME, "/XML", tempTaskXml, "/F"]);
+    await rm(paths.lastError, { force: true });
+    await rm(paths.runtime, { force: true });
     run("schtasks.exe", ["/Run", "/TN", WINDOWS_TASK_NAME]);
 
     await rm(backupHost, { force: true });
     await rm(backupInstallation, { force: true });
-    await rm(paths.lastError, { force: true });
   } catch (error) {
     runRollback("end failed installation", "schtasks.exe", ["/End", "/TN", WINDOWS_TASK_NAME], {
       acceptedExitCodes: [0, 1]
