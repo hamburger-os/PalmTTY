@@ -90,6 +90,33 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
     expect(diff.truncated).toBe(false);
   });
 
+  it("previews untracked files without treating directories as pseudo-paths", async () => {
+    const workspace = await initializedWorkspace();
+    await mkdir(path.join(workspace.cwd, "notes"), { recursive: true });
+    await writeFile(
+      path.join(workspace.cwd, "notes", "new file.md"),
+      "hello from untracked\n",
+      "utf8"
+    );
+
+    const status = await getWorkspaceGitStatus(workspace);
+    expect(status.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: "notes/new file.md",
+        kind: "untracked",
+        untracked: true
+      })
+    ]));
+
+    const diff = await getWorkspaceGitDiff(
+      workspace,
+      "notes/new file.md",
+      false
+    );
+    expect(diff.diff).toContain("+hello from untracked");
+    expect(diff.truncated).toBe(false);
+  });
+
   it("makes repository scope explicit when the Workspace is nested", async () => {
     const workspace = await initializedWorkspace();
     const nested = path.join(workspace.cwd, "apps", "web");
