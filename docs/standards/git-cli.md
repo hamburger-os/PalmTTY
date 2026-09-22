@@ -19,6 +19,14 @@ Source: https://git-scm.com/docs/git-diff
 - `--no-textconv` disables configured text conversion filters for diff rendering.
 - These flags are relevant to read-only inspection because configured helpers can otherwise invoke external programs.
 
+## Content filters
+
+Source: https://git-scm.com/docs/gitattributes
+
+- A path's `filter` attribute names a configured filter driver.
+- Filter drivers may define `clean`, `smudge`, or long-running `process` commands; `process` takes precedence when configured.
+- The clean side participates in Git's check-in conversion of working-tree content. A working-tree comparison must therefore account for filter execution separately from diff drivers/textconv.
+
 ## Hooks
 
 Source: https://git-scm.com/docs/git-config#Documentation/git-config.txt-corehooksPath
