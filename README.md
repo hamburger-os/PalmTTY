@@ -43,6 +43,7 @@ PalmTTY is **alpha**. Each terminal now runs in an independent durable Session W
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
 | Internet exposure | HTTPS/private-network deployment only |
 | Agent restart persistence | Implemented: independent Session Worker + authenticated local rediscovery |
+| Current-user autostart | Windows Task Scheduler + Linux systemd user service; Agent restarts after sign-in/user-manager startup |
 | Multi-user ACL | **Not implemented** |
 | Release process | Guarded manual Release Action: pinned `main` SHA → CI/security/license/CodeQL → annotated tag + verified GitHub Release |
 
@@ -86,7 +87,7 @@ Host shell / WSL shell
 Codex / Git / npm / dotnet / ...
 ```
 
-A browser disconnect does **not** kill the PTY. Restarting only the PalmTTY Agent also leaves the independent Session Worker and PTY alive; after the Agent returns, sign in again and reconnect to the same Session. PalmTTY does **not** claim persistence across Windows/OS reboot, user logoff, or loss of the Worker process itself.
+A browser disconnect does **not** kill the PTY. Restarting only the PalmTTY Agent also leaves the independent Session Worker and PTY alive; after the Agent returns, sign in again and reconnect to the same Session. PalmTTY can automatically start the Agent again on Windows/Linux, but it does **not** claim PTY persistence across OS reboot, user logoff, or loss of the Worker process itself. Autostart restores the control plane; persisted Workspaces remain available for creating new Sessions.
 
 ## Quick start on Windows 11 / 快速开始
 
@@ -114,11 +115,46 @@ pnpm check
 pnpm start
 ```
 
-Open `http://127.0.0.1:7688`, sign in with the access token, then create a workspace from the Web UI. Workspaces are stored separately from `palmtty.local.yaml`. Choose a **Terminal environment** directly: Host shells such as PowerShell 7 and registered WSL distributions such as `Ubuntu-22.04` appear in one selector. Use **Custom** only when explicit runtime/executable/argv control is required. Workspace environment entries use `NAME=value` lines and are applied before the Shell starts; balanced outer quotes are normalized, so copied forms such as `HTTP_PROXY="http://127.0.0.1:10808"` save the same value as the unquoted URL. The startup field accepts multiple lines sent after startup.
+Open `http://127.0.0.1:17688`, sign in with the access token, then create a workspace from the Web UI. Workspaces are stored separately from `palmtty.local.yaml`. Choose a **Terminal environment** directly: Host shells such as PowerShell 7 and registered WSL distributions such as `Ubuntu-22.04` appear in one selector. Use **Custom** only when explicit runtime/executable/argv control is required. Workspace environment entries use `NAME=value` lines and are applied before the Shell starts; balanced outer quotes are normalized, so copied forms such as `HTTP_PROXY="http://127.0.0.1:10808"` save the same value as the unquoted URL. The startup field accepts multiple lines sent after startup.
 
 `pnpm run preflight` validates the authentication environment, security exposure rules and configured Agent TCP listen endpoint before the Agent starts. Workspace directories and shells are validated when a workspace is created/updated and again when a Session starts or is explicitly restarted. Windows Store/MSIX PowerShell is supported through the current user's App Execution Alias, and resolved host shells are normalized to absolute launch paths before Worker creation. Each new/restarted Windows Host terminal rebuilds its environment from current Machine/User values before Workspace overrides are applied, so a CLI added to the user's PATH after the PalmTTY Agent started can be picked up by **Restart terminal** without restarting the Agent.
 
 For development, run `pnpm dev`. It invokes PalmTTY's `preflight` package script explicitly before Vite and the Agent are launched, so a bad token or Agent endpoint fails once with an actionable startup error instead of leaving the frontend proxy retrying a dead Agent. The script is intentionally not named `doctor` because pnpm 10 already owns `pnpm doctor` as a package-manager diagnostic command. The root launcher reads the same `PALMTTY_CONFIG`, derives the local Agent URL from `server.host`/`server.port`, and injects it into Vite as `PALMTTY_AGENT_URL`; an explicitly supplied `PALMTTY_AGENT_URL` still overrides the derived target. **Vite now listens on `0.0.0.0:5173` by default**, while the Agent remains on its configured endpoint (the example config stays loopback-only). The launcher enumerates current private/overlay IPv4 addresses and adds only those exact `http://<address>:5173` Origins to the development Agent in memory, so a phone on the same LAN can use the printed Network URL without editing `trustedOrigins`. Set `PALMTTY_WEB_HOST=127.0.0.1` to opt out of LAN development listening. On Windows, if another LAN device still times out, allow Node.js/PalmTTY TCP 5173 on the Private network profile; PalmTTY never elevates itself or edits firewall rules. Vite keeps strict port 5173 so it cannot silently move to a different untrusted Origin.
+
+## Quick start on Linux / Linux 快速开始
+
+The Linux Host runtime is implemented and exercised by Ubuntu CI. A basic source checkout uses the same Agent/Web build as Windows:
+
+```bash
+git clone https://github.com/hamburger-os/PalmTTY.git
+cd PalmTTY
+
+corepack enable
+pnpm install --frozen-lockfile
+cp examples/palmtty.example.yaml palmtty.local.yaml
+
+export PALMTTY_CONFIG="$PWD/palmtty.local.yaml"
+export PALMTTY_ACCESS_TOKEN="replace-with-a-long-random-secret"
+
+pnpm run preflight
+pnpm check
+pnpm start
+```
+
+With the example config, open `http://127.0.0.1:17688`. Linux uses the native Host runtime and Unix-domain-socket Worker IPC; WSL is a separate Windows runtime adapter.
+
+## Autostart / 开机自启
+
+After `pnpm build`, PalmTTY can register the Agent under the **current OS user**:
+
+```text
+pnpm autostart install --config <config-path> [--env-file <env-file>]
+pnpm autostart status
+pnpm autostart restart
+pnpm autostart uninstall
+```
+
+Windows uses a current-user Task Scheduler logon trigger rather than LocalSystem. Linux uses a `systemd --user` service; headless hosts may opt into user lingering according to local policy. Secret values stay out of the task/unit command line when `--env-file` is used. See [Autostart / 开机自启](docs/community/autostart.md) for setup and security details.
 
 ## Secure remote access / 安全远程访问
 
