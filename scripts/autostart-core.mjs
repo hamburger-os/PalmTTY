@@ -26,6 +26,10 @@ export function parseAutostartArgs(argv) {
     throw new Error("Usage: pnpm autostart <install|status|restart|uninstall> [--config <path>] [--env-file <path>]");
   }
 
+  if (command !== "install" && args.length > 0) {
+    throw new Error(`${command} does not accept install options`);
+  }
+
   let configPath;
   let envFile;
   for (let index = 0; index < args.length; index += 1) {
@@ -83,7 +87,10 @@ export function escapeXml(value) {
 }
 
 function assertSingleLine(value, name) {
-  if (value.includes("\0") || /[\r\n]/u.test(value)) {
+  if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(value)) {
+    throw new Error(`${name} contains an unsupported control character`);
+  }
+  if (/\r|\n/u.test(value)) {
     throw new Error(`${name} must be a single line`);
   }
 }
