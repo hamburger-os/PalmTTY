@@ -1,4 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -50,19 +53,77 @@ test("quoteWindowsArg preserves spaces and trailing backslashes", () => {
   assert.equal(quoteWindowsArg("C:\\path with space\\"), '"C:\\path with space\\\\"');
 });
 
-test("Windows launcher uses a hidden PowerShell host and preserves process exit status", () => {
+test("Windows launcher supervises the Agent in a breakaway-safe kill-on-close job", () => {
   const command = buildWindowsAgentPowerShellCommand({
     nodePath: "C:\\Program Files\\nodejs\\node.exe",
     agentPath: "C:\\PalmTTY\\apps\\agent\\dist\\index.js",
+    repoRoot: "C:\\PalmTTY",
     configPath: "C:\\Users\\O'Brien\\PalmTTY config.yaml",
     envFile: "C:\\Users\\me\\PalmTTY.env"
   });
-  assert.equal(command.includes("& 'C:\\Program Files\\nodejs\\node.exe'"), true);
+  assert.match(command, /JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE/u);
+  assert.match(command, /JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK/u);
+  assert.match(command, /CREATE_SUSPENDED \| CREATE_NO_WINDOW/u);
+  assert.match(command, /AssignProcessToJobObject/u);
+  assert.match(command, /WaitForSingleObject/u);
   assert.match(command, /O''Brien/u);
   assert.match(command, /--config/u);
   assert.match(command, /--env-file/u);
-  assert.match(command, /exit \$LASTEXITCODE/u);
+  assert.match(command, /exit \$exitCode/u);
   assert.equal(Buffer.from(encodePowerShellCommand(command), "base64").toString("utf16le"), command);
+});
+
+test("Windows launcher compiles, propagates Agent exit code, and lets detached children break away", { skip: process.platform !== "win32" }, async () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "palmtty-autostart-"));
+  const markerPath = path.join(directory, "worker-survived.txt");
+  const workerPath = path.join(directory, "worker.cjs");
+  const agentPath = path.join(directory, "agent.cjs");
+  try {
+    writeFileSync(
+      workerPath,
+      \`const { writeFileSync } = require("node:fs");\nsetTimeout(() => { writeFileSync(\${JSON.stringify(markerPath)}, "ok"); }, 300);\n\`,
+      "utf8"
+    );
+    writeFileSync(
+      agentPath,
+      \`const { spawn } = require("node:child_process");\nconst child = spawn(process.execPath, [\${JSON.stringify(workerPath)}], { detached: true, windowsHide: true, stdio: "ignore" });\nchild.unref();\nprocess.exit(7);\n\`,
+      "utf8"
+    );
+
+    const command = buildWindowsAgentPowerShellCommand({
+      nodePath: process.execPath,
+      agentPath,
+      repoRoot: directory,
+      configPath: path.join(directory, "ignored.yaml")
+    });
+    const result = spawnSync(
+      defaultWindowsPowerShellPath(),
+      [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-WindowStyle",
+        "Hidden",
+        "-EncodedCommand",
+        encodePowerShellCommand(command)
+      ],
+      { encoding: "utf8", windowsHide: true, timeout: 15_000 }
+    );
+    assert.equal(result.status, 7, result.stderr || result.stdout);
+
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      try {
+        assert.equal(readFileSync(markerPath, "utf8"), "ok");
+        return;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+    assert.fail("detached child did not survive supervisor job close");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("Windows task runs headlessly as the current interactive user without elevation", () => {
