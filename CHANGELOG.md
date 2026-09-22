@@ -41,6 +41,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Fixed
 
+- Remove the redundant Release workflow acceptance checkbox; real-device/deployment checks remain recommended operator evidence while publication is gated by protected `main` plus immutable-SHA CI/security/license/CodeQL checks.
 - Align quick-start documentation with the example Agent port `17688` instead of the stale `7688` URL/diagnostic example.
 - Normalize balanced outer single/double quotes in Web Workspace environment values, so proxy entries copied as `HTTP_PROXY="http://127.0.0.1:10808"` reach child processes as `http://127.0.0.1:10808` instead of a URL containing literal quote characters; reject unmatched outer quotes.
 - Enumerate WSL distributions with `wsl.exe --list --quiet` for terminal profiles instead of starting a distro and probing its shells, removing the cold-start-dependent first-scan failure mode; hide Docker Desktop and Rancher Desktop utility distributions from the user-facing profile list.
