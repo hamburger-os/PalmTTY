@@ -1,6 +1,6 @@
 # Current implementation state
 
-Status: **alpha foundation implemented with durable per-session workers, Windows/Ubuntu CI and current-user Windows/Linux Agent autostart; guarded v0.1.0 release automation is implemented. Real mobile/Codex/deployment checks remain recommended release evidence rather than a workflow gate.**
+Status: **alpha foundation implemented with durable per-session workers, Windows/Ubuntu CI, current-user Windows/Linux Agent autostart, and installable Windows/Linux release packaging. Release qualification now requires native package builds plus detached installed-runtime smoke before asset-bearing publication. Real mobile/Codex/deployment checks remain recommended release evidence rather than a workflow gate.**
 
 ## Implemented
 
@@ -19,6 +19,10 @@ Status: **alpha foundation implemented with durable per-session workers, Windows
 - root `package.json` is the single release/runtime version source; private workspace manifests intentionally omit duplicate versions and the Agent health endpoint reads the root version
 - guarded manual Release workflow locks an exact `main` SHA, reuses the Windows/Ubuntu CI + Security Audit + CodeQL workflows against that SHA, rejects tag/release reuse, aborts if `main` advances, and publishes an annotated tag plus verified GitHub Release with rollback before finalization; reusable gates consume `inputs.ref` directly and use separate CI/Security/CodeQL concurrency namespaces so sibling release gates cannot cancel one another; publication binds source authority through the remote peeled annotated tag, creates the draft through the Release REST API and retains its returned ID directly, and does not treat either list-enumeration visibility or Release `target_commitish` as source proof once the tag exists; it intentionally has no manual acceptance checkbox
 - Apache-2.0 licensing
+- self-contained installed distribution layout with bundled Node.js, production-only deployed Agent dependencies, compiled Web/PWA assets and an immutable `release-manifest.json`; installed runtime discovery does not depend on repository layout or on preserving `PALMTTY_INSTALL_ROOT` into Session Workers
+- native Release packages: Windows x64 per-user Inno Setup installer + portable zip, Linux x64 Debian package + portable tar, per-platform CycloneDX SBOMs, Release `SHA256SUMS`, and GitHub build-provenance attestations
+- installed `palmtty` CLI for init/info/start/preflight/version and current-user service install/status/restart/uninstall; Windows release packaging precompiles the GUI-subsystem autostart host so target installations do not compile C# or require global Node/pnpm
+- Release package jobs copy the finished runtime outside the checkout and smoke it with the bundled Node runtime (version, preflight, Agent health and compiled Web serving); draft Release promotion verifies the exact asset set and remote size of every uploaded asset
 - four documentation layers and docs-sync Agent Skill
 
 ### Agent and security
