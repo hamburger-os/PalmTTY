@@ -5,9 +5,10 @@ This layer records the external technical basis used by PalmTTY. It is not a pla
 - [websocket-security.md](websocket-security.md) — RFC 6455 and OWASP WebSocket security guidance
 - [terminal-runtime.md](terminal-runtime.md) — Microsoft ConPTY, PowerShell, WSL, node-pty and xterm.js
 - [agent-skills.md](agent-skills.md) — Agent Skills / SKILL.md format used by the repository
+- [git-cli.md](git-cli.md) — Git porcelain v2, diff helper controls, hooks path and transport protocol policy
 
 ## Rule
 
 When PalmTTY behavior differs from an external source, document the difference in the owner/AI layers. Do not rewrite this layer to make the implementation appear compliant.
 
-Last reviewed: 2026-09-19.
+Last reviewed: 2026-09-22.
