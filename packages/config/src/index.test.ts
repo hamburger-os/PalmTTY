@@ -154,6 +154,16 @@ describe("configuration", () => {
     expect(secureCookies(reverseProxy)).toBe(true);
     expect(exposureOrigins(reverseProxy)).toEqual(["https://tty.example.com"]);
 
+    const canonicalEquivalent = parseConfig({
+      server: {
+        exposure: {
+          mode: "reverseProxy",
+          origins: ["https://TTY.example.com:443/"]
+        }
+      }
+    });
+    expect(exposureOrigins(canonicalEquivalent)).toEqual(["https://tty.example.com"]);
+
     const directHttps = parseConfig({
       server: {
         port: 17688,
