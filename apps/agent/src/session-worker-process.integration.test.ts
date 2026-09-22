@@ -95,7 +95,7 @@ function processWorkspace(windowsShellPath?: string): WorkspaceDefinition {
 
 function testConfig() {
   const config = parseConfig({
-    server: { host: "127.0.0.1", port: 7688 },
+    server: { port: 7688, exposure: { mode: "local" } },
     auth: { enabled: false }
   });
   config.sessions.exitedRetentionMinutes = 0.01;

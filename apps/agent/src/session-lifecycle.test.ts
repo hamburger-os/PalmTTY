@@ -122,10 +122,8 @@ async function buildHarness() {
 
   const config = parseConfig({
     server: {
-      host: "127.0.0.1",
       port: 7688,
-      trustedOrigins: [ORIGIN],
-      secureCookies: false
+      exposure: { mode: "local" }
     },
     auth: { enabled: false }
   });

@@ -37,7 +37,7 @@ async function main() {
   const runtimeDir = process.argv[2];
   if (!runtimeDir) throw new Error("runtime directory argument is required");
 
-  const config = parseConfig({ server: { host: "127.0.0.1", port: 7688 }, auth: { enabled: false } });
+  const config = parseConfig({ server: { port: 7688, exposure: { mode: "local" } }, auth: { enabled: false } });
   config.sessions.exitedRetentionMinutes = 0.01;
   const manager = new SessionManager(config, {
     runtimeDir,

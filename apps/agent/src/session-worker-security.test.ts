@@ -220,7 +220,7 @@ describe("session worker security boundary", () => {
       }
     };
     const config = parseConfig({
-      server: { host: "127.0.0.1", port: 7688 },
+      server: { port: 7688, exposure: { mode: "local" } },
       auth: {
         enabled: false,
         tokenEnv: "PALMTTY_TEST_ACCESS_TOKEN"
@@ -277,7 +277,7 @@ describe("session worker security boundary", () => {
       }
     };
     const config = parseConfig({
-      server: { host: "127.0.0.1", port: 7688 },
+      server: { port: 7688, exposure: { mode: "local" } },
       auth: { enabled: false }
     });
     const manager = new SessionManager(config, {
@@ -333,7 +333,7 @@ describe("session worker security boundary", () => {
     });
 
     const config = parseConfig({
-      server: { host: "127.0.0.1", port: 7688 },
+      server: { port: 7688, exposure: { mode: "local" } },
       auth: { enabled: false }
     });
 

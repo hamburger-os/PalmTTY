@@ -12,10 +12,8 @@ const ORIGIN = "http://127.0.0.1:7688";
 function testConfig() {
   return parseConfig({
     server: {
-      host: "127.0.0.1",
       port: 7688,
-      trustedOrigins: [ORIGIN],
-      secureCookies: false
+      exposure: { mode: "local" }
     },
     auth: {
       enabled: true,
@@ -27,10 +25,10 @@ function testConfig() {
 
 const runtimeDirs = new Set<string>();
 
-async function buildTestApp() {
+async function buildTestApp(config = testConfig()) {
   const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-app-test-"));
   runtimeDirs.add(runtimeDir);
-  return buildApp(testConfig(), {
+  return buildApp(config, {
     sessionManager: { runtimeDir },
     workspaceStore: new MemoryWorkspaceStore()
   });
@@ -59,6 +57,40 @@ afterEach(async () => {
 });
 
 describe("HTTP security boundary", () => {
+  it("rejects public source addresses before serving LAN exposure", async () => {
+    process.env.PALMTTY_TEST_TOKEN = TOKEN;
+    const app = await buildTestApp(parseConfig({
+      server: {
+        port: 7688,
+        exposure: { mode: "lan" }
+      },
+      auth: {
+        enabled: true,
+        tokenEnv: "PALMTTY_TEST_TOKEN",
+        sessionTtlMinutes: 60
+      }
+    }));
+
+    const publicResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/health",
+      remoteAddress: "203.0.113.10",
+      headers: { "x-forwarded-for": "192.168.31.20" }
+    });
+    expect(publicResponse.statusCode).toBe(403);
+    expect(publicResponse.json()).toEqual({ error: "lan_client_not_private" });
+
+    const privateResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/health",
+      remoteAddress: "192.168.31.20",
+      headers: { "x-forwarded-for": "203.0.113.10" }
+    });
+    expect(privateResponse.statusCode).toBe(200);
+
+    await app.close();
+  });
+
   it("rejects login from an untrusted origin", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
     const app = await buildTestApp();

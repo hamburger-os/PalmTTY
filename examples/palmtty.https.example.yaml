@@ -1,0 +1,26 @@
+# Direct HTTPS example.
+# Replace origin/certificate paths for your host. Relative certificate paths
+# are resolved relative to this YAML file.
+
+server:
+  port: 17688
+  exposure:
+    mode: https
+    listenHost: 0.0.0.0
+    origins:
+      - https://tty.example.com:17688
+    certificatePath: ./tls/cert.pem
+    privateKeyPath: ./tls/key.pem
+
+auth:
+  enabled: true
+  tokenEnv: PALMTTY_ACCESS_TOKEN
+  maxLoginSessions: 32
+  sessionTtlMinutes: 720
+
+sessions:
+  maxSessions: 8
+  exitedRetentionMinutes: 30
+  scrollbackLines: 10000
+  replayBytes: 2097152
+  maxSocketBufferedBytes: 2097152

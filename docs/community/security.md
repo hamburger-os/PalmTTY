@@ -8,11 +8,11 @@ PalmTTY provides shell access with the privileges of the OS user running it. Tre
 ### Required boundaries
 
 - Run PalmTTY as a normal user, not Administrator/root.
-- Production/normal Agent configuration defaults to loopback or a private overlay network. `pnpm dev` is intentionally different: Vite listens on `0.0.0.0:5173` for private-LAN testing while the Agent stays on its configured endpoint (the example remains loopback).
-- The development launcher dynamically adds only the workstation's detected private/overlay IPv4 `http://<address>:5173` Origins as exact in-memory Origins. It does not persist them, use wildcard Origin matching, or make production Agent startup non-loopback.
-- Non-loopback normal Agent mode requires authentication, secure cookies and an exact Origin allowlist.
+- Production/normal Agent uses an explicit exposure profile. `local` is the default and binds loopback; `lan` is explicit authenticated private/overlay HTTP; `reverseProxy` derives Secure cookies from explicit HTTPS browser Origins while allowing a private HTTP upstream; `https` terminates TLS in the Agent from configured certificate/key files.
+- The development launcher dynamically adds only the workstation's detected private/overlay IPv4 `http://<address>:5173` Origins as exact runtime Origins. It does not persist them, use wildcard Origin matching, or change the configured production exposure profile.
+- `lan` requires authentication, rejects non-private client source addresses before routing, and derives exact private/overlay HTTP Origins automatically. Origin remains a browser boundary rather than a substitute for the source-address gate. `reverseProxy` and `https` require authentication plus explicit HTTPS Origins; Secure-cookie behavior is derived from those modes rather than configured independently.
 - Browser login uses a bootstrap secret sent only in a POST body, never in a URL.
-- Successful login creates an in-memory HttpOnly, SameSite=Strict session cookie; Secure is required for normal non-loopback deployment.
+- Successful login creates an in-memory HttpOnly, SameSite=Strict session cookie. Secure is derived automatically for `reverseProxy` and `https`; `local`/`lan` use non-Secure cookies because they are HTTP profiles.
 - Authentication and Origin are separate controls. The LAN Vite proxy does not rewrite an arbitrary browser Origin into a trusted one; requests still have to match the generated exact development Origin and authenticate.
 - Workspace management is an explicit authenticated, exact-Origin-protected mutation surface. The directory picker and terminal-profile discovery endpoint are separate authenticated + exact-Origin bounded inspection APIs. Profile discovery checks only known Host shells and enumerates registered WSL distributions without starting them; it does not expose file contents or arbitrary command execution.
 - Session-workbench Files/Git use separate authenticated + exact-Origin APIs rather than the terminal WebSocket. Files accepts canonical Workspace-relative paths, contains Host/WSL symlinks inside the persisted Workspace root, limits directory entries and caps UTF-8 preview at 512 KiB. Git explicitly operates on the complete repository containing the Workspace cwd and reports that scope. Reads use porcelain-v2 status plus bounded diff/history/branch queries and disable external diff/textconv/fsmonitor plus log signature-helper execution. Working-tree diff also resolves the selected path's `filter` attribute and overrides that driver's clean/process commands plus `required` for the diff command, so inspection does not execute repository-configured content filters; filter names that cannot be neutralized safely are rejected. Writes accept only typed stage/unstage/restore/commit/branch/stash/fetch/pull/push operations. They are serialized per resolved repository, including across multiple Workspaces that share one repository; incomplete/truncated status is rejected as write authority; requests require the current state token and explicit trusted-repository acknowledgement, and destructive restore verifies the viewed diff snapshot. Hooks, editors and interactive credential prompts are disabled; Git config/exec/SSH/askpass override environment variables are stripped; remote transport is allowlisted to http/https/ssh/git and denies ext/file/unknown protocols. Normal Git filters and trusted host/repository Git configuration may still execute under standard Git semantics.
@@ -48,7 +48,7 @@ PalmTTY does not claim persistence across OS reboot, user logoff or Worker-proce
 
 ### Autostart boundary
 
-PalmTTY autostart is always current-user scoped: Windows Task Scheduler uses an interactive user token and least privilege; Linux uses `systemd --user`. The Windows task uses the system Windows PowerShell host with a hidden window only as a presentation/lifecycle wrapper. It creates the Node Agent inside a kill-on-close Job Object and allows child processes to break away, so task termination supervises the Agent while independent Session Workers keep their separate lifetime. This does not change the user token or elevation boundary. PalmTTY does not install a LocalSystem/root service or silently enable Linux lingering.
+PalmTTY autostart is always current-user scoped: Windows Task Scheduler uses an interactive user token and least privilege; Linux uses `systemd --user`. Windows installation compiles a small GUI-subsystem host into the current user's local application data and Task Scheduler launches that executable directly. The host starts the Node Agent with no console, places it in a kill-on-close Job Object and allows child processes to break away, so task termination supervises the Agent while independent Session Workers keep their separate lifetime. PowerShell is used only during installation to compile the host and is not part of the long-lived runtime chain. This does not change the user token or elevation boundary. PalmTTY does not install a LocalSystem/root service or silently enable Linux lingering.
 
 The optional Agent `--env-file` keeps bootstrap secret **values** out of task/unit argv. Its strict parser does not perform shell expansion. Keep real env files outside the repository and readable only by the PalmTTY user; Linux autostart installation rejects group/world-readable files. Stopping/restarting the Linux Agent service uses `KillMode=process` so independent Session Workers are not reclassified as ordinary service children. This still does not provide PTY survival across OS reboot.
 
@@ -63,9 +63,9 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 ### 必须保持的边界
 
 - 以普通用户运行，不默认提权。
-- 生产/正常 Agent 默认仍只监听 loopback，或通过私有组网访问。`pnpm dev` 是单独的开发拓扑：Vite 默认监听 `0.0.0.0:5173` 供私有 LAN 测试，但 Agent 仍使用配置中的 endpoint（示例仍是 loopback）。
+- 生产/正常 Agent 使用显式 exposure profile：`local` 默认只监听 loopback；`lan` 是显式、已认证但未加密的私有/overlay HTTP，会在路由前拒绝非私有来源地址，并自动只接受当前私有/overlay IPv4 精确 Origin；`reverseProxy` 从明确的 HTTPS 浏览器 Origin 自动派生 Secure Cookie，同时允许私有 HTTP upstream；`https` 则由 Agent 自己读取证书/私钥终止 TLS。
 - 开发启动器只把当前机器检测到的私有/overlay IPv4 对应 `http://<address>:5173` 作为精确 Origin 临时加入内存 allowlist；不持久化、不使用 Origin 通配，也不把 production Agent 改成默认非 loopback。
-- 非 loopback 正常 Agent 模式要求认证、Secure Cookie 和精确 Origin 白名单。
+- `lan` 要求认证 + 私有来源地址 + 精确私有 Origin，但因其是 HTTP 模式不会设置 Secure Cookie；`reverseProxy` / `https` 则要求认证、显式 HTTPS Origin，并自动使用 Secure Cookie。
 - 浏览器登录 secret 只通过 POST body 提交，不进入 URL。
 - 登录 Cookie 使用 HttpOnly、SameSite=Strict；正常非 loopback 部署要求 Secure。
 - 认证与 Origin 是独立控制。LAN Vite 代理不会把任意浏览器 Origin 改写成可信 Origin，请求仍必须精确匹配自动生成的 development Origin 并通过认证。
@@ -103,7 +103,7 @@ Worker/Shell PID 只用于诊断。PalmTTY 不会因为 stale record 记录了�
 
 ### 自启动边界
 
-PalmTTY 自启动始终属于当前用户：Windows Task Scheduler 使用交互用户 token + 最低权限，Linux 使用 `systemd --user`。Windows 任务使用系统 Windows PowerShell 的隐藏窗口模式只作为展示与生命周期包装层；它把 Node Agent 放入 kill-on-close Job Object，同时允许子进程 break away，因此计划任务终止时仍能监督 Agent，而独立 Session Worker 继续保持单独生命周期。该设计不改变用户 token，也不改变提权边界。PalmTTY 不安装 LocalSystem/root service，也不会静默开启 Linux linger。
+PalmTTY 自启动始终属于当前用户：Windows Task Scheduler 使用交互用户 token + 最低权限，Linux 使用 `systemd --user`。Windows 安装阶段会在当前用户 Local AppData 下编译一个 GUI-subsystem 原生 host，计划任务直接启动这个 exe；host 以无 console 方式创建 Node Agent，并把它放入 kill-on-close Job Object，同时允许子进程 break away，因此计划任务终止时仍能监督 Agent，而独立 Session Worker 保持单独生命周期。PowerShell 只在安装时负责编译，不再是长期运行链的一部分。该设计不改变用户 token，也不改变提权边界。PalmTTY 不安装 LocalSystem/root service，也不会静默开启 Linux linger。
 
 可选 Agent `--env-file` 让 bootstrap secret 的**值**不进入 task/unit argv；严格解析器不做 shell expansion。真实 env 文件应放在仓库外并只允许 PalmTTY 用户读取；Linux autostart 安装会拒绝 group/world 可读文件。Linux 停止/restart Agent service 时使用 `KillMode=process`，避免把独立 Session Worker 重新归类成普通 service child 一起终止；这仍不代表 OS reboot 后旧 PTY 能存活。
 

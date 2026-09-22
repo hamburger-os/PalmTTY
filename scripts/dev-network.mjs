@@ -1,39 +1,13 @@
-import { isIP } from "node:net";
+import {
+  isPrivateIpv4,
+  privateIpv4Addresses
+} from "../packages/config/dist/index.js";
 
 export const WEB_PORT = 5173;
 export const DEFAULT_WEB_HOST = "0.0.0.0";
 
-export function isPrivateDevelopmentIpv4(address) {
-  if (isIP(address) !== 4) return false;
-  const octets = address.split(".").map(Number);
-
-  const [a, b] = octets;
-  return (
-    a === 10 ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 169 && b === 254) ||
-    (a === 100 && b >= 64 && b <= 127)
-  );
-}
-
-export function privateLanIpv4Addresses(networkInterfaces) {
-  const addresses = new Set();
-  for (const entries of Object.values(networkInterfaces)) {
-    for (const entry of entries ?? []) {
-      const ipv4 = entry.family === "IPv4" || entry.family === 4;
-      if (
-        !ipv4 ||
-        entry.internal ||
-        !isPrivateDevelopmentIpv4(entry.address)
-      ) {
-        continue;
-      }
-      addresses.add(entry.address);
-    }
-  }
-  return [...addresses].sort();
-}
+export const isPrivateDevelopmentIpv4 = isPrivateIpv4;
+export const privateLanIpv4Addresses = privateIpv4Addresses;
 
 export function developmentWebOrigin(host, port = WEB_PORT) {
   const formatted = host.includes(":") && !host.startsWith("[")

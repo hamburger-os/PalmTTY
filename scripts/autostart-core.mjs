@@ -2,6 +2,7 @@ import os from "node:os";
 import path from "node:path";
 
 export const WINDOWS_TASK_NAME = "PalmTTY Agent";
+export const WINDOWS_INSTALLATION_VERSION = 1;
 export const LINUX_UNIT_NAME = "palmtty.service";
 
 export function defaultConfigPath(platform = process.platform, env = process.env, home = os.homedir()) {
@@ -25,6 +26,22 @@ export function defaultWindowsPowerShellPath(env = process.env) {
     throw new Error("Windows SystemRoot/WINDIR is unavailable");
   }
   return path.win32.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+}
+
+export function defaultWindowsAutostartDir(env = process.env, home = os.homedir()) {
+  const localAppData = env.LOCALAPPDATA ?? env.APPDATA ?? home;
+  return path.win32.join(localAppData, "PalmTTY", "autostart");
+}
+
+export function windowsAutostartPaths(env = process.env, home = os.homedir()) {
+  const directory = defaultWindowsAutostartDir(env, home);
+  return {
+    directory,
+    host: path.win32.join(directory, "palmtty-autostart-host.exe"),
+    installation: path.win32.join(directory, "installation.json"),
+    runtime: path.win32.join(directory, "runtime.json"),
+    lastError: path.win32.join(directory, "last-error.txt")
+  };
 }
 
 export function parseAutostartArgs(argv) {
@@ -118,10 +135,20 @@ export function encodePowerShellCommand(command) {
   return Buffer.from(command, "utf16le").toString("base64");
 }
 
-export function buildWindowsTaskXml({
-  userSid,
-  powershellPath,
-  supervisorPath,
+export function buildWindowsHostCompilePowerShellCommand({ sourcePath, outputPath }) {
+  assertSingleLine(sourcePath, "sourcePath");
+  assertSingleLine(outputPath, "outputPath");
+  return [
+    "$ErrorActionPreference = 'Stop'",
+    "Add-Type `",
+    `  -Path ${quotePowerShellLiteral(sourcePath)} \``,
+    `  -OutputAssembly ${quotePowerShellLiteral(outputPath)} \``,
+    "  -OutputType WindowsApplication `",
+    "  -ReferencedAssemblies 'System.dll','System.Core.dll','System.Runtime.Serialization.dll','System.Xml.dll'"
+  ].join("\n");
+}
+
+export function buildWindowsInstallationManifest({
   nodePath,
   agentPath,
   repoRoot,
@@ -129,9 +156,6 @@ export function buildWindowsTaskXml({
   envFile
 }) {
   for (const [name, value] of Object.entries({
-    userSid,
-    powershellPath,
-    supervisorPath,
     nodePath,
     agentPath,
     repoRoot,
@@ -141,25 +165,65 @@ export function buildWindowsTaskXml({
   }
   if (envFile) assertSingleLine(envFile, "envFile");
 
-  const taskArguments = [
-    "-NoLogo",
-    "-NoProfile",
-    "-NonInteractive",
-    "-WindowStyle",
-    "Hidden",
-    "-File",
-    supervisorPath,
-    "-NodePath",
+  return {
+    version: WINDOWS_INSTALLATION_VERSION,
     nodePath,
-    "-AgentPath",
     agentPath,
-    "-RepoRoot",
-    repoRoot,
-    "-ConfigPath",
-    configPath
-  ];
-  if (envFile) taskArguments.push("-EnvFile", envFile);
-  const argumentsText = taskArguments.map(quoteWindowsArg).join(" ");
+    workingDirectory: repoRoot,
+    configPath,
+    ...(envFile ? { envFile } : {})
+  };
+}
+
+export function parseWindowsInstallationManifest(source) {
+  let value;
+  try {
+    value = JSON.parse(source);
+  } catch {
+    throw new Error("Windows autostart installation manifest is invalid JSON");
+  }
+
+  if (!value || typeof value !== "object" || value.version !== WINDOWS_INSTALLATION_VERSION) {
+    throw new Error("Windows autostart installation manifest has an unsupported version");
+  }
+  for (const key of ["nodePath", "agentPath", "workingDirectory", "configPath"]) {
+    if (typeof value[key] !== "string" || value[key].length === 0) {
+      throw new Error(`Windows autostart installation manifest is missing ${key}`);
+    }
+  }
+  if (value.envFile !== undefined && (typeof value.envFile !== "string" || value.envFile.length === 0)) {
+    throw new Error("Windows autostart installation manifest has an invalid envFile");
+  }
+
+  return {
+    version: WINDOWS_INSTALLATION_VERSION,
+    nodePath: value.nodePath,
+    agentPath: value.agentPath,
+    workingDirectory: value.workingDirectory,
+    configPath: value.configPath,
+    ...(value.envFile ? { envFile: value.envFile } : {})
+  };
+}
+
+export function buildWindowsTaskXml({
+  userSid,
+  hostPath,
+  installationPath,
+  workingDirectory
+}) {
+  for (const [name, value] of Object.entries({
+    userSid,
+    hostPath,
+    installationPath,
+    workingDirectory
+  })) {
+    assertSingleLine(value, name);
+  }
+
+  const argumentsText = [
+    "--installation",
+    installationPath
+  ].map(quoteWindowsArg).join(" ");
 
   return `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -204,9 +268,9 @@ export function buildWindowsTaskXml({
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>${escapeXml(powershellPath)}</Command>
+      <Command>${escapeXml(hostPath)}</Command>
       <Arguments>${escapeXml(argumentsText)}</Arguments>
-      <WorkingDirectory>${escapeXml(repoRoot)}</WorkingDirectory>
+      <WorkingDirectory>${escapeXml(workingDirectory)}</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>
@@ -231,6 +295,7 @@ export function buildWindowsTaskStatusPowerShellCommand(taskName = WINDOWS_TASK_
     `  state = [string]$task.State\n` +
     `  lastRunTime = $lastRunTime\n` +
     `  nextRunTime = $nextRunTime\n` +
+    `  lastTaskResult = [int64]$info.LastTaskResult\n` +
     `} | ConvertTo-Json -Compress`;
 }
 
@@ -254,11 +319,15 @@ export function parseWindowsTaskStatus(output) {
       throw new Error(`Windows Task Scheduler returned an invalid ${key}`);
     }
   }
+  if (typeof parsed.lastTaskResult !== "number" || !Number.isSafeInteger(parsed.lastTaskResult)) {
+    throw new Error("Windows Task Scheduler returned an invalid lastTaskResult");
+  }
   return {
     installed: true,
     state: parsed.state.toLowerCase(),
     lastRunTime: parsed.lastRunTime ?? null,
-    nextRunTime: parsed.nextRunTime ?? null
+    nextRunTime: parsed.nextRunTime ?? null,
+    lastTaskResult: parsed.lastTaskResult
   };
 }
 

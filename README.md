@@ -41,9 +41,9 @@ PalmTTY is **alpha**. Each terminal now runs in an independent durable Session W
 | Session workbench | Terminal / Git / Files tabs; terminal stays mounted while switching views |
 | Mobile terminal | xterm.js PWA, touch special-key bar, on-demand long-text input |
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
-| Internet exposure | HTTPS/private-network deployment only |
+| Network exposure | Explicit `local` / `lan` / `reverseProxy` / direct `https` profiles; HTTPS/private entry is recommended |
 | Agent restart persistence | Implemented: independent Session Worker + authenticated local rediscovery |
-| Current-user autostart | Windows Task Scheduler + Linux systemd user service; Agent restarts after sign-in/user-manager startup |
+| Current-user autostart | Windows Task Scheduler + console-free native GUI host; Linux systemd user service; Agent restarts after sign-in/user-manager startup |
 | Multi-user ACL | **Not implemented** |
 | Release process | Guarded manual Release Action: pinned `main` SHA → CI/security/license/CodeQL → annotated tag + verified GitHub Release |
 
@@ -119,7 +119,7 @@ Open `http://127.0.0.1:17688`, sign in with the access token, then create a work
 
 `pnpm run preflight` validates the authentication environment, security exposure rules and configured Agent TCP listen endpoint before the Agent starts. Workspace directories and shells are validated when a workspace is created/updated and again when a Session starts or is explicitly restarted. Windows Store/MSIX PowerShell is supported through the current user's App Execution Alias, and resolved host shells are normalized to absolute launch paths before Worker creation. Each new/restarted Windows Host terminal rebuilds its environment from current Machine/User values before Workspace overrides are applied, so a CLI added to the user's PATH after the PalmTTY Agent started can be picked up by **Restart terminal** without restarting the Agent.
 
-For development, run `pnpm dev`. It invokes PalmTTY's `preflight` package script explicitly before Vite and the Agent are launched, so a bad token or Agent endpoint fails once with an actionable startup error instead of leaving the frontend proxy retrying a dead Agent. The script is intentionally not named `doctor` because pnpm 10 already owns `pnpm doctor` as a package-manager diagnostic command. The root launcher reads the same `PALMTTY_CONFIG`, derives the local Agent URL from `server.host`/`server.port`, and injects it into Vite as `PALMTTY_AGENT_URL`; an explicitly supplied `PALMTTY_AGENT_URL` still overrides the derived target. **Vite now listens on `0.0.0.0:5173` by default**, while the Agent remains on its configured endpoint (the example config stays loopback-only). The launcher enumerates current private/overlay IPv4 addresses and adds only those exact `http://<address>:5173` Origins to the development Agent in memory, so a phone on the same LAN can use the printed Network URL without editing `trustedOrigins`. Set `PALMTTY_WEB_HOST=127.0.0.1` to opt out of LAN development listening. On Windows, if another LAN device still times out, allow Node.js/PalmTTY TCP 5173 on the Private network profile; PalmTTY never elevates itself or edits firewall rules. Vite keeps strict port 5173 so it cannot silently move to a different untrusted Origin.
+For development, run `pnpm dev`. It invokes PalmTTY's `preflight` package script explicitly before Vite and the Agent are launched, so a bad token or Agent endpoint fails once with an actionable startup error instead of leaving the frontend proxy retrying a dead Agent. The script is intentionally not named `doctor` because pnpm 10 already owns `pnpm doctor` as a package-manager diagnostic command. The root launcher reads the same `PALMTTY_CONFIG`, derives the local Agent URL from the exposure profile and `server.port`, and injects it into Vite as `PALMTTY_AGENT_URL`; an explicitly supplied `PALMTTY_AGENT_URL` still overrides the derived target. **Vite listens on `0.0.0.0:5173` by default**, while the Agent follows its exposure profile (the example remains `local`). The launcher enumerates current private/overlay IPv4 addresses and adds only those exact `http://<address>:5173` Origins to the development Agent at runtime, so a phone on the same LAN can use the printed Network URL without modifying persistent Origin policy. Set `PALMTTY_WEB_HOST=127.0.0.1` to opt out of LAN development listening. On Windows, if another LAN device still times out, allow Node.js/PalmTTY TCP 5173 on the Private network profile; PalmTTY never elevates itself or edits firewall rules. Vite keeps strict port 5173 so it cannot silently move to a different untrusted Origin.
 
 ## Quick start on Linux / Linux 快速开始
 
@@ -154,20 +154,23 @@ pnpm autostart restart
 pnpm autostart uninstall
 ```
 
-Windows uses a current-user Task Scheduler logon trigger rather than LocalSystem. Linux uses a `systemd --user` service; headless hosts may opt into user lingering according to local policy. Secret values stay out of the task/unit command line when `--env-file` is used. See [Autostart / 开机自启](docs/community/autostart.md) for setup and security details.
+Windows uses a current-user Task Scheduler logon trigger rather than LocalSystem. Installation compiles a small GUI-subsystem host into `%LOCALAPPDATA%\\PalmTTY\\autostart`; Task Scheduler launches that host directly, so no long-lived PowerShell/Node console is part of the startup chain. Linux uses a `systemd --user` service; headless hosts may opt into user lingering according to local policy. Secret values stay out of the task/unit command line when `--env-file` is used. See [Autostart / 开机自启](docs/community/autostart.md) for setup and security details.
 
-## Secure remote access / 安全远程访问
+## Network exposure / 网络暴露
 
-Recommended order:
+PalmTTY uses an explicit exposure profile instead of independent low-level security switches:
 
-1. **Private network + HTTPS**, for example Tailscale Serve.
-2. **HTTPS reverse proxy**, for example `HTTPS -> QNAP/Caddy -> PalmTTY`.
-3. Keep the PalmTTY upstream port private.
+- `local` — default; Agent binds loopback and accepts only local Origins.
+- `lan` — listens on IPv4 `0.0.0.0`, requires authentication, rejects non-private client source addresses, discovers exact private/overlay IPv4 Origins automatically, and intentionally uses unencrypted HTTP. Keep the host firewall scoped to trusted Private networks.
+- `reverseProxy` — HTTP upstream plus explicit HTTPS browser Origins; Secure cookies are derived automatically. Use this for Tailscale Serve, Caddy, QNAP, Nginx, and similar ingress.
+- `https` — Agent terminates TLS directly using configured certificate/key files and explicit HTTPS Origins.
 
-Normal non-loopback startup requires authentication, Secure Cookie and an explicit trusted Origin. PalmTTY refuses unsafe normal-mode startup unless the operator deliberately enables the development-only insecure LAN override.
+For normal remote use, prefer a private HTTPS entry point or authenticated HTTPS reverse proxy. Keep an HTTP reverse-proxy upstream private/firewalled.
 
 Deployment references:
 
+- [Private-LAN HTTP example](examples/palmtty.lan.example.yaml)
+- [Direct HTTPS example](examples/palmtty.https.example.yaml)
 - [QNAP/reverse-proxy example](examples/qnap-reverse-proxy.yaml)
 - [Caddy example](examples/Caddyfile.example)
 - [Community security guide](docs/community/security.md)

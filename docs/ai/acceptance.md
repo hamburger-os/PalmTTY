@@ -18,7 +18,7 @@ pnpm test
 
 Security, session and reconnect changes should include or update tests for:
 
-- exact Origin rejection, including generated development-LAN Origins remaining exact rather than wildcarded
+- exact Origin rejection for every exposure profile, including `lan` auto-detected private Origins and generated development-LAN Origins remaining exact rather than wildcarded
 - authentication failure
 - required WebSocket subprotocol
 - resume-before-input/resize ordering
@@ -55,8 +55,8 @@ Security, session and reconnect changes should include or update tests for:
 - Session workbench tab changes keep the terminal/xterm/WebSocket mounted, do not reset `lastSeq`, and do not emit hidden-pane geometry changes; returning to Terminal performs a safe refit
 - workspace file list/read APIs require authentication + exact Origin, use canonical relative paths, reject traversal/symlink escape, cap listings at 512 entries, cap text preview at 512 KiB, and report binary/truncated previews explicitly
 - workspace Git APIs require authentication + exact Origin, handle non-repositories without failing the Agent, use porcelain-v2 structured status, make containing-repository scope explicit, bound status/diff/history/branch output, reject path traversal, disable external diff/textconv/fsmonitor execution for reads, and do not inherit the reserved `PALMTTY_*` control namespace or any separately configured PalmTTY auth-token environment key; typed writes must reject stale or incomplete/truncated status, serialize concurrent writes by resolved repository even when multiple Workspaces share it, preserve both old/new paths for rename-aware single-file staging, use explicit repository-wide stage-all/unstage-all operations, destructive restore must verify the loaded diff snapshot and stay unavailable for rename/untracked/conflict entries, hooks/interactive prompts stay disabled, repository filter execution requires explicit Web acknowledgement, and remote operations stay non-interactive
-- development Origin parsing accepts only exact HTTP(S) Origins, deduplicates generated LAN values, and does not change the configured Agent bind address
-- autostart tests cover Windows command-line/PowerShell literal quoting, the hidden system-PowerShell `InteractiveToken`/least-privilege task XML, kill-on-close + silent-breakaway Job Object supervision, Agent exit-code propagation, a real Windows supervisor smoke proving a detached child survives Agent Job close, locale-independent UTF-8 scheduled-task status parsing, a real Windows PowerShell status probe in Windows CI, and Linux systemd `KillMode=process`; Agent environment-file tests cover comments/quotes/duplicates, literal no-shell-expansion behavior and environment application
+- exposure tests reject removed low-level switches, derive `local`/`lan` bind+Origin behavior, verify `lan` rejects public client source addresses, require explicit HTTPS Origins for `reverseProxy`/`https`, and development Origin parsing remains runtime-only
+- autostart tests cover Windows command-line/PowerShell literal quoting, `InteractiveToken`/least-privilege Task Scheduler XML that directly launches the GUI-subsystem host, kill-on-close + silent-breakaway Job Object supervision, Agent exit-code propagation, a real Windows GUI-host smoke proving a detached child survives Agent Job close, PE subsystem validation, locale-independent UTF-8 scheduled-task status including `LastTaskResult`, a real Windows PowerShell status probe in Windows CI, and Linux systemd `KillMode=process`; Agent environment-file tests cover comments/quotes/duplicates, literal no-shell-expansion behavior and environment application
 
 The Agent suite includes:
 
@@ -133,10 +133,10 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 - restart only the PalmTTY Agent, sign in again and return to the same live Session;
 - switch phone network or background/foreground and reconnect;
 - verify stale/new browser state recovers via snapshot;
-- verify non-loopback unsafe configuration is rejected;
+- verify legacy `host` / `trustedOrigins` / `secureCookies` / `unsafeAllowInsecureLan` config is rejected; verify `lan` requires auth, rejects public client source addresses, and derives only private/overlay HTTP Origins; verify `reverseProxy`/`https` accept only explicit HTTPS Origins;
 - verify HTTPS reverse-proxy login with Secure Cookie;
 - inspect the per-user Worker runtime directory and confirm secret/record files are not exposed through the browser or logs;
-- after `pnpm build`, install Windows autostart with a current-user env file, verify `pnpm autostart status` prints PalmTTY-owned UTF-8 fields without mojibake, sign out/in or restart the task, confirm the Agent starts as the same user without elevation, confirm no persistent console window remains and watch for any transient flash that CI cannot observe; then verify restarting only the autostart Agent still allows rediscovery of an already-running Worker.
+- Windows CI must compile the real autostart host as `WindowsApplication`, assert PE subsystem=GUI, execute it against a fixture Agent, verify Agent exit-code propagation and detached Worker breakaway, and run the locale-independent scheduled-task status query. On a real owner host, install autostart, verify `pnpm autostart status` reports `launcher: native-gui`, `lastTaskResult`, and the expected exposure/listen/browser/LAN diagnostics, sign out/in or restart the task, confirm the Agent starts as the same user without elevation and no empty console remains; then verify Agent restart still rediscovers an already-running Worker.
 
 ## Manual Linux validation before raising Linux support confidence
 

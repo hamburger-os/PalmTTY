@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
-import type { PalmTTYConfig } from "@palmtty/config";
+import { exposureOrigins, secureCookies, type PalmTTYConfig } from "@palmtty/config";
 import {
   BrowseDirectoryRequestSchema,
   CreateSessionSchema,
@@ -23,7 +23,7 @@ import { AUTH_COOKIE, AuthService } from "./auth.js";
 import { controlEnvironmentKeys, isReservedControlEnvironmentKey } from "./control-environment.js";
 import { browseWorkspaceDirectory } from "./workspace-directory-browser.js";
 import { detectTerminalProfiles } from "./terminal-profiles.js";
-import { FixedWindowLimiter, isTrustedOrigin } from "./security.js";
+import { FixedWindowLimiter, isPrivateClientAddress, isTrustedOrigin } from "./security.js";
 import { SessionManager, type SessionManagerOptions } from "./session-manager.js";
 import {
   detectRuntimeCapabilities,
@@ -42,6 +42,11 @@ export type BuildAppOptions = {
   webRoot?: string;
   sessionManager?: Omit<SessionManagerOptions, "workspaceStore">;
   workspaceStore?: WorkspaceStore;
+  additionalTrustedOrigins?: readonly string[];
+  https?: {
+    cert: Buffer;
+    key: Buffer;
+  };
 };
 
 export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions = {}) {
@@ -53,7 +58,18 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
         "res.headers.set-cookie"
       ]
     },
-    bodyLimit: MAX_MESSAGE_BYTES
+    bodyLimit: MAX_MESSAGE_BYTES,
+    ...(options.https ? { https: options.https } : {})
+  });
+
+  app.addHook("onRequest", async (request, reply) => {
+    if (
+      config.server.exposure.mode === "lan" &&
+      !isPrivateClientAddress(request.ip)
+    ) {
+      request.log.warn({ remoteAddress: request.ip }, "Rejected non-private LAN client");
+      return reply.code(403).send({ error: "lan_client_not_private" });
+    }
   });
 
   await app.register(cookie);
@@ -99,7 +115,11 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   }
 
   async function requireOrigin(request: FastifyRequest, reply: FastifyReply) {
-    if (!isTrustedOrigin(request.headers.origin, config)) {
+    const trustedOrigins = [
+      ...exposureOrigins(config),
+      ...(options.additionalTrustedOrigins ?? [])
+    ];
+    if (!isTrustedOrigin(request.headers.origin, trustedOrigins)) {
       request.log.warn({ origin: request.headers.origin }, "Rejected untrusted origin");
       return reply.code(403).send({ error: "untrusted_origin" });
     }
@@ -133,7 +153,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       path: "/",
       httpOnly: true,
       sameSite: "strict",
-      secure: config.server.secureCookies,
+      secure: secureCookies(config),
       maxAge: config.auth.sessionTtlMinutes * 60
     });
     return reply.code(204).send();

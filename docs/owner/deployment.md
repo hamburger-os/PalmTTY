@@ -24,7 +24,7 @@ PalmTTY Agent（配置 endpoint；示例为 127.0.0.1:17688）
 
 开发启动器只把检测到的 RFC1918、IPv4 link-local 和 100.64/10 私有/overlay 地址对应的 5173 Origin 作为**精确值**临时注入 development Agent，不写回配置、不启用通配 Origin。Windows 若 LAN 访问超时，应按 Private 网络配置防火墙，不由 PalmTTY 自动提权修改。
 
-正常构建运行与 autostart 不包含 Vite：`pnpm build` 后 Agent 直接托管 `apps/web/dist`，浏览器访问配置中的 Agent endpoint。示例配置对应 `http://127.0.0.1:17688/`；`http://<LAN-IP>:5173` 只在 `pnpm dev` 运行时存在。
+正常构建运行与 autostart 不包含 Vite：`pnpm build` 后 Agent 直接托管 `apps/web/dist`。网络暴露改为 `server.exposure.mode` 一等模型：`local` 固定 loopback；`lan` 固定监听 IPv4 `0.0.0.0`，但在应用入口拒绝非私有来源地址，并自动生成当前私有/overlay IPv4 的精确 HTTP Origin；`reverseProxy` 使用显式 HTTPS Origin 并自动启用 Secure Cookie；`https` 由 Agent 直接加载证书/私钥。示例配置为 `local`，对应 `http://127.0.0.1:17688/`；`http://<LAN-IP>:5173` 只在 `pnpm dev` 运行时存在。
 
 ## Windows 当前用户自启动
 
@@ -33,7 +33,9 @@ PalmTTY Agent（配置 endpoint；示例为 127.0.0.1:17688）
 - 触发器：当前用户登录；
 - LogonType：`InteractiveToken`；
 - RunLevel：`LeastPrivilege`；
-- Action：系统 Windows PowerShell（`System32\\WindowsPowerShell\\v1.0\\powershell.exe`）以 `-WindowStyle Hidden -File <repo>\\scripts\\windows-autostart-supervisor.ps1` 运行专用监督脚本；脚本用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 创建安装时的 Node 可执行文件 + 已编译 `apps/agent/dist/index.js`，先加入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` 的 Windows Job Object，再恢复并等待 Agent；Node 退出码继续传回 Task Scheduler；
+- 安装阶段：使用系统 Windows PowerShell 5.1 的 `Add-Type -OutputType WindowsApplication` 一次性把 `scripts/windows-autostart-host.cs` 编译为 `%LOCALAPPDATA%\\PalmTTY\\autostart\\palmtty-autostart-host.exe`；运行阶段不依赖 PowerShell；
+- Action：Task Scheduler 直接执行上述 GUI-subsystem host，并只传 `--installation <...\\installation.json>`；task XML 不再携带 Node/Agent/config/env-file 等仓库细节；
+- native host：读取 installation manifest，用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 创建 Node Agent，先加入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` Job Object，再恢复、等待并传递退出码；
 - WorkingDirectory、Agent、config 与可选 env-file 都使用安装时的绝对路径；
 - 安装会先结束旧任务实例、更新任务定义并立即启动新实例；
 - 失败 Agent 由 Task Scheduler 做有限次数重启；Job Object 的 kill-on-close 保证 Task Scheduler `/End` 或包装进程结束时 Agent 也随之退出，不留下占用端口的孤儿控制面；`SILENT_BREAKAWAY_OK` 让 Agent 创建的独立 Session Worker 脱离该 Job，从而继续满足 `Agent lifetime != Worker lifetime`；
@@ -41,7 +43,7 @@ PalmTTY Agent（配置 endpoint；示例为 127.0.0.1:17688）
 
 不使用 LocalSystem/S4U 的原因是 PalmTTY 的 Shell、Git/SSH credential、PATH、WindowsApps App Execution Alias 都属于真实开发用户。当前不实现“用户未登录时的 Windows Service 模式”。
 
-Windows 登录自启动不再直接启动 console-subsystem 的 `node.exe`，因此不会长期保留 Node console 窗口；窗口隐藏由 PowerShell 的 `-WindowStyle Hidden` 负责，而 Task Scheduler 的 `Hidden` 属性仍不承担这个语义。CI 无法观察真实桌面，所以发布验收仍需确认登录/任务重启时没有瞬时闪框。
+Windows 登录自启动链路已经彻底去除长期 console host：Task Scheduler 的直接 child 是 PE `Windows GUI` subsystem 的 PalmTTY host；Node 再由该 host 使用 `CREATE_NO_WINDOW` 创建。CI 会实际编译该 host、检查 PE subsystem=GUI、执行 fixture Agent，并验证 Agent 退出码与 detached Worker breakaway；真实桌面仍可作为额外视觉验收，但实现语义不再依赖 `-WindowStyle Hidden`。
 
 ## Linux 当前用户自启动
 

@@ -14,10 +14,8 @@ const roots = new Set<string>();
 function config() {
   return parseConfig({
     server: {
-      host: "127.0.0.1",
       port: 7688,
-      trustedOrigins: [ORIGIN],
-      secureCookies: false
+      exposure: { mode: "local" }
     },
     auth: {
       enabled: true,

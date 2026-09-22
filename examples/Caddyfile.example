@@ -2,5 +2,5 @@
 # Replace both the public domain and the private Windows host address.
 
 dev.example.com {
-    reverse_proxy http://192.168.1.100:7688
+    reverse_proxy http://192.168.1.100:17688
 }

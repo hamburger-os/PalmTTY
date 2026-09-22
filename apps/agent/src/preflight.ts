@@ -1,10 +1,15 @@
-import type { PalmTTYConfig } from "@palmtty/config";
+import {
+  serverBindHost,
+  type PalmTTYConfig
+} from "@palmtty/config";
 import { assertAuthEnvironment } from "./auth.js";
-import { probeServerEndpoint } from "./server-endpoint.js";
+import { probeServerEndpoint, type ServerEndpoint } from "./server-endpoint.js";
 import { assertSecureExposure } from "./security.js";
+import { loadServerTlsOptions } from "./server-tls.js";
 
 export type RuntimePreflightOptions = {
-  serverProbe?: (server: PalmTTYConfig["server"]) => Promise<void>;
+  serverProbe?: (server: ServerEndpoint) => Promise<void>;
+  tlsProbe?: (config: Pick<PalmTTYConfig, "server">) => Promise<unknown>;
 };
 
 function errorMessage(error: unknown): string {
@@ -31,9 +36,20 @@ export async function preflightRuntime(
     issues.push(errorMessage(error));
   }
 
+  if (config.server.exposure.mode === "https") {
+    try {
+      await (options.tlsProbe ?? loadServerTlsOptions)(config);
+    } catch (error) {
+      issues.push(`Direct HTTPS credentials are invalid: ${errorMessage(error)}`);
+    }
+  }
+
   if (exposureAllowed) {
     try {
-      await (options.serverProbe ?? probeServerEndpoint)(config.server);
+      await (options.serverProbe ?? probeServerEndpoint)({
+        host: serverBindHost(config),
+        port: config.server.port
+      });
     } catch (error) {
       issues.push(errorMessage(error));
     }

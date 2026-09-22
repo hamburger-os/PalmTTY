@@ -1,13 +1,30 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { access, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  exposureOrigins,
+  lanAgentUrls,
+  loadConfig,
+  localAgentUrl,
+  serverBindHost
+} from "../packages/config/dist/index.js";
+import {
   LINUX_UNIT_NAME,
   WINDOWS_TASK_NAME,
   buildSystemdUserUnit,
+  buildWindowsHostCompilePowerShellCommand,
+  buildWindowsInstallationManifest,
   buildWindowsTaskStatusPowerShellCommand,
   buildWindowsTaskXml,
   defaultConfigPath,
@@ -15,13 +32,15 @@ import {
   defaultWindowsPowerShellPath,
   encodePowerShellCommand,
   parseAutostartArgs,
-  parseWindowsTaskStatus
+  parseWindowsInstallationManifest,
+  parseWindowsTaskStatus,
+  windowsAutostartPaths
 } from "./autostart-core.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const agentPath = path.join(repoRoot, "apps", "agent", "dist", "index.js");
-const windowsSupervisorPath = path.join(scriptDir, "windows-autostart-supervisor.ps1");
+const windowsHostSourcePath = path.join(scriptDir, "windows-autostart-host.cs");
 
 function run(command, args, { acceptedExitCodes = [0] } = {}) {
   const result = spawnSync(command, args, {
@@ -36,15 +55,18 @@ function run(command, args, { acceptedExitCodes = [0] } = {}) {
   return result;
 }
 
-async function requireRegularFile(filePath, label) {
-  let info;
+async function regularFileExists(filePath) {
   try {
-    info = await stat(filePath);
+    return (await stat(filePath)).isFile();
   } catch {
-    throw new Error(`${label} does not exist: ${filePath}`);
+    return false;
   }
-  if (!info.isFile()) throw new Error(`${label} must be a regular file: ${filePath}`);
-  return info;
+}
+
+async function requireRegularFile(filePath, label) {
+  if (!await regularFileExists(filePath)) {
+    throw new Error(`${label} does not exist or is not a regular file: ${filePath}`);
+  }
 }
 
 async function resolveInputs(options) {
@@ -57,7 +79,7 @@ async function resolveInputs(options) {
 
 async function validateLinuxEnvFilePermissions(envFile) {
   if (!envFile) return;
-  const info = await requireRegularFile(envFile, "Environment file");
+  const info = await stat(envFile);
   if ((info.mode & 0o077) !== 0) {
     throw new Error(`Linux environment file must not be group/world accessible (chmod 600): ${envFile}`);
   }
@@ -84,36 +106,199 @@ function runRollback(action, command, args, options) {
   }
 }
 
+const WINDOWS_FILE_RETRY_CODES = new Set(["EBUSY", "EACCES", "EPERM"]);
+
+async function renameWithRetry(source, destination, attempts = 20) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await rename(source, destination);
+      return;
+    } catch (error) {
+      const retryable = process.platform === "win32" &&
+        WINDOWS_FILE_RETRY_CODES.has(error?.code) &&
+        attempt < attempts;
+      if (!retryable) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
+
+async function moveIfPresent(source, destination) {
+  if (!await regularFileExists(source)) return false;
+  await renameWithRetry(source, destination);
+  return true;
+}
+
+async function restoreBackup(backup, target, present) {
+  await rm(target, { force: true }).catch(() => undefined);
+  if (present && await regularFileExists(backup)) {
+    await renameWithRetry(backup, target);
+  }
+}
+
+function compileWindowsHost(powershellPath, sourcePath, outputPath) {
+  const command = buildWindowsHostCompilePowerShellCommand({
+    sourcePath,
+    outputPath
+  });
+  run(powershellPath, [
+    "-NoLogo",
+    "-NoProfile",
+    "-NonInteractive",
+    "-EncodedCommand",
+    encodePowerShellCommand(command)
+  ]);
+}
+
+function processIsAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function printNetworkStatus(configPath) {
+  try {
+    const config = await loadConfig(configPath);
+    const mode = config.server.exposure.mode;
+    console.log("network:");
+    console.log(`  exposure: ${mode}`);
+    console.log(`  listen: ${serverBindHost(config)}:${config.server.port}`);
+    if (mode === "local") {
+      console.log(`  browserUrl: ${localAgentUrl(config)}`);
+      console.log("  lanAccess: disabled (local exposure)");
+      return;
+    }
+
+    if (mode === "lan") {
+      const urls = lanAgentUrls(config);
+      console.log(`  browserUrl: ${localAgentUrl(config)}`);
+      console.log("  lanAccess: enabled (authenticated, unencrypted private/overlay HTTP)");
+      console.log("  sourceAddressGate: private/overlay clients only");
+      if (urls.length === 0) {
+        console.log("  lanUrls: none detected");
+      } else {
+        console.log("  lanUrls:");
+        for (const url of urls) console.log(`    - ${url}`);
+      }
+      if (process.platform === "win32") {
+        console.log("  firewall: keep the Agent port scoped to trusted Windows Private networks");
+      }
+      return;
+    }
+
+    if (mode === "reverseProxy") {
+      console.log(`  upstreamUrl: ${localAgentUrl(config)}`);
+    }
+    console.log("  browserOrigins:");
+    for (const origin of exposureOrigins(config)) console.log(`    - ${origin}`);
+  } catch (error) {
+    console.log(`network: unavailable (${error instanceof Error ? error.message : error})`);
+  }
+}
+
 async function installWindows(inputs) {
   const userSid = currentWindowsSid();
   const powershellPath = defaultWindowsPowerShellPath();
+  const paths = windowsAutostartPaths();
+  const installId = randomUUID();
+  const tempHost = path.join(paths.directory, `host-${installId}.tmp.exe`);
+  const tempInstallation = path.join(paths.directory, `installation-${installId}.tmp.json`);
+  const tempTaskXml = path.join(os.tmpdir(), `palmtty-task-${installId}.xml`);
+  const backupHost = path.join(paths.directory, `host-${installId}.bak.exe`);
+  const backupInstallation = path.join(paths.directory, `installation-${installId}.bak.json`);
+
   await requireRegularFile(powershellPath, "Windows PowerShell");
-  await requireRegularFile(windowsSupervisorPath, "Windows autostart supervisor");
-  const xml = buildWindowsTaskXml({
-    userSid,
-    powershellPath,
-    supervisorPath: windowsSupervisorPath,
+  await requireRegularFile(windowsHostSourcePath, "Windows autostart host source");
+  await mkdir(paths.directory, { recursive: true });
+
+  compileWindowsHost(powershellPath, windowsHostSourcePath, tempHost);
+  await requireRegularFile(tempHost, "Compiled Windows autostart host");
+
+  const installation = buildWindowsInstallationManifest({
     nodePath: process.execPath,
     agentPath,
     repoRoot,
     configPath: inputs.configPath,
     envFile: inputs.envFile
   });
-  const tempPath = path.join(os.tmpdir(), `palmtty-task-${randomUUID()}.xml`);
-  await writeFile(tempPath, `\ufeff${xml}`, { encoding: "utf16le", mode: 0o600 });
+  await writeFile(tempInstallation, `${JSON.stringify(installation, null, 2)}\n`, {
+    encoding: "utf8",
+    mode: 0o600
+  });
+
+  const xml = buildWindowsTaskXml({
+    userSid,
+    hostPath: paths.host,
+    installationPath: paths.installation,
+    workingDirectory: paths.directory
+  });
+  await writeFile(tempTaskXml, `\ufeff${xml}`, { encoding: "utf16le", mode: 0o600 });
+
+  let previousHost = false;
+  let previousInstallation = false;
+  let replacedFiles = false;
   try {
     run("schtasks.exe", ["/End", "/TN", WINDOWS_TASK_NAME], { acceptedExitCodes: [0, 1] });
-    run("schtasks.exe", ["/Create", "/TN", WINDOWS_TASK_NAME, "/XML", tempPath, "/F"]);
+
+    previousHost = await moveIfPresent(paths.host, backupHost);
+    previousInstallation = await moveIfPresent(paths.installation, backupInstallation);
+    await renameWithRetry(tempHost, paths.host);
+    await renameWithRetry(tempInstallation, paths.installation);
+    replacedFiles = true;
+
+    run("schtasks.exe", ["/Create", "/TN", WINDOWS_TASK_NAME, "/XML", tempTaskXml, "/F"]);
+    await rm(paths.lastError, { force: true });
+    await rm(paths.runtime, { force: true });
     run("schtasks.exe", ["/Run", "/TN", WINDOWS_TASK_NAME]);
+
+    await rm(backupHost, { force: true });
+    await rm(backupInstallation, { force: true });
+  } catch (error) {
+    runRollback("end failed installation", "schtasks.exe", ["/End", "/TN", WINDOWS_TASK_NAME], {
+      acceptedExitCodes: [0, 1]
+    });
+    if (replacedFiles) {
+      await restoreBackup(backupHost, paths.host, previousHost).catch((rollbackError) => {
+        warnRollbackFailure("restore Windows host", rollbackError);
+      });
+      await restoreBackup(backupInstallation, paths.installation, previousInstallation).catch((rollbackError) => {
+        warnRollbackFailure("restore installation manifest", rollbackError);
+      });
+      if (previousHost && previousInstallation) {
+        runRollback("restart previous Windows task", "schtasks.exe", ["/Run", "/TN", WINDOWS_TASK_NAME], {
+          acceptedExitCodes: [0, 1]
+        });
+      } else {
+        runRollback("remove incomplete Windows task", "schtasks.exe", ["/Delete", "/TN", WINDOWS_TASK_NAME, "/F"], {
+          acceptedExitCodes: [0, 1]
+        });
+      }
+    }
+    throw error;
   } finally {
-    await rm(tempPath, { force: true }).catch(() => undefined);
+    for (const temporary of [
+      tempHost,
+      tempInstallation,
+      tempTaskXml,
+      backupHost,
+      backupInstallation
+    ]) {
+      await rm(temporary, { force: true }).catch(() => undefined);
+    }
   }
-  console.log(`[PalmTTY] installed Windows background sign-in task: ${WINDOWS_TASK_NAME}`);
+
+  console.log(`[PalmTTY] installed Windows console-free sign-in task: ${WINDOWS_TASK_NAME}`);
+  console.log(`[PalmTTY] launcher: ${paths.host}`);
   console.log(`[PalmTTY] config: ${inputs.configPath}`);
   if (inputs.envFile) console.log(`[PalmTTY] environment file: ${inputs.envFile}`);
+  await printNetworkStatus(inputs.configPath);
 }
 
-function statusWindows() {
+function queryWindowsTaskStatus() {
   const command = buildWindowsTaskStatusPowerShellCommand();
   const result = run(defaultWindowsPowerShellPath(), [
     "-NoLogo",
@@ -122,15 +307,72 @@ function statusWindows() {
     "-EncodedCommand",
     encodePowerShellCommand(command)
   ]);
-  const status = parseWindowsTaskStatus(result.stdout);
+  return parseWindowsTaskStatus(result.stdout);
+}
+
+async function readWindowsRuntime(paths) {
+  try {
+    const source = await readFile(paths.runtime, "utf8");
+    const value = JSON.parse(source);
+    if (
+      !value ||
+      typeof value !== "object" ||
+      !Number.isInteger(value.hostPid) ||
+      !Number.isInteger(value.agentPid)
+    ) {
+      return undefined;
+    }
+    return {
+      hostPid: value.hostPid,
+      agentPid: value.agentPid,
+      startedAtUtc: typeof value.startedAtUtc === "string" ? value.startedAtUtc : undefined
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+async function statusWindows() {
+  const status = queryWindowsTaskStatus();
+  const paths = windowsAutostartPaths();
   console.log("[PalmTTY] autostart status");
   console.log("platform: windows");
   console.log(`task: ${WINDOWS_TASK_NAME}`);
   console.log(`installed: ${status.installed ? "yes" : "no"}`);
   if (!status.installed) return;
+
   console.log(`state: ${status.state}`);
+  console.log(`lastTaskResult: ${status.lastTaskResult}`);
+  console.log(`launcher: ${await regularFileExists(paths.host) ? "native-gui" : "missing"}`);
+  console.log(`launcherPath: ${paths.host}`);
   if (status.lastRunTime) console.log(`lastRunTime: ${status.lastRunTime}`);
   if (status.nextRunTime) console.log(`nextRunTime: ${status.nextRunTime}`);
+
+  let installation;
+  try {
+    installation = parseWindowsInstallationManifest(
+      await readFile(paths.installation, "utf8")
+    );
+    console.log(`config: ${installation.configPath}`);
+  } catch (error) {
+    console.log(`installation: invalid (${error instanceof Error ? error.message : error})`);
+  }
+
+  const runtime = await readWindowsRuntime(paths);
+  if (runtime) {
+    console.log(`hostPid: ${runtime.hostPid} (${processIsAlive(runtime.hostPid) ? "alive" : "stale"})`);
+    console.log(`agentPid: ${runtime.agentPid} (${processIsAlive(runtime.agentPid) ? "alive" : "stale"})`);
+    if (runtime.startedAtUtc) console.log(`startedAt: ${runtime.startedAtUtc}`);
+  } else {
+    console.log("runtime: unavailable");
+  }
+
+  if (await regularFileExists(paths.lastError)) {
+    const firstLine = (await readFile(paths.lastError, "utf8")).split(/\r?\n/u)[0];
+    console.log(`lastError: ${firstLine || "present"} (${paths.lastError})`);
+  }
+
+  if (installation) await printNetworkStatus(installation.configPath);
 }
 
 function restartWindows() {
@@ -139,10 +381,17 @@ function restartWindows() {
   console.log(`[PalmTTY] restarted Windows sign-in task: ${WINDOWS_TASK_NAME}`);
 }
 
-function uninstallWindows() {
+async function uninstallWindows() {
+  const paths = windowsAutostartPaths();
   run("schtasks.exe", ["/End", "/TN", WINDOWS_TASK_NAME], { acceptedExitCodes: [0, 1] });
-  run("schtasks.exe", ["/Delete", "/TN", WINDOWS_TASK_NAME, "/F"]);
-  console.log(`[PalmTTY] removed Windows sign-in task: ${WINDOWS_TASK_NAME}`);
+  run("schtasks.exe", ["/Delete", "/TN", WINDOWS_TASK_NAME, "/F"], { acceptedExitCodes: [0, 1] });
+  await rm(paths.directory, {
+    recursive: true,
+    force: true,
+    maxRetries: 20,
+    retryDelay: 100
+  });
+  console.log(`[PalmTTY] removed Windows sign-in task and launcher state: ${paths.directory}`);
 }
 
 async function installLinux(inputs) {
@@ -198,6 +447,7 @@ async function installLinux(inputs) {
   console.log(`[PalmTTY] installed systemd user service: ${unitPath}`);
   console.log(`[PalmTTY] config: ${inputs.configPath}`);
   if (inputs.envFile) console.log(`[PalmTTY] environment file: ${inputs.envFile}`);
+  await printNetworkStatus(inputs.configPath);
 }
 
 function linuxServiceState(action, acceptedExitCodes) {
@@ -235,7 +485,7 @@ async function main() {
   }
 
   if (options.command === "status") {
-    if (process.platform === "win32") statusWindows();
+    if (process.platform === "win32") await statusWindows();
     else statusLinux();
     return;
   }
@@ -247,7 +497,7 @@ async function main() {
   }
 
   if (options.command === "uninstall") {
-    if (process.platform === "win32") uninstallWindows();
+    if (process.platform === "win32") await uninstallWindows();
     else await uninstallLinux();
     return;
   }
