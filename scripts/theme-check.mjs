@@ -109,8 +109,9 @@ for (const marker of [
 }
 
 for (const marker of [
-  'terminal.buffer.active.type === "normal"',
-  'terminal.modes.mouseTrackingMode === "none"',
+  'shouldOwnTerminalTouchScroll(',
+  'terminal.buffer.active.type',
+  'terminal.modes.mouseTrackingMode',
   'event.preventDefault()',
   'terminal.scrollLines(step.lines)'
 ]) {
