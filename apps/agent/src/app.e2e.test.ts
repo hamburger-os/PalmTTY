@@ -169,10 +169,8 @@ async function startHarness(
   process.env[TOKEN_ENV] = TOKEN;
   const config = parseConfig({
     server: {
-      host: "127.0.0.1",
       port: 7688,
-      trustedOrigins: ["http://127.0.0.1:7688"],
-      secureCookies: false
+      exposure: { mode: "local" }
     },
     auth: {
       enabled: true,
@@ -197,7 +195,6 @@ async function startHarness(
 
   // Test-only ephemeral listener: keep the runtime Origin policy exact.
   config.server.port = Number(new URL(origin).port);
-  config.server.trustedOrigins = [origin];
 
   return {
     app,
@@ -743,7 +740,6 @@ describe("terminal WebSocket integration", () => {
     const restartedAddress = await restartedApp.listen({ host: "127.0.0.1", port: 0 });
     const restartedOrigin = new URL(restartedAddress).origin;
     harness.config.server.port = Number(new URL(restartedOrigin).port);
-    harness.config.server.trustedOrigins = [restartedOrigin];
 
     const restartedHarness: Harness = {
       ...harness,
