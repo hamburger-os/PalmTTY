@@ -26,6 +26,10 @@ test("extracts one changelog release and detects an empty Unreleased section", (
 
 - First release.
 
+## Release history
+
+No extra release-note text.
+
 ## [0.0.1]
 
 - Old release.
@@ -38,6 +42,13 @@ test("extracts one changelog release and detects an empty Unreleased section", (
   assert.equal(isUnreleasedEmpty(changelog), true);
   assert.equal(
     isUnreleasedEmpty(changelog.replace("<!-- Add pending changes here. -->", "- Pending.")),
+    false
+  );
+  assert.equal(
+    isUnreleasedEmpty(changelog.replace(
+      "<!-- Add pending changes here. -->",
+      "<!-- multiline\ncomment -->"
+    )),
     false
   );
 });
