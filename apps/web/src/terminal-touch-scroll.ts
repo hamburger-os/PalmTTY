@@ -23,9 +23,18 @@ export function consumeTouchScrollDelta(
   };
 }
 
+export function shouldOwnTerminalTouchScroll(
+  bufferType: "normal" | "alternate",
+  mouseTrackingMode: Terminal["modes"]["mouseTrackingMode"]
+): boolean {
+  return bufferType === "normal" && mouseTrackingMode === "none";
+}
+
 function canOwnTouchScroll(terminal: Terminal): boolean {
-  return terminal.buffer.active.type === "normal"
-    && terminal.modes.mouseTrackingMode === "none";
+  return shouldOwnTerminalTouchScroll(
+    terminal.buffer.active.type,
+    terminal.modes.mouseTrackingMode
+  );
 }
 
 function terminalLineHeight(host: HTMLElement, terminal: Terminal): number {
