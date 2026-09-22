@@ -60,9 +60,23 @@ async function validateLinuxEnvFilePermissions(envFile) {
 
 function currentWindowsSid() {
   const result = run("whoami.exe", ["/user", "/fo", "csv", "/nh"]);
-  const match = result.stdout.match(/"(S-[0-9-]+)"/u);
+  const match = result.stdout.match(/S-[0-9]+(?:-[0-9]+)+/u);
   if (!match) throw new Error("Unable to resolve the current Windows user SID");
-  return match[1];
+  return match[0];
+}
+
+function warnRollbackFailure(action, error) {
+  console.warn(
+    `[PalmTTY] autostart rollback warning (${action}): ${error instanceof Error ? error.message : error}`
+  );
+}
+
+function runRollback(action, command, args, options) {
+  try {
+    run(command, args, options);
+  } catch (error) {
+    warnRollbackFailure(action, error);
+  }
 }
 
 async function installWindows(inputs) {
@@ -90,11 +104,7 @@ async function installWindows(inputs) {
 }
 
 function statusWindows() {
-  const result = run("schtasks.exe", ["/Query", "/TN", WINDOWS_TASK_NAME, "/FO", "LIST", "/V"], { acceptedExitCodes: [0, 1] });
-  if (result.status === 1) {
-    console.log(`[PalmTTY] Windows sign-in task is not installed: ${WINDOWS_TASK_NAME}`);
-    return;
-  }
+  const result = run("schtasks.exe", ["/Query", "/TN", WINDOWS_TASK_NAME, "/FO", "LIST", "/V"]);
   process.stdout.write(result.stdout);
 }
 
@@ -106,11 +116,7 @@ function restartWindows() {
 
 function uninstallWindows() {
   run("schtasks.exe", ["/End", "/TN", WINDOWS_TASK_NAME], { acceptedExitCodes: [0, 1] });
-  const result = run("schtasks.exe", ["/Delete", "/TN", WINDOWS_TASK_NAME, "/F"], { acceptedExitCodes: [0, 1] });
-  if (result.status === 1) {
-    console.log(`[PalmTTY] Windows sign-in task was already absent: ${WINDOWS_TASK_NAME}`);
-    return;
-  }
+  run("schtasks.exe", ["/Delete", "/TN", WINDOWS_TASK_NAME, "/F"]);
   console.log(`[PalmTTY] removed Windows sign-in task: ${WINDOWS_TASK_NAME}`);
 }
 
@@ -153,14 +159,14 @@ async function installLinux(inputs) {
     if (previousUnit === undefined) await rm(unitPath, { force: true });
     else await writeFile(unitPath, previousUnit, { encoding: "utf8", mode: 0o644 });
 
-    run("systemctl", ["--user", "daemon-reload"], { acceptedExitCodes: [0, 1] });
+    runRollback("daemon-reload", "systemctl", ["--user", "daemon-reload"], { acceptedExitCodes: [0, 1] });
     if (previousUnit === undefined || !previousEnabled) {
-      run("systemctl", ["--user", "disable", LINUX_UNIT_NAME], { acceptedExitCodes: [0, 1, 4, 5] });
+      runRollback("disable restored unit", "systemctl", ["--user", "disable", LINUX_UNIT_NAME], { acceptedExitCodes: [0, 1, 4, 5] });
     } else {
-      run("systemctl", ["--user", "enable", LINUX_UNIT_NAME], { acceptedExitCodes: [0, 1] });
+      runRollback("enable restored unit", "systemctl", ["--user", "enable", LINUX_UNIT_NAME], { acceptedExitCodes: [0, 1] });
     }
     if (previousUnit !== undefined && previousActive) {
-      run("systemctl", ["--user", "restart", LINUX_UNIT_NAME], { acceptedExitCodes: [0, 1, 5] });
+      runRollback("restart restored unit", "systemctl", ["--user", "restart", LINUX_UNIT_NAME], { acceptedExitCodes: [0, 1, 5] });
     }
     throw error;
   }
@@ -169,10 +175,19 @@ async function installLinux(inputs) {
   if (inputs.envFile) console.log(`[PalmTTY] environment file: ${inputs.envFile}`);
 }
 
+function linuxServiceState(action, acceptedExitCodes) {
+  const result = run("systemctl", ["--user", action, LINUX_UNIT_NAME], { acceptedExitCodes });
+  const state = result.stdout.trim();
+  if (!state && result.stderr.trim()) {
+    throw new Error(`systemctl --user ${action} could not determine ${LINUX_UNIT_NAME} state: ${result.stderr.trim()}`);
+  }
+  return state || "unknown";
+}
+
 function statusLinux() {
-  const enabled = run("systemctl", ["--user", "is-enabled", LINUX_UNIT_NAME], { acceptedExitCodes: [0, 1, 3, 4] });
-  const active = run("systemctl", ["--user", "is-active", LINUX_UNIT_NAME], { acceptedExitCodes: [0, 1, 3, 4] });
-  console.log(`[PalmTTY] ${LINUX_UNIT_NAME}: enabled=${enabled.stdout.trim() || "unknown"}, active=${active.stdout.trim() || "unknown"}`);
+  const enabled = linuxServiceState("is-enabled", [0, 1, 3, 4]);
+  const active = linuxServiceState("is-active", [0, 1, 3, 4]);
+  console.log(`[PalmTTY] ${LINUX_UNIT_NAME}: enabled=${enabled}, active=${active}`);
 }
 
 function restartLinux() {
