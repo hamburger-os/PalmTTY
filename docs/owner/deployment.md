@@ -33,7 +33,7 @@ PalmTTY Agent（配置 endpoint；示例为 127.0.0.1:17688）
 - 触发器：当前用户登录；
 - LogonType：`InteractiveToken`；
 - RunLevel：`LeastPrivilege`；
-- Action：系统 Windows PowerShell（`System32\\WindowsPowerShell\\v1.0\\powershell.exe`）以 `-WindowStyle Hidden` 运行编码命令；包装层用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 创建安装时的 Node 可执行文件 + 已编译 `apps/agent/dist/index.js`，先加入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` 的 Windows Job Object，再恢复并等待 Agent；Node 退出码继续传回 Task Scheduler；
+- Action：系统 Windows PowerShell（`System32\\WindowsPowerShell\\v1.0\\powershell.exe`）以 `-WindowStyle Hidden -File <repo>\\scripts\\windows-autostart-supervisor.ps1` 运行专用监督脚本；脚本用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 创建安装时的 Node 可执行文件 + 已编译 `apps/agent/dist/index.js`，先加入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` 的 Windows Job Object，再恢复并等待 Agent；Node 退出码继续传回 Task Scheduler；
 - WorkingDirectory、Agent、config 与可选 env-file 都使用安装时的绝对路径；
 - 安装会先结束旧任务实例、更新任务定义并立即启动新实例；
 - 失败 Agent 由 Task Scheduler 做有限次数重启；Job Object 的 kill-on-close 保证 Task Scheduler `/End` 或包装进程结束时 Agent 也随之退出，不留下占用端口的孤儿控制面；`SILENT_BREAKAWAY_OK` 让 Agent 创建的独立 Session Worker 脱离该 Job，从而继续满足 `Agent lifetime != Worker lifetime`；
