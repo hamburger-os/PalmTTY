@@ -235,6 +235,7 @@ async function main() {
   const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
   const appRoot = path.join(outputRoot, "app");
   run(pnpm, [
+    "--config.node-linker=hoisted",
     "--filter",
     "@palmtty/agent",
     "--prod",
