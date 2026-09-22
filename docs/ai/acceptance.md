@@ -56,6 +56,7 @@ Security, session and reconnect changes should include or update tests for:
 - workspace file list/read APIs require authentication + exact Origin, use canonical relative paths, reject traversal/symlink escape, cap listings at 512 entries, cap text preview at 512 KiB, and report binary/truncated previews explicitly
 - workspace Git APIs require authentication + exact Origin, handle non-repositories without failing the Agent, use porcelain-v2 structured status, make containing-repository scope explicit, bound status/diff/history/branch output, reject path traversal, disable external diff/textconv/fsmonitor execution for reads, and do not inherit the reserved `PALMTTY_*` control namespace or any separately configured PalmTTY auth-token environment key; typed writes must reject stale or incomplete/truncated status, serialize concurrent writes by resolved repository even when multiple Workspaces share it, preserve both old/new paths for rename-aware single-file staging, use explicit repository-wide stage-all/unstage-all operations, destructive restore must verify the loaded diff snapshot and stay unavailable for rename/untracked/conflict entries, hooks/interactive prompts stay disabled, repository filter execution requires explicit Web acknowledgement, and remote operations stay non-interactive
 - development Origin parsing accepts only exact HTTP(S) Origins, deduplicates generated LAN values, and does not change the configured Agent bind address
+- autostart pure tests cover Windows command-line quoting/InteractiveToken/least-privilege task XML and Linux systemd `KillMode=process`; Agent environment-file tests cover comments/quotes/duplicates, literal no-shell-expansion behavior and environment application
 
 The Agent suite includes:
 
@@ -97,7 +98,7 @@ On a configured PalmTTY host, before `dev`/`start` or release validation:
 pnpm run preflight
 ~~~
 
-This requires the intended PalmTTY config and authentication environment. The preflight reports auth/security/server-bind failures. Workspace launch validation is intentionally performed when a workspace is created/updated and again when a Session starts, so a stale project path cannot prevent the Agent control plane from starting. It is not a generic CI/contributor prerequisite. The explicit `run` form is required because pnpm 10 has its own built-in `doctor` command; PalmTTY deliberately names its host check `preflight` to avoid command dispatch ambiguity.
+This requires the intended PalmTTY config and authentication environment. For service-style startup, the Agent may also be invoked with `--env-file <path>` so auth values are loaded before config/preflight without placing the secret value in argv. The preflight reports auth/security/server-bind failures. Workspace launch validation is intentionally performed when a workspace is created/updated and again when a Session starts, so a stale project path cannot prevent the Agent control plane from starting. It is not a generic CI/contributor prerequisite. The explicit `run` form is required because pnpm 10 has its own built-in `doctor` command; PalmTTY deliberately names its host check `preflight` to avoid command dispatch ambiguity.
 
 ## Web visual validation
 
@@ -134,7 +135,16 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 - verify stale/new browser state recovers via snapshot;
 - verify non-loopback unsafe configuration is rejected;
 - verify HTTPS reverse-proxy login with Secure Cookie;
-- inspect the per-user Worker runtime directory and confirm secret/record files are not exposed through the browser or logs.
+- inspect the per-user Worker runtime directory and confirm secret/record files are not exposed through the browser or logs;
+- after `pnpm build`, install Windows autostart with a current-user env file, verify `pnpm autostart status`, sign out/in or restart the task, confirm the Agent starts as the same user without elevation and check the real desktop for any unwanted console window; then verify restarting only the autostart Agent still allows rediscovery of an already-running Worker.
+
+## Manual Linux validation before raising Linux support confidence
+
+- run the source quick-start on a real supported Linux host and create a native Host-shell Workspace;
+- create a `0600` autostart env file, install with `pnpm autostart install`, and verify `status` reports enabled + active;
+- confirm a group/world-readable env file is rejected by the installer;
+- create a live Session, run `pnpm autostart restart`, sign in again and confirm the existing Worker/PTY can be rediscovered rather than being killed by systemd;
+- if headless boot startup is desired, enable user lingering explicitly according to host policy and verify the user service starts after reboot; do not claim the pre-reboot PTY survived.
 
 ## Review evidence
 
