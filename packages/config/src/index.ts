@@ -174,7 +174,7 @@ export function privateIpv4Addresses(
   const addresses = new Set<string>();
   for (const entries of Object.values(networkInterfaces)) {
     for (const entry of entries ?? []) {
-      const ipv4 = entry.family === "IPv4" || entry.family === 4;
+      const family = String(entry.family);\n      const ipv4 = family === "IPv4" || family === "4";
       if (!ipv4 || entry.internal || !isPrivateIpv4(entry.address)) continue;
       addresses.add(entry.address);
     }
