@@ -1,21 +1,20 @@
-# Safe local/development example.
+# Safe local example.
 # Copy to palmtty.local.yaml, set PALMTTY_ACCESS_TOKEN, and start PalmTTY.
-# `pnpm dev` keeps this Agent on loopback but exposes Vite on the private LAN
-# and adds the machine's detected private-LAN development Origins in memory.
+# Normal build/start/autostart serves the compiled Web UI from the Agent.
 # Workspaces are intentionally not configured here: create and manage them
 # after signing in through the PalmTTY web UI.
+#
+# To allow direct private-LAN HTTP access, change exposure.mode to "lan".
+# That mode is intentionally explicit because terminal/login traffic is not
+# encrypted. Prefer reverseProxy or direct HTTPS for normal remote use.
+#
+# `pnpm dev` is separate: Vite listens on 0.0.0.0:5173 and dynamically adds
+# exact private/overlay development Origins while the Agent follows this config.
 
 server:
-  host: 127.0.0.1
-  # If preflight reports this port is reserved/excluded or already in use, choose another free port.
   port: 17688
-  trustedOrigins:
-    - http://127.0.0.1:17688
-    - http://127.0.0.1:5173
-  # LAN Vite Origins such as http://192.168.x.x:5173 are generated only for
-  # `pnpm dev`; they do not need to be persisted here.
-  secureCookies: false
-  unsafeAllowInsecureLan: false
+  exposure:
+    mode: local
 
 auth:
   enabled: true
