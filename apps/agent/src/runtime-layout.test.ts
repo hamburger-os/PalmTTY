@@ -65,8 +65,14 @@ describe("installed runtime layout", () => {
     ).href;
 
     expect(installedRoot({}, moduleUrl)).toBeUndefined();
-    expect(defaultWebRoot({}, moduleUrl)).toBe(
-      path.join(os.tmpdir(), "palmtty-source-layout", "apps", "web", "dist")
+    expect(path.resolve(defaultWebRoot({}, moduleUrl))).toBe(
+      path.resolve(
+        os.tmpdir(),
+        "palmtty-source-layout",
+        "apps",
+        "web",
+        "dist"
+      )
     );
   });
 });
