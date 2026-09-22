@@ -47,7 +47,7 @@ test("rejects ranged or ungoverned xterm dependencies", () => {
   assert(failures.some((failure) => failure.includes("must be pinned")));
 });
 
-test("rejects xterm packages moved outside dependencies", () => {
+test("tracks xterm packages across supported dependency sections", () => {
   const input = manifests();
   delete input.webPackage.dependencies["@xterm/addon-fit"];
   input.webPackage.devDependencies = {
