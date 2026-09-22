@@ -1301,7 +1301,8 @@ button.directory-choose {
 }
 
 .git-diff-toolbar {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
 .git-diff-line {
