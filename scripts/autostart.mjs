@@ -388,7 +388,7 @@ async function uninstallWindows() {
   await rm(paths.directory, {
     recursive: true,
     force: true,
-    maxRetries: 5,
+    maxRetries: 20,
     retryDelay: 100
   });
   console.log(`[PalmTTY] removed Windows sign-in task and launcher state: ${paths.directory}`);
