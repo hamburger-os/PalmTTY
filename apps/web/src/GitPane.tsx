@@ -22,6 +22,10 @@ import {
   workspaceGitStatus
 } from "./api.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
+import {
+  canRestoreWorkingTreeChange,
+  gitMutationPaths
+} from "./git-change.js";
 import { parseUnifiedDiff } from "./git-diff.js";
 import { useI18n } from "./i18n.js";
 
@@ -49,12 +53,6 @@ function statusCode(entry: GitChange, staged: boolean): string {
   if (entry.untracked) return "?";
   const value = staged ? entry.indexStatus : entry.worktreeStatus;
   return value ? (STATUS_CODES[value] ?? "·") : "·";
-}
-
-function mutationPaths(entry: GitChange): string[] {
-  return entry.originalPath
-    ? [entry.originalPath, entry.path]
-    : [entry.path];
 }
 
 export function GitPane({
@@ -424,14 +422,14 @@ export function GitPane({
                   conflicts,
                   false,
                   t("git.stage"),
-                  (entry) => void runMutation({ type: "stage", paths: mutationPaths(entry) })
+                  (entry) => void runMutation({ type: "stage", paths: gitMutationPaths(entry) })
                 )}
                 {renderGroup(
                   t("git.staged"),
                   staged,
                   true,
                   t("git.unstage"),
-                  (entry) => void runMutation({ type: "unstage", paths: mutationPaths(entry) })
+                  (entry) => void runMutation({ type: "unstage", paths: gitMutationPaths(entry) })
                 )}
                 {staged.length > 0 && (
                   <button
@@ -450,7 +448,7 @@ export function GitPane({
                   changes,
                   false,
                   t("git.stage"),
-                  (entry) => void runMutation({ type: "stage", paths: mutationPaths(entry) })
+                  (entry) => void runMutation({ type: "stage", paths: gitMutationPaths(entry) })
                 )}
                 {changes.length > 0 && (
                   <button
@@ -602,9 +600,7 @@ export function GitPane({
               diff &&
               !diff.binary &&
               !diff.truncated &&
-              !selectedChange?.untracked &&
-              !selectedChange?.conflict &&
-              !selectedChange?.originalPath && (
+              canRestoreWorkingTreeChange(selectedChange) && (
               <button
                 type="button"
                 className="danger compact"
