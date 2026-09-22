@@ -45,7 +45,7 @@
 
 - “终端 / Git / 文件”三个一级视图，终端始终是核心视图；
 - 切到 Git/文件时 Terminal 组件保持 mounted，xterm、WebSocket、`lastSeq` 与重连循环不被展示状态重建；隐藏时不传播 resize，切回终端再安全 `fit`；
-- Git 视图已经升级为轻量 Source Control 工作台：显式显示“完整仓库”作用域、分支/上游/ahead-behind、冲突、staged/unstaged/untracked；diff 使用结构化 unified diff 行渲染并支持未跟踪文件预览；无选中修改时显示最近提交；支持 stage/unstage/all、带 diff 快照校验的丢弃、commit、分支创建/切换、stash，以及非交互 fetch/pull/push；进入页面、窗口重新聚焦/回到前台和可见页低频轮询都会刷新状态；
+- Git 视图已经升级为轻量 Source Control 工作台：显式显示“完整仓库”作用域、分支/上游/ahead-behind、冲突、staged/unstaged/untracked；diff 使用结构化 unified diff 行渲染并支持未跟踪文件预览；无选中修改时显示最近提交；支持 rename-aware 的单文件 stage/unstage、显式仓库级 stage-all/unstage-all、带 diff 快照校验的丢弃、commit、分支创建/切换、stash，以及非交互 fetch/pull/push；status 一旦被截断或解析不完整，所有写/remote 控件立即禁用；进入页面、窗口重新聚焦/回到前台和可见页低频轮询都会刷新状态；
 - 文件视图以持久 Workspace 根目录为边界浏览目录和文件，提供 UTF-8 文本只读预览；二进制文件只显示状态，大文件预览在 512 KiB 截断；
 - xterm.js；
 - 自动重连状态；
@@ -79,4 +79,4 @@
 
 ## 你审查时重点看
 
-手机体验优化不能绕开终端协议新增隐式高权限 API。Git/文件能力已经通过独立的只读、有界 Workspace API 落地；继续增加写能力时必须单独审查权限、仓库 hooks/filters、symlink/路径逃逸与敏感环境变量继承。
+手机体验优化不能绕开终端协议新增隐式高权限 API。Git/文件能力已经通过独立、有界 Workspace API 落地：Files 保持只读，Git 只开放 typed 写操作。继续增加更高级 Git 或文件写能力时仍必须单独审查权限、仓库 hooks/filters、并发写、symlink/路径逃逸与敏感环境变量继承。
