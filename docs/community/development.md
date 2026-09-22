@@ -27,7 +27,7 @@ For a repository-wide change, `pnpm check` runs the static/test/build acceptance
 
 Any behavior-changing PR must use the documentation-sync workflow in `.agents/skills/docs-sync/SKILL.md`. Security, session lifecycle, reconnect behavior, protocol and configuration changes always require a documentation review.
 
-For a release PR, also run `pnpm license:check` and `pnpm release:check -- X.Y.Z`. Publication is performed only by **Actions → Release** from protected `main`; the workflow pins one source SHA, re-runs Windows/Ubuntu CI, vulnerability/license checks and CodeQL, requires explicit real-device/deployment acceptance, and creates the annotated tag/GitHub Release only after those gates pass.
+For a release PR, also run `pnpm license:check` and `pnpm release:check -- X.Y.Z`. Publication is performed only by **Actions → Release** from protected `main`; the workflow pins one source SHA, re-runs Windows/Ubuntu CI, vulnerability/license checks and CodeQL, and creates the annotated tag/GitHub Release only after those automated gates pass. Real-device/deployment checks remain recommended operator evidence and are not represented by a release checkbox.
 
 ### Contribution principles
 
@@ -65,7 +65,7 @@ pnpm build
 
 任何影响行为的 PR 都必须按 `.agents/skills/docs-sync/SKILL.md` 同步文档。安全、会话生命周期、重连、协议、配置的变更始终需要文档审查。
 
-Release PR 还必须执行 `pnpm license:check` 与 `pnpm release:check -- X.Y.Z`。正式发布只允许从受保护的 `main` 手动触发 **Actions → Release**：workflow 锁定一个源码 SHA，针对该 SHA 重跑 Windows/Ubuntu CI、漏洞/许可证检查与 CodeQL，要求显式确认真实设备/部署验收，所有门禁通过后才创建 annotated Tag 与 GitHub Release。
+Release PR 还必须执行 `pnpm license:check` 与 `pnpm release:check -- X.Y.Z`。正式发布只允许从受保护的 `main` 手动触发 **Actions → Release**：workflow 锁定一个源码 SHA，针对该 SHA 重跑 Windows/Ubuntu CI、漏洞/许可证检查与 CodeQL，所有自动门禁通过后才创建 annotated Tag 与 GitHub Release。真实设备/部署检查仍是推荐的发布证据，但不再通过勾选框作为机器门禁。
 
 ### 贡献原则
 

@@ -31,7 +31,7 @@
 - Windows CI 实际启动 PowerShell 7/ConPTY，并验证 resize 与中文 Unicode 往返；
 - Pull Request 生产依赖漏洞审计、fail-closed 生产依赖 license policy 检查与 CodeQL；
 - root `package.json` 作为唯一 Release/runtime 版本源，私有 workspace package 不再重复维护 version；
-- 手动触发的 guarded Release Action：锁定 `main` SHA，要求真实设备/部署验收确认，针对同一 SHA 重跑 Windows/Ubuntu CI、Security/License、CodeQL，确认主干未前进后创建 annotated tag 与 GitHub Release，最终发布前失败会回滚本次 Tag/Release；
+- 手动触发的 guarded Release Action：锁定 `main` SHA，针对同一 SHA 重跑 Windows/Ubuntu CI、Security/License、CodeQL，确认主干未前进后创建 annotated tag 与 GitHub Release，最终发布前失败会回滚本次 Tag/Release；真实设备/部署检查保留为推荐证据，不设置无信息增益的人工勾选门禁；
 - 四层文档体系、docs-sync Agent Skill 与 Apache-2.0。
 
 ## 当前持久化边界
