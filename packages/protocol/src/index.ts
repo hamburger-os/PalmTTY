@@ -352,8 +352,7 @@ export const GitMutationOperationSchema = z.discriminatedUnion("type", [
   }).strict(),
   z.object({
     type: z.literal("commit"),
-    message: z.string().trim().min(1).max(4096),
-    amend: z.boolean().default(false)
+    message: z.string().trim().min(1).max(4096)
   }).strict(),
   z.object({
     type: z.literal("branch.create"),
