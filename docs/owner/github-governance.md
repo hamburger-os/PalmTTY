@@ -113,8 +113,8 @@ GitHub Dependency Review 曾因 Dependency graph 未开启而无法运行，因�
 - 触发 Release 时必须从 `main` 运行；不设置“已完成真实设备/部署验收”的人工勾选门禁，人工验收只作为推荐发布证据；
 - workflow 锁定远端 `main` SHA，并针对该 SHA 重跑 Windows/Ubuntu CI、Security Audit（漏洞 + license）和 CodeQL；三个 reusable gate 直接消费传入的 `inputs.ref`，并使用彼此独立的 concurrency namespace，避免 caller `github.workflow` 上下文导致兄弟 gate 互相取消；
 - 发布过程中只要 `main` 前进就 fail closed，要求重新触发；
-- Tag 必须不存在且不可覆盖；workflow 创建 annotated `vX.Y.Z` Tag；
-- GitHub Release 先以 Draft 创建并校验，校验通过后才转为 Published；
+- Tag 必须不存在且不可覆盖；workflow 创建 annotated `vX.Y.Z` Tag，并以远端 peeled tag target 严格绑定锁定的源码 SHA；
+- GitHub Release 只基于已经验证存在的 Tag 创建（`--verify-tag`），先以 Draft 校验后再转为 Published；对于已存在 Tag，Release 的 `target_commitish` 不作为源码 SHA 证明；
 - finalization 之前失败会删除本次创建的 Release/Tag，避免半发布状态。
 
 这套流程沿用 TauTerm 的“锁定源码 → 重新资格验证 → 原子化发布”原则，但 PalmTTY 当前没有桌面安装包，因此只发布 Git Tag / GitHub Release 与 GitHub 自动生成的源码归档，不引入无意义的平台打包步骤。
