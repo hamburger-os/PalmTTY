@@ -6,8 +6,7 @@ export function parseEnvironmentFile(source: string): Map<string, string> {
   const entries = new Map<string, string>();
   const lines = source.replace(/^\uFEFF/u, "").split(/\r?\n/u);
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const rawLine = lines[index];
+  for (const [index, rawLine] of lines.entries()) {
     const trimmed = rawLine.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
 
