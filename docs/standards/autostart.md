@@ -10,13 +10,16 @@ Authoritative Microsoft references:
 - Exec action and working directory: https://learn.microsoft.com/windows/win32/taskschd/execaction
 - Task Scheduler schema `LogonType`: https://learn.microsoft.com/windows/win32/taskschd/taskschedulerschema-logontype-principaltype-element
 - Restart-on-failure schema: https://learn.microsoft.com/windows/win32/taskschd/taskschedulerschema-restartonfailure-settingstype-element
-- `schtasks` commands: https://learn.microsoft.com/windows-server/administration/windows-commands/schtasks\n- Process creation flags (`CREATE_NO_WINDOW`, `CREATE_SUSPENDED`): https://learn.microsoft.com/windows/win32/procthread/process-creation-flags\n- Job Objects: https://learn.microsoft.com/windows/win32/procthread/job-objects
+- `schtasks` commands: https://learn.microsoft.com/windows-server/administration/windows-commands/schtasks
+- Process creation flags (`CREATE_NO_WINDOW`, `CREATE_SUSPENDED`): https://learn.microsoft.com/windows/win32/procthread/process-creation-flags
+- Job Objects: https://learn.microsoft.com/windows/win32/procthread/job-objects
 
 PalmTTY interpretation:
 
 - `InteractiveToken` intentionally binds the task to an already logged-on real user instead of storing a password or using LocalSystem/S4U.
 - A console-free Task Scheduler action may use a dedicated Windows GUI-subsystem launcher. PalmTTY compiles that launcher during install and the task launches it directly; the launcher then starts the exact Node executable and built Agent with `CREATE_NO_WINDOW`.
-- Windows Job Objects provide kill-on-close supervision for the Agent; `SILENT_BREAKAWAY_OK` is used so independent Session Workers are not reclassified into the Agent lifetime.\n- The task may restart a failed Agent, but this does not redefine Session Worker ownership or OS-reboot persistence.
+- Windows Job Objects provide kill-on-close supervision for the Agent; `SILENT_BREAKAWAY_OK` is used so independent Session Workers are not reclassified into the Agent lifetime.
+- The task may restart a failed Agent, but this does not redefine Session Worker ownership or OS-reboot persistence.
 
 ## Linux systemd user service
 
