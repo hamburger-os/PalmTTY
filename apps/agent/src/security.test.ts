@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { exposureOrigins, parseConfig } from "@palmtty/config";
-import { FixedWindowLimiter, assertSecureExposure, isTrustedOrigin } from "./security.js";
+import { FixedWindowLimiter, assertSecureExposure, isPrivateClientAddress, isTrustedOrigin } from "./security.js";
 
 function config(overrides: object = {}) {
   return parseConfig({
@@ -31,6 +31,32 @@ describe("security boundary", () => {
       auth: { enabled: true }
     });
     expect(() => assertSecureExposure(value)).not.toThrow();
+  });
+
+  it("accepts only loopback/private/overlay client addresses for LAN mode", () => {
+    for (const address of [
+      "127.0.0.1",
+      "::1",
+      "10.1.2.3",
+      "172.16.2.3",
+      "192.168.31.3",
+      "169.254.10.20",
+      "100.100.100.100",
+      "::ffff:192.168.31.3"
+    ]) {
+      expect(isPrivateClientAddress(address)).toBe(true);
+    }
+
+    for (const address of [
+      "8.8.8.8",
+      "203.0.113.10",
+      "172.32.0.1",
+      "100.128.0.1",
+      "::ffff:8.8.8.8",
+      "2001:4860:4860::8888"
+    ]) {
+      expect(isPrivateClientAddress(address)).toBe(false);
+    }
   });
 
   it("uses exact origin matching", () => {
