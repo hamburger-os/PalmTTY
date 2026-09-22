@@ -2,11 +2,11 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildSystemdUserUnit,
-  buildWindowsAgentPowerShellCommand,
   buildWindowsTaskStatusPowerShellCommand,
   buildWindowsTaskXml,
   defaultConfigPath,
@@ -16,6 +16,8 @@ import {
   parseWindowsTaskStatus,
   quoteWindowsArg
 } from "./autostart-core.mjs";
+
+const windowsSupervisorPath = fileURLToPath(new URL("./windows-autostart-supervisor.ps1", import.meta.url));
 
 test("parseAutostartArgs accepts install options and resolves paths", () => {
   const result = parseAutostartArgs(["install", "--config", "./config.yaml", "--env-file", "./secrets.env"]);
@@ -53,27 +55,21 @@ test("quoteWindowsArg preserves spaces and trailing backslashes", () => {
   assert.equal(quoteWindowsArg("C:\\path with space\\"), '"C:\\path with space\\\\"');
 });
 
-test("Windows launcher supervises the Agent in a breakaway-safe kill-on-close job", () => {
-  const command = buildWindowsAgentPowerShellCommand({
-    nodePath: "C:\\Program Files\\nodejs\\node.exe",
-    agentPath: "C:\\PalmTTY\\apps\\agent\\dist\\index.js",
-    repoRoot: "C:\\PalmTTY",
-    configPath: "C:\\Users\\O'Brien\\PalmTTY config.yaml",
-    envFile: "C:\\Users\\me\\PalmTTY.env"
-  });
-  assert.match(command, /JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE/u);
-  assert.match(command, /JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK/u);
-  assert.match(command, /CREATE_SUSPENDED \| CREATE_NO_WINDOW/u);
-  assert.match(command, /AssignProcessToJobObject/u);
-  assert.match(command, /WaitForSingleObject/u);
-  assert.match(command, /O''Brien/u);
-  assert.match(command, /--config/u);
-  assert.match(command, /--env-file/u);
-  assert.match(command, /exit \$exitCode/u);
-  assert.equal(Buffer.from(encodePowerShellCommand(command), "base64").toString("utf16le"), command);
+test("Windows supervisor is a kill-on-close job with detached-child breakaway", () => {
+  const source = readFileSync(windowsSupervisorPath, "utf8");
+  assert.match(source, /JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE/u);
+  assert.match(source, /JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK/u);
+  assert.match(source, /CREATE_SUSPENDED \| CREATE_NO_WINDOW/u);
+  assert.match(source, /AssignProcessToJobObject/u);
+  assert.match(source, /WaitForSingleObject/u);
+  assert.match(source, /param\(/u);
+  assert.match(source, /\[string\]\$NodePath/u);
+  assert.match(source, /\[string\]\$AgentPath/u);
+  assert.match(source, /\[string\]\$RepoRoot/u);
+  assert.match(source, /\[string\]\$ConfigPath/u);
 });
 
-test("Windows launcher compiles, propagates Agent exit code, and lets detached children break away", { skip: process.platform !== "win32" }, async () => {
+test("Windows supervisor compiles, propagates Agent exit code, and lets detached children break away", { skip: process.platform !== "win32" }, async () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "palmtty-autostart-"));
   const markerPath = path.join(directory, "worker-survived.txt");
   const workerPath = path.join(directory, "worker.cjs");
@@ -90,12 +86,6 @@ test("Windows launcher compiles, propagates Agent exit code, and lets detached c
       "utf8"
     );
 
-    const command = buildWindowsAgentPowerShellCommand({
-      nodePath: process.execPath,
-      agentPath,
-      repoRoot: directory,
-      configPath: path.join(directory, "ignored.yaml")
-    });
     const result = spawnSync(
       defaultWindowsPowerShellPath(),
       [
@@ -104,8 +94,16 @@ test("Windows launcher compiles, propagates Agent exit code, and lets detached c
         "-NonInteractive",
         "-WindowStyle",
         "Hidden",
-        "-EncodedCommand",
-        encodePowerShellCommand(command)
+        "-File",
+        windowsSupervisorPath,
+        "-NodePath",
+        process.execPath,
+        "-AgentPath",
+        agentPath,
+        "-RepoRoot",
+        directory,
+        "-ConfigPath",
+        path.join(directory, "ignored.yaml")
       ],
       { encoding: "utf8", windowsHide: true, timeout: 15_000 }
     );
@@ -130,6 +128,7 @@ test("Windows task runs headlessly as the current interactive user without eleva
   const xml = buildWindowsTaskXml({
     userSid: "S-1-5-21-123",
     powershellPath: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    supervisorPath: "C:\\PalmTTY\\scripts\\windows-autostart-supervisor.ps1",
     nodePath: "C:\\Program Files\\nodejs\\node.exe",
     agentPath: "C:\\PalmTTY\\apps\\agent\\dist\\index.js",
     repoRoot: "C:\\PalmTTY",
@@ -141,6 +140,8 @@ test("Windows task runs headlessly as the current interactive user without eleva
   assert.match(xml, /<MultipleInstancesPolicy>IgnoreNew<\/MultipleInstancesPolicy>/u);
   assert.match(xml, /<Command>C:\\Windows\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe<\/Command>/u);
   assert.match(xml, /-WindowStyle Hidden/u);
+  assert.match(xml, /-File/u);
+  assert.match(xml, /windows-autostart-supervisor\.ps1/u);
   assert.match(xml, /-EncodedCommand/u);
   assert.doesNotMatch(xml, /<Command>C:\\Program Files\\nodejs\\node\.exe<\/Command>/u);
   assert.doesNotMatch(xml, /PALMTTY_ACCESS_TOKEN=/u);
@@ -148,6 +149,7 @@ test("Windows task runs headlessly as the current interactive user without eleva
     () => buildWindowsTaskXml({
       userSid: "S-1-5-21-123",
       powershellPath: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      supervisorPath: "C:\\PalmTTY\\scripts\\windows-autostart-supervisor.ps1",
       nodePath: "C:\\Node\\node.exe",
       agentPath: "C:\\PalmTTY\\agent.js",
       repoRoot: "C:\\PalmTTY\nmalformed",
