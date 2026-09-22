@@ -6,10 +6,19 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+### Added
+
+- Add explicit `local`, `lan`, `reverseProxy`, and direct `https` network exposure profiles, plus dedicated private-LAN and direct-HTTPS examples. LAN mode derives exact private/overlay IPv4 Origins automatically; direct HTTPS validates and loads configured certificate/key files.
+- Extend `pnpm autostart status` with native launcher/runtime process details and exposure/listen/local/LAN URL diagnostics.
+
+### Changed
+
+- Replace Windows Task Scheduler's long-lived PowerShell supervisor with a console-free native GUI-subsystem host compiled during install into the current user's Local AppData. The host supervises only the Agent through a kill-on-close/silent-breakaway Job Object, creates Node with `CREATE_NO_WINDOW`, and propagates Agent exit status while independent Session Workers retain their separate lifetime.
+- Replace the low-level `server.host`, `trustedOrigins`, `secureCookies`, and `unsafeAllowInsecureLan` configuration with the exposure-profile model. Removed fields are rejected rather than silently migrated.
+
 ### Fixed
 
-- Run Windows Task Scheduler autostart through the system Windows PowerShell host with `-WindowStyle Hidden`; supervise the built Node Agent in a kill-on-close/silent-breakaway Job Object so task stop/restart reliably terminates the Agent without killing independent Session Workers, while propagating the Agent exit code and avoiding a persistent Node console window.
-- Replace localized `schtasks /FO LIST /V` passthrough with a locale-independent UTF-8 scheduled-task query and PalmTTY-owned status output; document that port `5173` is Vite development-only while built/start/autostart Web UI is served by the Agent endpoint.
+- Keep Windows scheduled-task status locale-independent by querying structured UTF-8 data instead of forwarding localized `schtasks /FO LIST /V` text, and make normal build/start/autostart documentation explicit that port `5173` belongs only to Vite development.
 
 <!-- Add changes here after the latest release. Publishing requires this section to be empty. -->
 
