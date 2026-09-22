@@ -1,10 +1,17 @@
 import path from "node:path";
-import { configPathFromEnvironment, loadConfig } from "@palmtty/config";
+import {
+  configPathFromEnvironment,
+  lanAgentUrls,
+  loadConfig,
+  localAgentUrl,
+  serverBindHost
+} from "@palmtty/config";
 import { buildApp } from "./app.js";
-import { withDevelopmentTrustedOrigins } from "./development-origins.js";
+import { parseDevelopmentTrustedOrigins } from "./development-origins.js";
 import { loadEnvironmentFile } from "./environment-file.js";
 import { preflightRuntime } from "./preflight.js";
 import { describeServerBindError } from "./server-endpoint.js";
+import { loadServerTlsOptions } from "./server-tls.js";
 import { runSessionWorkerFromStdin } from "./session-worker.js";
 
 function pathFromArgs(option: string): string | undefined {
@@ -33,40 +40,55 @@ async function main() {
   }
 
   const configPath = configPathFromArgs();
-  const loadedConfig = await loadConfig(configPath);
-  const config = process.argv.includes("--development")
-    ? withDevelopmentTrustedOrigins(
-        loadedConfig,
-        process.env.PALMTTY_DEV_TRUSTED_ORIGINS
-      )
-    : loadedConfig;
+  const config = await loadConfig(configPath);
+  const development = process.argv.includes("--development");
+  const developmentTrustedOrigins = development
+    ? parseDevelopmentTrustedOrigins(process.env.PALMTTY_DEV_TRUSTED_ORIGINS)
+    : [];
+
   await preflightRuntime(config);
 
-  if (config.server.unsafeAllowInsecureLan) {
+  if (config.server.exposure.mode === "lan") {
     console.warn(
-      "[PalmTTY] WARNING: unsafeAllowInsecureLan is enabled. " +
-      "Do not expose this configuration to the Internet."
+      "[PalmTTY] WARNING: LAN exposure uses unencrypted HTTP on private/overlay interfaces. " +
+      "Use direct HTTPS or reverseProxy exposure for normal remote use."
     );
   }
 
   if (process.argv.includes("--preflight")) {
-    console.log(
-      `[PalmTTY] preflight passed: ${configPath}`
-    );
+    console.log(`[PalmTTY] preflight passed: ${configPath}`);
     return;
   }
 
-  const app = await buildApp(config);
+  const tls = await loadServerTlsOptions(config);
+  const app = await buildApp(config, {
+    additionalTrustedOrigins: developmentTrustedOrigins,
+    https: tls
+  });
+  const host = serverBindHost(config);
   try {
-    await app.listen({ host: config.server.host, port: config.server.port });
+    await app.listen({ host, port: config.server.port });
   } catch (error) {
     await app.close().catch(() => undefined);
     throw new Error(
-      describeServerBindError(config.server, error),
+      describeServerBindError({ host, port: config.server.port }, error),
       { cause: error }
     );
   }
-  console.log(`[PalmTTY] listening on ${config.server.host}:${config.server.port}`);
+
+  console.log(
+    `[PalmTTY] listening on ${host}:${config.server.port} (${config.server.exposure.mode})`
+  );
+  console.log(`[PalmTTY] local URL: ${localAgentUrl(config)}`);
+  if (config.server.exposure.mode === "lan") {
+    const urls = lanAgentUrls(config);
+    if (urls.length === 0) {
+      console.warn("[PalmTTY] no private/overlay IPv4 LAN address was detected");
+    } else {
+      console.log("[PalmTTY] LAN URLs:");
+      for (const url of urls) console.log(`  - ${url}`);
+    }
+  }
 }
 
 main().catch((error) => {
