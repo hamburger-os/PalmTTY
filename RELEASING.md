@@ -24,7 +24,7 @@ The workflow locks the exact `main` SHA selected at dispatch time, re-runs the r
    - `pnpm check`
    - `pnpm license:check`
    - `pnpm release:check -- X.Y.Z`
-6. Complete the release-specific real-device/deployment acceptance that automation cannot prove: Windows workstation, relevant mobile Safari/Chrome paths, reconnect/network switching and Codex interaction for the intended release.
+6. Complete the release-specific real-device/deployment acceptance that automation cannot prove: Windows workstation, relevant mobile Safari/Chrome paths, reconnect/network switching and Codex interaction for the intended release. When the release contains autostart changes, also validate the Windows current-user scheduled task and Linux `systemd --user` path on real hosts, including Agent-only restart preserving a live Worker and confirming that OS reboot does not falsely claim PTY persistence.
 7. Merge the release PR only after the protected `main` checks pass.
 
 ## Publish from GitHub Actions
