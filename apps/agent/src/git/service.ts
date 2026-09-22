@@ -196,20 +196,39 @@ export async function getWorkspaceGitBranches(
     }
   );
 
-  const lines = result.stdout.toString("utf8").split(/\r?\n/).filter(Boolean);
-  const branches = lines.slice(0, MAX_GIT_BRANCHES).map((line) => {
+  const output = result.stdout.toString("utf8");
+  const allLines = output.split(/\r?\n/).filter(Boolean);
+  const lines = result.stdoutTruncated && !/\r?\n$/.test(output)
+    ? allLines.slice(0, -1)
+    : allLines;
+  const branches: Array<{
+    name: string;
+    oid: string;
+    upstream?: string;
+    current: boolean;
+  }> = [];
+  let malformed = false;
+
+  for (const line of lines.slice(0, MAX_GIT_BRANCHES)) {
     const [name = "", oid = "", upstream = "", current = ""] = line.split("\0");
-    return {
+    if (!name || !/^[0-9a-f]{40,64}$/i.test(oid)) {
+      malformed = true;
+      continue;
+    }
+    branches.push({
       name,
       oid,
       ...(upstream ? { upstream } : {}),
       current: current.trim() === "*"
-    };
-  });
+    });
+  }
 
   return GitBranchesResponseSchema.parse({
     branches,
-    truncated: result.stdoutTruncated || lines.length > MAX_GIT_BRANCHES
+    truncated:
+      result.stdoutTruncated ||
+      malformed ||
+      lines.length > MAX_GIT_BRANCHES
   });
 }
 
