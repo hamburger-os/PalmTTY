@@ -1,8 +1,16 @@
 # 部署架构
 
+## 部署原则
+
+PalmTTY 提供的是当前 OS 用户的真实开发 Shell，因此部署层必须保持三个边界：
+
+- Agent/Session Worker 默认都以**普通用户**权限运行，不静默提权；
+- HTTPS/私有网络只解决外部入口，不能改变 Workspace/PTY 的本机用户权限；
+- “Agent 自启动”与“旧 PTY 跨 OS reboot 存活”是两回事。前者已实现，后者仍未实现。
+
 ## 本机开发
 
-`pnpm dev` 的默认开发拓扑现在是：
+`pnpm dev` 的默认开发拓扑：
 
 ```text
 本机浏览器 / 同一私有局域网手机
@@ -11,12 +19,81 @@
 Vite dev server（默认 0.0.0.0:5173）
         │ 本机代理 /api + WebSocket
         ▼
-PalmTTY Agent（仍使用配置中的 host/port；示例配置保持 127.0.0.1:17688）
+PalmTTY Agent（配置 endpoint；示例为 127.0.0.1:17688）
 ```
 
-根开发启动器会枚举当前机器的 RFC1918、IPv4 link-local 和 100.64/10 私有/overlay 地址，把对应的 `http://<address>:5173` **精确 Origin** 只在本次 development Agent 进程内追加到 allowlist；不会写回配置文件，也不会把 Origin 放宽成通配符。默认仍要求 access token。设置 `PALMTTY_WEB_HOST=127.0.0.1` 可以显式退回仅本机 Vite 监听。
+开发启动器只把检测到的 RFC1918、IPv4 link-local 和 100.64/10 私有/overlay 地址对应的 5173 Origin 作为**精确值**临时注入 development Agent，不写回配置、不启用通配 Origin。Windows 若 LAN 访问超时，应按 Private 网络配置防火墙，不由 PalmTTY 自动提权修改。
 
-Windows 如果另一台局域网设备访问 5173 超时，应允许 Node.js/PalmTTY 的 TCP 5173 通过 **Private** 网络防火墙；PalmTTY 不会自动提权修改防火墙。Agent 启动后再通过 Web UI 管理 Workspace；Workspace 不写入 `palmtty.local.yaml`，而是保存到当前用户应用数据目录。
+## Windows 当前用户自启动
+
+`pnpm autostart install` 在 Windows 注册 Task Scheduler 登录任务：
+
+- 触发器：当前用户登录；
+- LogonType：`InteractiveToken`；
+- RunLevel：`LeastPrivilege`；
+- Action：当前 Node 可执行文件 + 已编译 `apps/agent/dist/index.js`；
+- WorkingDirectory、Agent、config 与可选 env-file 都使用安装时的绝对路径；
+- 安装会先结束旧任务实例、更新任务定义并立即启动新实例；
+- 失败 Agent 由 Task Scheduler 做有限次数重启。
+
+不使用 LocalSystem/S4U 的原因是 PalmTTY 的 Shell、Git/SSH credential、PATH、WindowsApps App Execution Alias 都属于真实开发用户。当前不实现“用户未登录时的 Windows Service 模式”。
+
+Windows 的真实发布验收必须继续检查登录自启动是否出现不希望看到的 console 窗口；Task Scheduler 的“Hidden”属性只控制任务在 UI 中的可见性，不能被当成窗口隐藏保证。
+
+## Linux 当前用户自启动
+
+Linux 使用 `systemd --user` service，安装路径为当前用户的 `~/.config/systemd/user/palmtty.service`（或对应 XDG config 目录）。
+
+生成 unit 的关键语义：
+
+- `Restart=on-failure`：只监督 Agent 控制面；
+- `KillMode=process`：停止/restart Agent 时只终止主 Agent 进程，不把独立 Session Worker 当普通 service child 一起清理；
+- `WantedBy=default.target`：随 user manager 默认目标启用；
+- 不使用 root/system service。
+
+普通 user manager 随用户会话出现；无头 Linux 如果要求在交互登录前就启动 user manager，可由管理员按本机策略启用 linger，例如 `loginctl enable-linger <user>`。PalmTTY 不自动修改该系统策略。
+
+## 自启动密钥
+
+Agent 支持 `--env-file <path>`，自启动管理器只把**文件路径**写进 task/unit argv，secret 值本身不进入命令行。
+
+env-file 使用严格 `NAME=value`：
+
+- 空行和 `#` 注释允许；
+- 成对最外层单双引号会去掉；
+- 不做 shell expansion；
+- 重复/非法变量名直接失败；
+- Linux autostart 安装要求 env-file 不允许 group/world 访问（通常 `chmod 600`）；
+- Windows 由操作者保证文件只对当前用户可读。
+
+示例：`examples/palmtty.autostart.env.example`。
+
+## 路径与升级
+
+自启动定义记录安装时的绝对 Node/仓库/Agent/config 路径。以下变化后必须重新执行 `pnpm build` 与 `pnpm autostart install ...`：
+
+- 仓库被移动；
+- Node 安装切换导致 `node` 可执行文件绝对路径变化；
+- 自启动参数/config/env-file 路径变化。
+
+原地更新仓库且 Node 路径不变时，重新 build 后可通过 `pnpm autostart restart` 重新加载 Agent。
+
+## 持久化边界
+
+已支持：
+
+- 浏览器断开后 PTY 继续；
+- 仅 Agent 进程 restart 后独立 Worker/PTY 继续；
+- Windows 登录或 Linux user manager 启动时自动拉起 Agent；
+- Workspace catalog 跨 Agent/OS restart 保留。
+
+仍不支持：
+
+- OS reboot 后恢复原 PTY/Worker；
+- 用户注销后继续保留旧 PTY；
+- Worker 进程自身死亡后的终端恢复。
+
+因此自启动解决的是“机器回来后 PalmTTY 控制面自动可用”，不是 replay 旧进程状态。
 
 ## 家庭局域网 / QNAP
 
@@ -26,44 +103,21 @@ Windows 如果另一台局域网设备访问 5173 超时，应允许 Node.js/Pal
 手机
   │ HTTPS/WSS
   ▼
-域名
+域名 / 私有入口
   │
-QNAP / Caddy
+QNAP / Caddy / Tailscale
   │ 内网 HTTP
   ▼
-Windows 11 :7688
-  │
-PalmTTY Agent
+Windows/Linux PalmTTY Agent
 ```
 
-PalmTTY 配置使用：
-
-- 非 loopback 监听地址；
-- `auth.enabled: true`；
-- `secureCookies: true`；
-- `trustedOrigins` 只填写最终 HTTPS 域名；
-- token 从 Windows 环境变量提供。
-
-参考配置：`examples/qnap-reverse-proxy.yaml`。
-
-## 更推荐的私有网络
-
-如果不需要“任何浏览器直接公网访问”，优先选择 Tailscale/WireGuard，让 PalmTTY 只在私有网络可达。
-
-## QNAP 的角色
-
-QNAP 只承担入口能力：
-
-- TLS；
-- 域名；
-- WebSocket 反代；
-- 可选的额外认证。
-
-真正的 Shell、Codex、Git 和项目文件都留在 Windows 开发电脑。
+正常非 loopback 配置必须开启认证、Secure Cookie 与最终 HTTPS Origin allowlist。QNAP/Caddy 只承担 TLS、域名、WebSocket 反代和可选附加认证；真正的 Shell、Codex、Git 与文件留在开发主机。
 
 ## 当前不做
 
 - PalmTTY 官方云中继；
 - NAT 穿透服务；
 - 自动申请公网域名；
-- 在 QNAP 上运行用户的开发 Shell。
+- Windows LocalSystem/预登录服务模式；
+- 自动修改 Linux linger/系统级 service；
+- 把 autostart 描述成 OS reboot PTY persistence。

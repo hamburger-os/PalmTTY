@@ -1,6 +1,6 @@
 # Current implementation state
 
-Status: **alpha foundation implemented with durable per-session workers and passing Windows/Ubuntu CI; guarded v0.1.0 release automation is implemented, while real mobile/Codex/deployment acceptance remains a publication gate.**
+Status: **alpha foundation implemented with durable per-session workers, Windows/Ubuntu CI and current-user Windows/Linux Agent autostart; guarded v0.1.0 release automation is implemented, while real mobile/Codex/deployment acceptance remains a publication gate.**
 
 ## Implemented
 
@@ -38,6 +38,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - typed Git write APIs cover stage/unstage, stale-safe destructive restore, commit, branch create/switch, stash push/pop, and non-interactive fetch/pull/push; no browser-supplied arbitrary Git argv exists. Mutations/remote operations are serialized per resolved repository (including across multiple Workspaces that point into the same repository), require the current status token plus an explicit repository-code-execution acknowledgement, and destructive restore additionally verifies the loaded diff snapshot. An incomplete/truncated status snapshot is never accepted as mutation authority, so all Git write/remote operations fail closed until status fits the safe bounds. Git hooks and interactive prompts are disabled; Git execution/config/SSH/askpass override environment variables are removed; remote transport is restricted to http/https/ssh/git while ext/file/unknown protocols are denied; normal Git filters and trusted host/repository Git configuration remain possible for acknowledged repositories
 - host runtime adapter with absolute executable normalization, including current-user Windows App Execution Aliases for Store/MSIX PowerShell; each new/restarted Windows terminal refreshes Machine/User environment variables from Windows before resolving the shell and PATH
 - Windows WSL runtime adapter using structured `wsl.exe` argv for distribution/cwd/shell rather than shell-string interpolation; configured workspace environment variables are forwarded by preserving existing colon-delimited `WSLENV` entries/flags and appending bounded names
+- current-user Agent autostart management: Windows Task Scheduler `InteractiveToken` logon task and Linux `systemd --user`, with install/status/restart/uninstall; optional strict `--env-file` keeps secret values out of task/unit argv, Linux rejects group/world-readable env files, and systemd uses `KillMode=process` so Agent service restart does not redefine Worker lifetime
 - Linux host runtime exercised by Ubuntu CI; macOS shares the host adapter but is not covered by repository CI
 - root development launcher derives the Agent target from the validated PalmTTY config, keeps the Agent on its configured endpoint (the example remains loopback), and exposes Vite on `0.0.0.0:5173` by default for private-LAN development; it enumerates current RFC1918/link-local/100.64/10 IPv4 addresses and adds only those exact `http://<address>:5173` Origins to the development Agent in memory, while Vite still refuses silent dev-port fallback; `PALMTTY_WEB_HOST` can override the development listener
 - bounded client message size and terminal dimensions
@@ -140,14 +141,14 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 
 ## Known gaps
 
-- No Windows/OS reboot persistence.
+- Windows/Linux current-user Agent autostart is implemented, but there is still no OS-reboot persistence for the pre-reboot PTY/Worker. Autostart creates a fresh Agent control plane after sign-in/user-manager startup.
 - Login sessions are memory-only; after Agent restart the terminal survives but the browser must sign in again before reattaching.
 - Authentication is a bootstrap token, not passkey/WebAuthn.
 - No per-device session administration.
 - No multi-user ACL.
 - Reverse-proxy/Tailscale examples are documentation/configuration, not automated setup.
 - Real owner workstation + mobile Safari/Chrome + long-running Codex validation remains required.
-- Windows “no visible console flash” remains a real-host visual acceptance check for both PTY creation and explicit termination; CI exercises the bundled ConPTY DLL path but cannot assert desktop window visibility. Development spawn-phase tracing narrows the responsible stage but does not claim to remove an upstream ConPTY/node-pty window if one is still shown.
+- Windows “no visible console flash” remains a real-host visual acceptance check for PTY creation, explicit termination, and the new Task Scheduler sign-in startup; CI exercises the bundled ConPTY DLL path but cannot assert desktop window visibility. Development spawn-phase tracing narrows the responsible stage but does not claim to remove an upstream ConPTY/node-pty window if one is still shown.
 - Potentially-live but unreachable recovery records are deliberately preserved when process death cannot be proven; this favors terminal survival over aggressive metadata reclamation.
 - Files remains a read-only viewer; Git now supports a bounded typed local/remote write set, but deliberately does not expose arbitrary Git commands, force push, interactive rebase/cherry-pick/reflog recovery, submodule/LFS administration, or a general browser file editor.
 - Git remote operations are intentionally non-interactive; repositories that require an interactive credential prompt must be configured with working non-interactive credentials/SSH agent state on the host.

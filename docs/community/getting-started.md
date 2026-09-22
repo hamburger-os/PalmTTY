@@ -38,11 +38,30 @@ Open the configured Agent URL, sign in, and create the first workspace in the We
 If Windows reports `EACCES/WSAEACCES` while probing the Agent port, distinguish an existing listener from a reserved/excluded port:
 
 ~~~powershell
-Get-NetTCPConnection -LocalPort 7688 -ErrorAction SilentlyContinue
+Get-NetTCPConnection -LocalPort 17688 -ErrorAction SilentlyContinue
 netsh interface ipv4 show excludedportrange protocol=tcp
 ~~~
 
 If the configured port is unavailable, change `server.port` in `palmtty.local.yaml` and rerun `pnpm run preflight`.
+
+### Linux host quick start
+
+The Linux Host runtime is implemented and exercised on Ubuntu CI. Use the same example config with POSIX shell syntax:
+
+~~~bash
+corepack enable
+pnpm install --frozen-lockfile
+cp examples/palmtty.example.yaml palmtty.local.yaml
+export PALMTTY_CONFIG="$PWD/palmtty.local.yaml"
+export PALMTTY_ACCESS_TOKEN="replace-with-a-long-random-secret"
+pnpm run preflight
+pnpm check
+pnpm start
+~~~
+
+The example config listens on `127.0.0.1:17688`. Linux uses native Host shells and Unix-domain-socket Worker IPC.
+
+For current-user startup registration on Windows or Linux, see [autostart.md](autostart.md). Autostart brings the Agent back; it does not preserve an old PTY across OS reboot.
 
 ### Development mode
 
@@ -95,11 +114,30 @@ pnpm start
 如果 Windows 在探测 Agent 端口时报告 `EACCES/WSAEACCES`，先区分普通监听进程与 Windows 排除/保留端口：
 
 ~~~powershell
-Get-NetTCPConnection -LocalPort 7688 -ErrorAction SilentlyContinue
+Get-NetTCPConnection -LocalPort 17688 -ErrorAction SilentlyContinue
 netsh interface ipv4 show excludedportrange protocol=tcp
 ~~~
 
 如果配置端口不可用，请修改 `palmtty.local.yaml` 中的 `server.port`，重新执行 `pnpm run preflight`。
+
+### Linux 宿主快速开始
+
+Linux Host runtime 已实现并进入 Ubuntu CI。使用同一份示例配置，只需改用 POSIX Shell 语法：
+
+~~~bash
+corepack enable
+pnpm install --frozen-lockfile
+cp examples/palmtty.example.yaml palmtty.local.yaml
+export PALMTTY_CONFIG="$PWD/palmtty.local.yaml"
+export PALMTTY_ACCESS_TOKEN="replace-with-a-long-random-secret"
+pnpm run preflight
+pnpm check
+pnpm start
+~~~
+
+示例配置监听 `127.0.0.1:17688`。Linux 使用原生 Host Shell 与 Unix-domain-socket Worker IPC。
+
+Windows/Linux 当前用户自启动请查看 [autostart.md](autostart.md)。自启动只负责把 Agent 拉起，不代表 OS reboot 后旧 PTY 仍存在。
 
 ### 开发模式
 

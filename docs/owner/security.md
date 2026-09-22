@@ -78,6 +78,14 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 - replay、scrollback、IPC frame、IPC backlog、browser backpressure 均有限制；
 - exited Worker 有有限 retention。
 
+## 自启动与密钥边界
+
+Windows/Linux 自启动始终注册为当前用户能力，不静默提权。Windows 使用 Task Scheduler `InteractiveToken` + `LeastPrivilege`；Linux 使用 `systemd --user`，不自动创建 root service，也不自动开启 linger。
+
+Agent 的 `--env-file` 只允许从本地文件载入严格 `NAME=value`，不会进行 shell expansion；task/unit argv 中只出现文件路径，不出现 token 值。Linux autostart 安装要求 env-file 没有 group/world 权限。Windows env-file 仍依赖当前用户文件 ACL，属于后续实机安全审查范围。
+
+systemd unit 使用 `KillMode=process` 是为了保持既有“Agent lifetime != Worker lifetime”不变量；停止/restart Agent 不应因为 service manager 的默认进程组清理而杀掉 detached Worker。该行为不表示 OS reboot 后 Worker 可存活。
+
 ## 仍需加强
 
 当前仍是 Alpha 安全模型，后续可以增加 Passkey/WebAuthn、按设备管理和吊销登录、更完整但不记录终端内容的审计事件，以及 Windows Worker runtime 文件 ACL 的专项实机审计。

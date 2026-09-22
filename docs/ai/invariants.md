@@ -13,6 +13,6 @@ These constraints are intentional. A task that needs to break one must explicitl
 9. **Authentication and Origin are separate controls.** A browser terminal connection requires both. Origin never replaces authentication.
 10. **No secrets in URLs.** Login secrets/tokens and Worker capabilities must not be query parameters.
 11. **No terminal content in default logs.** Input, output, AI prompts, access tokens, Worker secrets and workspace environment values are sensitive.
-12. **No silent elevation.** Workers and PTYs inherit normal-user privileges; PalmTTY does not silently elevate them.
+12. **No silent elevation.** Agent autostart, Workers and PTYs stay in the intended normal-user security context; PalmTTY does not silently install LocalSystem/root services or change host linger/elevation policy.
 13. **The terminal core is AI-vendor-neutral.** Codex, Claude Code, OpenCode or other CLI agents remain workloads, not core protocol dependencies.
 14. **Documentation is part of done.** Behavior-changing work must run the docs-sync workflow and keep all four layers consistent.
