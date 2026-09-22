@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { consumeTouchScrollDelta } from "./terminal-touch-scroll.js";
+import {
+  consumeTouchScrollDelta,
+  shouldOwnTerminalTouchScroll
+} from "./terminal-touch-scroll.js";
 
 describe("consumeTouchScrollDelta", () => {
   it("scrolls toward newer lines when the finger moves upward", () => {
@@ -31,5 +34,17 @@ describe("consumeTouchScrollDelta", () => {
       lines: 0,
       remainderPx: 5
     });
+  });
+});
+
+
+describe("shouldOwnTerminalTouchScroll", () => {
+  it("owns only normal-buffer gestures without terminal mouse tracking", () => {
+    expect(shouldOwnTerminalTouchScroll("normal", "none")).toBe(true);
+    expect(shouldOwnTerminalTouchScroll("alternate", "none")).toBe(false);
+    expect(shouldOwnTerminalTouchScroll("normal", "x10")).toBe(false);
+    expect(shouldOwnTerminalTouchScroll("normal", "vt200")).toBe(false);
+    expect(shouldOwnTerminalTouchScroll("normal", "drag")).toBe(false);
+    expect(shouldOwnTerminalTouchScroll("normal", "any")).toBe(false);
   });
 });
