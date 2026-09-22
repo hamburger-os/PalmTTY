@@ -209,45 +209,196 @@ export const WorkspaceFileReadResponseSchema = z.object({
 }).strict();
 export type WorkspaceFileReadResponse = z.infer<typeof WorkspaceFileReadResponseSchema>;
 
-export const GitStatusEntrySchema = z.object({
-  path: z.string().min(1).max(4096),
-  originalPath: z.string().min(1).max(4096).optional(),
-  index: z.string().length(1),
-  worktree: z.string().length(1),
+export const GitFileStatusSchema = z.enum([
+  "modified",
+  "typeChanged",
+  "added",
+  "deleted",
+  "renamed",
+  "copied",
+  "unmerged"
+]);
+export type GitFileStatus = z.infer<typeof GitFileStatusSchema>;
+
+export const GitChangeKindSchema = z.enum([
+  "modified",
+  "typeChanged",
+  "added",
+  "deleted",
+  "renamed",
+  "copied",
+  "untracked",
+  "conflict",
+  "submodule"
+]);
+export type GitChangeKind = z.infer<typeof GitChangeKindSchema>;
+
+const GitPathSchema = WorkspaceRelativePathSchema.refine(
+  (value) => value.length > 0,
+  "Git path is required"
+);
+
+export const GitChangeSchema = z.object({
+  path: GitPathSchema,
+  originalPath: GitPathSchema.optional(),
+  kind: GitChangeKindSchema,
+  indexStatus: GitFileStatusSchema.optional(),
+  worktreeStatus: GitFileStatusSchema.optional(),
   staged: z.boolean(),
   unstaged: z.boolean(),
-  untracked: z.boolean()
+  untracked: z.boolean(),
+  conflict: z.boolean()
 }).strict();
-export type GitStatusEntry = z.infer<typeof GitStatusEntrySchema>;
+export type GitChange = z.infer<typeof GitChangeSchema>;
+
+const GitObjectIdSchema = z.string().regex(/^[0-9a-f]{40,64}$/i);
+export const GitStateTokenSchema = z.string().regex(/^[0-9a-f]{64}$/);
+export type GitStateToken = z.infer<typeof GitStateTokenSchema>;
+
+export const GitRepositoryContextSchema = z.object({
+  root: z.string().min(1).max(4096),
+  workspacePath: WorkspaceRelativePathSchema,
+  scope: z.literal("repository"),
+  head: z.object({
+    oid: GitObjectIdSchema.optional(),
+    branch: z.string().min(1).max(512).optional(),
+    detached: z.boolean(),
+    unborn: z.boolean()
+  }).strict(),
+  upstream: z.string().min(1).max(512).optional(),
+  ahead: z.number().int().nonnegative(),
+  behind: z.number().int().nonnegative(),
+  stateToken: GitStateTokenSchema
+}).strict();
+export type GitRepositoryContext = z.infer<typeof GitRepositoryContextSchema>;
 
 export const GitStatusResponseSchema = z.object({
   available: z.boolean(),
-  root: z.string().max(4096).optional(),
-  branch: z.string().max(512).optional(),
-  upstream: z.string().max(512).optional(),
-  ahead: z.number().int().nonnegative(),
-  behind: z.number().int().nonnegative(),
-  entries: z.array(GitStatusEntrySchema).max(2048),
+  repository: GitRepositoryContextSchema.optional(),
+  changes: z.array(GitChangeSchema).max(2048),
   truncated: z.boolean()
 }).strict();
 export type GitStatusResponse = z.infer<typeof GitStatusResponseSchema>;
 
 export const GitDiffRequestSchema = z.object({
-  path: WorkspaceRelativePathSchema.refine(
-    (value) => value.length > 0,
-    "Git path is required"
-  ),
+  path: GitPathSchema,
   staged: z.boolean().default(false)
 }).strict();
 export type GitDiffRequest = z.infer<typeof GitDiffRequestSchema>;
 
 export const GitDiffResponseSchema = z.object({
-  path: z.string().min(1).max(4096),
+  path: GitPathSchema,
   staged: z.boolean(),
   diff: z.string().max(1024 * 1024),
-  truncated: z.boolean()
+  truncated: z.boolean(),
+  binary: z.boolean(),
+  snapshot: GitStateTokenSchema
 }).strict();
 export type GitDiffResponse = z.infer<typeof GitDiffResponseSchema>;
+
+export const GitHistoryRequestSchema = z.object({
+  limit: z.number().int().min(1).max(50).default(20)
+}).strict();
+export type GitHistoryRequest = z.infer<typeof GitHistoryRequestSchema>;
+
+export const GitCommitSummarySchema = z.object({
+  oid: GitObjectIdSchema,
+  shortOid: z.string().min(4).max(64),
+  author: z.string().max(512),
+  authoredAt: z.string().max(64),
+  subject: z.string().max(4096)
+}).strict();
+export type GitCommitSummary = z.infer<typeof GitCommitSummarySchema>;
+
+export const GitHistoryResponseSchema = z.object({
+  commits: z.array(GitCommitSummarySchema).max(50)
+}).strict();
+export type GitHistoryResponse = z.infer<typeof GitHistoryResponseSchema>;
+
+export const GitBranchSchema = z.object({
+  name: z.string().min(1).max(512),
+  oid: GitObjectIdSchema,
+  upstream: z.string().min(1).max(512).optional(),
+  current: z.boolean()
+}).strict();
+export type GitBranch = z.infer<typeof GitBranchSchema>;
+
+export const GitBranchesResponseSchema = z.object({
+  branches: z.array(GitBranchSchema).max(256),
+  truncated: z.boolean()
+}).strict();
+export type GitBranchesResponse = z.infer<typeof GitBranchesResponseSchema>;
+
+const GitMutationPathsSchema = z.array(GitPathSchema).min(1).max(128);
+const GitBranchNameSchema = z.string()
+  .trim()
+  .min(1)
+  .max(512)
+  .refine((value) => !/[\0\r\n]/.test(value), "Git branch name is invalid");
+
+export const GitMutationOperationSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("stage"),
+    paths: GitMutationPathsSchema
+  }).strict(),
+  z.object({
+    type: z.literal("unstage"),
+    paths: GitMutationPathsSchema
+  }).strict(),
+  z.object({
+    type: z.literal("restore"),
+    path: GitPathSchema,
+    diffSnapshot: GitStateTokenSchema
+  }).strict(),
+  z.object({
+    type: z.literal("commit"),
+    message: z.string().trim().min(1).max(4096),
+    amend: z.boolean().default(false)
+  }).strict(),
+  z.object({
+    type: z.literal("branch.create"),
+    name: GitBranchNameSchema
+  }).strict(),
+  z.object({
+    type: z.literal("branch.switch"),
+    name: GitBranchNameSchema
+  }).strict(),
+  z.object({
+    type: z.literal("stash.push"),
+    includeUntracked: z.boolean().default(true)
+  }).strict(),
+  z.object({
+    type: z.literal("stash.pop")
+  }).strict()
+]);
+export type GitMutationOperation = z.infer<typeof GitMutationOperationSchema>;
+
+export const GitMutationRequestSchema = z.object({
+  expectedState: GitStateTokenSchema,
+  allowRepositoryCodeExecution: z.literal(true),
+  operation: GitMutationOperationSchema
+}).strict();
+export type GitMutationRequest = z.infer<typeof GitMutationRequestSchema>;
+
+export const GitMutationResponseSchema = z.object({
+  status: GitStatusResponseSchema
+}).strict();
+export type GitMutationResponse = z.infer<typeof GitMutationResponseSchema>;
+
+export const GitRemoteOperationSchema = z.enum(["fetch", "pull", "push"]);
+export type GitRemoteOperation = z.infer<typeof GitRemoteOperationSchema>;
+
+export const GitRemoteRequestSchema = z.object({
+  expectedState: GitStateTokenSchema,
+  allowRepositoryCodeExecution: z.literal(true),
+  operation: GitRemoteOperationSchema
+}).strict();
+export type GitRemoteRequest = z.infer<typeof GitRemoteRequestSchema>;
+
+export const GitRemoteResponseSchema = z.object({
+  status: GitStatusResponseSchema
+}).strict();
+export type GitRemoteResponse = z.infer<typeof GitRemoteResponseSchema>;
 
 export const SessionStateSchema = z.enum([
   "starting",
