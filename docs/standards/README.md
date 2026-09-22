@@ -7,6 +7,7 @@ This layer records the external technical basis used by PalmTTY. It is not a pla
 - [agent-skills.md](agent-skills.md) — Agent Skills / SKILL.md format used by the repository
 - [git-cli.md](git-cli.md) — Git porcelain v2, diff helper controls, hooks path and transport protocol policy
 - [autostart.md](autostart.md) — Microsoft Task Scheduler and systemd user-service behavior used by PalmTTY autostart
+- [github-actions.md](github-actions.md) — GitHub reusable-workflow contexts, inputs and concurrency semantics used by release gates
 
 ## Rule
 
