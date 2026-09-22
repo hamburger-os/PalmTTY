@@ -136,8 +136,8 @@ function peSubsystem(executablePath) {
   assert.equal(data.toString("ascii", peOffset, peOffset + 4), "PE\0\0");
   const optionalHeader = peOffset + 4 + 20;
   const magic = data.readUInt16LE(optionalHeader);
-  const subsystemOffset = optionalHeader + (magic === 0x20b ? 88 : 68);
-  return data.readUInt16LE(subsystemOffset);
+  assert.ok(magic === 0x10b || magic === 0x20b, "PE optional-header magic must be PE32/PE32+");
+  return data.readUInt16LE(optionalHeader + 68);
 }
 
 test("Windows native host compiles as GUI, propagates Agent exit, and preserves detached Worker lifetime", { skip: process.platform !== "win32" }, async () => {
