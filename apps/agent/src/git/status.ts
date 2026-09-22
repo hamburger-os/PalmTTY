@@ -33,10 +33,11 @@ function statusName(value: string): GitFileStatus | undefined {
 function changeKind(
   indexStatus: GitFileStatus | undefined,
   worktreeStatus: GitFileStatus | undefined,
-  conflict: boolean,
   submodule: boolean
 ): GitChangeKind {
-  if (conflict) return "conflict";
+  if (indexStatus === "unmerged" || worktreeStatus === "unmerged") {
+    return "conflict";
+  }
   if (submodule) return "submodule";
   return worktreeStatus ?? indexStatus ?? "modified";
 }
@@ -69,7 +70,7 @@ function parseTrackedRecord(record: string): GitChange {
 
   return {
     path,
-    kind: changeKind(indexStatus, worktreeStatus, conflict, isSubmodule),
+    kind: changeKind(indexStatus, worktreeStatus, isSubmodule),
     ...(indexStatus ? { indexStatus } : {}),
     ...(worktreeStatus ? { worktreeStatus } : {}),
     staged: Boolean(indexStatus),
@@ -92,7 +93,7 @@ function parseRenameRecord(record: string, originalRecord: string | undefined): 
   return {
     path,
     originalPath,
-    kind: changeKind(indexStatus, worktreeStatus, conflict, isSubmodule),
+    kind: changeKind(indexStatus, worktreeStatus, isSubmodule),
     ...(indexStatus ? { indexStatus } : {}),
     ...(worktreeStatus ? { worktreeStatus } : {}),
     staged: Boolean(indexStatus),
