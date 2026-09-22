@@ -3,7 +3,29 @@
 
 ## English
 
-### Requirements
+### Install a release
+
+For normal use, download a packaged Release instead of cloning the repository.
+
+- Windows x64: use `PalmTTY-Setup-X.Y.Z-win-x64.exe`. The per-user installer bundles Node.js, production dependencies and the compiled Web UI, initializes a user config/token when absent, and registers the current-user startup task.
+- Debian/Ubuntu x64: install `palmtty_X.Y.Z_amd64.deb`, then run `palmtty init --install-service` as the intended PalmTTY user.
+- Portable users can extract the Windows `.zip` or Linux `.tar.gz` and use the bundled `bin/palmtty` command.
+
+Useful installed commands:
+
+~~~text
+palmtty info
+palmtty preflight
+palmtty start
+palmtty service status
+palmtty service restart
+palmtty version
+~~~
+
+Release assets include per-platform CycloneDX SBOM files plus `SHA256SUMS`; GitHub build-provenance attestations are generated before the Release is promoted.
+
+### Source-build requirements
+
 
 - Node.js 22 or newer.
 - pnpm through Corepack.
@@ -79,7 +101,29 @@ Do **not** expose the Vite development server directly to the Internet. For remo
 
 ## 中文
 
-### 环境要求
+### 安装发行版
+
+正常使用时优先下载 Release 发行包，不需要克隆仓库。
+
+- Windows x64：使用 `PalmTTY-Setup-X.Y.Z-win-x64.exe`。这是当前用户安装器，已包含 Node.js、生产依赖与 Web UI；首次安装会在用户配置不存在时初始化 config/token，并注册当前用户启动任务。
+- Debian/Ubuntu x64：安装 `palmtty_X.Y.Z_amd64.deb` 后，以真正运行 PalmTTY 的用户执行 `palmtty init --install-service`。
+- Portable 用户可以解压 Windows `.zip` 或 Linux `.tar.gz`，直接使用其中的 `bin/palmtty`。
+
+常用安装版命令：
+
+~~~text
+palmtty info
+palmtty preflight
+palmtty start
+palmtty service status
+palmtty service restart
+palmtty version
+~~~
+
+Release 同时提供每个平台的 CycloneDX SBOM 与 `SHA256SUMS`，并在正式发布前生成 GitHub build provenance attestation。
+
+### 源码构建环境要求
+
 
 - Node.js 22 或更高版本。
 - 通过 Corepack 使用 pnpm。
