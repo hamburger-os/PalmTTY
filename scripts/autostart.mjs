@@ -131,6 +131,17 @@ async function installLinux(inputs) {
   } catch (error) {
     if (error?.code !== "ENOENT") throw error;
   }
+  const previousEnabled = run(
+    "systemctl",
+    ["--user", "is-enabled", LINUX_UNIT_NAME],
+    { acceptedExitCodes: [0, 1, 3, 4] }
+  ).stdout.trim() === "enabled";
+  const previousActive = run(
+    "systemctl",
+    ["--user", "is-active", LINUX_UNIT_NAME],
+    { acceptedExitCodes: [0, 1, 3, 4] }
+  ).stdout.trim() === "active";
+
   const tempPath = `${unitPath}.${randomUUID()}.tmp`;
   await writeFile(tempPath, unit, { encoding: "utf8", mode: 0o644 });
   await rename(tempPath, unitPath);
@@ -141,7 +152,16 @@ async function installLinux(inputs) {
   } catch (error) {
     if (previousUnit === undefined) await rm(unitPath, { force: true });
     else await writeFile(unitPath, previousUnit, { encoding: "utf8", mode: 0o644 });
+
     run("systemctl", ["--user", "daemon-reload"], { acceptedExitCodes: [0, 1] });
+    if (previousUnit === undefined || !previousEnabled) {
+      run("systemctl", ["--user", "disable", LINUX_UNIT_NAME], { acceptedExitCodes: [0, 1, 4, 5] });
+    } else {
+      run("systemctl", ["--user", "enable", LINUX_UNIT_NAME], { acceptedExitCodes: [0, 1] });
+    }
+    if (previousUnit !== undefined && previousActive) {
+      run("systemctl", ["--user", "restart", LINUX_UNIT_NAME], { acceptedExitCodes: [0, 1, 5] });
+    }
     throw error;
   }
   console.log(`[PalmTTY] installed systemd user service: ${unitPath}`);
