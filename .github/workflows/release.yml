@@ -68,6 +68,11 @@ jobs:
             exit 1
           fi
 
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::A GitHub Release already exists for $TAG."
+            exit 1
+          fi
+
           PRERELEASE=false
           if [[ "$VERSION" == *-* ]]; then
             PRERELEASE=true
@@ -107,13 +112,119 @@ jobs:
     with:
       ref: ${{ needs.prepare.outputs.source_sha }}
 
+  package-windows:
+    name: Package / Windows x64
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Build installed runtime
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          GITHUB_SHA: ${{ needs.prepare.outputs.source_sha }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $runtime = Join-Path $PWD "dist/PalmTTY-$env:VERSION-win-x64"
+          node scripts/package-runtime.mjs --out "$runtime" --platform win32 --arch x64
+          node scripts/package-smoke.mjs --root "$runtime"
+
+          $assets = Join-Path $PWD "dist/release-windows"
+          New-Item -ItemType Directory -Force $assets | Out-Null
+          Copy-Item (Join-Path $runtime "sbom.cdx.json") (Join-Path $assets "PalmTTY-$env:VERSION-win-x64.sbom.cdx.json")
+          Compress-Archive -Path (Join-Path $runtime "*") -DestinationPath (Join-Path $assets "PalmTTY-$env:VERSION-win-x64.zip") -CompressionLevel Optimal
+
+          $iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6/ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            throw "Inno Setup 6 is unavailable on the GitHub Windows runner: $iscc"
+          }
+          & $iscc "/DVersion=$env:VERSION" "/DSourceDir=$runtime" "/DOutputDir=$assets" "packaging/windows/PalmTTY.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+
+          $expected = @(
+            "PalmTTY-Setup-$env:VERSION-win-x64.exe",
+            "PalmTTY-$env:VERSION-win-x64.zip",
+            "PalmTTY-$env:VERSION-win-x64.sbom.cdx.json"
+          )
+          $actual = @(Get-ChildItem $assets -File | Select-Object -ExpandProperty Name | Sort-Object)
+          if (Compare-Object ($expected | Sort-Object) $actual) {
+            throw "Windows release assets do not match the expected set: $($actual -join ', ')"
+          }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-windows-x64
+          path: dist/release-windows/*
+          if-no-files-found: error
+          compression-level: 0
+
+  package-linux:
+    name: Package / Linux x64
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Build installed runtime
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          GITHUB_SHA: ${{ needs.prepare.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          runtime="$PWD/dist/PalmTTY-$VERSION-linux-x64"
+          assets="$PWD/dist/release-linux"
+          mkdir -p "$assets"
+
+          node scripts/package-runtime.mjs --out "$runtime" --platform linux --arch x64
+          node scripts/package-smoke.mjs --root "$runtime"
+          cp "$runtime/sbom.cdx.json" "$assets/PalmTTY-$VERSION-linux-x64.sbom.cdx.json"
+          tar -C "$runtime" -czf "$assets/PalmTTY-$VERSION-linux-x64.tar.gz" .
+          node scripts/package-linux-deb.mjs             --root "$runtime"             --out "$assets/palmtty_${VERSION}_amd64.deb"
+
+          expected=(
+            "PalmTTY-$VERSION-linux-x64.tar.gz"
+            "PalmTTY-$VERSION-linux-x64.sbom.cdx.json"
+            "palmtty_${VERSION}_amd64.deb"
+          )
+          mapfile -t actual < <(find "$assets" -maxdepth 1 -type f -printf '%f\n' | sort)
+          printf '%s\n' "${expected[@]}" | sort > /tmp/expected-assets.txt
+          printf '%s\n' "${actual[@]}" > /tmp/actual-assets.txt
+          diff -u /tmp/expected-assets.txt /tmp/actual-assets.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-linux-x64
+          path: dist/release-linux/*
+          if-no-files-found: error
+          compression-level: 0
+
   publish:
     name: Publish verified release
-    needs: [prepare, quality, security, codeql]
+    needs: [prepare, quality, security, codeql, package-windows, package-linux]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -123,7 +234,36 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
-      - name: Create, verify and publish release
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-*
+          path: /tmp/palmtty-assets
+          merge-multiple: true
+      - name: Verify and checksum release assets
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd /tmp/palmtty-assets
+          expected=(
+            "PalmTTY-Setup-$VERSION-win-x64.exe"
+            "PalmTTY-$VERSION-win-x64.zip"
+            "PalmTTY-$VERSION-win-x64.sbom.cdx.json"
+            "PalmTTY-$VERSION-linux-x64.tar.gz"
+            "PalmTTY-$VERSION-linux-x64.sbom.cdx.json"
+            "palmtty_${VERSION}_amd64.deb"
+          )
+          mapfile -t actual < <(find . -maxdepth 1 -type f -printf '%f\n' | sort)
+          printf '%s\n' "${expected[@]}" | sort > /tmp/expected-assets.txt
+          printf '%s\n' "${actual[@]}" > /tmp/actual-assets.txt
+          diff -u /tmp/expected-assets.txt /tmp/actual-assets.txt
+          sha256sum "${expected[@]}" > SHA256SUMS
+          test -s SHA256SUMS
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: /tmp/palmtty-assets/*
+      - name: Create, upload, verify and publish release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -186,12 +326,7 @@ jobs:
             exit 1
           fi
 
-          jq -n \
-            --arg tag "$TAG" \
-            --arg name "$TAG" \
-            --rawfile body /tmp/palmtty-release-notes.md \
-            --argjson prerelease "$PRERELEASE" \
-            '{
+          jq -n             --arg tag "$TAG"             --arg name "$TAG"             --rawfile body /tmp/palmtty-release-notes.md             --argjson prerelease "$PRERELEASE"             '{
               tag_name: $tag,
               name: $name,
               body: $body,
@@ -199,9 +334,7 @@ jobs:
               prerelease: $prerelease
             }' > /tmp/palmtty-release-create.json
 
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
-            --input /tmp/palmtty-release-create.json \
-            > /tmp/palmtty-release.json
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/releases"             --input /tmp/palmtty-release-create.json             > /tmp/palmtty-release.json
           CREATED_RELEASE=true
 
           RELEASE_ID="$(jq -r '.id // empty' /tmp/palmtty-release.json)"
@@ -217,6 +350,33 @@ jobs:
             (.body | length) > 20
           ' /tmp/palmtty-release.json >/dev/null
 
+          expected_assets=(
+            "PalmTTY-Setup-$VERSION-win-x64.exe"
+            "PalmTTY-$VERSION-win-x64.zip"
+            "PalmTTY-$VERSION-win-x64.sbom.cdx.json"
+            "PalmTTY-$VERSION-linux-x64.tar.gz"
+            "PalmTTY-$VERSION-linux-x64.sbom.cdx.json"
+            "palmtty_${VERSION}_amd64.deb"
+            "SHA256SUMS"
+          )
+          for name in "${expected_assets[@]}"; do
+            asset="/tmp/palmtty-assets/$name"
+            test -s "$asset"
+            curl --fail-with-body --silent --show-error               --request POST               --header "Authorization: Bearer $GH_TOKEN"               --header "Accept: application/vnd.github+json"               --header "X-GitHub-Api-Version: 2022-11-28"               --header "Content-Type: application/octet-stream"               --data-binary "@$asset"               "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets?name=$name"               > "/tmp/upload-$name.json"
+            jq --arg name "$name" -e '.name == $name and .state == "uploaded" and .size > 0'               "/tmp/upload-$name.json" >/dev/null
+          done
+
+          gh api "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets?per_page=100"             > /tmp/palmtty-release-assets.json
+          test "$(jq 'length' /tmp/palmtty-release-assets.json)" -eq "${#expected_assets[@]}"
+          for name in "${expected_assets[@]}"; do
+            local_size="$(stat -c '%s' "/tmp/palmtty-assets/$name")"
+            remote_size="$(jq -r --arg name "$name" '.[] | select(.name == $name) | .size' /tmp/palmtty-release-assets.json)"
+            if [ -z "$remote_size" ] || [ "$remote_size" != "$local_size" ]; then
+              echo "::error::Release asset verification failed for $name (local=$local_size remote=${remote_size:-missing})."
+              exit 1
+            fi
+          done
+
           REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
           REMOTE_TAG_TARGET="$(
             git ls-remote origin "refs/tags/$TAG^{}" | awk '{print $1}'
@@ -227,9 +387,7 @@ jobs:
           fi
 
           printf '%s\n' '{"draft":false}' > /tmp/palmtty-release-publish.json
-          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" \
-            --input /tmp/palmtty-release-publish.json \
-            > /tmp/palmtty-release-final.json
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID"             --input /tmp/palmtty-release-publish.json             > /tmp/palmtty-release-final.json
 
           jq --arg tag "$TAG" --argjson prerelease "$PRERELEASE" -e '
             .tag_name == $tag and
@@ -250,4 +408,4 @@ jobs:
           fi
 
           FINALIZED=true
-          echo "Published $TAG from immutable source $SOURCE_SHA."
+          echo "Published $TAG from immutable source $SOURCE_SHA with ${#expected_assets[@]} verified assets."
