@@ -1,4 +1,4 @@
-import type { PalmTTYConfig } from "@palmtty/config";
+import { isPrivateIpv4, type PalmTTYConfig } from "@palmtty/config";
 
 function normalizedOrigin(value: string): string | undefined {
   try {
@@ -18,6 +18,15 @@ export function isTrustedOrigin(
   const candidate = normalizedOrigin(origin);
   if (!candidate) return false;
   return trustedOrigins.some((value) => normalizedOrigin(value) === candidate);
+}
+
+export function isPrivateClientAddress(address: string): boolean {
+  let normalized = address.trim().toLowerCase();
+  if (normalized.startsWith("::ffff:")) {
+    normalized = normalized.slice("::ffff:".length);
+  }
+  if (normalized === "::1" || normalized === "127.0.0.1") return true;
+  return isPrivateIpv4(normalized);
 }
 
 export function assertSecureExposure(config: PalmTTYConfig): void {
