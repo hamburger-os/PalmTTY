@@ -69,6 +69,46 @@ function hashText(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
+function safeFilterDriver(value: string): string | undefined {
+  if (
+    value === "" ||
+    value === "unspecified" ||
+    value === "unset" ||
+    value === "set"
+  ) {
+    return undefined;
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value)) {
+    throw new Error("Git filter driver name cannot be neutralized safely");
+  }
+  return value;
+}
+
+async function safeWorkingTreeDiffConfig(
+  workspace: WorkspaceDefinition,
+  root: string,
+  path: string,
+  excludedEnvironmentKeys: string[]
+): Promise<string[]> {
+  const result = await runWorkspaceGit(
+    workspace,
+    root,
+    ["check-attr", "-z", "filter", "--", path],
+    excludedEnvironmentKeys,
+    { maxStdoutBytes: 32 * 1024 }
+  );
+  const fields = result.stdout.toString("utf8").split("\0");
+  const attribute = fields[1] ?? "";
+  const driver = safeFilterDriver(fields[2] ?? "");
+  if (attribute !== "filter" || !driver) return [];
+
+  return [
+    "-c", `filter.${driver}.clean=`,
+    "-c", `filter.${driver}.process=`,
+    "-c", `filter.${driver}.required=false`
+  ];
+}
+
 export const getWorkspaceGitStatus = getGitStatus;
 
 export async function getWorkspaceGitDiff(
@@ -85,8 +125,17 @@ export async function getWorkspaceGitDiff(
     (change) => change.path === path && change.untracked
   );
 
+  const workingTreeConfig = staged
+    ? []
+    : await safeWorkingTreeDiffConfig(
+        workspace,
+        repository.root,
+        path,
+        excludedEnvironmentKeys
+      );
   const args = untracked
     ? [
+        ...workingTreeConfig,
         "diff",
         "--no-index",
         "--no-color",
@@ -97,6 +146,7 @@ export async function getWorkspaceGitDiff(
         path
       ]
     : [
+        ...workingTreeConfig,
         "diff",
         "--no-ext-diff",
         "--no-textconv",
