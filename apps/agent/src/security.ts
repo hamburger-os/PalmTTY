@@ -1,53 +1,39 @@
 import type { PalmTTYConfig } from "@palmtty/config";
 
-export function isLoopbackHost(host: string): boolean {
-  const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, "");
-  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
-}
-
 function normalizedOrigin(value: string): string | undefined {
   try {
-    return new URL(value).origin.toLowerCase();
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    return url.origin.toLowerCase();
   } catch {
     return undefined;
   }
 }
 
-export function isTrustedOrigin(origin: string | undefined, config: PalmTTYConfig): boolean {
+export function isTrustedOrigin(
+  origin: string | undefined,
+  trustedOrigins: readonly string[]
+): boolean {
   if (!origin) return false;
   const candidate = normalizedOrigin(origin);
   if (!candidate) return false;
-
-  const configured = config.server.trustedOrigins
-    .map(normalizedOrigin)
-    .filter((value): value is string => Boolean(value));
-
-  if (configured.includes(candidate)) return true;
-
-  if (isLoopbackHost(config.server.host)) {
-    try {
-      const url = new URL(candidate);
-      return isLoopbackHost(url.hostname) && Number(url.port || (url.protocol === "https:" ? 443 : 80)) === config.server.port;
-    } catch {
-      return false;
-    }
-  }
-
-  return false;
+  return trustedOrigins.some((value) => normalizedOrigin(value) === candidate);
 }
 
 export function assertSecureExposure(config: PalmTTYConfig): void {
-  if (isLoopbackHost(config.server.host)) return;
-  if (config.server.unsafeAllowInsecureLan) return;
+  const mode = config.server.exposure.mode;
+  if (mode === "local") return;
 
   if (!config.auth.enabled) {
-    throw new Error("Refusing non-loopback bind without authentication. Enable auth or explicitly set unsafeAllowInsecureLan.");
+    throw new Error(`Refusing ${mode} exposure without authentication.`);
   }
-  if (!config.server.secureCookies) {
-    throw new Error("Refusing non-loopback bind with insecure auth cookies. Put PalmTTY behind HTTPS and set secureCookies: true.");
-  }
-  if (config.server.trustedOrigins.length === 0) {
-    throw new Error("Refusing non-loopback bind without an explicit trustedOrigins allowlist.");
+
+  if (mode === "reverseProxy" || mode === "https") {
+    for (const origin of config.server.exposure.origins) {
+      if (new URL(origin).protocol !== "https:") {
+        throw new Error(`Refusing ${mode} exposure with non-HTTPS Origin: ${origin}`);
+      }
+    }
   }
 }
 
