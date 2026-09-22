@@ -78,6 +78,7 @@ async function main() {
   const temp = await mkdtemp(path.join(os.tmpdir(), "palmtty-installed-smoke-"));
   const root = path.join(temp, "PalmTTY");
   let child;
+  let stderr = "";
   try {
     // Execute from a detached temporary directory so no source-repository
     // relative path can accidentally satisfy runtime lookups.
@@ -154,7 +155,6 @@ sessions:
         windowsHide: true
       }
     );
-    let stderr = "";
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => {
       if (stderr.length < 8192) stderr += chunk;
