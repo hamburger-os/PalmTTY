@@ -109,6 +109,7 @@ for (const marker of [
 }
 
 for (const marker of [
+  'host.querySelector<HTMLElement>(".xterm-screen")',
   'shouldOwnTerminalTouchScroll(',
   'terminal.buffer.active.type',
   'terminal.modes.mouseTrackingMode',
