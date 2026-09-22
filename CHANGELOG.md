@@ -17,6 +17,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - Cross-process integration tests proving a Worker survives creator-Agent exit and can be rediscovered with replay intact.
 - Persistent Web-managed workspace catalog with authenticated create/edit/delete, separate from operator YAML configuration.
 - Host runtime adapter for Windows/Linux/macOS design, plus a structured Windows WSL adapter; Ubuntu CI exercises the Linux host path.
+- Current-user Agent autostart management: Windows Task Scheduler logon registration and Linux `systemd --user`, with install/status/restart/uninstall commands, strict optional environment-file loading, Linux secret-file permission enforcement, and Worker-safe systemd `KillMode=process`.
 - English and Simplified Chinese Web UI with persisted language preference.
 - PalmTTY-owned Spectrum / Obsidian / Frosted visual themes, Quality / Performance rendering modes, reduced-motion handling, semantic liquid-glass surfaces, and matching theme/review Agent Skills.
 - Runtime-aware remote directory picker for Host/WSL workspaces, unified terminal profiles that expose known Host shells and registered WSL distributions directly, a Custom advanced fallback, bounded Workspace environment variables, and one-click startup presets for common terminal coding agents.
@@ -40,6 +41,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Fixed
 
+- Align quick-start documentation with the example Agent port `17688` instead of the stale `7688` URL/diagnostic example.
 - Normalize balanced outer single/double quotes in Web Workspace environment values, so proxy entries copied as `HTTP_PROXY="http://127.0.0.1:10808"` reach child processes as `http://127.0.0.1:10808` instead of a URL containing literal quote characters; reject unmatched outer quotes.
 - Enumerate WSL distributions with `wsl.exe --list --quiet` for terminal profiles instead of starting a distro and probing its shells, removing the cold-start-dependent first-scan failure mode; hide Docker Desktop and Rancher Desktop utility distributions from the user-facing profile list.
 - Keep Host and WSL working-directory drafts separate in the Workspace editor so a Windows path is not silently reused as a WSL cwd.
