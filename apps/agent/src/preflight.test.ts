@@ -40,9 +40,14 @@ describe("runtime preflight", () => {
   });
 
   it("probes the endpoint derived from the exposure profile", async () => {
+    vi.stubEnv("PALMTTY_TEST_ACCESS_TOKEN", "0123456789abcdef");
     const serverProbe = vi.fn(async () => undefined);
     const config = parseConfig({
-      server: { port: 17688, exposure: { mode: "lan" } }
+      server: { port: 17688, exposure: { mode: "lan" } },
+      auth: {
+        enabled: true,
+        tokenEnv: "PALMTTY_TEST_ACCESS_TOKEN"
+      }
     });
 
     await preflightRuntime(config, { serverProbe });
