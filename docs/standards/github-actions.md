@@ -11,7 +11,7 @@ Authoritative upstream references used by PalmTTY's repository/release automatio
 - GitHub Docs — Artifact attestations / build provenance: https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations
 - `actions/upload-artifact`: https://github.com/actions/upload-artifact
 - `actions/download-artifact`: https://github.com/actions/download-artifact
-- `actions/attest-build-provenance`: https://github.com/actions/attest-build-provenance
+- `actions/attest`: https://github.com/actions/attest
 
 ## Relevant upstream semantics
 
@@ -24,7 +24,7 @@ Authoritative upstream references used by PalmTTY's repository/release automatio
 
 - Actions artifacts are intermediate workflow transport, not GitHub Release assets. PalmTTY package jobs upload their platform outputs as Actions artifacts; the final publish job downloads and validates them before explicitly uploading them to the draft Release.
 - Artifact upload/download actions are pinned to full commit SHAs like the rest of the workflow supply chain.
-- Build provenance is generated only after the exact release-asset set and `SHA256SUMS` have been assembled, and the publish job receives only the minimum additional `id-token: write` + `attestations: write` permissions needed for that step.
+- Build provenance is generated through the direct `actions/attest` action only after the exact release-asset set and `SHA256SUMS` have been assembled, and the publish job receives only the minimum additional `id-token: write` + `attestations: write` permissions needed for that step.
 - GitHub's automatically generated source archives are not PalmTTY binary distribution artifacts and are never counted toward the required Release asset set.
 
 ## PalmTTY interpretation
