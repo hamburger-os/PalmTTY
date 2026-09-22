@@ -1,5 +1,3 @@
-import type { PalmTTYConfig } from "@palmtty/config";
-
 function normalizedDevelopmentOrigin(value: string): string {
   const parsed = new URL(value);
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
@@ -37,23 +35,4 @@ export function parseDevelopmentTrustedOrigins(
   }
 
   return [...new Set(parsed.map(normalizedDevelopmentOrigin))];
-}
-
-export function withDevelopmentTrustedOrigins(
-  config: PalmTTYConfig,
-  source: string | undefined
-): PalmTTYConfig {
-  const additional = parseDevelopmentTrustedOrigins(source);
-  if (additional.length === 0) return config;
-
-  return {
-    ...config,
-    server: {
-      ...config.server,
-      trustedOrigins: [...new Set([
-        ...config.server.trustedOrigins,
-        ...additional
-      ])]
-    }
-  };
 }
