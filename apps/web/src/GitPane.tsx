@@ -678,6 +678,7 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
           title={t("git.restoreTitle")}
           message={t("git.restoreConfirm", { path: restoreConfirm.path })}
           confirmLabel={t("git.restore")}
+          danger
           busy={busy}
           onCancel={() => setRestoreConfirm(null)}
           onConfirm={() => {
