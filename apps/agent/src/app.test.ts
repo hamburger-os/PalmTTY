@@ -12,10 +12,8 @@ const ORIGIN = "http://127.0.0.1:7688";
 function testConfig() {
   return parseConfig({
     server: {
-      host: "127.0.0.1",
       port: 7688,
-      trustedOrigins: [ORIGIN],
-      secureCookies: false
+      exposure: { mode: "local" }
     },
     auth: {
       enabled: true,
