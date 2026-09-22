@@ -231,7 +231,7 @@ export async function getGitStatus(
   const result = await runWorkspaceGit(
     workspace,
     repository.root,
-    ["status", "--porcelain=v2", "-z", "--branch", "--untracked-files=normal"],
+    ["status", "--porcelain=v2", "-z", "--branch", "--untracked-files=all"],
     excludedEnvironmentKeys,
     {
       maxStdoutBytes: GIT_STATUS_LIMIT_BYTES,
