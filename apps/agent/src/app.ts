@@ -34,6 +34,7 @@ import {
   type WorkspaceStore
 } from "./workspace-store.js";
 import { registerWorkspaceToolRoutes } from "./workspace-tool-routes.js";
+import { PALMTTY_VERSION } from "./version.js";
 
 const LoginSchema = z.object({ token: z.string().min(1).max(4096) });
 
@@ -106,7 +107,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
 
   app.get("/api/v1/health", async () => ({
     status: "ok",
-    version: "0.1.0-alpha.0",
+    version: PALMTTY_VERSION,
     platform: process.platform
   }));
 

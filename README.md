@@ -24,7 +24,7 @@ PalmTTY 是一个以持久终端为核心、面向手机、自托管的远程开
 
 ## Status / 当前状态
 
-PalmTTY is **alpha**. Each terminal now runs in an independent durable Session Worker, so restarting only the HTTP/API Agent does not terminate the live PTY. Windows and Ubuntu CI cover authenticated Worker IPC, Agent restart rediscovery, replay/snapshot recovery and detached-process survival; Windows CI also uses real node-pty + PowerShell 7 / ConPTY for Unicode and resize smoke coverage. Real phone + real workstation + long-running Codex hardening is still ongoing.
+PalmTTY is **alpha**. Each terminal now runs in an independent durable Session Worker, so restarting only the HTTP/API Agent does not terminate the live PTY. Windows and Ubuntu CI cover authenticated Worker IPC, Agent restart rediscovery, replay/snapshot recovery and detached-process survival; Windows CI also uses real node-pty + PowerShell 7 / ConPTY for Unicode and resize smoke coverage. Release publication is guarded by pinned-SHA CI/security/license/CodeQL gates plus explicit real-device/deployment acceptance; real phone + real workstation + long-running Codex hardening remains part of that release qualification.
 
 | Capability | Alpha status |
 |---|---|
@@ -44,7 +44,7 @@ PalmTTY is **alpha**. Each terminal now runs in an independent durable Session W
 | Internet exposure | HTTPS/private-network deployment only |
 | Agent restart persistence | Implemented: independent Session Worker + authenticated local rediscovery |
 | Multi-user ACL | **Not implemented** |
-| Tagged release | **Not published yet** |
+| Release process | Guarded manual Release Action: pinned `main` SHA → CI/security/license/CodeQL → annotated tag + verified GitHub Release |
 
 ## Why PalmTTY / 为什么做 PalmTTY
 
@@ -152,7 +152,7 @@ pnpm build
 pnpm check
 ```
 
-CI runs with a committed `pnpm-lock.yaml` and `--frozen-lockfile` on Windows and Ubuntu. Pull requests also receive a production-dependency vulnerability audit and CodeQL analysis.
+CI runs with a committed `pnpm-lock.yaml` and `--frozen-lockfile` on Windows and Ubuntu. Pull requests also receive a production-dependency vulnerability audit, a fail-closed production dependency license-policy review, and CodeQL analysis. Tagged releases are published only through the guarded [Release workflow](RELEASING.md), which re-runs those gates against one immutable `main` SHA before creating the annotated tag and GitHub Release.
 
 ## Documentation / 文档
 

@@ -1,6 +1,6 @@
 # Current implementation state
 
-Status: **alpha foundation implemented with durable per-session workers and passing Windows/Ubuntu CI; real mobile/Codex deployment hardening remains before a stable release.**
+Status: **alpha foundation implemented with durable per-session workers and passing Windows/Ubuntu CI; guarded v0.1.0 release automation is implemented, while real mobile/Codex/deployment acceptance remains a publication gate.**
 
 ## Implemented
 
@@ -14,8 +14,10 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Windows ConPTY smoke coverage that prefers PowerShell 7 locally, falls back to Windows PowerShell for generic host checks, and is forced to PowerShell 7 in repository Windows CI
 - end-to-end Fastify HTTP/WebSocket/Worker IPC lifecycle coverage with deterministic PTY adapters
 - detached-process integration coverage proving a Worker survives the creator Agent process exit and can be rediscovered with replay intact
-- production dependency vulnerability audit and CodeQL
+- production dependency vulnerability audit, fail-closed production dependency license-policy review, and CodeQL
 - CODEOWNERS, PR/Issue templates, contribution/security/governance/release documentation
+- root `package.json` is the single release/runtime version source; private workspace manifests intentionally omit duplicate versions and the Agent health endpoint reads the root version
+- guarded manual Release workflow locks an exact `main` SHA, requires explicit real-device/deployment acceptance, reuses the Windows/Ubuntu CI + Security Audit + CodeQL workflows against that SHA, rejects tag/release reuse, aborts if `main` advances, and publishes an annotated tag plus verified GitHub Release with rollback before finalization
 - Apache-2.0 licensing
 - four documentation layers and docs-sync Agent Skill
 
@@ -153,7 +155,7 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - Linux host runtime is exercised on Ubuntu CI. macOS uses the same host adapter but remains unverified because there is no macOS CI job.
 - Windows Worker runtime file ACL behavior relies on the current-user application-data boundary and still merits dedicated real-host review.
 - The current xterm 6 package is loaded through an isolated CommonJS boundary in the Node Worker because the published headless package is not reliably consumable through native Node ESM named exports; re-review this when upgrading xterm.
-- GitHub Dependency Review remains unavailable while Dependency graph is disabled; pnpm audit --prod is enforced instead.
+- GitHub Dependency Review remains unavailable while Dependency graph is disabled; `pnpm audit --prod` plus the production dependency license-policy check are enforced instead.
 
 ## Required honesty rule
 

@@ -27,6 +27,8 @@ For a repository-wide change, `pnpm check` runs the static/test/build acceptance
 
 Any behavior-changing PR must use the documentation-sync workflow in `.agents/skills/docs-sync/SKILL.md`. Security, session lifecycle, reconnect behavior, protocol and configuration changes always require a documentation review.
 
+For a release PR, also run `pnpm license:check` and `pnpm release:check -- X.Y.Z`. Publication is performed only by **Actions → Release** from protected `main`; the workflow pins one source SHA, re-runs Windows/Ubuntu CI, vulnerability/license checks and CodeQL, requires explicit real-device/deployment acceptance, and creates the annotated tag/GitHub Release only after those gates pass.
+
 ### Contribution principles
 
 - Keep the terminal core vendor-neutral; Codex is a supported workload, not a protocol dependency.
@@ -59,9 +61,11 @@ pnpm test
 pnpm build
 ```
 
-仓库级代码质量门禁可以直接执行 `pnpm check`。在真实 PalmTTY 宿主机上做运行验证时，再单独执行 `pnpm run preflight`；它依赖本机 config/token，用于检查认证/安全配置与 Agent TCP 监听端点是否可绑定，不属于通用 CI 门禁。Workspace/运行环境验证由工作区管理 API 与 Session 创建路径负责，不再阻塞 Agent 启动。CI 在 Windows 和 Ubuntu 上使用 `pnpm install --frozen-lockfile` 安装依赖。Agent 测试套件通过真实 Fastify HTTP/WebSocket 与认证后的 Session Worker IPC 边界，端到端覆盖 replay/snapshot、Agent 重启 rediscovery、显式终端替换重启、工作区环境刷新、错误 Worker secret、stale recovery 清理、backpressure、登录过期、退出清理和并发 Session 上限；独立的真实进程测试还验证创建 Worker 的 Agent 进程彻底退出后 Worker 仍存活。Windows CI 另行通过真实 node-pty 强制启动 PowerShell 7/ConPTY 并验证 Unicode 往返。本机 Windows 质量门禁会优先使用 `pwsh.exe`，未安装时退回系统 Windows PowerShell，仅用于通用 ConPTY/Worker 进程集成测试，因此 `pnpm check` 不再要求额外安装 PowerShell 7。运行时可执行文件解析会专门识别当前用户的 `%LOCALAPPDATA%\Microsoft\WindowsApps`；MSIX App Execution Alias 属于特殊 reparse point，Node 的普通文件遍历可能拒绝它，但 Windows 本身仍可通过该 alias 启动应用。PR 还会执行生产依赖安全审计和 CodeQL；受保护的 `main` 必须通过 PR 和四项自动检查。当前 AI 主维护治理模型有意不强制人工 approval，也不强制 Code Owner approval。根开发启动器会在 preflight 后读取已验证的 PalmTTY config，推导本地 Agent URL，并以 `PALMTTY_AGENT_URL` 注入 Web dev 进程；Agent 仍监听该配置 endpoint。Vite 固定使用 strict 5173，并默认监听 `0.0.0.0`。启动器根据当前私有/overlay IPv4 网卡生成精确 development Origins，只注入 `--development` Agent，因此局域网调试不需要手工修改 `trustedOrigins`，也不会放宽 production Origin 策略。Windows 下根开发启动器还会默认开启不含内容的 Worker/PTTY spawn phase trace，用于把可见 console 闪窗定位到具体生命周期阶段，同时不记录 argv、环境变量值或 terminal I/O。Web 测试/构建不会读取宿主 runtime config。修改依赖清单时必须同步更新 `pnpm-lock.yaml`。
+仓库级代码质量门禁可以直接执行 `pnpm check`。在真实 PalmTTY 宿主机上做运行验证时，再单独执行 `pnpm run preflight`；它依赖本机 config/token，用于检查认证/安全配置与 Agent TCP 监听端点是否可绑定，不属于通用 CI 门禁。Workspace/运行环境验证由工作区管理 API 与 Session 创建路径负责，不再阻塞 Agent 启动。CI 在 Windows 和 Ubuntu 上使用 `pnpm install --frozen-lockfile` 安装依赖。Agent 测试套件通过真实 Fastify HTTP/WebSocket 与认证后的 Session Worker IPC 边界，端到端覆盖 replay/snapshot、Agent 重启 rediscovery、显式终端替换重启、工作区环境刷新、错误 Worker secret、stale recovery 清理、backpressure、登录过期、退出清理和并发 Session 上限；独立的真实进程测试还验证创建 Worker 的 Agent 进程彻底退出后 Worker 仍存活。Windows CI 另行通过真实 node-pty 强制启动 PowerShell 7/ConPTY 并验证 Unicode 往返。本机 Windows 质量门禁会优先使用 `pwsh.exe`，未安装时退回系统 Windows PowerShell，仅用于通用 ConPTY/Worker 进程集成测试，因此 `pnpm check` 不再要求额外安装 PowerShell 7。运行时可执行文件解析会专门识别当前用户的 `%LOCALAPPDATA%\Microsoft\WindowsApps`；MSIX App Execution Alias 属于特殊 reparse point，Node 的普通文件遍历可能拒绝它，但 Windows 本身仍可通过该 alias 启动应用。PR 还会执行生产依赖漏洞审计、license policy 检查和 CodeQL；受保护的 `main` 必须通过 PR 和四项自动检查。当前 AI 主维护治理模型有意不强制人工 approval，也不强制 Code Owner approval。根开发启动器会在 preflight 后读取已验证的 PalmTTY config，推导本地 Agent URL，并以 `PALMTTY_AGENT_URL` 注入 Web dev 进程；Agent 仍监听该配置 endpoint。Vite 固定使用 strict 5173，并默认监听 `0.0.0.0`。启动器根据当前私有/overlay IPv4 网卡生成精确 development Origins，只注入 `--development` Agent，因此局域网调试不需要手工修改 `trustedOrigins`，也不会放宽 production Origin 策略。Windows 下根开发启动器还会默认开启不含内容的 Worker/PTTY spawn phase trace，用于把可见 console 闪窗定位到具体生命周期阶段，同时不记录 argv、环境变量值或 terminal I/O。Web 测试/构建不会读取宿主 runtime config。修改依赖清单时必须同步更新 `pnpm-lock.yaml`。
 
 任何影响行为的 PR 都必须按 `.agents/skills/docs-sync/SKILL.md` 同步文档。安全、会话生命周期、重连、协议、配置的变更始终需要文档审查。
+
+Release PR 还必须执行 `pnpm license:check` 与 `pnpm release:check -- X.Y.Z`。正式发布只允许从受保护的 `main` 手动触发 **Actions → Release**：workflow 锁定一个源码 SHA，针对该 SHA 重跑 Windows/Ubuntu CI、漏洞/许可证检查与 CodeQL，要求显式确认真实设备/部署验收，所有门禁通过后才创建 annotated Tag 与 GitHub Release。
 
 ### 贡献原则
 

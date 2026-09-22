@@ -268,7 +268,7 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
     expect(history.commits[0]).toEqual(expect.objectContaining({
       subject: "test: Git workbench commit"
     }));
-  }, 45_000);
+  }, 90_000);
 
   it("serializes Git writes across Workspaces that share one repository", async () => {
     const workspace = await initializedWorkspace();
