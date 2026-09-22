@@ -35,7 +35,7 @@ function extractSection(markdown, label) {
 
   let end = lines.length;
   for (let index = start + 1; index < lines.length; index += 1) {
-    if (/^##\s+\[/.test(lines[index])) {
+    if (/^##\s+/.test(lines[index])) {
       end = index;
       break;
     }
