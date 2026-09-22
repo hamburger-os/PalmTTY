@@ -8,7 +8,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
-- Add explicit `local`, `lan`, `reverseProxy`, and direct `https` network exposure profiles, plus dedicated private-LAN and direct-HTTPS examples. LAN mode derives exact private/overlay IPv4 Origins automatically; direct HTTPS validates and loads configured certificate/key files.
+- Add explicit `local`, `lan`, `reverseProxy`, and direct `https` network exposure profiles, plus dedicated private-LAN and direct-HTTPS examples. LAN mode rejects non-private client source addresses and derives exact private/overlay IPv4 Origins automatically; direct HTTPS validates and loads configured certificate/key files.
 - Extend `pnpm autostart status` with native launcher/runtime process details and exposure/listen/local/LAN URL diagnostics.
 
 ### Changed
