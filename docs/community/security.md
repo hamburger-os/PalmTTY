@@ -63,9 +63,9 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 ### 必须保持的边界
 
 - 以普通用户运行，不默认提权。
-- 生产/正常 Agent 使用显式 exposure profile：`local` 默认只监听 loopback；`lan` 是显式、已认证的私有/overlay HTTP；`reverseProxy` 从明确的 HTTPS 浏览器 Origin 自动派生 Secure Cookie，同时允许私有 HTTP upstream；`https` 则由 Agent 自己读取证书/私钥终止 TLS。
+- 生产/正常 Agent 使用显式 exposure profile：`local` 默认只监听 loopback；`lan` 是显式、已认证但未加密的私有/overlay HTTP，会在路由前拒绝非私有来源地址，并自动只接受当前私有/overlay IPv4 精确 Origin；`reverseProxy` 从明确的 HTTPS 浏览器 Origin 自动派生 Secure Cookie，同时允许私有 HTTP upstream；`https` 则由 Agent 自己读取证书/私钥终止 TLS。
 - 开发启动器只把当前机器检测到的私有/overlay IPv4 对应 `http://<address>:5173` 作为精确 Origin 临时加入内存 allowlist；不持久化、不使用 Origin 通配，也不把 production Agent 改成默认非 loopback。
-- 非 loopback 正常 Agent 模式要求认证、Secure Cookie 和精确 Origin 白名单。
+- `lan` 要求认证 + 私有来源地址 + 精确私有 Origin，但因其是 HTTP 模式不会设置 Secure Cookie；`reverseProxy` / `https` 则要求认证、显式 HTTPS Origin，并自动使用 Secure Cookie。
 - 浏览器登录 secret 只通过 POST body 提交，不进入 URL。
 - 登录 Cookie 使用 HttpOnly、SameSite=Strict；正常非 loopback 部署要求 Secure。
 - 认证与 Origin 是独立控制。LAN Vite 代理不会把任意浏览器 Origin 改写成可信 Origin，请求仍必须精确匹配自动生成的 development Origin 并通过认证。
