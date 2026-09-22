@@ -47,6 +47,31 @@ test("rejects ranged or ungoverned xterm dependencies", () => {
   assert(failures.some((failure) => failure.includes("must be pinned")));
 });
 
+test("rejects xterm packages moved outside dependencies", () => {
+  const input = manifests();
+  delete input.webPackage.dependencies["@xterm/addon-fit"];
+  input.webPackage.devDependencies = {
+    "@xterm/addon-fit": "0.12.0-beta.301"
+  };
+
+  const failures = validateTerminalStack(stack, input);
+  assert(
+    failures.some((failure) =>
+      failure.includes("@palmtty/web @xterm dependency set must exactly match")
+    ) === false
+  );
+});
+
+test("rejects duplicate xterm declarations across dependency sections", () => {
+  const input = manifests();
+  input.webPackage.devDependencies = {
+    "@xterm/xterm": "6.1.0-beta.304"
+  };
+
+  const failures = validateTerminalStack(stack, input);
+  assert(failures.some((failure) => failure.includes("more than one dependency section")));
+});
+
 test("rejects the xterm 6.0.0 browser touch-scroll regression", () => {
   const regressedStack = {
     ...stack,
