@@ -233,7 +233,10 @@ export async function getGitStatus(
     repository.root,
     ["status", "--porcelain=v2", "-z", "--branch", "--untracked-files=normal"],
     excludedEnvironmentKeys,
-    { maxStdoutBytes: GIT_STATUS_LIMIT_BYTES }
+    {
+      maxStdoutBytes: GIT_STATUS_LIMIT_BYTES,
+      allowTruncated: true
+    }
   );
 
   return parsePorcelainV2Status(
