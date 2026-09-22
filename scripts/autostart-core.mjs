@@ -171,8 +171,6 @@ export function buildSystemdUserUnit({ nodePath, agentPath, repoRoot, configPath
 
   return `[Unit]
 Description=PalmTTY Agent
-After=network-online.target
-Wants=network-online.target
 
 [Service]
 Type=simple
