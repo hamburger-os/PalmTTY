@@ -295,6 +295,7 @@ export function buildWindowsTaskStatusPowerShellCommand(taskName = WINDOWS_TASK_
     `  state = [string]$task.State\n` +
     `  lastRunTime = $lastRunTime\n` +
     `  nextRunTime = $nextRunTime\n` +
+    `  lastTaskResult = [int64]$info.LastTaskResult\n` +
     `} | ConvertTo-Json -Compress`;
 }
 
@@ -318,11 +319,15 @@ export function parseWindowsTaskStatus(output) {
       throw new Error(`Windows Task Scheduler returned an invalid ${key}`);
     }
   }
+  if (typeof parsed.lastTaskResult !== "number" || !Number.isSafeInteger(parsed.lastTaskResult)) {
+    throw new Error("Windows Task Scheduler returned an invalid lastTaskResult");
+  }
   return {
     installed: true,
     state: parsed.state.toLowerCase(),
     lastRunTime: parsed.lastRunTime ?? null,
-    nextRunTime: parsed.nextRunTime ?? null
+    nextRunTime: parsed.nextRunTime ?? null,
+    lastTaskResult: parsed.lastTaskResult
   };
 }
 
