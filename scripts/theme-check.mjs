@@ -121,7 +121,6 @@ for (const marker of [
 }
 
 for (const marker of [
-  "position: fixed;",
   "touch-action: none;",
   "overscroll-behavior: none;"
 ]) {
