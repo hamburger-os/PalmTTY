@@ -68,21 +68,24 @@ export function readReleaseManifest(
     throw new Error("PalmTTY release manifest is unreadable", { cause: error });
   }
 
+  if (!value || typeof value !== "object") {
+    throw new Error("PalmTTY release manifest is invalid");
+  }
+
+  const record = value as Record<string, unknown>;
   if (
-    !value ||
-    typeof value !== "object" ||
-    (value as Record<string, unknown>).schemaVersion !== 1 ||
-    (value as Record<string, unknown>).name !== "PalmTTY" ||
-    typeof (value as Record<string, unknown>).version !== "string" ||
-    !VERSION_PATTERN.test((value as Record<string, string>).version) ||
-    typeof (value as Record<string, unknown>).commit !== "string" ||
-    !/^[0-9a-f]{40}$/u.test((value as Record<string, string>).commit) ||
-    typeof (value as Record<string, unknown>).platform !== "string" ||
-    typeof (value as Record<string, unknown>).arch !== "string" ||
-    typeof (value as Record<string, unknown>).nodeVersion !== "string"
+    record.schemaVersion !== 1 ||
+    record.name !== "PalmTTY" ||
+    typeof record.version !== "string" ||
+    !VERSION_PATTERN.test(record.version) ||
+    typeof record.commit !== "string" ||
+    !/^[0-9a-f]{40}$/u.test(record.commit) ||
+    typeof record.platform !== "string" ||
+    typeof record.arch !== "string" ||
+    typeof record.nodeVersion !== "string"
   ) {
     throw new Error("PalmTTY release manifest is invalid");
   }
 
-  return value as ReleaseManifest;
+  return record as ReleaseManifest;
 }
