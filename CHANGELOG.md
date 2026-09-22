@@ -19,7 +19,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Fixed
 
-- Restore one-finger mobile terminal scrollback with a narrow PalmTTY host-local fallback after real-device testing showed that upgrading beyond xterm 6.0.0's upstream touch-scroll regression plus CSS overscroll containment was still insufficient. Normal-buffer/no-mouse-tracking content swipes now drive xterm's public scroll API while terminal-local touch cancellation prevents page panning without changing Workbench layout; the xterm scrollbar keeps its own PointerEvent drag path, and alternate-buffer/mouse-tracking gestures remain xterm-owned.
+- Refine one-finger mobile terminal scrollback after iPhone validation: remove PalmTTY's row-quantized touch shim so xterm's own continuous Gesture/Viewport path provides release inertia and mode-aware touch semantics, while `.xterm-screen` still suppresses browser page panning. Split the decorative terminal frame from a padding-free xterm mount so FitAddon no longer counts frame padding as usable terminal height and the final rendered row is not clipped; active terminals also refit on VisualViewport resize without sending redundant geometry.
 - Keep Windows scheduled-task status locale-independent by querying structured UTF-8 data instead of forwarding localized `schtasks /FO LIST /V` text, and make normal build/start/autostart documentation explicit that port `5173` belongs only to Vite development.
 
 <!-- Add changes here after the latest release. Publishing requires this section to be empty. -->
