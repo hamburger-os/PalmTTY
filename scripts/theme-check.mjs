@@ -65,9 +65,13 @@ const themeTsPath = path.join(webSource, "theme.tsx");
 const themeCss = await readFile(themeCssPath, "utf8");
 const themeTs = await readFile(themeTsPath, "utf8");
 const terminalViewPath = path.join(webSource, "TerminalView.tsx");
+const terminalTouchScrollPath = path.join(webSource, "terminal-touch-scroll.ts");
+const stylesPath = path.join(webSource, "styles.css");
 const sessionWorkbenchPath = path.join(webSource, "SessionWorkbench.tsx");
 const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
+const terminalTouchScroll = await readFile(terminalTouchScrollPath, "utf8");
+const styles = await readFile(stylesPath, "utf8");
 const sessionWorkbench = await readFile(sessionWorkbenchPath, "utf8");
 const workspaceDialog = await readFile(workspaceDialogPath, "utf8");
 
@@ -96,10 +100,32 @@ for (const marker of [
   'className="terminal-host terminal-surface"',
   '"--terminal-background"',
   'terminalThemeRef.current',
+  'attachTerminalTouchScroll(host, terminal)',
   '}, [sessionId]);'
 ]) {
   if (!terminalView.includes(marker)) {
     failures.push(`apps/web/src/TerminalView.tsx [terminal-surface-contract] missing ${marker}`);
+  }
+}
+
+for (const marker of [
+  'terminal.buffer.active.type === "normal"',
+  'terminal.modes.mouseTrackingMode === "none"',
+  'event.preventDefault()',
+  'terminal.scrollLines(step.lines)'
+]) {
+  if (!terminalTouchScroll.includes(marker)) {
+    failures.push(`apps/web/src/terminal-touch-scroll.ts [terminal-touch-contract] missing ${marker}`);
+  }
+}
+
+for (const marker of [
+  "position: fixed;",
+  "touch-action: none;",
+  "overscroll-behavior: none;"
+]) {
+  if (!styles.includes(marker)) {
+    failures.push(`apps/web/src/styles.css [mobile-terminal-scroll-contract] missing ${marker}`);
   }
 }
 
