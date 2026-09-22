@@ -78,6 +78,17 @@ For broad changes:
 pnpm check
 ~~~
 
+## Release qualification
+
+A release PR additionally runs:
+
+~~~text
+pnpm license:check
+pnpm release:check -- X.Y.Z
+~~~
+
+Before dispatching **Actions → Release**, complete the release-specific real-device/deployment checks below and explicitly confirm that acceptance in the workflow input. The Release workflow does not trust older CI results: it locks the selected `main` SHA, re-runs Windows/Ubuntu `pnpm check`, dependency vulnerability + license policy checks and CodeQL against that exact SHA, rejects existing tags/releases, and aborts if `main` moves before promotion.
+
 ## Host runtime preflight
 
 On a configured PalmTTY host, before `dev`/`start` or release validation:
