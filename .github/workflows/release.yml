@@ -1,0 +1,250 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (X.Y.Z, X.Y.Z-alpha.N, beta.N or rc.N)
+        required: true
+        type: string
+      confirm_release_acceptance:
+        description: I completed the release-specific real-device/deployment acceptance
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: palmtty-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Resolve Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      source_sha: ${{ steps.meta.outputs.source_sha }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Resolve immutable release source
+        id: meta
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          ACCEPTANCE_CONFIRMED: ${{ inputs.confirm_release_acceptance }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Manual releases must be started from main."
+            exit 1
+          fi
+          if [ "$ACCEPTANCE_CONFIRMED" != "true" ]; then
+            echo "::error::Release-specific real-device/deployment acceptance must be completed before publishing."
+            exit 1
+          fi
+
+          VERSION="${INPUT_VERSION#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$ ]]; then
+            echo "::error::Unsupported release version: $VERSION"
+            exit 1
+          fi
+
+          TAG="v$VERSION"
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test -n "$REMOTE_MAIN"
+          if [ "$REMOTE_MAIN" != "$SOURCE_SHA" ]; then
+            echo "::error::main advanced before release preparation."
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::$TAG already exists. Release tags are immutable."
+            exit 1
+          fi
+
+          EXISTING_RELEASES="$(
+            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
+              jq --arg tag "$TAG" '[.[] | select(.tag_name == $tag)] | length'
+          )"
+          if [ "$EXISTING_RELEASES" -ne 0 ]; then
+            echo "::error::A GitHub Release already exists for $TAG."
+            exit 1
+          fi
+
+          PRERELEASE=false
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE=true
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+
+      - name: Verify release metadata
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: pnpm release:check -- "$VERSION"
+
+  quality:
+    name: Quality Gate
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.prepare.outputs.source_sha }}
+
+  security:
+    name: Dependency Security and License Gate
+    needs: prepare
+    uses: ./.github/workflows/security-audit.yml
+    with:
+      ref: ${{ needs.prepare.outputs.source_sha }}
+
+  codeql:
+    name: CodeQL Gate
+    needs: prepare
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/codeql.yml
+    with:
+      ref: ${{ needs.prepare.outputs.source_sha }}
+
+  publish:
+    name: Publish verified release
+    needs: [prepare, quality, security, codeql]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          persist-credentials: true
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+      - name: Create, verify and publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          CREATED_TAG=false
+          CREATED_RELEASE=false
+          FINALIZED=false
+
+          cleanup() {
+            code=$?
+            if [ "$code" -ne 0 ] && [ "$FINALIZED" != "true" ]; then
+              echo "::warning::Release validation failed; rolling back the tag/release created by this run."
+              if [ "$CREATED_RELEASE" = "true" ]; then
+                gh release delete "$TAG" --yes --cleanup-tag=false >/dev/null 2>&1 || true
+              fi
+              if [ "$CREATED_TAG" = "true" ]; then
+                git push origin ":refs/tags/$TAG" >/dev/null 2>&1 || true
+              fi
+            fi
+            exit "$code"
+          }
+          trap cleanup EXIT
+
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          if [ "$REMOTE_MAIN" != "$SOURCE_SHA" ]; then
+            echo "::error::main advanced while release gates were running; restart the Release workflow."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::$TAG already exists."
+            exit 1
+          fi
+
+          EXISTING_RELEASES="$(
+            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
+              jq --arg tag "$TAG" '[.[] | select(.tag_name == $tag)] | length'
+          )"
+          if [ "$EXISTING_RELEASES" -ne 0 ]; then
+            echo "::error::A GitHub Release already exists for $TAG."
+            exit 1
+          fi
+
+          node scripts/release-notes.mjs "$VERSION" > /tmp/palmtty-release-notes.md
+          test -s /tmp/palmtty-release-notes.md
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$SOURCE_SHA" -m "PalmTTY $TAG"
+          test "$(git rev-list -n 1 "$TAG")" = "$SOURCE_SHA"
+          git push origin "refs/tags/$TAG"
+          CREATED_TAG=true
+
+          CREATE_ARGS=(
+            "$TAG"
+            --target "$SOURCE_SHA"
+            --title "$TAG"
+            --notes-file /tmp/palmtty-release-notes.md
+            --draft
+          )
+          if [ "$PRERELEASE" = "true" ]; then
+            CREATE_ARGS+=(--prerelease)
+          fi
+          gh release create "${CREATE_ARGS[@]}"
+          CREATED_RELEASE=true
+
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
+            jq --arg tag "$TAG" --arg sha "$SOURCE_SHA" --argjson prerelease "$PRERELEASE" -e '
+              [.[] | select(
+                .tag_name == $tag and
+                .draft == true and
+                .prerelease == $prerelease and
+                .target_commitish == $sha and
+                (.body | length) > 20
+              )] |
+              if length == 1 then .[0]
+              else error("expected exactly one verified draft release")
+              end
+            ' > /tmp/palmtty-release.json
+
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          if [ "$REMOTE_MAIN" != "$SOURCE_SHA" ]; then
+            echo "::error::main advanced before release promotion; rolling back this run."
+            exit 1
+          fi
+
+          RELEASE_ID="$(jq -r .id /tmp/palmtty-release.json)"
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" -F draft=false             > /tmp/palmtty-release-final.json
+
+          jq --arg tag "$TAG" --arg sha "$SOURCE_SHA" --argjson prerelease "$PRERELEASE" -e '
+            .tag_name == $tag and
+            .draft == false and
+            .prerelease == $prerelease and
+            .target_commitish == $sha and
+            (.body | length) > 20
+          ' /tmp/palmtty-release-final.json >/dev/null
+
+          FINALIZED=true
+          echo "Published $TAG from immutable source $SOURCE_SHA."
