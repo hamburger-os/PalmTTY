@@ -205,6 +205,7 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
     }));
 
     await writeFile(path.join(workspace.cwd, "SECOND.md"), "second\n", "utf8");
+    status = await getWorkspaceGitStatus(workspace);
     status = (await mutateWorkspaceGit(workspace, {
       expectedState: status.repository!.stateToken,
       allowRepositoryCodeExecution: true,
