@@ -27,7 +27,7 @@ Status: **alpha foundation implemented with durable per-session workers, Windows
 - versioned per-user persistent workspace store managed through authenticated + exact-Origin CRUD API
 - built-in single-user bootstrap-token login
 - random in-memory login session cookie with bounded active-session count
-- explicit `local` / `lan` / `reverseProxy` / direct `https` exposure profiles: bind host, trusted Origins and Secure-cookie behavior are derived from the profile; legacy low-level exposure switches are rejected
+- explicit `local` / `lan` / `reverseProxy` / direct `https` exposure profiles: bind host, trusted Origins and Secure-cookie behavior are derived from the profile; `lan` additionally rejects non-private client source addresses; legacy low-level exposure switches are rejected
 - bounded login/session-create rate limiting
 - Session creation/restart remain workspace-authority operations; Web workspace mutation may persist a bounded environment map except the reserved `PALMTTY_*` control namespace and any separately configured login-token variable, while Session requests cannot inject ad-hoc cwd/shell/environment overrides
 - runtime preflight for auth/exposure policy, direct-HTTPS credential validity and derived Agent TCP bindability, exposed as the unambiguous `pnpm run preflight` package script
