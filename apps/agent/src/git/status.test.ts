@@ -98,6 +98,22 @@ describe("parsePorcelainV2Status", () => {
     });
   });
 
+  it("marks status as truncated when the safe change-count bound is exceeded", () => {
+    const source = Array.from(
+      { length: 2049 },
+      (_, index) => `? file-${index}.txt`
+    ).join("\0");
+
+    const status = parsePorcelainV2Status(
+      source,
+      { root: "/repo", workspacePath: "" },
+      false
+    );
+
+    expect(status.changes).toHaveLength(2048);
+    expect(status.truncated).toBe(true);
+  });
+
   it("marks malformed or bounded status output as truncated instead of trusting it", () => {
     const status = parsePorcelainV2Status(
       "? ../escape\0",
