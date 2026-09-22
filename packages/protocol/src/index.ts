@@ -346,6 +346,12 @@ export const GitMutationOperationSchema = z.discriminatedUnion("type", [
     paths: GitMutationPathsSchema
   }).strict(),
   z.object({
+    type: z.literal("stage.all")
+  }).strict(),
+  z.object({
+    type: z.literal("unstage.all")
+  }).strict(),
+  z.object({
     type: z.literal("restore"),
     path: GitPathSchema,
     diffSnapshot: GitStateTokenSchema
