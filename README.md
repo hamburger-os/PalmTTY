@@ -169,7 +169,9 @@ For normal remote use, prefer a private HTTPS entry point or authenticated HTTPS
 
 Deployment references:
 
-- [Private-LAN HTTP example](examples/palmtty.lan.example.yaml)\n- [Direct HTTPS example](examples/palmtty.https.example.yaml)\n- [QNAP/reverse-proxy example](examples/qnap-reverse-proxy.yaml)
+- [Private-LAN HTTP example](examples/palmtty.lan.example.yaml)
+- [Direct HTTPS example](examples/palmtty.https.example.yaml)
+- [QNAP/reverse-proxy example](examples/qnap-reverse-proxy.yaml)
 - [Caddy example](examples/Caddyfile.example)
 - [Community security guide](docs/community/security.md)
 - [Security policy](SECURITY.md)
