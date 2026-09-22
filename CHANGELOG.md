@@ -6,6 +6,10 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+<!-- Add changes here after the latest release. Publishing requires this section to be empty. -->
+
+## [0.1.0]
+
 ### Added
 
 - Independent detached Session Worker per terminal, with Agent-restart persistence and authenticated local IPC.
@@ -77,4 +81,4 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## Release history
 
-No tagged PalmTTY release has been published yet.
+Versioned sections above are the canonical human-written release notes. The guarded Release workflow publishes the matching section to GitHub Releases.
