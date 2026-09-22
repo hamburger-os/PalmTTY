@@ -204,6 +204,24 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
       unstaged: true
     }));
 
+    await writeFile(path.join(workspace.cwd, "SECOND.md"), "second\n", "utf8");
+    status = (await mutateWorkspaceGit(workspace, {
+      expectedState: status.repository!.stateToken,
+      allowRepositoryCodeExecution: true,
+      operation: { type: "stage.all" }
+    })).status;
+    expect(status.changes.every((entry) => entry.staged)).toBe(true);
+
+    status = (await mutateWorkspaceGit(workspace, {
+      expectedState: status.repository!.stateToken,
+      allowRepositoryCodeExecution: true,
+      operation: { type: "unstage.all" }
+    })).status;
+    expect(status.changes.every((entry) => !entry.staged)).toBe(true);
+
+    await rm(path.join(workspace.cwd, "SECOND.md"));
+    status = await getWorkspaceGitStatus(workspace);
+
     const diff = await getWorkspaceGitDiff(workspace, "README.md", false);
     status = (await mutateWorkspaceGit(workspace, {
       expectedState: status.repository!.stateToken,
@@ -249,6 +267,35 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
     expect(history.commits[0]).toEqual(expect.objectContaining({
       subject: "test: Git workbench commit"
     }));
+  }, 45_000);
+
+  it("serializes Git writes across Workspaces that share one repository", async () => {
+    const workspace = await initializedWorkspace();
+    await writeFile(path.join(workspace.cwd, "A.md"), "a\n", "utf8");
+    await writeFile(path.join(workspace.cwd, "B.md"), "b\n", "utf8");
+    const secondWorkspace = { ...workspace, id: "git-test-2" };
+    const status = await getWorkspaceGitStatus(workspace);
+    const expectedState = status.repository!.stateToken;
+
+    const results = await Promise.allSettled([
+      mutateWorkspaceGit(workspace, {
+        expectedState,
+        allowRepositoryCodeExecution: true,
+        operation: { type: "stage", paths: ["A.md"] }
+      }),
+      mutateWorkspaceGit(secondWorkspace, {
+        expectedState,
+        allowRepositoryCodeExecution: true,
+        operation: { type: "stage", paths: ["B.md"] }
+      })
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((result) => result.status === "rejected");
+    expect(rejected).toMatchObject({
+      status: "rejected",
+      reason: { name: "GitStateChangedError" }
+    });
   }, 45_000);
 
   it("rejects stale mutations and stale destructive restores", async () => {
