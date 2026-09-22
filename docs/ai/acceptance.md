@@ -88,7 +88,7 @@ pnpm license:check
 pnpm release:check -- X.Y.Z
 ~~~
 
-Before dispatching **Actions → Release**, complete the release-specific real-device/deployment checks below and explicitly confirm that acceptance in the workflow input. The Release workflow does not trust older CI results: it locks the selected `main` SHA, re-runs Windows/Ubuntu `pnpm check`, dependency vulnerability + license policy checks and CodeQL against that exact SHA, rejects existing tags/releases, and aborts if `main` moves before promotion.
+The real-device/deployment checks below remain recommended release evidence for behavior that CI cannot observe, but they are not represented by a checkbox and do not block the Release workflow. The Release workflow derives publication authority from protected `main`: it locks the selected `main` SHA, re-runs Windows/Ubuntu `pnpm check`, dependency vulnerability + license policy checks and CodeQL against that exact SHA, rejects existing tags/releases, and aborts if `main` moves before promotion.
 
 ## Host runtime preflight
 
