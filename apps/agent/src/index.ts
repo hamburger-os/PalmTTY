@@ -1,6 +1,7 @@
 import path from "node:path";
 import {
   configPathFromEnvironment,
+  exposureOrigins,
   lanAgentUrls,
   loadConfig,
   localAgentUrl,
@@ -76,18 +77,28 @@ async function main() {
     );
   }
 
+  const mode = config.server.exposure.mode;
   console.log(
-    `[PalmTTY] listening on ${host}:${config.server.port} (${config.server.exposure.mode})`
+    `[PalmTTY] listening on ${host}:${config.server.port} (${mode})`
   );
-  console.log(`[PalmTTY] local URL: ${localAgentUrl(config)}`);
-  if (config.server.exposure.mode === "lan") {
+
+  if (mode === "local") {
+    console.log(`[PalmTTY] browser URL: ${localAgentUrl(config)}`);
+  } else if (mode === "lan") {
+    console.log(`[PalmTTY] local browser URL: ${localAgentUrl(config)}`);
     const urls = lanAgentUrls(config);
     if (urls.length === 0) {
       console.warn("[PalmTTY] no private/overlay IPv4 LAN address was detected");
     } else {
-      console.log("[PalmTTY] LAN URLs:");
+      console.log("[PalmTTY] LAN browser URLs:");
       for (const url of urls) console.log(`  - ${url}`);
     }
+  } else {
+    if (mode === "reverseProxy") {
+      console.log(`[PalmTTY] reverse-proxy upstream URL: ${localAgentUrl(config)}`);
+    }
+    console.log("[PalmTTY] browser Origins:");
+    for (const origin of exposureOrigins(config)) console.log(`  - ${origin}`);
   }
 }
 
