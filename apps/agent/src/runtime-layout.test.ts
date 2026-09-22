@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultWebRoot,
@@ -52,10 +53,20 @@ describe("installed runtime layout", () => {
   });
 
   it("keeps the source-tree Web path when no release root is present", () => {
-    const moduleUrl = new URL("file:///repo/apps/agent/dist/runtime-layout.js").href;
+    const sourceRoot = path.join(
+      os.tmpdir(),
+      "palmtty-source-layout",
+      "apps",
+      "agent",
+      "dist"
+    );
+    const moduleUrl = pathToFileURL(
+      path.join(sourceRoot, "runtime-layout.js")
+    ).href;
+
     expect(installedRoot({}, moduleUrl)).toBeUndefined();
-    expect(defaultWebRoot({}, moduleUrl)).toMatch(
-      /apps[\\/]web[\\/]dist[\\/]?$/u
+    expect(defaultWebRoot({}, moduleUrl)).toBe(
+      path.join(os.tmpdir(), "palmtty-source-layout", "apps", "web", "dist")
     );
   });
 });
