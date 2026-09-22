@@ -2,7 +2,7 @@
 
 All notable PalmTTY changes are recorded here.
 
-The project follows a Keep-a-Changelog-style structure and intends to use Semantic Versioning once tagged releases begin.
+The project follows a Keep-a-Changelog-style structure and uses Semantic Versioning for tagged releases.
 
 ## [Unreleased]
 
@@ -27,10 +27,10 @@ The project follows a Keep-a-Changelog-style structure and intends to use Semant
 - Single-user bootstrap-token authentication with HttpOnly session cookies.
 - Exact Origin checks, non-loopback safety gates, bounded rate-limit/session state and socket backpressure.
 - Windows and Ubuntu CI, including deterministic end-to-end HTTP/WebSocket/SessionManager lifecycle coverage and a separate Windows node-pty + PowerShell/ConPTY Unicode smoke test.
-- Frozen pnpm lockfile and production dependency-license audit.
+- Frozen pnpm lockfile, production dependency vulnerability audit, and automated production dependency license-policy review.
 - Four-layer project documentation and docs-sync Agent Skill.
 - Apache-2.0 licensing.
-- Community governance files, contribution templates and security automation.
+- Community governance files, contribution templates and security automation.\n- Guarded manual Release workflow that locks an immutable `main` SHA, re-runs Windows/Ubuntu CI, dependency security/license review and CodeQL, then creates an annotated tag and verified GitHub Release with rollback on failure.\n- Root `package.json` as the single release/runtime version source; private workspace packages no longer carry duplicate version fields and `/api/v1/health` reports that root version.
 
 ### Fixed
 
