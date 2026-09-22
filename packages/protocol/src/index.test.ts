@@ -122,6 +122,11 @@ describe("protocol", () => {
       allowRepositoryCodeExecution: true,
       operation: { type: "stage", paths: ["README.md"] }
     }).operation.type).toBe("stage");
+    expect(GitMutationRequestSchema.parse({
+      expectedState: "a".repeat(64),
+      allowRepositoryCodeExecution: true,
+      operation: { type: "stage.all" }
+    }).operation.type).toBe("stage.all");
     expect(() => GitMutationRequestSchema.parse({
       expectedState: "a".repeat(64),
       allowRepositoryCodeExecution: false,
