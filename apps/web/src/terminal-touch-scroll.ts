@@ -37,16 +37,18 @@ function canOwnTouchScroll(terminal: Terminal): boolean {
   );
 }
 
-function terminalLineHeight(host: HTMLElement, terminal: Terminal): number {
-  const screen = host.querySelector<HTMLElement>(".xterm-screen");
-  const height = screen?.clientHeight ?? host.clientHeight;
-  return terminal.rows > 0 ? height / terminal.rows : 0;
+function terminalLineHeight(screen: HTMLElement, terminal: Terminal): number {
+  return terminal.rows > 0 ? screen.clientHeight / terminal.rows : 0;
 }
 
 export function attachTerminalTouchScroll(
   host: HTMLElement,
   terminal: Terminal
 ): { dispose(): void } {
+  const screen = host.querySelector<HTMLElement>(".xterm-screen");
+  if (!screen) {
+    return { dispose() {} };
+  }
   let active = false;
   let previousClientY = 0;
   let remainderPx = 0;
@@ -73,7 +75,7 @@ export function attachTerminalTouchScroll(
       return;
     }
 
-    lineHeightPx = terminalLineHeight(host, terminal);
+    lineHeightPx = terminalLineHeight(screen, terminal);
     if (!Number.isFinite(lineHeightPx) || lineHeightPx <= 0) {
       reset();
       return;
@@ -136,17 +138,17 @@ export function attachTerminalTouchScroll(
     reset();
   };
 
-  host.addEventListener("touchstart", onTouchStart, { passive: false });
-  host.addEventListener("touchmove", onTouchMove, { passive: false });
-  host.addEventListener("touchend", onTouchEnd, { passive: false });
-  host.addEventListener("touchcancel", onTouchCancel, { passive: false });
+  screen.addEventListener("touchstart", onTouchStart, { passive: false });
+  screen.addEventListener("touchmove", onTouchMove, { passive: false });
+  screen.addEventListener("touchend", onTouchEnd, { passive: false });
+  screen.addEventListener("touchcancel", onTouchCancel, { passive: false });
 
   return {
     dispose() {
-      host.removeEventListener("touchstart", onTouchStart);
-      host.removeEventListener("touchmove", onTouchMove);
-      host.removeEventListener("touchend", onTouchEnd);
-      host.removeEventListener("touchcancel", onTouchCancel);
+      screen.removeEventListener("touchstart", onTouchStart);
+      screen.removeEventListener("touchmove", onTouchMove);
+      screen.removeEventListener("touchend", onTouchEnd);
+      screen.removeEventListener("touchcancel", onTouchCancel);
       reset();
     }
   };
