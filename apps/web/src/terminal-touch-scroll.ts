@@ -87,6 +87,7 @@ export function attachTerminalTouchScroll(
     // xterm's current gesture implementation listens on document. PalmTTY owns
     // normal-buffer, no-mouse-protocol touch scrolling locally so the gesture
     // cannot escape into either xterm's duplicate handler or page scrolling.
+    event.preventDefault();
     event.stopPropagation();
   };
 
