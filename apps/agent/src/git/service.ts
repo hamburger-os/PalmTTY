@@ -70,14 +70,7 @@ function hashText(value: string): string {
 }
 
 function safeFilterDriver(value: string): string | undefined {
-  if (
-    value === "" ||
-    value === "unspecified" ||
-    value === "unset" ||
-    value === "set"
-  ) {
-    return undefined;
-  }
+  if (value === "") return undefined;
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value)) {
     throw new Error("Git filter driver name cannot be neutralized safely");
   }
