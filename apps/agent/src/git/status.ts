@@ -256,6 +256,13 @@ export async function requireExpectedGitState(
   if (!status.available || !status.repository) {
     throw new Error("Workspace is not inside a Git repository");
   }
+  if (status.truncated) {
+    const error = new Error(
+      "Git status is incomplete; write operations are disabled until the repository fits the safe status bounds"
+    );
+    error.name = "GitStateChangedError";
+    throw error;
+  }
   if (status.repository.stateToken !== expectedState) {
     const error = new Error("Git repository changed since the page was refreshed");
     error.name = "GitStateChangedError";
