@@ -74,7 +74,8 @@ describe("HTTP security boundary", () => {
     const publicResponse = await app.inject({
       method: "GET",
       url: "/api/v1/health",
-      remoteAddress: "203.0.113.10"
+      remoteAddress: "203.0.113.10",
+      headers: { "x-forwarded-for": "192.168.31.20" }
     });
     expect(publicResponse.statusCode).toBe(403);
     expect(publicResponse.json()).toEqual({ error: "lan_client_not_private" });
@@ -82,7 +83,8 @@ describe("HTTP security boundary", () => {
     const privateResponse = await app.inject({
       method: "GET",
       url: "/api/v1/health",
-      remoteAddress: "192.168.31.20"
+      remoteAddress: "192.168.31.20",
+      headers: { "x-forwarded-for": "203.0.113.10" }
     });
     expect(privateResponse.statusCode).toBe(200);
 
