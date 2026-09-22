@@ -111,7 +111,7 @@ GitHub Dependency Review 曾因 Dependency graph 未开启而无法运行，因�
 - release PR 先通过普通 Ruleset 合入版本与 CHANGELOG；
 - root `package.json` 是唯一版本源，workspace 私有包不再维护重复 version；
 - 触发 Release 时必须从 `main` 运行；不设置“已完成真实设备/部署验收”的人工勾选门禁，人工验收只作为推荐发布证据；
-- workflow 锁定远端 `main` SHA，并针对该 SHA 重跑 Windows/Ubuntu CI、Security Audit（漏洞 + license）和 CodeQL；
+- workflow 锁定远端 `main` SHA，并针对该 SHA 重跑 Windows/Ubuntu CI、Security Audit（漏洞 + license）和 CodeQL；三个 reusable gate 直接消费传入的 `inputs.ref`，并使用彼此独立的 concurrency namespace，避免 caller `github.workflow` 上下文导致兄弟 gate 互相取消；
 - 发布过程中只要 `main` 前进就 fail closed，要求重新触发；
 - Tag 必须不存在且不可覆盖；workflow 创建 annotated `vX.Y.Z` Tag；
 - GitHub Release 先以 Draft 创建并校验，校验通过后才转为 Published；
