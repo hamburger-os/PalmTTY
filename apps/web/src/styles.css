@@ -752,10 +752,9 @@ button.directory-choose {
 
 /* Session workbench */
 .workbench-page {
-  position: fixed;
-  inset: 0;
+  position: relative;
   z-index: 1;
-  width: 100%;
+  height: 100dvh;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 6px;
