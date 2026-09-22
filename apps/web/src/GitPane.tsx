@@ -51,6 +51,12 @@ function statusCode(entry: GitChange, staged: boolean): string {
   return value ? (STATUS_CODES[value] ?? "·") : "·";
 }
 
+function mutationPaths(entry: GitChange): string[] {
+  return entry.originalPath
+    ? [entry.originalPath, entry.path]
+    : [entry.path];
+}
+
 export function GitPane({
   workspaceId,
   writesEnabled,
@@ -186,7 +192,7 @@ export function GitPane({
 
   const runMutation = useCallback(async (operation: GitMutationOperation) => {
     const repository = status?.repository;
-    if (!repository || busy || !writesEnabled) return;
+    if (!repository || busy || !writesEnabled || status?.truncated) return;
     setBusy(true);
     setActionError(null);
     try {
@@ -220,7 +226,7 @@ export function GitPane({
 
   const runRemote = useCallback(async (operation: "fetch" | "pull" | "push") => {
     const repository = status?.repository;
-    if (!repository || busy || !writesEnabled) return;
+    if (!repository || busy || !writesEnabled || status?.truncated) return;
     setBusy(true);
     setActionError(null);
     try {
@@ -256,6 +262,7 @@ export function GitPane({
   const changes = status?.changes.filter(
     (entry) => entry.unstaged && !entry.conflict
   ) ?? [];
+  const writeReady = writesEnabled && !status?.truncated;
 
   const diffLines = useMemo(
     () => parseUnifiedDiff(diff?.diff ?? ""),
@@ -308,7 +315,7 @@ export function GitPane({
                   className="ghost compact git-row-action"
                   title={actionLabel}
                   aria-label={actionLabel}
-                  disabled={!writesEnabled || busy}
+                  disabled={!writeReady || busy}
                   onClick={() => action(entry)}
                 >
                   {stagedView ? "−" : "+"}
@@ -384,7 +391,7 @@ export function GitPane({
                 <button
                   type="button"
                   className="ghost compact"
-                  disabled={!writesEnabled || busy}
+                  disabled={!writeReady || busy}
                   onClick={() => void runRemote("fetch")}
                 >
                   {t("git.fetch")}
@@ -392,7 +399,7 @@ export function GitPane({
                 <button
                   type="button"
                   className="ghost compact"
-                  disabled={!writesEnabled || busy}
+                  disabled={!writeReady || busy}
                   onClick={() => void runRemote("pull")}
                 >
                   {t("git.pull")}
@@ -400,7 +407,7 @@ export function GitPane({
                 <button
                   type="button"
                   className="ghost compact"
-                  disabled={!writesEnabled || busy}
+                  disabled={!writeReady || busy}
                   onClick={() => void runRemote("push")}
                 >
                   {t("git.push")}
@@ -417,23 +424,22 @@ export function GitPane({
                   conflicts,
                   false,
                   t("git.stage"),
-                  (entry) => void runMutation({ type: "stage", paths: [entry.path] })
+                  (entry) => void runMutation({ type: "stage", paths: mutationPaths(entry) })
                 )}
                 {renderGroup(
                   t("git.staged"),
                   staged,
                   true,
                   t("git.unstage"),
-                  (entry) => void runMutation({ type: "unstage", paths: [entry.path] })
+                  (entry) => void runMutation({ type: "unstage", paths: mutationPaths(entry) })
                 )}
                 {staged.length > 0 && (
                   <button
                     type="button"
                     className="ghost compact git-group-action"
-                    disabled={!writesEnabled || busy}
+                    disabled={!writeReady || busy}
                     onClick={() => void runMutation({
-                      type: "unstage",
-                      paths: staged.map((entry) => entry.path)
+                      type: "unstage.all"
                     })}
                   >
                     {t("git.unstageAll")}
@@ -444,16 +450,15 @@ export function GitPane({
                   changes,
                   false,
                   t("git.stage"),
-                  (entry) => void runMutation({ type: "stage", paths: [entry.path] })
+                  (entry) => void runMutation({ type: "stage", paths: mutationPaths(entry) })
                 )}
                 {changes.length > 0 && (
                   <button
                     type="button"
                     className="ghost compact git-group-action"
-                    disabled={!writesEnabled || busy}
+                    disabled={!writeReady || busy}
                     onClick={() => void runMutation({
-                      type: "stage",
-                      paths: changes.map((entry) => entry.path)
+                      type: "stage.all"
                     })}
                   >
                     {t("git.stageAll")}
@@ -469,14 +474,14 @@ export function GitPane({
                 maxLength={4096}
                 value={commitMessage}
                 placeholder={t("git.commitPlaceholder")}
-                disabled={!writesEnabled || busy}
+                disabled={!writeReady || busy}
                 onChange={(event) => setCommitMessage(event.target.value)}
               />
               <button
                 type="button"
                 className="primary"
                 disabled={
-                  !writesEnabled ||
+                  !writeReady ||
                   busy ||
                   staged.length === 0 ||
                   commitMessage.trim().length === 0
@@ -510,7 +515,7 @@ export function GitPane({
                     type="button"
                     className="ghost compact"
                     disabled={
-                      !writesEnabled ||
+                      !writeReady ||
                       busy ||
                       !branchSelection ||
                       branchSelection === repository.head.branch
@@ -529,7 +534,7 @@ export function GitPane({
                     value={branchName}
                     maxLength={512}
                     placeholder={t("git.newBranch")}
-                    disabled={!writesEnabled || busy}
+                    disabled={!writeReady || busy}
                     onChange={(event) => setBranchName(event.target.value)}
                   />
                   <button
@@ -564,7 +569,7 @@ export function GitPane({
                 <button
                   type="button"
                   className="ghost compact"
-                  disabled={!writesEnabled || busy}
+                  disabled={!writeReady || busy}
                   onClick={() => void runMutation({ type: "stash.pop" })}
                 >
                   {t("git.stashPop")}
@@ -598,11 +603,12 @@ export function GitPane({
               !diff.binary &&
               !diff.truncated &&
               !selectedChange?.untracked &&
-              !selectedChange?.conflict && (
+              !selectedChange?.conflict &&
+              !selectedChange?.originalPath && (
               <button
                 type="button"
                 className="danger compact"
-                disabled={!writesEnabled || busy}
+                disabled={!writeReady || busy}
                 onClick={() => setRestoreConfirm({
                   path: selection.path,
                   snapshot: diff.snapshot
