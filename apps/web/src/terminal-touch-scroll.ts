@@ -56,8 +56,14 @@ export function attachTerminalTouchScroll(
       return;
     }
 
+    const touch = event.touches.item(0);
+    if (!touch) {
+      reset();
+      return;
+    }
+
     active = true;
-    previousClientY = event.touches[0].clientY;
+    previousClientY = touch.clientY;
     remainderPx = 0;
     moved = false;
 
@@ -77,7 +83,13 @@ export function attachTerminalTouchScroll(
     event.preventDefault();
     event.stopPropagation();
 
-    const currentClientY = event.touches[0].clientY;
+    const touch = event.touches.item(0);
+    if (!touch) {
+      reset();
+      return;
+    }
+
+    const currentClientY = touch.clientY;
     const step = consumeTouchScrollDelta(
       remainderPx,
       previousClientY,
