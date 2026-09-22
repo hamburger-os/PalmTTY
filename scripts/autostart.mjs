@@ -21,6 +21,7 @@ import {
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const agentPath = path.join(repoRoot, "apps", "agent", "dist", "index.js");
+const windowsSupervisorPath = path.join(scriptDir, "windows-autostart-supervisor.ps1");
 
 function run(command, args, { acceptedExitCodes = [0] } = {}) {
   const result = spawnSync(command, args, {
@@ -87,9 +88,11 @@ async function installWindows(inputs) {
   const userSid = currentWindowsSid();
   const powershellPath = defaultWindowsPowerShellPath();
   await requireRegularFile(powershellPath, "Windows PowerShell");
+  await requireRegularFile(windowsSupervisorPath, "Windows autostart supervisor");
   const xml = buildWindowsTaskXml({
     userSid,
     powershellPath,
+    supervisorPath: windowsSupervisorPath,
     nodePath: process.execPath,
     agentPath,
     repoRoot,
