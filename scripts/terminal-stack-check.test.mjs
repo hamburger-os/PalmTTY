@@ -54,12 +54,7 @@ test("tracks xterm packages across supported dependency sections", () => {
     "@xterm/addon-fit": "0.12.0-beta.301"
   };
 
-  const failures = validateTerminalStack(stack, input);
-  assert(
-    failures.some((failure) =>
-      failure.includes("@palmtty/web @xterm dependency set must exactly match")
-    ) === false
-  );
+  assert.deepEqual(validateTerminalStack(stack, input), []);
 });
 
 test("rejects duplicate xterm declarations across dependency sections", () => {
