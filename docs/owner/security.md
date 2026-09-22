@@ -6,7 +6,7 @@ PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。安全失
 
 ## 外部访问边界
 
-生产/正常 Agent 不再暴露 `host` / `trustedOrigins` / `secureCookies` / `unsafeAllowInsecureLan` 这组可任意拼装的底层开关，而使用一等 exposure profile。`local` 固定 loopback；`lan` 明确表示已认证但未加密的私有/overlay HTTP，并自动只接受当前私有 IPv4 精确 Origin；`reverseProxy` 要求显式 HTTPS Origin、自动使用 Secure Cookie，可按部署需要指定 upstream `listenHost`；`https` 要求显式 HTTPS Origin并由 Agent 加载证书/私钥。`pnpm dev` 仍是独立开发拓扑：Vite 监听 `0.0.0.0:5173`，只把检测到的私有/overlay IPv4 对应 5173 Origin 作为运行时精确 Origin 注入，不写回生产配置。
+生产/正常 Agent 不再暴露 `host` / `trustedOrigins` / `secureCookies` / `unsafeAllowInsecureLan` 这组可任意拼装的底层开关，而使用一等 exposure profile。`local` 固定 loopback；`lan` 明确表示已认证但未加密的私有/overlay HTTP，会先拒绝非私有来源地址，再只接受当前私有 IPv4 精确 Origin；`reverseProxy` 要求显式 HTTPS Origin、自动使用 Secure Cookie，可按部署需要指定 upstream `listenHost`；`https` 要求显式 HTTPS Origin并由 Agent 加载证书/私钥。`pnpm dev` 仍是独立开发拓扑：Vite 监听 `0.0.0.0:5173`，只把检测到的私有/overlay IPv4 对应 5173 Origin 作为运行时精确 Origin 注入，不写回生产配置。
 
 ## 浏览器认证
 
@@ -94,6 +94,6 @@ systemd unit 使用 `KillMode=process` 是为了保持既有“Agent lifetime !=
 
 1. Workspace CRUD、目录浏览、终端 Profile 与 Git/Files 工作台是否仍受认证 + 精确 Origin 保护；Files 是否始终约束在 Workspace 根目录；Git 是否显式声明完整仓库 scope、读取保持有界并禁止 external diff/textconv/fsmonitor、写入仅允许 typed operation 且执行 stale-state/diff-snapshot 校验、hooks/交互提示保持禁用；Session 创建/重启是否仍只消费持久化 Workspace authority，而不是接收临时 cwd/shell/env？
 2. 是否让 secret/终端内容进入日志、URL、argv 或浏览器？
-3. 是否破坏 exposure profile 的认证 + Origin + HTTPS 边界？尤其检查 `lan` 是否仍强制认证且只接受动态检测到的精确私有 Origin，`reverseProxy`/`https` 是否仍只接受显式 HTTPS Origin，以及 `pnpm dev` 是否只注入运行时 5173 Origin。
+3. 是否破坏 exposure profile 的认证 + Origin + HTTPS 边界？尤其检查 `lan` 是否仍强制认证、拒绝非私有来源地址且只接受动态检测到的精确私有 Origin，`reverseProxy`/`https` 是否仍只接受显式 HTTPS Origin，以及 `pnpm dev` 是否只注入运行时 5173 Origin。
 4. 是否允许未认证本地 IPC 控制 Worker？
 5. 是否把 persisted PID 当成 kill authority？
