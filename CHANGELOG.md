@@ -41,6 +41,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Fixed
 
+- Make Draft Release publication object-stable: validate the Create Release REST response directly, retain its Release ID for promotion/rollback, and stop depending on access-sensitive draft enumeration to rediscover a release that was just created.
 - Fix GitHub Release verification for pre-created annotated tags: source authority now comes from the verified remote peeled tag target, while Release metadata no longer incorrectly requires `target_commitish` to equal the locked SHA after the tag already exists.
 - Fix reusable Release gate concurrency/ref handling so Security Audit and CodeQL cannot cancel each other under the caller workflow context, while each gate checks out the exact passed release SHA.
 - Remove the redundant Release workflow acceptance checkbox; real-device/deployment checks remain recommended operator evidence while publication is gated by protected `main` plus immutable-SHA CI/security/license/CodeQL checks.

@@ -44,9 +44,9 @@ The Release workflow then:
 9. re-runs CodeQL;
 10. verifies `main` still points at the locked SHA;
 11. creates annotated tag `vX.Y.Z` and verifies the remote peeled tag resolves to the locked source SHA;
-12. creates a draft GitHub Release only from that already-verified tag;
-13. verifies Release metadata, re-verifies the tag/source binding, and promotes the draft; `target_commitish` is not used as source evidence once the tag already exists;
-14. rolls back the tag/release created by this run if validation fails before finalization.
+12. creates the draft GitHub Release through the REST API from that already-verified tag and retains the returned Release ID directly instead of rediscovering the draft through list enumeration;
+13. verifies the returned Release object, re-verifies the tag/source binding, and promotes that exact Release ID; `target_commitish` is not used as source evidence once the tag already exists;
+14. rolls back that exact Release ID and the tag created by this run if validation fails before finalization.
 
 If `main` advances while release gates run, the workflow deliberately aborts. Re-run it so the published tag always corresponds to a source SHA that was the current protected `main` for the entire qualification window.
 

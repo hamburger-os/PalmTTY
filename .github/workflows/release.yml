@@ -68,15 +68,6 @@ jobs:
             exit 1
           fi
 
-          EXISTING_RELEASES="$(
-            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
-              jq --arg tag "$TAG" '[.[] | select(.tag_name == $tag)] | length'
-          )"
-          if [ "$EXISTING_RELEASES" -ne 0 ]; then
-            echo "::error::A GitHub Release already exists for $TAG."
-            exit 1
-          fi
-
           PRERELEASE=false
           if [[ "$VERSION" == *-* ]]; then
             PRERELEASE=true
@@ -145,6 +136,7 @@ jobs:
 
           CREATED_TAG=false
           CREATED_RELEASE=false
+          RELEASE_ID=""
           FINALIZED=false
 
           cleanup() {
@@ -152,7 +144,11 @@ jobs:
             if [ "$code" -ne 0 ] && [ "$FINALIZED" != "true" ]; then
               echo "::warning::Release validation failed; rolling back the tag/release created by this run."
               if [ "$CREATED_RELEASE" = "true" ]; then
-                gh release delete "$TAG" --yes --cleanup-tag=false >/dev/null 2>&1 || true
+                if [ -n "$RELEASE_ID" ]; then
+                  gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" >/dev/null 2>&1 || true
+                else
+                  gh release delete "$TAG" --yes --cleanup-tag=false >/dev/null 2>&1 || true
+                fi
               fi
               if [ "$CREATED_TAG" = "true" ]; then
                 git push origin ":refs/tags/$TAG" >/dev/null 2>&1 || true
@@ -169,15 +165,6 @@ jobs:
           fi
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
             echo "::error::$TAG already exists."
-            exit 1
-          fi
-
-          EXISTING_RELEASES="$(
-            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
-              jq --arg tag "$TAG" '[.[] | select(.tag_name == $tag)] | length'
-          )"
-          if [ "$EXISTING_RELEASES" -ne 0 ]; then
-            echo "::error::A GitHub Release already exists for $TAG."
             exit 1
           fi
 
@@ -199,32 +186,36 @@ jobs:
             exit 1
           fi
 
-          CREATE_ARGS=(
-            "$TAG"
-            --verify-tag
-            --title "$TAG"
-            --notes-file /tmp/palmtty-release-notes.md
-            --draft
-          )
-          if [ "$PRERELEASE" = "true" ]; then
-            CREATE_ARGS+=(--prerelease)
-          fi
-          gh release create "${CREATE_ARGS[@]}"
+          jq -n \
+            --arg tag "$TAG" \
+            --arg name "$TAG" \
+            --rawfile body /tmp/palmtty-release-notes.md \
+            --argjson prerelease "$PRERELEASE" \
+            '{
+              tag_name: $tag,
+              name: $name,
+              body: $body,
+              draft: true,
+              prerelease: $prerelease
+            }' > /tmp/palmtty-release-create.json
+
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
+            --input /tmp/palmtty-release-create.json \
+            > /tmp/palmtty-release.json
           CREATED_RELEASE=true
 
-          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
-            jq --arg tag "$TAG" --argjson prerelease "$PRERELEASE" -e '
-              [.[] | select(
-                .tag_name == $tag and
-                .name == $tag and
-                .draft == true and
-                .prerelease == $prerelease and
-                (.body | length) > 20
-              )] |
-              if length == 1 then .[0]
-              else error("expected exactly one verified draft release")
-              end
-            ' > /tmp/palmtty-release.json
+          RELEASE_ID="$(jq -r '.id // empty' /tmp/palmtty-release.json)"
+          if [ -z "$RELEASE_ID" ]; then
+            echo "::error::GitHub did not return a Release ID."
+            exit 1
+          fi
+          jq --arg tag "$TAG" --argjson prerelease "$PRERELEASE" -e '
+            .tag_name == $tag and
+            .name == $tag and
+            .draft == true and
+            .prerelease == $prerelease and
+            (.body | length) > 20
+          ' /tmp/palmtty-release.json >/dev/null
 
           REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
           REMOTE_TAG_TARGET="$(
@@ -235,8 +226,9 @@ jobs:
             exit 1
           fi
 
-          RELEASE_ID="$(jq -r .id /tmp/palmtty-release.json)"
-          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" -F draft=false \
+          printf '%s\n' '{"draft":false}' > /tmp/palmtty-release-publish.json
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" \
+            --input /tmp/palmtty-release-publish.json \
             > /tmp/palmtty-release-final.json
 
           jq --arg tag "$TAG" --argjson prerelease "$PRERELEASE" -e '
