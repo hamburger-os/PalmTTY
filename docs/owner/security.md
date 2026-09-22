@@ -6,7 +6,7 @@ PalmTTY 提供的是开发电脑 Shell，而不是普通网页功能。安全失
 
 ## 外部访问边界
 
-生产/正常 Agent 的默认监听仍是 127.0.0.1。非 loopback 正常模式必须同时开启认证、Secure Cookie 和明确 trustedOrigins，否则 Agent 拒绝启动。`pnpm dev` 是单独的开发拓扑：Vite 默认监听 `0.0.0.0:5173` 供私有 LAN 调试，但 Agent 仍使用配置中的 endpoint（示例仍是 loopback）；开发启动器只把实际检测到的私有/overlay IPv4 对应 5173 Origin 作为**精确值**追加到当前 development Agent 内存 allowlist。它不启用 Origin 通配、不写回配置，也不改变生产启动。`unsafeAllowInsecureLan` 仍只作为显式逃生口。
+生产/正常 Agent 不再暴露 `host` / `trustedOrigins` / `secureCookies` / `unsafeAllowInsecureLan` 这组可任意拼装的底层开关，而使用一等 exposure profile。`local` 固定 loopback；`lan` 明确表示已认证但未加密的私有/overlay HTTP，并自动只接受当前私有 IPv4 精确 Origin；`reverseProxy` 要求显式 HTTPS Origin、自动使用 Secure Cookie，可按部署需要指定 upstream `listenHost`；`https` 要求显式 HTTPS Origin并由 Agent 加载证书/私钥。`pnpm dev` 仍是独立开发拓扑：Vite 监听 `0.0.0.0:5173`，只把检测到的私有/overlay IPv4 对应 5173 Origin 作为运行时精确 Origin 注入，不写回生产配置。
 
 ## 浏览器认证
 
@@ -80,7 +80,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 ## 自启动与密钥边界
 
-Windows/Linux 自启动始终注册为当前用户能力，不静默提权。Windows 使用 Task Scheduler `InteractiveToken` + `LeastPrivilege`；Action 由系统 Windows PowerShell 以 `-WindowStyle Hidden` 包装，使用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 启动 Node Agent，并在恢复执行前把 Agent 放入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` 的 Job Object。这样任务包装层退出时能可靠终止 Agent，但独立 Session Worker 可以脱离该 Job，继续保持既有 Worker 生命周期边界；整个过程不改变用户 token、完整性级别或提权边界。Linux 使用 `systemd --user`，不自动创建 root service，也不自动开启 linger。
+Windows/Linux 自启动始终注册为当前用户能力，不静默提权。Windows 使用 Task Scheduler `InteractiveToken` + `LeastPrivilege`；安装阶段借助系统 Windows PowerShell 5.1 把仓库内 C# 源编译成 GUI-subsystem host，随后 Task Scheduler 直接运行该 exe，运行期不再常驻 PowerShell。host 使用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 启动 Node Agent，并在恢复前把 Agent 放入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` Job Object。这样 task host 退出时能可靠终止 Agent，但独立 Session Worker 可以脱离该 Job；整个过程不改变用户 token、完整性级别或提权边界。Linux 使用 `systemd --user`，不自动创建 root service，也不自动开启 linger。
 
 Agent 的 `--env-file` 只允许从本地文件载入严格 `NAME=value`，不会进行 shell expansion；task/unit argv 中只出现文件路径，不出现 token 值。Linux autostart 安装要求 env-file 没有 group/world 权限。Windows env-file 仍依赖当前用户文件 ACL，属于后续实机安全审查范围。
 
@@ -94,6 +94,6 @@ systemd unit 使用 `KillMode=process` 是为了保持既有“Agent lifetime !=
 
 1. Workspace CRUD、目录浏览、终端 Profile 与 Git/Files 工作台是否仍受认证 + 精确 Origin 保护；Files 是否始终约束在 Workspace 根目录；Git 是否显式声明完整仓库 scope、读取保持有界并禁止 external diff/textconv/fsmonitor、写入仅允许 typed operation 且执行 stale-state/diff-snapshot 校验、hooks/交互提示保持禁用；Session 创建/重启是否仍只消费持久化 Workspace authority，而不是接收临时 cwd/shell/env？
 2. 是否让 secret/终端内容进入日志、URL、argv 或浏览器？
-3. 是否破坏认证 + Origin + HTTPS 外部边界？尤其检查 `pnpm dev` 的 LAN 暴露是否仍只动态加入精确私有 Origin，且没有把 production Agent 改成默认非 loopback。
+3. 是否破坏 exposure profile 的认证 + Origin + HTTPS 边界？尤其检查 `lan` 是否仍强制认证且只接受动态检测到的精确私有 Origin，`reverseProxy`/`https` 是否仍只接受显式 HTTPS Origin，以及 `pnpm dev` 是否只注入运行时 5173 Origin。
 4. 是否允许未认证本地 IPC 控制 Worker？
 5. 是否把 persisted PID 当成 kill authority？
