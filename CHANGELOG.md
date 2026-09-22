@@ -41,6 +41,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Fixed
 
+- Fix GitHub Release verification for pre-created annotated tags: source authority now comes from the verified remote peeled tag target, while Release metadata no longer incorrectly requires `target_commitish` to equal the locked SHA after the tag already exists.
 - Fix reusable Release gate concurrency/ref handling so Security Audit and CodeQL cannot cancel each other under the caller workflow context, while each gate checks out the exact passed release SHA.
 - Remove the redundant Release workflow acceptance checkbox; real-device/deployment checks remain recommended operator evidence while publication is gated by protected `main` plus immutable-SHA CI/security/license/CodeQL checks.
 - Align quick-start documentation with the example Agent port `17688` instead of the stale `7688` URL/diagnostic example.

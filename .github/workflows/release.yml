@@ -201,7 +201,7 @@ jobs:
 
           CREATE_ARGS=(
             "$TAG"
-            --target "$SOURCE_SHA"
+            --verify-tag
             --title "$TAG"
             --notes-file /tmp/palmtty-release-notes.md
             --draft
@@ -213,12 +213,12 @@ jobs:
           CREATED_RELEASE=true
 
           gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
-            jq --arg tag "$TAG" --arg sha "$SOURCE_SHA" --argjson prerelease "$PRERELEASE" -e '
+            jq --arg tag "$TAG" --argjson prerelease "$PRERELEASE" -e '
               [.[] | select(
                 .tag_name == $tag and
+                .name == $tag and
                 .draft == true and
                 .prerelease == $prerelease and
-                .target_commitish == $sha and
                 (.body | length) > 20
               )] |
               if length == 1 then .[0]
@@ -227,8 +227,11 @@ jobs:
             ' > /tmp/palmtty-release.json
 
           REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
-          if [ "$REMOTE_MAIN" != "$SOURCE_SHA" ]; then
-            echo "::error::main advanced before release promotion; rolling back this run."
+          REMOTE_TAG_TARGET="$(
+            git ls-remote origin "refs/tags/$TAG^{}" | awk '{print $1}'
+          )"
+          if [ "$REMOTE_MAIN" != "$SOURCE_SHA" ] || [ "$REMOTE_TAG_TARGET" != "$SOURCE_SHA" ]; then
+            echo "::error::Source or tag moved before release promotion; rolling back this run."
             exit 1
           fi
 
@@ -236,11 +239,12 @@ jobs:
           gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" -F draft=false \
             > /tmp/palmtty-release-final.json
 
-          jq --arg tag "$TAG" --arg sha "$SOURCE_SHA" --argjson prerelease "$PRERELEASE" -e '
+          jq --arg tag "$TAG" --argjson prerelease "$PRERELEASE" -e '
             .tag_name == $tag and
+            .name == $tag and
             .draft == false and
             .prerelease == $prerelease and
-            .target_commitish == $sha and
+            .published_at != null and
             (.body | length) > 20
           ' /tmp/palmtty-release-final.json >/dev/null
 
