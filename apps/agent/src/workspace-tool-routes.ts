@@ -57,24 +57,6 @@ export function registerWorkspaceToolRoutes(
   const readLimiter = new FixedWindowLimiter(240, 60_000);
   const mutationLimiter = new FixedWindowLimiter(120, 60_000);
   const remoteLimiter = new FixedWindowLimiter(30, 60_000);
-  const gitWritePipelines = new Map<string, Promise<void>>();
-
-  async function serializedGitWrite<T>(
-    workspaceId: string,
-    operation: () => Promise<T>
-  ): Promise<T> {
-    const previous = gitWritePipelines.get(workspaceId) ?? Promise.resolve();
-    const current = previous.then(operation);
-    const tail = current.then(() => undefined, () => undefined);
-    gitWritePipelines.set(workspaceId, tail);
-    try {
-      return await current;
-    } finally {
-      if (gitWritePipelines.get(workspaceId) === tail) {
-        gitWritePipelines.delete(workspaceId);
-      }
-    }
-  }
 
   function workspaceFor(id: string) {
     return options.workspaceStore.get(id);
@@ -261,12 +243,10 @@ export function registerWorkspaceToolRoutes(
         return reply.code(400).send({ error: "invalid_git_request" });
       }
       try {
-        return await serializedGitWrite(request.params.id, () =>
-          mutateWorkspaceGit(
-            workspace,
-            parsed.data,
-            options.sensitiveEnvironmentKeys
-          )
+        return await mutateWorkspaceGit(
+          workspace,
+          parsed.data,
+          options.sensitiveEnvironmentKeys
         );
       } catch (error) {
         return gitFailure(
@@ -293,12 +273,10 @@ export function registerWorkspaceToolRoutes(
         return reply.code(400).send({ error: "invalid_git_request" });
       }
       try {
-        return await serializedGitWrite(request.params.id, () =>
-          runWorkspaceGitRemote(
-            workspace,
-            parsed.data,
-            options.sensitiveEnvironmentKeys
-          )
+        return await runWorkspaceGitRemote(
+          workspace,
+          parsed.data,
+          options.sensitiveEnvironmentKeys
         );
       } catch (error) {
         return gitFailure(
