@@ -44,6 +44,7 @@ jobs:
           SOURCE_SHA: ${{ inputs.ref || github.sha }}
         run: |
           $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           $version = $env:INPUT_VERSION
           if ([string]::IsNullOrWhiteSpace($version)) {
             $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
@@ -51,8 +52,8 @@ jobs:
           $env:GITHUB_SHA = $env:SOURCE_SHA
 
           $runtime = Join-Path $PWD "dist/PalmTTY-$version-win-x64"
-          node scripts/package-runtime.mjs --out "$runtime" --platform win32 --arch x64
-          node scripts/package-smoke.mjs --root "$runtime"
+          pnpm package:runtime -- --out "$runtime" --platform win32 --arch x64
+          pnpm package:smoke -- --root "$runtime"
 
           $assets = Join-Path $PWD "dist/distribution-windows"
           New-Item -ItemType Directory -Force $assets | Out-Null
@@ -114,8 +115,8 @@ jobs:
           assets="$PWD/dist/distribution-linux"
           mkdir -p "$assets"
 
-          node scripts/package-runtime.mjs --out "$runtime" --platform linux --arch x64
-          node scripts/package-smoke.mjs --root "$runtime"
+          pnpm package:runtime -- --out "$runtime" --platform linux --arch x64
+          pnpm package:smoke -- --root "$runtime"
           cp "$runtime/sbom.cdx.json" "$assets/PalmTTY-$version-linux-x64.sbom.cdx.json"
           tar -C "$runtime" -czf "$assets/PalmTTY-$version-linux-x64.tar.gz" .
           node scripts/package-linux-deb.mjs             --root "$runtime"             --out "$assets/palmtty_${version}_amd64.deb"
