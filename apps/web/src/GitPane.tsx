@@ -51,7 +51,15 @@ function statusCode(entry: GitChange, staged: boolean): string {
   return value ? (STATUS_CODES[value] ?? "·") : "·";
 }
 
-export function GitPane({ workspaceId }: { workspaceId: string }) {
+export function GitPane({
+  workspaceId,
+  writesEnabled,
+  onEnableWrites
+}: {
+  workspaceId: string;
+  writesEnabled: boolean;
+  onEnableWrites(): void;
+}) {
   const { t, error: translateError } = useI18n();
   const [status, setStatus] = useState<GitStatusResponse | null>(null);
   const [history, setHistory] = useState<GitCommitSummary[]>([]);
@@ -64,7 +72,6 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [diffError, setDiffError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [writesEnabled, setWritesEnabled] = useState(false);
   const [trustConfirmOpen, setTrustConfirmOpen] = useState(false);
   const [restoreConfirm, setRestoreConfirm] = useState<RestoreConfirmation>(null);
   const [commitMessage, setCommitMessage] = useState("");
@@ -672,7 +679,7 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
           onCancel={() => setTrustConfirmOpen(false)}
           onConfirm={() => {
             setTrustConfirmOpen(false);
-            setWritesEnabled(true);
+            onEnableWrites();
           }}
         />
       )}
