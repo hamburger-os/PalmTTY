@@ -48,6 +48,12 @@ export function extractReleaseSection(markdown, version) {
   return extractSection(markdown, normalizeVersion(version));
 }
 
+function isStandaloneHtmlComment(line) {
+  if (!line.startsWith("<!--") || !line.endsWith("-->")) return false;
+  const body = line.slice(4, -3);
+  return !body.includes("<!--") && !body.includes("-->");
+}
+
 export function isUnreleasedEmpty(markdown) {
   const body = extractSection(markdown, "Unreleased");
   if (body === undefined) return false;
@@ -55,11 +61,7 @@ export function isUnreleasedEmpty(markdown) {
   return body
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .every(
-      (line) =>
-        line.length === 0 ||
-        (line.startsWith("<!--") && line.endsWith("-->"))
-    );
+    .every((line) => line.length === 0 || isStandaloneHtmlComment(line));
 }
 
 function isApprovedLicenseExpression(expression) {
@@ -67,24 +69,22 @@ function isApprovedLicenseExpression(expression) {
   if (
     !value ||
     /unknown|unlicensed|see license in|proprietary|custom/i.test(value) ||
-    /\bWITH\b/i.test(value)
+    !/^[A-Za-z0-9.+()\-\s]+$/.test(value)
   ) {
     return false;
   }
 
-  const branches = value
-    .replace(/[()]/g, " ")
-    .split(/\s+OR\s+/i)
-    .map((branch) => branch.trim())
-    .filter(Boolean);
+  const tokens = value.match(/[A-Za-z0-9][A-Za-z0-9.+-]*/g) ?? [];
+  let licenseCount = 0;
 
-  return branches.some((branch) => {
-    const ids = branch
-      .split(/\s+AND\s+/i)
-      .map((id) => id.trim())
-      .filter(Boolean);
-    return ids.length > 0 && ids.every((id) => APPROVED_LICENSE_IDS.has(id));
-  });
+  for (const token of tokens) {
+    if (/^(?:AND|OR)$/i.test(token)) continue;
+    if (/^WITH$/i.test(token)) return false;
+    licenseCount += 1;
+    if (!APPROVED_LICENSE_IDS.has(token)) return false;
+  }
+
+  return licenseCount > 0;
 }
 
 export function inspectLicenseReport(report) {
