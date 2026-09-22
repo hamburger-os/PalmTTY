@@ -239,14 +239,16 @@ test("Windows status query is locale-independent UTF-8 JSON", () => {
 
   assert.deepEqual(parseWindowsTaskStatus('{"installed":false}'), { installed: false });
   assert.deepEqual(
-    parseWindowsTaskStatus('{"installed":true,"state":"Running","lastRunTime":"2026-09-22T12:00:00.0000000Z","nextRunTime":null}'),
+    parseWindowsTaskStatus('{"installed":true,"state":"Running","lastRunTime":"2026-09-22T12:00:00.0000000Z","nextRunTime":null,"lastTaskResult":0}'),
     {
       installed: true,
       state: "running",
       lastRunTime: "2026-09-22T12:00:00.0000000Z",
-      nextRunTime: null
+      nextRunTime: null,
+      lastTaskResult: 0
     }
   );
+  assert.throws(() => parseWindowsTaskStatus('{"installed":true,"state":"Running","lastRunTime":null,"nextRunTime":null}'), /lastTaskResult/u);
   assert.throws(() => parseWindowsTaskStatus("garbage"), /invalid status payload/u);
 });
 
