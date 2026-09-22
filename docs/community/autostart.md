@@ -15,7 +15,7 @@ pnpm autostart uninstall
 
 The install command records absolute paths to the current Node executable, repository, built Agent and config in a small installation manifest. Re-run `pnpm autostart install ...` after moving the repository or changing to a Node installation with a different executable path.
 
-After `pnpm build`, normal `pnpm start` and autostart do **not** run Vite. The Agent serves the compiled Web UI itself; with the default `local` exposure profile that is `http://127.0.0.1:17688/`. Port `5173` belongs only to `pnpm dev`. `pnpm autostart status` prints PalmTTY-owned UTF-8 task/runtime fields plus the configured exposure mode, bind endpoint, local URL and detected LAN URLs when applicable.
+After `pnpm build`, normal `pnpm start` and autostart do **not** run Vite. The Agent serves the compiled Web UI itself; with the default `local` exposure profile that is `http://127.0.0.1:17688/`. Port `5173` belongs only to `pnpm dev`. `pnpm autostart status` prints PalmTTY-owned UTF-8 task/runtime fields, the last Task Scheduler result on Windows, and exposure-aware bind/browser/upstream/LAN diagnostics.
 
 ### Environment file
 
@@ -79,7 +79,7 @@ pnpm autostart uninstall
 
 安装命令会把当前 Node 可执行文件、仓库、已编译 Agent 和配置文件的绝对路径写入一个小型 installation manifest。移动仓库或切换到不同 Node 安装路径后，应重新执行 `pnpm autostart install ...`。
 
-`pnpm build` 之后，正常 `pnpm start` 与 autostart **不会**启动 Vite；编译后的 Web UI 由 Agent 自己提供。默认 `local` exposure 下地址是 `http://127.0.0.1:17688/`。端口 `5173` 只属于 `pnpm dev`。`pnpm autostart status` 会输出 PalmTTY 自己的 UTF-8 任务/运行时字段，并同时显示 exposure 模式、监听端点、本地 URL，以及适用时自动检测到的 LAN URL。
+`pnpm build` 之后，正常 `pnpm start` 与 autostart **不会**启动 Vite；编译后的 Web UI 由 Agent 自己提供。默认 `local` exposure 下地址是 `http://127.0.0.1:17688/`。端口 `5173` 只属于 `pnpm dev`。`pnpm autostart status` 会输出 PalmTTY 自己的 UTF-8 任务/运行时字段、Windows 上一次 Task Scheduler 结果，以及按 exposure 模式区分的监听、浏览器入口、upstream 与 LAN URL 诊断。
 
 ### 环境文件
 
