@@ -3,7 +3,7 @@ name: palmtty-theme-review
 description: "Audit PalmTTY Web UI for theme SSOT compliance, mobile rendering quality, semantic surface ownership, terminal lifecycle isolation, and visual performance regressions."
 license: Apache-2.0
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 # PalmTTY theme and rendering review
