@@ -3,6 +3,9 @@ import {
   BrowseDirectoryRequestSchema,
   CreateSessionSchema,
   GitDiffRequestSchema,
+  GitHistoryRequestSchema,
+  GitMutationRequestSchema,
+  GitRemoteRequestSchema,
   WorkspaceFileListRequestSchema,
   WorkspaceFileReadRequestSchema,
   DetectTerminalProfilesRequestSchema,
@@ -112,6 +115,23 @@ describe("protocol", () => {
     });
     expect(() => GitDiffRequestSchema.parse({ path: "../outside" })).toThrow();
     expect(() => GitDiffRequestSchema.parse({ path: "src\\index.ts" })).toThrow();
+
+    expect(GitHistoryRequestSchema.parse({})).toEqual({ limit: 20 });
+    expect(GitMutationRequestSchema.parse({
+      expectedState: "a".repeat(64),
+      allowRepositoryCodeExecution: true,
+      operation: { type: "stage", paths: ["README.md"] }
+    }).operation.type).toBe("stage");
+    expect(() => GitMutationRequestSchema.parse({
+      expectedState: "a".repeat(64),
+      allowRepositoryCodeExecution: false,
+      operation: { type: "stage", paths: ["README.md"] }
+    })).toThrow();
+    expect(GitRemoteRequestSchema.parse({
+      expectedState: "b".repeat(64),
+      allowRepositoryCodeExecution: true,
+      operation: "fetch"
+    }).operation).toBe("fetch");
   });
 
   it("requires a WSL shell when shell arguments are configured", () => {
