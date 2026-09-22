@@ -1,6 +1,6 @@
 {
   "name": "palmtty",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -16,10 +16,14 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "docs:check": "node scripts/docs-check.mjs",
     "theme:check": "node scripts/theme-check.mjs",
-    "scripts:check": "node --check scripts/dev.mjs && node --check scripts/dev-network.mjs && node --check scripts/dev-network.test.mjs && node --check scripts/docs-check.mjs && node --check scripts/theme-check.mjs",
-    "scripts:test": "node --test scripts/dev-network.test.mjs",
-    "lint": "pnpm typecheck && pnpm scripts:check && pnpm docs:check && pnpm theme:check",
-    "check": "pnpm lint && pnpm test && pnpm build"
+    "scripts:check": "node --check scripts/dev.mjs && node --check scripts/dev-network.mjs && node --check scripts/dev-network.test.mjs && node --check scripts/docs-check.mjs && node --check scripts/theme-check.mjs && node --check scripts/release-tools.mjs && node --check scripts/release-check.mjs && node --check scripts/release-notes.mjs && node --check scripts/license-check.mjs && node --check scripts/release-tools.test.mjs",
+    "scripts:test": "node --test scripts/dev-network.test.mjs scripts/release-tools.test.mjs",
+    "lint": "pnpm typecheck && pnpm scripts:check && pnpm docs:check && pnpm theme:check && pnpm version:check",
+    "check": "pnpm lint && pnpm test && pnpm build",
+    "version:check": "node scripts/release-check.mjs",
+    "release:check": "node scripts/release-check.mjs --release",
+    "release:notes": "node scripts/release-notes.mjs",
+    "license:check": "node scripts/license-check.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.18.0",
