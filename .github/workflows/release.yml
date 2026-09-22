@@ -202,6 +202,14 @@ jobs:
           git push origin "refs/tags/$TAG"
           CREATED_TAG=true
 
+          REMOTE_TAG_TARGET="$(
+            git ls-remote origin "refs/tags/$TAG^{}" | awk '{print $1}'
+          )"
+          if [ "$REMOTE_TAG_TARGET" != "$SOURCE_SHA" ]; then
+            echo "::error::Remote annotated tag does not resolve to the qualified source SHA."
+            exit 1
+          fi
+
           CREATE_ARGS=(
             "$TAG"
             --target "$SOURCE_SHA"
@@ -236,7 +244,8 @@ jobs:
           fi
 
           RELEASE_ID="$(jq -r .id /tmp/palmtty-release.json)"
-          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" -F draft=false             > /tmp/palmtty-release-final.json
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" -F draft=false \
+            > /tmp/palmtty-release-final.json
 
           jq --arg tag "$TAG" --arg sha "$SOURCE_SHA" --argjson prerelease "$PRERELEASE" -e '
             .tag_name == $tag and
@@ -245,6 +254,15 @@ jobs:
             .target_commitish == $sha and
             (.body | length) > 20
           ' /tmp/palmtty-release-final.json >/dev/null
+
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          REMOTE_TAG_TARGET="$(
+            git ls-remote origin "refs/tags/$TAG^{}" | awk '{print $1}'
+          )"
+          if [ "$REMOTE_MAIN" != "$SOURCE_SHA" ] || [ "$REMOTE_TAG_TARGET" != "$SOURCE_SHA" ]; then
+            echo "::error::Source or tag moved during release promotion; rolling back this run."
+            exit 1
+          fi
 
           FINALIZED=true
           echo "Published $TAG from immutable source $SOURCE_SHA."
