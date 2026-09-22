@@ -310,6 +310,9 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
   };
 
   const repository = status?.repository;
+  const selectedChange = selection
+    ? status?.changes.find((entry) => entry.path === selection.path)
+    : undefined;
   const currentBranch = repository?.head.branch ?? t("git.detached");
   const clean = Boolean(status?.available && status.changes.length === 0);
 
@@ -579,7 +582,12 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
             <span>
               {selection.staged ? t("git.stagedBadge") : t("git.workingTreeBadge")}
             </span>
-            {!selection.staged && diff && !diff.binary && !diff.truncated && (
+            {!selection.staged &&
+              diff &&
+              !diff.binary &&
+              !diff.truncated &&
+              !selectedChange?.untracked &&
+              !selectedChange?.conflict && (
               <button
                 type="button"
                 className="danger compact"
