@@ -325,6 +325,7 @@ async function statusWindows() {
   if (!status.installed) return;
 
   console.log(`state: ${status.state}`);
+  console.log(`lastTaskResult: ${status.lastTaskResult}`);
   console.log(`launcher: ${await regularFileExists(paths.host) ? "native-gui" : "missing"}`);
   console.log(`launcherPath: ${paths.host}`);
   if (status.lastRunTime) console.log(`lastRunTime: ${status.lastRunTime}`);
