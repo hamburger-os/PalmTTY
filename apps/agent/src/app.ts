@@ -23,7 +23,7 @@ import { AUTH_COOKIE, AuthService } from "./auth.js";
 import { controlEnvironmentKeys, isReservedControlEnvironmentKey } from "./control-environment.js";
 import { browseWorkspaceDirectory } from "./workspace-directory-browser.js";
 import { detectTerminalProfiles } from "./terminal-profiles.js";
-import { FixedWindowLimiter, isTrustedOrigin } from "./security.js";
+import { FixedWindowLimiter, isPrivateClientAddress, isTrustedOrigin } from "./security.js";
 import { SessionManager, type SessionManagerOptions } from "./session-manager.js";
 import {
   detectRuntimeCapabilities,
@@ -60,6 +60,16 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     },
     bodyLimit: MAX_MESSAGE_BYTES,
     ...(options.https ? { https: options.https } : {})
+  });
+
+  app.addHook("onRequest", async (request, reply) => {
+    if (
+      config.server.exposure.mode === "lan" &&
+      !isPrivateClientAddress(request.ip)
+    ) {
+      request.log.warn({ remoteAddress: request.ip }, "Rejected non-private LAN client");
+      return reply.code(403).send({ error: "lan_client_not_private" });
+    }
   });
 
   await app.register(cookie);
