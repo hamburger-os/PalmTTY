@@ -336,7 +336,6 @@ export async function mutateWorkspaceGit(
           "commit",
           "--no-verify",
           "--no-gpg-sign",
-          ...(request.operation.amend ? ["--amend"] : []),
           "-m",
           request.operation.message
         ],
