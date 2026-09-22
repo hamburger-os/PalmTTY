@@ -1,6 +1,6 @@
 # Current implementation state
 
-Status: **alpha foundation implemented with durable per-session workers, Windows/Ubuntu CI and current-user Windows/Linux Agent autostart; guarded v0.1.0 release automation is implemented, while real mobile/Codex/deployment acceptance remains a publication gate.**
+Status: **alpha foundation implemented with durable per-session workers, Windows/Ubuntu CI and current-user Windows/Linux Agent autostart; guarded v0.1.0 release automation is implemented. Real mobile/Codex/deployment checks remain recommended release evidence rather than a workflow gate.**
 
 ## Implemented
 
@@ -17,7 +17,7 @@ Status: **alpha foundation implemented with durable per-session workers, Windows
 - production dependency vulnerability audit, fail-closed production dependency license-policy review, and CodeQL
 - CODEOWNERS, PR/Issue templates, contribution/security/governance/release documentation
 - root `package.json` is the single release/runtime version source; private workspace manifests intentionally omit duplicate versions and the Agent health endpoint reads the root version
-- guarded manual Release workflow locks an exact `main` SHA, requires explicit real-device/deployment acceptance, reuses the Windows/Ubuntu CI + Security Audit + CodeQL workflows against that SHA, rejects tag/release reuse, aborts if `main` advances, and publishes an annotated tag plus verified GitHub Release with rollback before finalization
+- guarded manual Release workflow locks an exact `main` SHA, reuses the Windows/Ubuntu CI + Security Audit + CodeQL workflows against that SHA, rejects tag/release reuse, aborts if `main` advances, and publishes an annotated tag plus verified GitHub Release with rollback before finalization; it intentionally has no manual acceptance checkbox
 - Apache-2.0 licensing
 - four documentation layers and docs-sync Agent Skill
 
