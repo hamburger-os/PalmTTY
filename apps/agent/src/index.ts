@@ -63,7 +63,7 @@ async function main() {
   const tls = await loadServerTlsOptions(config);
   const app = await buildApp(config, {
     additionalTrustedOrigins: developmentTrustedOrigins,
-    https: tls
+    ...(tls ? { https: tls } : {})
   });
   const host = serverBindHost(config);
   try {
