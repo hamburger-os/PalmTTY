@@ -8,6 +8,7 @@ This layer is for contributors who want to build, review, deploy, or extend Palm
 - [architecture.md](architecture.md) — component boundaries and protocol shape
 - [security.md](security.md) — security model and contributor requirements
 - [development.md](development.md) — repository workflow and testing expectations
+- [autostart.md](autostart.md) — Windows/Linux current-user autostart and service lifecycle
 
 For external technical sources, use [../standards/README.md](../standards/README.md).
 
@@ -19,5 +20,6 @@ For external technical sources, use [../standards/README.md](../standards/README
 - [architecture.md](architecture.md) — 组件边界与协议结构
 - [security.md](security.md) — 安全模型与贡献要求
 - [development.md](development.md) — 仓库工作流与测试要求
+- [autostart.md](autostart.md) — Windows/Linux 当前用户自启动与服务生命周期
 
 外部权威技术依据请查看 [../standards/README.md](../standards/README.md)。
