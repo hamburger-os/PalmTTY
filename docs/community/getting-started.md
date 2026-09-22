@@ -25,7 +25,7 @@ pnpm start
 
 `PALMTTY_ACCESS_TOKEN` must contain at least 16 characters; use a long random secret for real deployments. `pnpm run preflight` validates authentication/security settings and the configured Agent TCP endpoint. Workspace launch targets are no longer stored in the YAML configuration, so host startup is not blocked by a stale project path.
 
-Open the configured Agent URL, sign in, and create the first workspace in the Web UI. After `pnpm build`, both `pnpm start` and autostart serve the compiled Web UI from the Agent itself; with the example config the normal URL is `http://127.0.0.1:17688/`. Port `5173` is development-only and is available only while `pnpm dev` is running. PalmTTY stores the workspace catalog in per-user application data. The browser can create/edit/delete this persistent catalog only through authenticated, exact-Origin-protected API calls; starting a Session still sends only the selected workspace ID.
+Open the configured Agent URL, sign in, and create the first workspace in the Web UI. After `pnpm build`, both `pnpm start` and autostart serve the compiled Web UI from the Agent itself; with the example config (`server.exposure.mode: local`) the URL is `http://127.0.0.1:17688/`. Port `5173` is development-only and is available only while `pnpm dev` is running. For explicit private-LAN HTTP access, use `examples/palmtty.lan.example.yaml` or set `server.exposure.mode: lan`; the Agent then binds `0.0.0.0`, requires authentication, and accepts only exact detected private/overlay IPv4 Origins. Windows Firewall may still require a Private-profile inbound rule for the Agent port. PalmTTY stores the workspace catalog in per-user application data. The browser can create/edit/delete this persistent catalog only through authenticated, exact-Origin-protected API calls; starting a Session still sends only the selected workspace ID.
 
 ### Runtime choices
 
@@ -71,7 +71,7 @@ $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
 pnpm dev
 ~~~
 
-`pnpm dev` runs the same Agent preflight before starting the Agent and Vite. The root launcher derives the local Agent URL from the validated config and injects it as `PALMTTY_AGENT_URL`. Vite listens on `0.0.0.0:5173` by default, so the development UI is immediately reachable from the same private LAN. The launcher enumerates the machine's RFC1918, IPv4 link-local and 100.64/10 private/overlay IPv4 addresses and adds only those exact `http://<address>:5173` Origins to the development Agent in memory. The Agent itself still listens on the endpoint in `palmtty.local.yaml`; the example config remains loopback-only. You do not need to persist the current LAN IP in `trustedOrigins` for `pnpm dev`.
+`pnpm dev` runs the same Agent preflight before starting the Agent and Vite. The root launcher derives the local Agent URL from the validated config and injects it as `PALMTTY_AGENT_URL`. Vite listens on `0.0.0.0:5173` by default, so the development UI is immediately reachable from the same private LAN. The launcher enumerates the machine's RFC1918, IPv4 link-local and 100.64/10 private/overlay IPv4 addresses and adds only those exact `http://<address>:5173` Origins to the development Agent at runtime. The Agent itself still follows the exposure profile in `palmtty.local.yaml`; the example remains `local`. You do not need to persist development Origins in the config.
 
 Vite prints the reachable LAN URLs. On Windows, if another device still times out, allow Node.js/PalmTTY TCP 5173 on the **Private** network profile; PalmTTY does not elevate itself or edit firewall rules. To opt out of LAN development listening, set `PALMTTY_WEB_HOST=127.0.0.1` before `pnpm dev`.
 
@@ -101,7 +101,7 @@ pnpm start
 
 `PALMTTY_ACCESS_TOKEN` 至少需要 16 个字符，实际部署应使用长随机 secret。`pnpm run preflight` 只检查认证/安全设置与 Agent TCP 监听端点。Workspace 启动目标不再写入 YAML，因此某个旧项目目录失效不会阻塞整个 Agent 启动。
 
-打开配置的 Agent 地址并登录，然后直接在 Web UI 中创建第一个工作区。`pnpm build` 之后，无论 `pnpm start` 还是 autostart，编译后的 Web UI 都由 Agent 自己提供；示例配置的正常地址是 `http://127.0.0.1:17688/`。端口 `5173` 只用于开发，只有执行 `pnpm dev` 且 Vite 正在运行时才存在。PalmTTY 会把工作区目录持久化到当前用户的应用数据目录。浏览器只能通过已认证且受精确 Origin 保护的 API 持久化创建/编辑/删除工作区；真正创建 Session 时仍只发送 workspace ID。
+打开配置的 Agent 地址并登录，然后直接在 Web UI 中创建第一个工作区。`pnpm build` 之后，无论 `pnpm start` 还是 autostart，编译后的 Web UI 都由 Agent 自己提供；示例配置使用 `server.exposure.mode: local`，地址是 `http://127.0.0.1:17688/`。端口 `5173` 只用于开发。若明确需要家庭/开发局域网 HTTP 直连，可使用 `examples/palmtty.lan.example.yaml` 或把 `server.exposure.mode` 改为 `lan`；Agent 会监听 `0.0.0.0`、强制要求认证，并只接受自动检测到的私有/overlay IPv4 精确 Origin。Windows 防火墙仍可能需要为 Agent 端口开放 Private 网络入站。PalmTTY 会把工作区目录持久化到当前用户的应用数据目录。浏览器只能通过已认证且受精确 Origin 保护的 API 持久化创建/编辑/删除工作区；真正创建 Session 时仍只发送 workspace ID。
 
 ### 运行环境
 
@@ -147,7 +147,7 @@ $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
 pnpm dev
 ~~~
 
-`pnpm dev` 会先执行同一套 Agent preflight，再启动 Agent 与 Vite。根启动器从已验证配置推导本地 Agent URL，并通过 `PALMTTY_AGENT_URL` 注入 Vite。Vite 默认监听 `0.0.0.0:5173`，因此同一私有局域网里的手机/电脑可以直接访问。启动器会枚举当前机器的 RFC1918、IPv4 link-local 与 100.64/10 私有/overlay IPv4 地址，只把对应的 `http://<address>:5173` **精确 Origin** 临时加入 development Agent 内存 allowlist；Agent 本身仍按 `palmtty.local.yaml` 的 endpoint 监听，示例配置仍保持 loopback。使用 `pnpm dev` 时不需要把当前局域网 IP 持久化到 `trustedOrigins`。
+`pnpm dev` 会先执行同一套 Agent preflight，再启动 Agent 与 Vite。根启动器从已验证配置推导本地 Agent URL，并通过 `PALMTTY_AGENT_URL` 注入 Vite。Vite 默认监听 `0.0.0.0:5173`，因此同一私有局域网里的手机/电脑可以直接访问。启动器会枚举当前机器的 RFC1918、IPv4 link-local 与 100.64/10 私有/overlay IPv4 地址，只把对应的 `http://<address>:5173` **精确 Origin** 临时加入 development Agent；Agent 本身仍按 `palmtty.local.yaml` 的 exposure profile 监听，示例配置仍保持 `local`。`pnpm dev` 不需要把开发 Origin 持久化到配置。
 
 Vite 会打印可访问的 LAN URL。Windows 上如果其他设备仍然超时，请允许 Node.js/PalmTTY 的 TCP 5173 通过 **专用网络（Private）** 防火墙；PalmTTY 不会自行提权或修改防火墙。若要关闭默认 LAN 开发监听，可在 `pnpm dev` 前设置 `PALMTTY_WEB_HOST=127.0.0.1`。
 
