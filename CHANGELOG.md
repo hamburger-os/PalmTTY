@@ -6,6 +6,11 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+### Fixed
+
+- Run Windows Task Scheduler autostart through the system Windows PowerShell host with `-WindowStyle Hidden`, synchronously supervising the built Node Agent and propagating its exit code so startup no longer leaves a persistent Node console window.
+- Replace localized `schtasks /FO LIST /V` passthrough with a locale-independent UTF-8 scheduled-task query and PalmTTY-owned status output; document that port `5173` is Vite development-only while built/start/autostart Web UI is served by the Agent endpoint.
+
 <!-- Add changes here after the latest release. Publishing requires this section to be empty. -->
 
 ## [0.1.0]
