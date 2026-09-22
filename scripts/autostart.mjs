@@ -106,16 +106,33 @@ function runRollback(action, command, args, options) {
   }
 }
 
+const WINDOWS_FILE_RETRY_CODES = new Set(["EBUSY", "EACCES", "EPERM"]);
+
+async function renameWithRetry(source, destination, attempts = 20) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await rename(source, destination);
+      return;
+    } catch (error) {
+      const retryable = process.platform === "win32" &&
+        WINDOWS_FILE_RETRY_CODES.has(error?.code) &&
+        attempt < attempts;
+      if (!retryable) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
+
 async function moveIfPresent(source, destination) {
   if (!await regularFileExists(source)) return false;
-  await rename(source, destination);
+  await renameWithRetry(source, destination);
   return true;
 }
 
 async function restoreBackup(backup, target, present) {
   await rm(target, { force: true }).catch(() => undefined);
   if (present && await regularFileExists(backup)) {
-    await rename(backup, target);
+    await renameWithRetry(backup, target);
   }
 }
 
@@ -229,8 +246,8 @@ async function installWindows(inputs) {
 
     previousHost = await moveIfPresent(paths.host, backupHost);
     previousInstallation = await moveIfPresent(paths.installation, backupInstallation);
-    await rename(tempHost, paths.host);
-    await rename(tempInstallation, paths.installation);
+    await renameWithRetry(tempHost, paths.host);
+    await renameWithRetry(tempInstallation, paths.installation);
     replacedFiles = true;
 
     run("schtasks.exe", ["/Create", "/TN", WINDOWS_TASK_NAME, "/XML", tempTaskXml, "/F"]);
