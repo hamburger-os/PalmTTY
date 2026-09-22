@@ -51,9 +51,16 @@ No extra release-note text.
     )),
     false
   );
+  assert.equal(
+    isUnreleasedEmpty(changelog.replace(
+      "<!-- Add pending changes here. -->",
+      "<!-- first --> visible <!-- second -->"
+    )),
+    false
+  );
 });
 
-test("accepts reviewed permissive production dependency licenses", () => {
+test("accepts only fully reviewed permissive production dependency expressions", () => {
   const result = inspectLicenseReport({
     MIT: [
       { name: "a", versions: ["1.0.0"], license: "MIT" }
@@ -79,6 +86,28 @@ test("fails closed for unknown or restricted-only licenses", () => {
     inspectLicenseReport({
       Unknown: [
         { name: "unknown", versions: ["1.0.0"], license: "Unknown" }
+      ]
+    })
+  );
+  assert.throws(() =>
+    inspectLicenseReport({
+      "MIT OR GPL-3.0-only": [
+        {
+          name: "mixed-choice",
+          versions: ["1.0.0"],
+          license: "MIT OR GPL-3.0-only"
+        }
+      ]
+    })
+  );
+  assert.throws(() =>
+    inspectLicenseReport({
+      "GPL-3.0-only AND (MIT OR Apache-2.0)": [
+        {
+          name: "nested-restricted",
+          versions: ["1.0.0"],
+          license: "GPL-3.0-only AND (MIT OR Apache-2.0)"
+        }
       ]
     })
   );
