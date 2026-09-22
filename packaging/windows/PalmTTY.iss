@@ -57,8 +57,8 @@ begin
   if FileExists(CliPath) then
   begin
     Exec(
-      CliPath,
-      'service uninstall',
+      ExpandConstant('{cmd}'),
+      '/C ""' + CliPath + '" service uninstall',
       ExpandConstant('{app}'),
       SW_HIDE,
       ewWaitUntilTerminated,
