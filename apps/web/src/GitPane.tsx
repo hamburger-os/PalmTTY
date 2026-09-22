@@ -170,7 +170,12 @@ export function GitPane({ workspaceId }: { workspaceId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [selection, translateError, workspaceId]);
+  }, [
+    selection,
+    status?.repository?.stateToken,
+    translateError,
+    workspaceId
+  ]);
 
   const runMutation = useCallback(async (operation: GitMutationOperation) => {
     const repository = status?.repository;
