@@ -1,15 +1,22 @@
-# Example for HTTPS reverse proxy access through QNAP/Caddy.
-# Replace the public HTTPS origin and set PALMTTY_ACCESS_TOKEN to a long
-# random secret in the Agent user's environment.
-# Workspaces are managed after sign-in through the PalmTTY Web UI.
+# Example for HTTPS reverse-proxy access through QNAP/Caddy.
+# Replace the external HTTPS origin and the listenHost as needed.
+#
+# If the reverse proxy runs on the same host, keep listenHost at 127.0.0.1.
+# If the reverse proxy runs on another private-LAN device (for example QNAP),
+# bind to a private interface address or 0.0.0.0 and restrict the upstream port
+# with host/network firewall policy. Browsers are still accepted only from the
+# exact HTTPS Origins below and login cookies remain Secure.
+#
+# Set PALMTTY_ACCESS_TOKEN to a long random secret in the Agent user's
+# environment. Workspaces are managed after sign-in through the Web UI.
 
 server:
-  host: 0.0.0.0
   port: 7688
-  trustedOrigins:
-    - https://dev.example.com
-  secureCookies: true
-  unsafeAllowInsecureLan: false
+  exposure:
+    mode: reverseProxy
+    listenHost: 0.0.0.0
+    origins:
+      - https://dev.example.com
 
 auth:
   enabled: true
