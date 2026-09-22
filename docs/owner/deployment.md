@@ -33,10 +33,10 @@ PalmTTY Agent（配置 endpoint；示例为 127.0.0.1:17688）
 - 触发器：当前用户登录；
 - LogonType：`InteractiveToken`；
 - RunLevel：`LeastPrivilege`；
-- Action：系统 Windows PowerShell（`System32\\WindowsPowerShell\\v1.0\\powershell.exe`）以 `-WindowStyle Hidden` 运行编码命令；该 PowerShell 进程同步调用安装时的 Node 可执行文件 + 已编译 `apps/agent/dist/index.js`，并把 Node 退出码传回 Task Scheduler；
+- Action：系统 Windows PowerShell（`System32\\WindowsPowerShell\\v1.0\\powershell.exe`）以 `-WindowStyle Hidden` 运行编码命令；包装层用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 创建安装时的 Node 可执行文件 + 已编译 `apps/agent/dist/index.js`，先加入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` 的 Windows Job Object，再恢复并等待 Agent；Node 退出码继续传回 Task Scheduler；
 - WorkingDirectory、Agent、config 与可选 env-file 都使用安装时的绝对路径；
 - 安装会先结束旧任务实例、更新任务定义并立即启动新实例；
-- 失败 Agent 由 Task Scheduler 做有限次数重启；PowerShell 同步等待 Node，因此不会把 Agent 变成脱离 Task Scheduler 生命周期的 fire-and-forget 子进程；
+- 失败 Agent 由 Task Scheduler 做有限次数重启；Job Object 的 kill-on-close 保证 Task Scheduler `/End` 或包装进程结束时 Agent 也随之退出，不留下占用端口的孤儿控制面；`SILENT_BREAKAWAY_OK` 让 Agent 创建的独立 Session Worker 脱离该 Job，从而继续满足 `Agent lifetime != Worker lifetime`；
 - `pnpm autostart status` 通过 `Get-ScheduledTask` / `Get-ScheduledTaskInfo` 生成 UTF-8 JSON，再由 PalmTTY 输出稳定字段，不再直接打印随 Windows 语言/code page 变化的 `schtasks /FO LIST /V` 文本。
 
 不使用 LocalSystem/S4U 的原因是 PalmTTY 的 Shell、Git/SSH credential、PATH、WindowsApps App Execution Alias 都属于真实开发用户。当前不实现“用户未登录时的 Windows Service 模式”。
