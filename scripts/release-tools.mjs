@@ -51,8 +51,15 @@ export function extractReleaseSection(markdown, version) {
 export function isUnreleasedEmpty(markdown) {
   const body = extractSection(markdown, "Unreleased");
   if (body === undefined) return false;
-  const withoutComments = body.replace(/<!--[\s\S]*?-->/g, "").trim();
-  return withoutComments.length === 0;
+
+  return body
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .every(
+      (line) =>
+        line.length === 0 ||
+        (line.startsWith("<!--") && line.endsWith("-->"))
+    );
 }
 
 function isApprovedLicenseExpression(expression) {
