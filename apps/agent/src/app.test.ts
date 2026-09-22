@@ -208,6 +208,60 @@ describe("HTTP security boundary", () => {
     await app.close();
   });
 
+  it("protects typed Git write routes with authentication and exact Origin", async () => {
+    process.env.PALMTTY_TEST_TOKEN = TOKEN;
+    const app = await buildTestApp();
+    const payloads = [
+      {
+        url: "/api/v1/workspaces/missing/git/mutate",
+        payload: {
+          expectedState: "a".repeat(64),
+          allowRepositoryCodeExecution: true,
+          operation: { type: "stage", paths: ["README.md"] }
+        }
+      },
+      {
+        url: "/api/v1/workspaces/missing/git/remote",
+        payload: {
+          expectedState: "a".repeat(64),
+          allowRepositoryCodeExecution: true,
+          operation: "fetch"
+        }
+      }
+    ];
+
+    for (const request of payloads) {
+      const unauthenticated = await app.inject({
+        method: "POST",
+        url: request.url,
+        headers: { origin: ORIGIN },
+        payload: request.payload
+      });
+      expect(unauthenticated.statusCode).toBe(401);
+    }
+
+    const cookie = await loginCookie(app);
+    for (const request of payloads) {
+      const wrongOrigin = await app.inject({
+        method: "POST",
+        url: request.url,
+        headers: { cookie, origin: "https://evil.invalid" },
+        payload: request.payload
+      });
+      expect(wrongOrigin.statusCode).toBe(403);
+
+      const protectedRoute = await app.inject({
+        method: "POST",
+        url: request.url,
+        headers: { cookie, origin: ORIGIN },
+        payload: request.payload
+      });
+      expect(protectedRoute.statusCode).toBe(404);
+    }
+
+    await app.close();
+  });
+
   it("creates, updates, and deletes a validated host workspace", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
     const app = await buildTestApp();

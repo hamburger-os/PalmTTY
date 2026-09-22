@@ -28,6 +28,7 @@ export function SessionWorkbench({
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [restartError, setRestartError] = useState<string | null>(null);
+  const [gitWritesEnabled, setGitWritesEnabled] = useState(false);
 
   const handleConnectionChange = useCallback((next: ConnectionState) => {
     setConnection(next);
@@ -104,7 +105,11 @@ export function SessionWorkbench({
 
         {workspace && pane === "git" && (
           <div className="workbench-pane is-active">
-            <GitPane workspaceId={workspace.id} />
+            <GitPane
+              workspaceId={workspace.id}
+              writesEnabled={gitWritesEnabled}
+              onEnableWrites={() => setGitWritesEnabled(true)}
+            />
           </div>
         )}
 

@@ -59,8 +59,9 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 - Workspace CRUD 是显式高权限配置面，只有认证成功且 Origin 精确匹配的请求可以修改当前用户的持久化 workspace。
 - Workspace 目录选择器也是“认证 + 精确 Origin”保护的显式 API，但只读且只枚举目录名称/绝对路径，不返回文件内容；Host/WSL 浏览均有限流、返回数量上限，WSL 还限制子进程输出与执行时间。
-- 会话工作台的 Files 与 Git 是与目录选择器、终端 WebSocket 分离的只读检查面，全部要求认证 + 精确 Origin，并有独立限流。Files API 只接收规范化 Workspace 相对路径，Host 使用 `realpath`/symlink containment 防止越过 Workspace 根目录，WSL 在发行版内再次解析 physical path 并做根目录前缀检查；目录最多返回 512 项，文本预览最多 512 KiB，二进制内容不解码。
-- Git API 只暴露 status/diff，不提供 stage/commit/push/pull。Git 命令使用结构化 argv、输出/超时上限和 `--` pathspec 分隔；diff 禁止 external diff/textconv，status 禁用 fsmonitor，以避免一次“查看”动作隐式执行仓库配置中的外部程序。Git/WSL 辅助子进程会从环境中剔除 `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量。
+- 会话工作台的 Files 与 Git 与目录选择器、终端 WebSocket 分离，全部要求认证 + 精确 Origin，并按读取、Git mutation、Git remote 分别限流。Files API 仍只接收规范化 Workspace 相对路径，Host 使用 `realpath`/symlink containment 防止越过 Workspace 根目录，WSL 在发行版内再次解析 physical path 并做根目录前缀检查；目录最多返回 512 项，文本预览最多 512 KiB，二进制内容不解码。
+- Git API 明确以“包含 Workspace cwd 的完整仓库”为作用域，并返回 workspace 在仓库内的相对路径，避免 Files 根目录边界与 Git 仓库边界被误认为相同。读取面使用 porcelain v2 status 与有界 diff/history/branches；Git 命令使用结构化 argv、输出/超时上限和 `--` pathspec 分隔，diff 禁止 external diff/textconv，status 禁用 fsmonitor，history 强制关闭 `log.showSignature`，避免只读历史查询触发签名验证外部程序。对于 working-tree diff，Agent 会先用 `git check-attr -z filter` 读取该路径实际生效的 filter driver，再通过命令级配置把该 driver 的 clean/process 清空并把 required 设为 false，避免“只是查看 diff”触发仓库配置的内容过滤程序。异常/不可安全建模的 filter 名称直接拒绝 diff，而不是退回执行。
+- Git 写入只接受固定 typed operation：stage/unstage、restore、commit、branch create/switch、stash push/pop 和非交互 fetch/pull/push，不存在 `/git/run` 或浏览器自定义 argv。同一“已解析 Git 仓库”的 mutation/remote 操作在 Agent 内串行执行，即使两个 Workspace 指向同一仓库也共用一条写队列；每个请求必须带当前 status state token，因此排队期间被前一个写操作改变状态的请求会以 `409 git_state_changed` 失败。若 status 因输出上限、条目上限或解析异常被标记为 truncated，则该快照不能作为写 authority，所有 mutation/remote 都 fail closed，直到状态重新落入安全范围。restore 还必须带所查看 diff 的 snapshot。Web 默认禁用写操作并要求一次明确的可信仓库确认。写/remote 命令禁用 Git hooks、编辑器和交互式 credential prompt，并剔除 Git config/exec/SSH/askpass 覆盖环境；remote 仅允许 http/https/ssh/git 协议，拒绝 ext/file/未知 helper 协议。正常 Git filters 与可信宿主/仓库 Git 配置仍可能在 stage/switch/stash/pull 等语义中执行，因此确认模型不能被描述成沙箱。
 - Web workspace 可以配置 cwd、runtime、Shell、Shell args、有界 environment 与启动命令。Environment 是当前用户应用数据中的持久化配置，可能敏感但不是 secret vault；默认日志不得记录其值。`PALMTTY_*` 整个命名空间以及单独配置的认证 token 环境变量属于保留项，Workspace mutation 会拒绝持久化它们；Worker bootstrap 和 PTY 仍继续剔除作为纵深防御。
 - Session 创建与重启都只使用已持久化的 workspace authority，不允许用一次 Session 请求临时注入 cwd/shell/env。
 - Workspace 新建/更新会验证运行目标，Session 创建/重启前再次验证；Host Shell 解析为绝对 executable，Windows 新终端先刷新 Machine/User 环境再应用 Workspace environment；WSL 通过结构化 argv 调用 `wsl.exe`，并仅通过 `WSLENV` 名称列表转发 workspace variables，不做用户命令字符串拼接。
@@ -71,7 +72,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 ## 资源限制
 
-- 登录、创建 Session、Session lifecycle mutation、目录浏览、终端 Profile 发现与 Workspace Git/Files 检查面分别限流；
+- 登录、创建 Session、Session lifecycle mutation、目录浏览、终端 Profile 发现、Workspace Files/Git 读取、Git mutation 与 Git remote 分别限流；
 - Session 数量有上限，并发创建也计入上限；
 - browser WebSocket 消息和终端尺寸有上限；
 - replay、scrollback、IPC frame、IPC backlog、browser backpressure 均有限制；
@@ -83,7 +84,7 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 
 ## 你审查时重点看
 
-1. Workspace CRUD、目录浏览、终端 Profile 与 Git/Files 工作台是否仍受认证 + 精确 Origin 保护；Files 是否始终约束在 Workspace 根目录；Git 是否保持只读、有界并禁止 external diff/textconv/fsmonitor；Session 创建/重启是否仍只消费持久化 Workspace authority，而不是接收临时 cwd/shell/env？
+1. Workspace CRUD、目录浏览、终端 Profile 与 Git/Files 工作台是否仍受认证 + 精确 Origin 保护；Files 是否始终约束在 Workspace 根目录；Git 是否显式声明完整仓库 scope、读取保持有界并禁止 external diff/textconv/fsmonitor、写入仅允许 typed operation 且执行 stale-state/diff-snapshot 校验、hooks/交互提示保持禁用；Session 创建/重启是否仍只消费持久化 Workspace authority，而不是接收临时 cwd/shell/env？
 2. 是否让 secret/终端内容进入日志、URL、argv 或浏览器？
 3. 是否破坏认证 + Origin + HTTPS 外部边界？尤其检查 `pnpm dev` 的 LAN 暴露是否仍只动态加入精确私有 Origin，且没有把 production Agent 改成默认非 loopback。
 4. 是否允许未认证本地 IPC 控制 Worker？

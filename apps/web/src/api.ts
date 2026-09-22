@@ -2,7 +2,13 @@ import type {
   BrowseDirectoryRequest,
   CreateWorkspaceInput,
   DirectoryListing,
+  GitBranchesResponse,
   GitDiffResponse,
+  GitHistoryResponse,
+  GitMutationRequest,
+  GitMutationResponse,
+  GitRemoteRequest,
+  GitRemoteResponse,
   GitStatusResponse,
   RuntimeCapabilities,
   SessionPublic,
@@ -150,6 +156,63 @@ export async function workspaceGitDiff(
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ path, staged })
+    }
+  ));
+}
+
+export async function workspaceGitHistory(
+  workspaceId: string,
+  limit = 20
+) {
+  return responseJson<GitHistoryResponse>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/git/history`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ limit })
+    }
+  ));
+}
+
+export async function workspaceGitBranches(workspaceId: string) {
+  return responseJson<GitBranchesResponse>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/git/branches`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    }
+  ));
+}
+
+export async function workspaceGitMutate(
+  workspaceId: string,
+  input: GitMutationRequest
+) {
+  return responseJson<GitMutationResponse>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/git/mutate`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input)
+    }
+  ));
+}
+
+export async function workspaceGitRemote(
+  workspaceId: string,
+  input: GitRemoteRequest
+) {
+  return responseJson<GitRemoteResponse>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/git/remote`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input)
     }
   ));
 }

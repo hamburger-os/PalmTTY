@@ -21,7 +21,7 @@
 - 单用户 token 登录和 Cookie 会话；
 - Origin、安全启动闸门和基础限流；
 - 手机端 Session Workbench（终端 / Git / 文件）、xterm/PWA、触摸特殊键栏与按需长文本输入，中文/英文界面切换，并提供明确的终端替换重启动作；
-- Git status/diff 与 Workspace 根目录只读文件浏览/预览已经作为独立、有界、认证的 Agent API 落地，不复用终端协议；
+- Git Source Control 工作台与 Workspace 根目录只读文件浏览/预览已经作为独立、有界、认证的 Agent API 落地，不复用终端协议；Git 已支持 porcelain-v2 状态/结构化 diff/history/branches 与受控 stage/unstage/restore/commit/branch/stash/fetch/pull/push；
 - PalmTTY 自有的三主题视觉系统（炫彩流光/黑曜石/白霜）、效果/性能两档、reduced-motion 处理与主题审查 skills；
 - Web 端持久化 Workspace CRUD，Host / WSL runtime adapter；正常 UI 使用统一终端 Profile（Host Shell + WSL 发行版），高级 runtime 细节只在 Custom 路径展开；工作区支持有界环境变量与多行启动输入，Session 创建/重启仍只消费持久化 workspace authority；
 - Ubuntu CI 已覆盖 Linux host runtime；Windows CI 保持 PowerShell 7/ConPTY 路径；macOS adapter 已按同一 Host 模型实现但尚无仓库 CI；
@@ -79,9 +79,9 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 
 ### P2：增强开发体验
 
-已完成 Git 状态/diff 与只读文件预览的第一阶段；继续保持轻量工作台边界。
+Git 已完成从只读 status/diff 到受控 Source Control 工作台的第二阶段：typed mutation、stale-state/diff-snapshot 校验、hooks/交互提示禁用、filter 风险确认、分支/history/stash 与非交互 remote 都已落地；继续保持轻量工作台边界。
 
-- 根据真实使用反馈评估受控 Git 写操作（stage/commit），前置解决 hooks/filters 与显式确认模型；
+- 根据真实使用反馈评估更高级 Git 操作（force push、interactive rebase/cherry-pick、reflog、submodule/LFS）；除非有明确需求与独立安全设计，不暴露任意 Git argv；
 - 根据真实使用反馈评估受控文件编辑，前置解决并发修改、编码与原子写入；
 - 本地服务入口；
 - WSL 实机长期验证与发行版边界测试；
@@ -93,4 +93,4 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 
 ## 不应提前做
 
-在真实设备与长期运行稳定之前，不建议投入完整浏览器 IDE、可安装插件系统、多用户协作、云中继或未经设计的 reboot persistence。当前 Workbench 只提供终端核心 + 有界 Git/Files 上下文，不引入 Monaco/LSP/插件运行时。
+在真实设备与长期运行稳定之前，不建议投入完整浏览器 IDE、可安装插件系统、多用户协作、云中继或未经设计的 reboot persistence。当前 Workbench 提供终端核心 + 有界 typed Git Source Control + 只读 Files 上下文，不引入 Monaco/LSP/插件运行时。
