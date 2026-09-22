@@ -30,7 +30,9 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - Frozen pnpm lockfile, production dependency vulnerability audit, and automated production dependency license-policy review.
 - Four-layer project documentation and docs-sync Agent Skill.
 - Apache-2.0 licensing.
-- Community governance files, contribution templates and security automation.\n- Guarded manual Release workflow that locks an immutable `main` SHA, re-runs Windows/Ubuntu CI, dependency security/license review and CodeQL, then creates an annotated tag and verified GitHub Release with rollback on failure.\n- Root `package.json` as the single release/runtime version source; private workspace packages no longer carry duplicate version fields and `/api/v1/health` reports that root version.
+- Community governance files, contribution templates and security automation.
+- Guarded manual Release workflow that locks an immutable `main` SHA, re-runs Windows/Ubuntu CI, dependency security/license review and CodeQL, then creates an annotated tag and verified GitHub Release with rollback on failure.
+- Root `package.json` as the single release/runtime version source; private workspace packages no longer carry duplicate version fields and `/api/v1/health` reports that root version.
 
 ### Fixed
 
