@@ -56,7 +56,7 @@ Security, session and reconnect changes should include or update tests for:
 - workspace file list/read APIs require authentication + exact Origin, use canonical relative paths, reject traversal/symlink escape, cap listings at 512 entries, cap text preview at 512 KiB, and report binary/truncated previews explicitly
 - workspace Git APIs require authentication + exact Origin, handle non-repositories without failing the Agent, use porcelain-v2 structured status, make containing-repository scope explicit, bound status/diff/history/branch output, reject path traversal, disable external diff/textconv/fsmonitor execution for reads, and do not inherit the reserved `PALMTTY_*` control namespace or any separately configured PalmTTY auth-token environment key; typed writes must reject stale or incomplete/truncated status, serialize concurrent writes by resolved repository even when multiple Workspaces share it, preserve both old/new paths for rename-aware single-file staging, use explicit repository-wide stage-all/unstage-all operations, destructive restore must verify the loaded diff snapshot and stay unavailable for rename/untracked/conflict entries, hooks/interactive prompts stay disabled, repository filter execution requires explicit Web acknowledgement, and remote operations stay non-interactive
 - development Origin parsing accepts only exact HTTP(S) Origins, deduplicates generated LAN values, and does not change the configured Agent bind address
-- autostart pure tests cover Windows command-line quoting/InteractiveToken/least-privilege task XML and Linux systemd `KillMode=process`; Agent environment-file tests cover comments/quotes/duplicates, literal no-shell-expansion behavior and environment application
+- autostart tests cover Windows command-line/PowerShell literal quoting, the hidden system-PowerShell `InteractiveToken`/least-privilege task XML, Node exit-code supervision, locale-independent UTF-8 scheduled-task status parsing, a real Windows PowerShell status probe in Windows CI, and Linux systemd `KillMode=process`; Agent environment-file tests cover comments/quotes/duplicates, literal no-shell-expansion behavior and environment application
 
 The Agent suite includes:
 
@@ -136,7 +136,7 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 - verify non-loopback unsafe configuration is rejected;
 - verify HTTPS reverse-proxy login with Secure Cookie;
 - inspect the per-user Worker runtime directory and confirm secret/record files are not exposed through the browser or logs;
-- after `pnpm build`, install Windows autostart with a current-user env file, verify `pnpm autostart status`, sign out/in or restart the task, confirm the Agent starts as the same user without elevation and check the real desktop for any unwanted console window; then verify restarting only the autostart Agent still allows rediscovery of an already-running Worker.
+- after `pnpm build`, install Windows autostart with a current-user env file, verify `pnpm autostart status` prints PalmTTY-owned UTF-8 fields without mojibake, sign out/in or restart the task, confirm the Agent starts as the same user without elevation, confirm no persistent console window remains and watch for any transient flash that CI cannot observe; then verify restarting only the autostart Agent still allows rediscovery of an already-running Worker.
 
 ## Manual Linux validation before raising Linux support confidence
 
