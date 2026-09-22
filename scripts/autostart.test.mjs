@@ -7,17 +7,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildSystemdUserUnit,
+  buildWindowsHostCompilePowerShellCommand,
+  buildWindowsInstallationManifest,
   buildWindowsTaskStatusPowerShellCommand,
   buildWindowsTaskXml,
   defaultConfigPath,
   defaultWindowsPowerShellPath,
   encodePowerShellCommand,
   parseAutostartArgs,
+  parseWindowsInstallationManifest,
   parseWindowsTaskStatus,
-  quoteWindowsArg
+  quoteWindowsArg,
+  windowsAutostartPaths
 } from "./autostart-core.mjs";
 
-const windowsSupervisorPath = fileURLToPath(new URL("./windows-autostart-supervisor.ps1", import.meta.url));
+const windowsHostSourcePath = fileURLToPath(new URL("./windows-autostart-host.cs", import.meta.url));
 
 test("parseAutostartArgs accepts install options and resolves paths", () => {
   const result = parseAutostartArgs(["install", "--config", "./config.yaml", "--env-file", "./secrets.env"]);
@@ -33,12 +37,23 @@ test("parseAutostartArgs rejects duplicate and unknown options", () => {
   assert.throws(() => parseAutostartArgs(["restart", "--env-file", "a"]), /does not accept/u);
 });
 
-test("defaultConfigPath follows Windows and XDG conventions", () => {
+test("default paths follow Windows and XDG conventions", () => {
   assert.equal(
     defaultConfigPath("win32", { APPDATA: "C:\\Users\\u\\AppData\\Roaming" }, "C:\\Users\\u"),
     "C:\\Users\\u\\AppData\\Roaming\\PalmTTY\\config.yaml"
   );
   assert.equal(defaultConfigPath("linux", { XDG_CONFIG_HOME: "/tmp/config" }, "/home/u"), "/tmp/config/palmtty/config.yaml");
+
+  assert.deepEqual(
+    windowsAutostartPaths({ LOCALAPPDATA: "C:\\Users\\u\\AppData\\Local" }, "C:\\Users\\u"),
+    {
+      directory: "C:\\Users\\u\\AppData\\Local\\PalmTTY\\autostart",
+      host: "C:\\Users\\u\\AppData\\Local\\PalmTTY\\autostart\\palmtty-autostart-host.exe",
+      installation: "C:\\Users\\u\\AppData\\Local\\PalmTTY\\autostart\\installation.json",
+      runtime: "C:\\Users\\u\\AppData\\Local\\PalmTTY\\autostart\\runtime.json",
+      lastError: "C:\\Users\\u\\AppData\\Local\\PalmTTY\\autostart\\last-error.txt"
+    }
+  );
 });
 
 test("defaultWindowsPowerShellPath resolves the system Windows PowerShell", () => {
@@ -55,26 +70,87 @@ test("quoteWindowsArg preserves spaces and trailing backslashes", () => {
   assert.equal(quoteWindowsArg("C:\\path with space\\"), '"C:\\path with space\\\\"');
 });
 
-test("Windows supervisor is a kill-on-close job with detached-child breakaway", () => {
-  const source = readFileSync(windowsSupervisorPath, "utf8");
+test("Windows installation manifest contains paths but never secret values", () => {
+  const manifest = buildWindowsInstallationManifest({
+    nodePath: "C:\\Program Files\\nodejs\\node.exe",
+    agentPath: "C:\\PalmTTY\\apps\\agent\\dist\\index.js",
+    repoRoot: "C:\\PalmTTY",
+    configPath: "C:\\Users\\me\\PalmTTY config.yaml",
+    envFile: "C:\\Users\\me\\PalmTTY\\autostart.env"
+  });
+  assert.equal(manifest.version, 1);
+  assert.equal(manifest.envFile, "C:\\Users\\me\\PalmTTY\\autostart.env");
+  assert.doesNotMatch(JSON.stringify(manifest), /PALMTTY_ACCESS_TOKEN=/u);
+  assert.deepEqual(
+    parseWindowsInstallationManifest(JSON.stringify(manifest)),
+    manifest
+  );
+  assert.throws(
+    () => parseWindowsInstallationManifest('{"version":2}'),
+    /unsupported version/u
+  );
+});
+
+test("Windows Task Scheduler launches only the native GUI host", () => {
+  const xml = buildWindowsTaskXml({
+    userSid: "S-1-5-21-123",
+    hostPath: "C:\\Users\\me\\AppData\\Local\\PalmTTY\\autostart\\palmtty-autostart-host.exe",
+    installationPath: "C:\\Users\\me\\AppData\\Local\\PalmTTY\\autostart\\installation.json",
+    workingDirectory: "C:\\Users\\me\\AppData\\Local\\PalmTTY\\autostart"
+  });
+  assert.match(xml, /<LogonType>InteractiveToken<\/LogonType>/u);
+  assert.match(xml, /<RunLevel>LeastPrivilege<\/RunLevel>/u);
+  assert.match(xml, /<MultipleInstancesPolicy>IgnoreNew<\/MultipleInstancesPolicy>/u);
+  assert.match(xml, /<Command>C:\\Users\\me\\AppData\\Local\\PalmTTY\\autostart\\palmtty-autostart-host\.exe<\/Command>/u);
+  assert.match(xml, /--installation/u);
+  assert.match(xml, /installation\.json/u);
+  assert.doesNotMatch(xml, /powershell/i);
+  assert.doesNotMatch(xml, /node\.exe/i);
+  assert.doesNotMatch(xml, /apps\\agent/i);
+});
+
+test("Windows host source owns Agent lifecycle without a console", () => {
+  const source = readFileSync(windowsHostSourcePath, "utf8");
   assert.match(source, /JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE/u);
   assert.match(source, /JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK/u);
   assert.match(source, /CREATE_SUSPENDED \| CREATE_NO_WINDOW/u);
   assert.match(source, /AssignProcessToJobObject/u);
   assert.match(source, /WaitForSingleObject/u);
-  assert.match(source, /param\(/u);
-  assert.match(source, /\[string\]\$NodePath/u);
-  assert.match(source, /\[string\]\$AgentPath/u);
-  assert.match(source, /\[string\]\$RepoRoot/u);
-  assert.match(source, /\[string\]\$ConfigPath/u);
+  assert.match(source, /DataContractJsonSerializer/u);
+  assert.doesNotMatch(source, /System\.Windows\.Forms/u);
 });
 
-test("Windows supervisor compiles, propagates Agent exit code, and lets detached children break away", { skip: process.platform !== "win32" }, async () => {
+test("Windows host compilation targets the GUI subsystem", () => {
+  const command = buildWindowsHostCompilePowerShellCommand({
+    sourcePath: "C:\\PalmTTY\\scripts\\windows-autostart-host.cs",
+    outputPath: "C:\\Users\\me\\AppData\\Local\\PalmTTY\\autostart\\host.tmp.exe"
+  });
+  assert.match(command, /Add-Type/u);
+  assert.match(command, /-OutputType WindowsApplication/u);
+  assert.match(command, /System\.Runtime\.Serialization\.dll/u);
+});
+
+function peSubsystem(executablePath) {
+  const data = readFileSync(executablePath);
+  const peOffset = data.readUInt32LE(0x3c);
+  assert.equal(data.toString("ascii", peOffset, peOffset + 4), "PE\0\0");
+  const optionalHeader = peOffset + 4 + 20;
+  const magic = data.readUInt16LE(optionalHeader);
+  const subsystemOffset = optionalHeader + (magic === 0x20b ? 88 : 68);
+  return data.readUInt16LE(subsystemOffset);
+}
+
+test("Windows native host compiles as GUI, propagates Agent exit, and preserves detached Worker lifetime", { skip: process.platform !== "win32" }, async () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "palmtty autostart-"));
+  const hostPath = path.join(directory, "palmtty-autostart-host.exe");
+  const installationPath = path.join(directory, "installation.json");
   const markerPath = path.join(directory, "worker-survived.txt");
   const workerPath = path.join(directory, "worker.cjs");
   const agentPath = path.join(directory, "agent.cjs");
+  const configPath = path.join(directory, "config.yaml");
+
   try {
+    writeFileSync(configPath, "server:\n  port: 17688\n  exposure:\n    mode: local\n", "utf8");
     writeFileSync(
       workerPath,
       `const { writeFileSync } = require("node:fs");\nsetTimeout(() => { writeFileSync(${JSON.stringify(markerPath)}, "ok"); }, 300);\n`,
@@ -86,26 +162,39 @@ test("Windows supervisor compiles, propagates Agent exit code, and lets detached
       "utf8"
     );
 
-    const result = spawnSync(
+    const compileCommand = buildWindowsHostCompilePowerShellCommand({
+      sourcePath: windowsHostSourcePath,
+      outputPath: hostPath
+    });
+    const compile = spawnSync(
       defaultWindowsPowerShellPath(),
       [
         "-NoLogo",
         "-NoProfile",
         "-NonInteractive",
-        "-WindowStyle",
-        "Hidden",
-        "-File",
-        windowsSupervisorPath,
-        "-NodePath",
-        process.execPath,
-        "-AgentPath",
-        agentPath,
-        "-RepoRoot",
-        directory,
-        "-ConfigPath",
-        path.join(directory, "ignored.yaml")
+        "-EncodedCommand",
+        encodePowerShellCommand(compileCommand)
       ],
-      { encoding: "utf8", windowsHide: true, timeout: 15_000 }
+      { encoding: "utf8", windowsHide: true, timeout: 30_000 }
+    );
+    assert.equal(compile.status, 0, compile.stderr || compile.stdout);
+    assert.equal(peSubsystem(hostPath), 2, "PE subsystem must be Windows GUI");
+
+    writeFileSync(
+      installationPath,
+      JSON.stringify(buildWindowsInstallationManifest({
+        nodePath: process.execPath,
+        agentPath,
+        repoRoot: directory,
+        configPath
+      })),
+      "utf8"
+    );
+
+    const result = spawnSync(
+      hostPath,
+      ["--installation", installationPath],
+      { encoding: "utf8", windowsHide: false, timeout: 15_000 }
     );
     assert.equal(result.status, 7, result.stderr || result.stdout);
 
@@ -118,46 +207,10 @@ test("Windows supervisor compiles, propagates Agent exit code, and lets detached
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
-    assert.fail("detached child did not survive supervisor job close");
+    assert.fail("detached Worker did not survive native host Job close");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
-});
-
-test("Windows task runs headlessly as the current interactive user without elevation", () => {
-  const xml = buildWindowsTaskXml({
-    userSid: "S-1-5-21-123",
-    powershellPath: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-    supervisorPath: "C:\\PalmTTY\\scripts\\windows-autostart-supervisor.ps1",
-    nodePath: "C:\\Program Files\\nodejs\\node.exe",
-    agentPath: "C:\\PalmTTY\\apps\\agent\\dist\\index.js",
-    repoRoot: "C:\\PalmTTY",
-    configPath: "C:\\Users\\me\\PalmTTY config.yaml",
-    envFile: "C:\\Users\\me\\PalmTTY.env"
-  });
-  assert.match(xml, /<LogonType>InteractiveToken<\/LogonType>/u);
-  assert.match(xml, /<RunLevel>LeastPrivilege<\/RunLevel>/u);
-  assert.match(xml, /<MultipleInstancesPolicy>IgnoreNew<\/MultipleInstancesPolicy>/u);
-  assert.match(xml, /<Command>C:\\Windows\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe<\/Command>/u);
-  assert.match(xml, /-WindowStyle Hidden/u);
-  assert.match(xml, /-File/u);
-  assert.match(xml, /windows-autostart-supervisor\.ps1/u);
-  assert.match(xml, /-EnvFile/u);
-  assert.match(xml, /PalmTTY config\.yaml/u);
-  assert.doesNotMatch(xml, /<Command>C:\\Program Files\\nodejs\\node\.exe<\/Command>/u);
-  assert.doesNotMatch(xml, /PALMTTY_ACCESS_TOKEN=/u);
-  assert.throws(
-    () => buildWindowsTaskXml({
-      userSid: "S-1-5-21-123",
-      powershellPath: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-      supervisorPath: "C:\\PalmTTY\\scripts\\windows-autostart-supervisor.ps1",
-      nodePath: "C:\\Node\\node.exe",
-      agentPath: "C:\\PalmTTY\\agent.js",
-      repoRoot: "C:\\PalmTTY\nmalformed",
-      configPath: "C:\\PalmTTY\\config.yaml"
-    }),
-    /single line/u
-  );
 });
 
 test("Windows status query executes through the system PowerShell", { skip: process.platform !== "win32" }, () => {
