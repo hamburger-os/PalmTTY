@@ -15,7 +15,9 @@ Status: **alpha foundation implemented with durable per-session workers and pass
 - end-to-end Fastify HTTP/WebSocket/Worker IPC lifecycle coverage with deterministic PTY adapters
 - detached-process integration coverage proving a Worker survives the creator Agent process exit and can be rediscovered with replay intact
 - production dependency vulnerability audit, fail-closed production dependency license-policy review, and CodeQL
-- CODEOWNERS, PR/Issue templates, contribution/security/governance/release documentation\n- root `package.json` is the single release/runtime version source; private workspace manifests intentionally omit duplicate versions and the Agent health endpoint reads the root version\n- guarded manual Release workflow locks an exact `main` SHA, requires explicit real-device/deployment acceptance, reuses the Windows/Ubuntu CI + Security Audit + CodeQL workflows against that SHA, rejects tag/release reuse, aborts if `main` advances, and publishes an annotated tag plus verified GitHub Release with rollback before finalization
+- CODEOWNERS, PR/Issue templates, contribution/security/governance/release documentation
+- root `package.json` is the single release/runtime version source; private workspace manifests intentionally omit duplicate versions and the Agent health endpoint reads the root version
+- guarded manual Release workflow locks an exact `main` SHA, requires explicit real-device/deployment acceptance, reuses the Windows/Ubuntu CI + Security Audit + CodeQL workflows against that SHA, rejects tag/release reuse, aborts if `main` advances, and publishes an annotated tag plus verified GitHub Release with rollback before finalization
 - Apache-2.0 licensing
 - four documentation layers and docs-sync Agent Skill
 
