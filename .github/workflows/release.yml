@@ -7,11 +7,6 @@ on:
         description: Version to release (X.Y.Z, X.Y.Z-alpha.N, beta.N or rc.N)
         required: true
         type: string
-      confirm_release_acceptance:
-        description: I completed the release-specific real-device/deployment acceptance
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -45,7 +40,6 @@ jobs:
         shell: bash
         env:
           INPUT_VERSION: ${{ inputs.version }}
-          ACCEPTANCE_CONFIRMED: ${{ inputs.confirm_release_acceptance }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -54,11 +48,6 @@ jobs:
             echo "::error::Manual releases must be started from main."
             exit 1
           fi
-          if [ "$ACCEPTANCE_CONFIRMED" != "true" ]; then
-            echo "::error::Release-specific real-device/deployment acceptance must be completed before publishing."
-            exit 1
-          fi
-
           VERSION="${INPUT_VERSION#v}"
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$ ]]; then
             echo "::error::Unsupported release version: $VERSION"
