@@ -11,6 +11,7 @@ import {
   DetectTerminalProfilesRequestSchema,
   CreateWorkspaceSchema,
   MAX_MESSAGE_BYTES,
+  MAX_SESSION_ARTIFACT_BYTES,
   WS_SUBPROTOCOL,
   WorkspaceDefinitionSchema,
   encodeServerMessage,
@@ -23,6 +24,8 @@ import { controlEnvironmentKeys, isReservedControlEnvironmentKey } from "./contr
 import { browseWorkspaceDirectory } from "./workspace-directory-browser.js";
 import { detectTerminalProfiles } from "./terminal-profiles.js";
 import { FixedWindowLimiter, isPrivateClientAddress, isTrustedOrigin } from "./security.js";
+import { registerSessionArtifactRoutes } from "./session-artifact-routes.js";
+import { SessionArtifactStore } from "./session-artifacts.js";
 import { SessionManager, type SessionManagerOptions } from "./session-manager.js";
 import {
   detectRuntimeCapabilities,
@@ -35,12 +38,16 @@ import {
 import { registerWorkspaceToolRoutes } from "./workspace-tool-routes.js";
 import { defaultWebRoot } from "./runtime-layout.js";
 import { PALMTTY_VERSION } from "./version.js";
+import { defaultRuntimeDir } from "./worker-storage.js";
 
 const LoginSchema = z.object({ token: z.string().min(1).max(4096) });
 
 export type BuildAppOptions = {
   webRoot?: string;
-  sessionManager?: Omit<SessionManagerOptions, "workspaceStore">;
+  sessionManager?: Omit<
+    SessionManagerOptions,
+    "workspaceStore" | "onSessionDisposed"
+  >;
   workspaceStore?: WorkspaceStore;
   additionalTrustedOrigins?: readonly string[];
   https?: {
@@ -73,6 +80,14 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   await app.register(cookie);
+  app.addContentTypeParser(
+    "application/octet-stream",
+    {
+      parseAs: "buffer",
+      bodyLimit: MAX_SESSION_ARTIFACT_BYTES
+    },
+    (_request, body, done) => done(null, body)
+  );
   await app.register(websocket, {
     options: { maxPayload: MAX_MESSAGE_BYTES },
     errorHandler(error, socket, request) {
@@ -83,11 +98,16 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
 
   const auth = new AuthService(config.auth);
   const workspaceStore = options.workspaceStore ?? new FileWorkspaceStore();
+  const runtimeDir = options.sessionManager?.runtimeDir ?? defaultRuntimeDir();
+  const artifacts = new SessionArtifactStore(runtimeDir);
   const sessions = new SessionManager(config, {
     ...options.sessionManager,
-    workspaceStore
+    runtimeDir,
+    workspaceStore,
+    onSessionDisposed: (sessionId) => artifacts.removeSession(sessionId)
   });
   await sessions.initialize();
+  await artifacts.initialize();
   const runtimeCapabilitiesPromise = detectRuntimeCapabilities();
   const createLimiter = new FixedWindowLimiter(20, 60_000);
   const sessionMutationLimiter = new FixedWindowLimiter(60, 60_000);
@@ -217,11 +237,19 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     }
   );
 
+  const sensitiveEnvironmentKeys = controlEnvironmentKeys(config.auth.tokenEnv);
   registerWorkspaceToolRoutes(app, {
     workspaceStore,
     requireAuth,
     requireOrigin,
-    sensitiveEnvironmentKeys: controlEnvironmentKeys(config.auth.tokenEnv)
+    sensitiveEnvironmentKeys
+  });
+  registerSessionArtifactRoutes(app, {
+    sessions,
+    artifacts,
+    requireAuth,
+    requireOrigin,
+    sensitiveEnvironmentKeys
   });
 
   app.get("/api/v1/workspaces", { preHandler: requireAuth }, async () => ({

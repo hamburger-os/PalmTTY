@@ -92,6 +92,7 @@ function bootstrap(runtimeDir: string): WorkerBootstrap {
     excludedEnvKeys: ["PALMTTY_TEST_ACCESS_TOKEN"],
     createdAt: new Date().toISOString(),
     workspace: runtimeWorkspace(),
+    launchRuntime: { kind: "host" },
     session: {
       exitedRetentionMinutes: 30,
       scrollbackLines: 1_000,
@@ -258,6 +259,7 @@ describe("session worker security boundary", () => {
         "PALMTTY_WINDOWS_SPAWN_TRACE"
       ]));
       expect(capturedBootstrap!.workspace.env.USER_VISIBLE).toBe("yes");
+      expect(capturedBootstrap!.launchRuntime).toEqual({ kind: "host" });
     } finally {
       await manager.close();
     }
@@ -327,6 +329,7 @@ describe("session worker security boundary", () => {
       sessionId,
       workspaceId: "security",
       createdAt: new Date().toISOString(),
+      launchRuntime: { kind: "host" },
       endpointId,
       workerPid: process.pid,
       shellPid: process.pid
@@ -382,7 +385,8 @@ describe("session worker security boundary", () => {
         expect(record).toMatchObject({
           sessionId: config.sessionId,
           endpointId: config.endpointId,
-          workerPid: process.pid
+          workerPid: process.pid,
+          launchRuntime: { kind: "host" }
         });
         expect(secret).toBe(config.secret);
         break;

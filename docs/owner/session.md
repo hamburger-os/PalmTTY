@@ -43,7 +43,7 @@ Worker + PTY running
                               └────> Worker 自清理并退出┘
 ~~~
 
-当前会话实现浏览器断线持久化和 Agent 重启持久化。产品动作严格区分“终止”“重启”和“清除”：终止只结束 PTY/进程并进入 `stopping → exited`，退出后的 snapshot/replay 仍按 retention 保留；重启会等待旧 PTY 退出、retire 旧 retained Session，再按同一 Workspace 创建一个新的 Session，因此 Session ID 与终端历史都会更换；清除只允许用于 `exited/failed` Session，并要求 Worker 立即释放 terminal state、recovery metadata 后退出。
+当前会话实现浏览器断线持久化和 Agent 重启持久化。产品动作严格区分“终止”“重启”和“清除”：终止只结束 PTY/进程并进入 `stopping → exited`，退出后的 snapshot/replay 仍按 retention 保留；重启会等待旧 PTY 退出、retire 旧 retained Session，再按同一 Workspace 创建一个新的 Session，因此 Session ID 与终端历史都会更换；清除只允许用于 `exited/failed` Session，并要求 Worker 立即释放 terminal state、recovery metadata 后退出。Session 附件跟随同一个 Session ID：终止后在 retention 内仍可查看，重启会随旧 Session retirement 清理，显式清除/retention 到期也会清理。
 
 明确不承诺：
 
@@ -51,13 +51,22 @@ Worker + PTY running
 - 用户注销后继续运行；
 - Worker 自身被系统或用户终止后的恢复。
 
+## Session 图片附件
+
+图片附件不是 PTY 数据，也不写入 Workspace/Git 工作树。Agent 在当前用户私有 runtime 下维护独立的 Session attachment store，使用随机文件名和持久元数据记录原始显示名、真实 MIME、尺寸、创建时间以及当前 runtime 可读路径。Session 创建时的 launch runtime 身份（Host，或 WSL + distribution）同时写入 Worker recovery record；附件路径映射只读取这份不可变 Session 身份，不重新读取后来可能被编辑的 Workspace。上传仅允许 PNG/JPEG/WebP/GIF，服务端根据文件签名与头部尺寸判断类型，不信任浏览器声明的 MIME/扩展名；单文件 8 MiB、每 Session 32 个、合计 64 MiB，图片边长最多 8192，且总像素不超过 32 MiPixels。
+
+Host Session 直接得到宿主机私有附件路径；Windows WSL Session 通过结构化 `wsl.exe` + `wslpath` 映射为发行版可读路径，并继续剔除 PalmTTY 控制/认证环境。Web 的“插入路径”只向现有终端输入流写入路径文本和一个空格，不发送回车，因此不会因为查看/选择图片自动执行 Shell/CLI 命令。Codex、Antigravity 等是否把该路径识别为图片上下文仍属于其各自 CLI 行为，PalmTTY 核心不编码厂商协议。
+
+附件元数据/文件由 Agent 管理，但生命周期以 Worker recovery record 为锚：Agent 重启后，只要对应 Worker record 仍存在，附件目录继续可发现；Session retirement/明确死亡后由 SessionManager 清理，若清理时 Agent 崩溃，下次启动还会按现存 Worker records 删除 orphan attachment 目录。
+
 ## Recovery metadata
 
-每个 Worker 在与私有 Worker IPC generation 对齐的用户 runtime 目录保存最小恢复状态。当前 `WORKER_PROTOCOL_VERSION = 4` 使用 `runtime-v4`；本代加入显式 `stopping` 与 retained-session retirement 控制。升级内部 Worker 协议 generation 时必须同步切换 runtime generation，不读取上一代 recovery state。
+每个 Worker 在与私有 Worker IPC generation 对齐的用户 runtime 目录保存最小恢复状态。当前 `WORKER_PROTOCOL_VERSION = 5` 使用 `runtime-v5`；本代在既有显式 `stopping` / retained-session retirement 基础上，把 Session 创建时的 launch runtime 身份纳入 Worker recovery authority。升级内部 Worker 协议 generation 时必须同步切换 runtime generation，不读取上一代 recovery state。
 
 - Session ID；
 - endpoint ID；
 - workspace ID；
+- 创建时的 launch runtime 身份（Host，或 WSL + distribution），为本 generation 必填；
 - createdAt；
 - Worker/Shell PID（仅诊断）；
 - 独立 secret 文件。

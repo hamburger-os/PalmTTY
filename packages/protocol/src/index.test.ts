@@ -6,6 +6,8 @@ import {
   GitHistoryRequestSchema,
   GitMutationRequestSchema,
   GitRemoteRequestSchema,
+  SessionArtifactSchema,
+  WorkspaceFileImageRequestSchema,
   WorkspaceFileListRequestSchema,
   WorkspaceFileReadRequestSchema,
   DetectTerminalProfilesRequestSchema,
@@ -108,6 +110,30 @@ describe("protocol", () => {
     expect(() => WorkspaceFileListRequestSchema.parse({ path: "src\\index.ts" })).toThrow();
     expect(() => WorkspaceFileListRequestSchema.parse({ path: "src//index.ts" })).toThrow();
     expect(() => WorkspaceFileReadRequestSchema.parse({ path: "" })).toThrow();
+    expect(WorkspaceFileImageRequestSchema.parse({ path: "shot.png" })).toEqual({
+      path: "shot.png"
+    });
+
+    expect(SessionArtifactSchema.parse({
+      id: "abcdefghijklmnop",
+      name: "shot.png",
+      mime: "image/png",
+      size: 128,
+      width: 64,
+      height: 32,
+      createdAt: "2026-09-24T00:00:00.000Z",
+      terminalPath: "/tmp/shot.png"
+    }).mime).toBe("image/png");
+    expect(() => SessionArtifactSchema.parse({
+      id: "bad/id",
+      name: "shot.svg",
+      mime: "image/svg+xml",
+      size: 128,
+      width: 64,
+      height: 32,
+      createdAt: "2026-09-24T00:00:00.000Z",
+      terminalPath: "/tmp/shot.svg"
+    })).toThrow();
 
     expect(GitDiffRequestSchema.parse({ path: "apps/web/src/App.tsx" })).toEqual({
       path: "apps/web/src/App.tsx",

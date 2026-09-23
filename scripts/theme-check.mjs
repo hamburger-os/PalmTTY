@@ -90,7 +90,9 @@ for (const marker of [
   'active={pane === "terminal"}',
   'workbench-pane',
   'pane === "git"',
-  'pane === "files"'
+  'pane === "files"',
+  'pane === "artifacts"',
+  '<ArtifactsPane'
 ]) {
   if (!sessionWorkbench.includes(marker)) {
     failures.push(`apps/web/src/SessionWorkbench.tsx [workbench-lifecycle-contract] missing ${marker}`);

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -16,6 +16,17 @@ import {
 import { MemoryWorkspaceStore } from "./workspace-store.js";
 
 const ORIGIN = "http://127.0.0.1:7688";
+
+function png(width = 32, height = 24): Buffer {
+  const buffer = Buffer.alloc(24);
+  Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
+  ]).copy(buffer);
+  buffer.write("IHDR", 12, "ascii");
+  buffer.writeUInt32BE(width, 16);
+  buffer.writeUInt32BE(height, 20);
+  return buffer;
+}
 
 class ControlledPty implements PtyHandle {
   readonly pid = 61_001;
@@ -160,6 +171,47 @@ describe("session lifecycle API", () => {
     });
     expect(created.statusCode).toBe(201);
     const session = created.json().session as SessionPublic;
+    expect((await readWorkerRecord(runtimeDir, session.id)).launchRuntime)
+      .toEqual({ kind: "host" });
+
+    const uploaded = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${session.id}/artifacts/upload`,
+      headers: {
+        origin: ORIGIN,
+        "content-type": "application/octet-stream",
+        "x-palmtty-filename": encodeURIComponent("screen shot.png")
+      },
+      payload: png()
+    });
+    expect(uploaded.statusCode).toBe(201);
+    expect(uploaded.json().artifact).toMatchObject({
+      name: "screen shot.png",
+      mime: "image/png",
+      width: 32,
+      height: 24
+    });
+    const artifactId = uploaded.json().artifact.id as string;
+
+    const listed = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${session.id}/artifacts/list`,
+      headers: { origin: ORIGIN },
+      payload: {}
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json().artifacts).toHaveLength(1);
+
+    const content = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${session.id}/artifacts/${artifactId}/content`,
+      headers: { origin: ORIGIN },
+      payload: {}
+    });
+    expect(content.statusCode).toBe(200);
+    expect(content.headers["content-type"]).toContain("image/png");
+    expect(content.headers["x-content-type-options"]).toBe("nosniff");
+    expect(content.rawPayload).toEqual(png());
 
     const prematureClear = await app.inject({
       method: "DELETE",
@@ -253,6 +305,10 @@ describe("session lifecycle API", () => {
       ]);
       return record.status === "rejected" && secret.status === "rejected";
     });
+
+    await expect(access(
+      path.join(runtimeDir, "artifacts-v1", session.id)
+    )).rejects.toThrow();
   });
 
   it("validates the replacement before terminating the current PTY", async () => {

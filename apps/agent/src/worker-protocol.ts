@@ -1,6 +1,9 @@
 import net from "node:net";
 import { z } from "zod";
-import { RuntimeWorkspaceSchema } from "./workspace-runtime.js";
+import {
+  RuntimeWorkspaceSchema,
+  SessionLaunchRuntimeSchema
+} from "./workspace-runtime.js";
 import {
   MAX_INPUT_BYTES,
   ServerMessageSchema,
@@ -9,7 +12,7 @@ import {
   TerminalRowsSchema
 } from "@palmtty/protocol";
 
-export const WORKER_PROTOCOL_VERSION = 4 as const;
+export const WORKER_PROTOCOL_VERSION = 5 as const;
 export const MAX_WORKER_FRAME_BYTES = 64 * 1024 * 1024;
 
 const SessionWorkerConfigSchema = z.object({
@@ -28,6 +31,7 @@ export const WorkerBootstrapSchema = z.object({
   traceWindowsSpawn: z.boolean().optional(),
   createdAt: z.string().datetime(),
   workspace: RuntimeWorkspaceSchema,
+  launchRuntime: SessionLaunchRuntimeSchema,
   session: SessionWorkerConfigSchema,
   cols: z.number().int().min(2).max(500),
   rows: z.number().int().min(1).max(200)

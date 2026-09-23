@@ -20,7 +20,7 @@
 - 未 adoption Worker 通过短创建租约自清理；`adopt` 为幂等提交，可跨 IPC 重连安全重试，确认后才进入持久 Session；
 - 单用户 token 登录和 Cookie 会话；
 - Origin、安全启动闸门和基础限流；
-- 手机端 Session Workbench（终端 / Git / 文件）、xterm/PWA、触摸特殊键栏与按需长文本输入，中文/英文界面切换，并提供明确的终端替换重启动作；
+- 手机端 Session Workbench（终端 / Git / 文件 / 附件）、xterm/PWA、触摸特殊键栏与按需长文本输入，中文/英文界面切换，并提供明确的终端替换重启动作；Session 附件支持手机/浏览器上传 PNG/JPEG/WebP/GIF、预览、删除和把本地路径安全插入终端，Files 同时可直接预览 Workspace 中的受支持图片；
 - Git Source Control 工作台与 Workspace 根目录只读文件浏览/预览已经作为独立、有界、认证的 Agent API 落地，不复用终端协议；Git 已支持 porcelain-v2 状态/结构化 diff/history/branches 与受控 stage/unstage/restore/commit/branch/stash/fetch/pull/push；
 - PalmTTY 自有的三主题视觉系统（炫彩流光/黑曜石/白霜）、效果/性能两档、reduced-motion 处理与主题审查 skills；
 - Web 端持久化 Workspace CRUD，Host / WSL runtime adapter；正常 UI 使用统一终端 Profile（Host Shell + WSL 发行版），高级 runtime 细节只在 Custom 路径展开；工作区支持有界环境变量与多行启动输入，Session 创建/重启仍只消费持久化 workspace authority；
@@ -101,6 +101,7 @@ Git 已完成从只读 status/diff 到受控 Source Control 工作台的第二�
 
 - 根据真实使用反馈评估更高级 Git 操作（force push、interactive rebase/cherry-pick、reflog、submodule/LFS）；除非有明确需求与独立安全设计，不暴露任意 Git argv；
 - 根据真实使用反馈评估受控文件编辑，前置解决并发修改、编码与原子写入；
+- 根据真实 Codex/Antigravity/Claude Code 等 CLI 的多模态交互反馈，评估厂商专用 adapter 是否有必要；当前先保持“受控本地附件 + 路径插入”的中立边界，不把任何一个 Agent 的图片消息协议写入核心；
 - 本地服务入口；
 - WSL 实机长期验证与发行版边界测试；
 - 增加 macOS CI / 实机验证后再提升其支持等级。
@@ -111,4 +112,4 @@ Git 已完成从只读 status/diff 到受控 Source Control 工作台的第二�
 
 ## 不应提前做
 
-在真实设备与长期运行稳定之前，不建议投入完整浏览器 IDE、可安装插件系统、多用户协作、云中继或未经设计的 reboot persistence。当前 Workbench 提供终端核心 + 有界 typed Git Source Control + 只读 Files 上下文，不引入 Monaco/LSP/插件运行时。
+在真实设备与长期运行稳定之前，不建议投入完整浏览器 IDE、可安装插件系统、多用户协作、云中继或未经设计的 reboot persistence。当前 Workbench 提供终端核心 + 有界 typed Git Source Control + 只读 Files/图片预览 + Session 图片附件上下文，不引入 Monaco/LSP/插件运行时。

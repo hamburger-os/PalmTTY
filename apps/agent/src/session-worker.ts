@@ -229,7 +229,9 @@ export class SessionWorkerServer {
       if (
         record && (
           record.endpointId !== this.bootstrap.endpointId ||
-          record.workerPid !== process.pid
+          record.workerPid !== process.pid ||
+          JSON.stringify(record.launchRuntime) !==
+            JSON.stringify(this.bootstrap.launchRuntime)
         )
       ) {
         throw new Error("Worker recovery record belongs to another process");
@@ -278,6 +280,7 @@ export class SessionWorkerServer {
       sessionId: this.bootstrap.sessionId,
       workspaceId: this.bootstrap.workspace.id,
       createdAt: this.bootstrap.createdAt,
+      launchRuntime: this.bootstrap.launchRuntime,
       endpointId: this.bootstrap.endpointId,
       workerPid: process.pid,
       shellPid: this.runtime.pid

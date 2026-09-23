@@ -240,6 +240,38 @@ describe("HTTP security boundary", () => {
     await app.close();
   });
 
+  it("protects Session artifact routes with authentication and exact Origin", async () => {
+    process.env.PALMTTY_TEST_TOKEN = TOKEN;
+    const app = await buildTestApp();
+
+    const unauthenticated = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions/missing-session/artifacts/list",
+      headers: { origin: ORIGIN },
+      payload: {}
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const cookie = await loginCookie(app);
+    const wrongOrigin = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions/missing-session/artifacts/list",
+      headers: { cookie, origin: "https://evil.invalid" },
+      payload: {}
+    });
+    expect(wrongOrigin.statusCode).toBe(403);
+
+    const protectedRoute = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions/missing-session/artifacts/list",
+      headers: { cookie, origin: ORIGIN },
+      payload: {}
+    });
+    expect(protectedRoute.statusCode).toBe(404);
+
+    await app.close();
+  });
+
   it("protects typed Git write routes with authentication and exact Origin", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
     const app = await buildTestApp();

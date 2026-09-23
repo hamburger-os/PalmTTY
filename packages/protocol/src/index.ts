@@ -209,6 +209,50 @@ export const WorkspaceFileReadResponseSchema = z.object({
 }).strict();
 export type WorkspaceFileReadResponse = z.infer<typeof WorkspaceFileReadResponseSchema>;
 
+export const WorkspaceFileImageRequestSchema = WorkspaceFileReadRequestSchema;
+export type WorkspaceFileImageRequest = z.infer<typeof WorkspaceFileImageRequestSchema>;
+
+export const MAX_SESSION_ARTIFACT_BYTES = 8 * 1024 * 1024;
+export const MAX_SESSION_ARTIFACTS = 32;
+export const MAX_SESSION_ARTIFACT_TOTAL_BYTES = 64 * 1024 * 1024;
+export const MAX_IMAGE_DIMENSION = 8192;
+export const MAX_IMAGE_PIXELS = 32 * 1024 * 1024;
+
+export const SessionArtifactIdSchema = z.string()
+  .min(16)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/);
+
+export const SessionArtifactMimeSchema = z.enum([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif"
+]);
+export type SessionArtifactMime = z.infer<typeof SessionArtifactMimeSchema>;
+
+export const SessionArtifactSchema = z.object({
+  id: SessionArtifactIdSchema,
+  name: z.string().min(1).max(240),
+  mime: SessionArtifactMimeSchema,
+  size: z.number().int().positive().max(MAX_SESSION_ARTIFACT_BYTES),
+  width: z.number().int().positive().max(MAX_IMAGE_DIMENSION),
+  height: z.number().int().positive().max(MAX_IMAGE_DIMENSION),
+  createdAt: z.string().datetime(),
+  terminalPath: z.string().min(1).max(4096)
+}).strict();
+export type SessionArtifact = z.infer<typeof SessionArtifactSchema>;
+
+export const SessionArtifactListRequestSchema = z.object({}).strict();
+export type SessionArtifactListRequest = z.infer<typeof SessionArtifactListRequestSchema>;
+
+export const SessionArtifactListResponseSchema = z.object({
+  artifacts: z.array(SessionArtifactSchema).max(MAX_SESSION_ARTIFACTS)
+}).strict();
+export type SessionArtifactListResponse = z.infer<typeof SessionArtifactListResponseSchema>;
+
+export const SessionArtifactContentRequestSchema = z.object({}).strict();
+
 export const GitFileStatusSchema = z.enum([
   "modified",
   "typeChanged",

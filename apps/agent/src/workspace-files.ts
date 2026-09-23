@@ -1,6 +1,7 @@
 import { lstat, open, opendir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import {
+  MAX_SESSION_ARTIFACT_BYTES,
   WorkspaceFileListResponseSchema,
   WorkspaceFileReadResponseSchema,
   type WorkspaceDefinition,
@@ -8,8 +9,10 @@ import {
   type WorkspaceFileListResponse,
   type WorkspaceFileReadResponse
 } from "@palmtty/protocol";
+import { readOpenedFileStableBounded } from "./bounded-file.js";
 import { readHostEnvironment, withoutEnvironmentKeys } from "./host-environment.js";
 import { runBoundedProcess } from "./bounded-process.js";
+import { inspectImageArtifact, type ImageArtifactInfo } from "./image-artifact.js";
 import { resolveExecutable } from "./workspace-runtime.js";
 
 const MAX_ENTRIES = 512;
@@ -382,4 +385,99 @@ export async function readWorkspaceFile(
   return workspace.runtime.kind === "wsl"
     ? readWslFile(workspace, relativePath, excludedEnvironmentKeys)
     : readHostFile(workspace, relativePath);
+}
+
+
+export type WorkspaceImageReadResult = ImageArtifactInfo & {
+  size: number;
+  content: Buffer;
+};
+
+async function readHostImage(
+  workspace: WorkspaceDefinition,
+  relativePath: string
+): Promise<WorkspaceImageReadResult> {
+  const { target } = await resolveHostTarget(workspace, relativePath);
+  const handle = await open(target, "r");
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) throw new Error("Workspace path is not a file");
+    if (info.size < 1 || info.size > MAX_SESSION_ARTIFACT_BYTES) {
+      throw new Error("Workspace image exceeds the preview size limit");
+    }
+
+    const content = await readOpenedFileStableBounded(
+      handle,
+      info.size,
+      MAX_SESSION_ARTIFACT_BYTES,
+      "Workspace image"
+    );
+    const image = inspectImageArtifact(content);
+    return { ...image, size: content.length, content };
+  } finally {
+    await handle.close();
+  }
+}
+
+const WSL_IMAGE_READ_SCRIPT = [
+  'root="$1"',
+  'rel="$2"',
+  'cd -- "$root" || exit 20',
+  'root_physical="$(pwd -P)"',
+  'target="$root_physical/$rel"',
+  'resolved="$(readlink -f -- "$target" 2>/dev/null || true)"',
+  '[ -n "$resolved" ] || exit 21',
+  'case "$resolved" in "$root_physical"|"$root_physical"/*) ;; *) exit 22 ;; esac',
+  '[ -f "$resolved" ] || exit 23',
+  'size="$(stat -c %s -- "$resolved" 2>/dev/null)" || exit 24',
+  'printf "%s\\0" "$size"',
+  `[ "$size" -le ${MAX_SESSION_ARTIFACT_BYTES} ] || exit 25`,
+  'cat -- "$resolved"'
+].join("\n");
+
+async function readWslImage(
+  workspace: WorkspaceDefinition,
+  relativePath: string,
+  excludedEnvironmentKeys: string[]
+): Promise<WorkspaceImageReadResult> {
+  const result = await runWslScript(
+    workspace,
+    WSL_IMAGE_READ_SCRIPT,
+    [workspace.cwd, relativePath],
+    MAX_SESSION_ARTIFACT_BYTES + 64 * 1024,
+    excludedEnvironmentKeys
+  );
+  const separator = result.stdout.indexOf(0);
+  const size = separator < 0
+    ? Number.NaN
+    : Number.parseInt(result.stdout.subarray(0, separator).toString("utf8"), 10);
+
+  if (result.code === 25 || size > MAX_SESSION_ARTIFACT_BYTES) {
+    throw new Error("Workspace image exceeds the preview size limit");
+  }
+  if (result.code !== 0 || result.stdoutTruncated || separator < 0) {
+    throw new Error(result.stderr.trim() || "WSL image read failed");
+  }
+  if (!Number.isSafeInteger(size) || size < 1) {
+    throw new Error("WSL image size was invalid");
+  }
+
+  const content = result.stdout.subarray(separator + 1);
+  if (content.length !== size) {
+    throw new Error("WSL image content was incomplete");
+  }
+  const image = inspectImageArtifact(content);
+  return { ...image, size, content };
+}
+
+export async function readWorkspaceImage(
+  workspace: WorkspaceDefinition,
+  requestedPath: string,
+  excludedEnvironmentKeys: string[] = []
+): Promise<WorkspaceImageReadResult> {
+  const relativePath = normalizeWorkspaceRelativePath(requestedPath);
+  if (!relativePath) throw new Error("File path is required");
+  return workspace.runtime.kind === "wsl"
+    ? readWslImage(workspace, relativePath, excludedEnvironmentKeys)
+    : readHostImage(workspace, relativePath);
 }

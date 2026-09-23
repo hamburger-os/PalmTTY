@@ -1,3 +1,4 @@
+import { MAX_SESSION_ARTIFACT_BYTES } from "@palmtty/protocol";
 import type {
   BrowseDirectoryRequest,
   CreateWorkspaceInput,
@@ -11,6 +12,8 @@ import type {
   GitRemoteResponse,
   GitStatusResponse,
   RuntimeCapabilities,
+  SessionArtifact,
+  SessionArtifactListResponse,
   SessionPublic,
   TerminalProfile,
   WorkspaceFileListResponse,
@@ -28,24 +31,31 @@ export class ApiError extends Error {
   }
 }
 
-async function responseJson<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    let code = `http_${response.status}`;
-    let detail: string | undefined;
-    try {
-      const body = await response.json() as {
-        error?: string;
-        message?: string;
-      };
-      if (body.error) code = body.error;
-      if (body.message) detail = body.message;
-    } catch {
-      // Ignore non-JSON error bodies.
-    }
-    throw new ApiError(code, detail);
+async function responseError(response: Response): Promise<never> {
+  let code = `http_${response.status}`;
+  let detail: string | undefined;
+  try {
+    const body = await response.json() as {
+      error?: string;
+      message?: string;
+    };
+    if (body.error) code = body.error;
+    if (body.message) detail = body.message;
+  } catch {
+    // Ignore non-JSON error bodies.
   }
+  throw new ApiError(code, detail);
+}
+
+async function responseJson<T>(response: Response): Promise<T> {
+  if (!response.ok) return responseError(response);
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+async function responseBlob(response: Response): Promise<Blob> {
+  if (!response.ok) return responseError(response);
+  return response.blob();
 }
 
 export async function authStatus() {
@@ -123,6 +133,21 @@ export async function readWorkspaceFile(
 ) {
   return responseJson<WorkspaceFileReadResponse>(await fetch(
     `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/files/read`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path })
+    }
+  ));
+}
+
+export async function readWorkspaceImage(
+  workspaceId: string,
+  path: string
+) {
+  return responseBlob(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/files/image`,
     {
       method: "POST",
       credentials: "same-origin",
@@ -273,6 +298,67 @@ export async function createSession(workspaceId: string) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ workspaceId, cols: 80, rows: 24 })
   }));
+}
+
+export async function listSessionArtifacts(sessionId: string) {
+  return responseJson<SessionArtifactListResponse>(await fetch(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/artifacts/list`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    }
+  ));
+}
+
+export async function uploadSessionArtifact(
+  sessionId: string,
+  file: File
+) {
+  if (file.size < 1 || file.size > MAX_SESSION_ARTIFACT_BYTES) {
+    throw new ApiError("artifact_too_large");
+  }
+  return responseJson<{ artifact: SessionArtifact }>(await fetch(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/artifacts/upload`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/octet-stream",
+        "x-palmtty-filename": encodeURIComponent(file.name || "image")
+      },
+      body: file
+    }
+  ));
+}
+
+export async function readSessionArtifactContent(
+  sessionId: string,
+  artifactId: string
+) {
+  return responseBlob(await fetch(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifactId)}/content`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    }
+  ));
+}
+
+export async function deleteSessionArtifact(
+  sessionId: string,
+  artifactId: string
+) {
+  return responseJson<void>(await fetch(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifactId)}`,
+    {
+      method: "DELETE",
+      credentials: "same-origin"
+    }
+  ));
 }
 
 export async function terminateSession(id: string) {

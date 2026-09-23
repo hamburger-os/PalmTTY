@@ -1,16 +1,18 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { WorkspacePublic } from "@palmtty/protocol";
+import { ArtifactsPane } from "./ArtifactsPane.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { FilesPane } from "./FilesPane.js";
 import { GitPane } from "./GitPane.js";
 import { useI18n } from "./i18n.js";
 import {
   TerminalView,
-  type ConnectionState
+  type ConnectionState,
+  type TerminalInsertRequest
 } from "./TerminalView.js";
 import { workbenchVisualViewportFrame } from "./visual-viewport.js";
 
-type WorkbenchPane = "terminal" | "git" | "files";
+type WorkbenchPane = "terminal" | "git" | "files" | "artifacts";
 
 export function SessionWorkbench({
   sessionId,
@@ -30,6 +32,8 @@ export function SessionWorkbench({
   const [restarting, setRestarting] = useState(false);
   const [restartError, setRestartError] = useState<string | null>(null);
   const [gitWritesEnabled, setGitWritesEnabled] = useState(false);
+  const [terminalInsert, setTerminalInsert] = useState<TerminalInsertRequest>();
+  const terminalInsertSequence = useRef(0);
 
   const handleConnectionChange = useCallback((next: ConnectionState) => {
     setConnection(next);
@@ -90,8 +94,17 @@ export function SessionWorkbench({
   }, []);
 
   const selectPane = (next: WorkbenchPane) => {
-    if (next !== "terminal" && !workspace) return;
+    if ((next === "git" || next === "files") && !workspace) return;
     setPane(next);
+  };
+
+  const insertArtifactPath = (artifactPath: string) => {
+    terminalInsertSequence.current += 1;
+    setTerminalInsert({
+      id: terminalInsertSequence.current,
+      text: `${artifactPath} `
+    });
+    setPane("terminal");
   };
 
   return (
@@ -112,14 +125,14 @@ export function SessionWorkbench({
         </div>
 
         <nav className="workbench-tabs" role="tablist" aria-label={t("workbench.views")}>
-          {(["terminal", "git", "files"] as const).map((item) => (
+          {(["terminal", "git", "files", "artifacts"] as const).map((item) => (
             <button
               type="button"
               role="tab"
               key={item}
               className={pane === item ? "selected" : ""}
               aria-selected={pane === item}
-              disabled={item !== "terminal" && !workspace}
+              disabled={(item === "git" || item === "files") && !workspace}
               onClick={() => selectPane(item)}
             >
               {t(`workbench.${item}`)}
@@ -154,6 +167,7 @@ export function SessionWorkbench({
           <TerminalView
             sessionId={sessionId}
             active={pane === "terminal"}
+            insertRequest={terminalInsert}
             onConnectionChange={handleConnectionChange}
           />
         </div>
@@ -171,6 +185,17 @@ export function SessionWorkbench({
         {workspace && pane === "files" && (
           <div className="workbench-pane is-active">
             <FilesPane workspaceId={workspace.id} />
+          </div>
+        )}
+
+        {pane === "artifacts" && (
+          <div className="workbench-pane is-active">
+            <ArtifactsPane
+              sessionId={sessionId}
+              canUpload={connection === "connected"}
+              canInsert={connection === "connected"}
+              onInsertPath={insertArtifactPath}
+            />
           </div>
         )}
       </div>

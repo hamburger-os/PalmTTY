@@ -25,7 +25,9 @@ import {
 import { withoutEnvironmentKeys } from "./host-environment.js";
 import {
   resolveRuntimeWorkspace,
-  type RuntimeWorkspace
+  sessionLaunchRuntime,
+  type RuntimeWorkspace,
+  type SessionLaunchRuntime
 } from "./workspace-runtime.js";
 import type { WorkspaceStore } from "./workspace-store.js";
 
@@ -42,6 +44,7 @@ export type SessionManagerOptions = {
   runtimeDir?: string;
   workerSpawner?: WorkerSpawner;
   workspaceStore: WorkspaceStore;
+  onSessionDisposed?: (sessionId: string) => Promise<void> | void;
 };
 
 const CREATE_CONNECT_DELAYS_MS = [0, 50, 100, 200, 400, 800, 1200, 1600];
@@ -87,6 +90,9 @@ export class SessionManager {
   readonly runtimeDir: string;
   private readonly workerSpawner: WorkerSpawner;
   private readonly workspaceStore: WorkspaceStore;
+  private readonly onSessionDisposed:
+    | ((sessionId: string) => Promise<void> | void)
+    | undefined;
   private readonly sessions = new Map<string, ManagedWorker>();
   private readonly pendingByWorkspace = new Map<string, number>();
   private readonly restartInFlight = new Map<string, Promise<SessionPublic>>();
@@ -101,6 +107,7 @@ export class SessionManager {
     this.runtimeDir = options.runtimeDir ?? defaultRuntimeDir();
     this.workerSpawner = options.workerSpawner ?? new ProcessWorkerSpawner();
     this.workspaceStore = options.workspaceStore;
+    this.onSessionDisposed = options.onSessionDisposed;
   }
 
   async initialize(): Promise<void> {
@@ -155,6 +162,10 @@ export class SessionManager {
     return this.sessions.has(id);
   }
 
+  getLaunchRuntime(id: string): SessionLaunchRuntime | undefined {
+    return this.sessions.get(id)?.record.launchRuntime;
+  }
+
   hasActiveWorkspaceSessions(workspaceId: string): boolean {
     if ((this.pendingByWorkspace.get(workspaceId) ?? 0) > 0) return true;
     return [...this.sessions.values()].some(
@@ -175,7 +186,12 @@ export class SessionManager {
       traceWindowsSpawn(`workspace:${workspaceId}`, "runtime.resolve.begin");
       const workspace = await resolveRuntimeWorkspace(definition);
       traceWindowsSpawn(`workspace:${workspaceId}`, "runtime.resolve.ready");
-      return await this.spawnSession(workspace, cols, rows);
+      return await this.spawnSession(
+        workspace,
+        sessionLaunchRuntime(definition),
+        cols,
+        rows
+      );
     } finally {
       release();
     }
@@ -212,6 +228,7 @@ export class SessionManager {
 
   private async spawnSession(
     workspace: RuntimeWorkspace,
+    launchRuntime: SessionLaunchRuntime,
     cols: number,
     rows: number
   ): Promise<SessionPublic> {
@@ -243,6 +260,7 @@ export class SessionManager {
       ...(traceWindowsSpawnEnabled ? { traceWindowsSpawn: true } : {}),
       createdAt,
       workspace: workerWorkspace,
+      launchRuntime,
       session: {
         exitedRetentionMinutes: this.config.sessions.exitedRetentionMinutes,
         scrollbackLines: this.config.sessions.scrollbackLines,
@@ -394,7 +412,12 @@ export class SessionManager {
         }
       }
 
-      return await this.spawnSession(replacement, cols, rows);
+      return await this.spawnSession(
+        replacement,
+        sessionLaunchRuntime(definition),
+        cols,
+        rows
+      );
     } finally {
       release();
     }
@@ -419,6 +442,7 @@ export class SessionManager {
     }
     managed.clients.clear();
     managed.worker.close();
+    await this.disposeSessionResources(id);
     return "removed";
   }
 
@@ -463,6 +487,7 @@ export class SessionManager {
           }
         }
         managed.clients.clear();
+        void this.disposeSessionResources(managed.record.sessionId);
         return;
       }
 
@@ -547,6 +572,7 @@ export class SessionManager {
               this.sessions.delete(managed.record.sessionId);
             }
             await removeWorkerState(this.runtimeDir, managed.record);
+            await this.disposeSessionResources(managed.record.sessionId);
             return;
           }
           // A live or unverifiable Worker keeps ownership of its recovery
@@ -635,6 +661,15 @@ export class SessionManager {
     throw lastError instanceof Error
       ? lastError
       : new Error("Session worker did not publish its metadata");
+  }
+
+  private async disposeSessionResources(sessionId: string): Promise<void> {
+    try {
+      await this.onSessionDisposed?.(sessionId);
+    } catch {
+      // Session disposal must not resurrect or retain a terminal because
+      // ancillary artifact cleanup failed. Orphan cleanup retries on startup.
+    }
   }
 
   private publicSession(managed: ManagedWorker): SessionPublic {
