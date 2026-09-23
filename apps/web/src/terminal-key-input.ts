@@ -3,6 +3,10 @@ export type TerminalModifierState = Readonly<{
   alt: boolean;
 }>;
 
+export type TerminalKeyEncodingContext = Readonly<{
+  applicationCursorKeysMode?: boolean;
+}>;
+
 export type TerminalKey =
   | "escape"
   | "tab"
@@ -21,6 +25,7 @@ export type TerminalKey =
 
 const ESC = "\u001b";
 const NO_MODIFIERS: TerminalModifierState = { ctrl: false, alt: false };
+const NO_CONTEXT: TerminalKeyEncodingContext = {};
 
 const BASE_KEY_SEQUENCES: Record<TerminalKey, string> = {
   escape: ESC,
@@ -39,12 +44,20 @@ const BASE_KEY_SEQUENCES: Record<TerminalKey, string> = {
   delete: `${ESC}[3~`
 };
 
-const KEY_BY_SEQUENCE = new Map(
-  Object.entries(BASE_KEY_SEQUENCES).map(([key, sequence]) => [
-    sequence,
-    key as TerminalKey
-  ])
-);
+const APPLICATION_CURSOR_SEQUENCES: Partial<Record<TerminalKey, string>> = {
+  arrowUp: `${ESC}OA`,
+  arrowDown: `${ESC}OB`,
+  arrowRight: `${ESC}OC`,
+  arrowLeft: `${ESC}OD`
+};
+
+const KEY_BY_SEQUENCE = new Map<string, TerminalKey>();
+for (const [key, sequence] of Object.entries(BASE_KEY_SEQUENCES)) {
+  KEY_BY_SEQUENCE.set(sequence, key as TerminalKey);
+}
+for (const [key, sequence] of Object.entries(APPLICATION_CURSOR_SEQUENCES)) {
+  if (sequence) KEY_BY_SEQUENCE.set(sequence, key as TerminalKey);
+}
 
 export function controlCharacter(value: string): string | undefined {
   if (value.length !== 1) return undefined;
@@ -55,9 +68,7 @@ export function controlCharacter(value: string): string | undefined {
 
 export function encodeControlShortcut(value: string): string {
   const sequence = controlCharacter(value);
-  if (!sequence) {
-    throw new Error(`Unsupported Ctrl shortcut: ${value}`);
-  }
+  if (!sequence) throw new Error(`Unsupported Ctrl shortcut: ${value}`);
   return sequence;
 }
 
@@ -73,37 +84,39 @@ function modifiedNavigationSequence(
   if (parameter === 1) return undefined;
 
   switch (key) {
-    case "arrowUp":
-      return `${ESC}[1;${parameter}A`;
-    case "arrowDown":
-      return `${ESC}[1;${parameter}B`;
-    case "arrowRight":
-      return `${ESC}[1;${parameter}C`;
-    case "arrowLeft":
-      return `${ESC}[1;${parameter}D`;
-    case "home":
-      return `${ESC}[1;${parameter}H`;
-    case "end":
-      return `${ESC}[1;${parameter}F`;
-    case "pageUp":
-      return `${ESC}[5;${parameter}~`;
-    case "pageDown":
-      return `${ESC}[6;${parameter}~`;
-    case "delete":
-      return `${ESC}[3;${parameter}~`;
-    default:
-      return undefined;
+    case "arrowUp": return `${ESC}[1;${parameter}A`;
+    case "arrowDown": return `${ESC}[1;${parameter}B`;
+    case "arrowRight": return `${ESC}[1;${parameter}C`;
+    case "arrowLeft": return `${ESC}[1;${parameter}D`;
+    case "home": return `${ESC}[1;${parameter}H`;
+    case "end": return `${ESC}[1;${parameter}F`;
+    case "pageUp": return `${ESC}[5;${parameter}~`;
+    case "pageDown": return `${ESC}[6;${parameter}~`;
+    case "delete": return `${ESC}[3;${parameter}~`;
+    default: return undefined;
   }
+}
+
+function baseKeySequence(
+  key: TerminalKey,
+  context: TerminalKeyEncodingContext
+): string {
+  if (context.applicationCursorKeysMode) {
+    const sequence = APPLICATION_CURSOR_SEQUENCES[key];
+    if (sequence) return sequence;
+  }
+  return BASE_KEY_SEQUENCES[key];
 }
 
 export function encodeTerminalKey(
   key: TerminalKey,
-  modifiers: TerminalModifierState = NO_MODIFIERS
+  modifiers: TerminalModifierState = NO_MODIFIERS,
+  context: TerminalKeyEncodingContext = NO_CONTEXT
 ): string {
   const modifiedNavigation = modifiedNavigationSequence(key, modifiers);
   if (modifiedNavigation) return modifiedNavigation;
 
-  const base = BASE_KEY_SEQUENCES[key];
+  const base = baseKeySequence(key, context);
   return modifiers.alt ? ESC + base : base;
 }
 

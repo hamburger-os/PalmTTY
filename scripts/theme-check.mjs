@@ -66,7 +66,9 @@ const themeCss = await readFile(themeCssPath, "utf8");
 const themeTs = await readFile(themeTsPath, "utf8");
 const terminalViewPath = path.join(webSource, "TerminalView.tsx");
 const terminalKeyBarPath = path.join(webSource, "TerminalKeyBar.tsx");
+const terminalImeInputPath = path.join(webSource, "terminal-ime-input.ts");
 const terminalKeyInputPath = path.join(webSource, "terminal-key-input.ts");
+const terminalPreferencesPath = path.join(webSource, "terminal-preferences.ts");
 const visualViewportPath = path.join(webSource, "visual-viewport.ts");
 const viewportDebugPath = path.join(webSource, "ViewportDebug.tsx");
 const mainPath = path.join(webSource, "main.tsx");
@@ -76,7 +78,9 @@ const sessionWorkbenchPath = path.join(webSource, "SessionWorkbench.tsx");
 const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
 const terminalKeyBar = await readFile(terminalKeyBarPath, "utf8");
+const terminalImeInput = await readFile(terminalImeInputPath, "utf8");
 const terminalKeyInput = await readFile(terminalKeyInputPath, "utf8");
+const terminalPreferences = await readFile(terminalPreferencesPath, "utf8");
 const visualViewport = await readFile(visualViewportPath, "utf8");
 const viewportDebug = await readFile(viewportDebugPath, "utf8");
 const mainSource = await readFile(mainPath, "utf8");
@@ -125,8 +129,11 @@ for (const marker of [
 
 for (const marker of [
   "<TerminalKeyBar",
-  "applyTerminalModifiers(raw, modifiers)",
-  "encodeTerminalKey(key, {"
+  "new Ime229InputTransaction()",
+  "recoverIme229ControlKey(event)",
+  "terminal.attachCustomKeyEventHandler",
+  "terminal.paste(data)",
+  "applicationCursorKeysMode:"
 ]) {
   if (!terminalView.includes(marker)) {
     failures.push(`apps/web/src/TerminalView.tsx [terminal-keybar-contract] missing ${marker}`);
@@ -138,6 +145,7 @@ for (const marker of [
   'shortcutButton("Ctrl+J"',
   'keyButton("Shift+Tab", "backTab")',
   'shortcutButton("Ctrl+D"',
+  'shortcutButton("/", "/")',
   'aria-pressed={ctrl}',
   'aria-pressed={alt}',
   'aria-expanded={moreOpen}'
@@ -150,11 +158,33 @@ for (const marker of [
 for (const marker of [
   'enter: "\\r"',
   'backTab: `\${ESC}[Z`',
+  "APPLICATION_CURSOR_SEQUENCES",
   "modifiedNavigationSequence(",
   "applyTerminalModifiers("
 ]) {
   if (!terminalKeyInput.includes(marker)) {
     failures.push(`apps/web/src/terminal-key-input.ts [terminal-keybar-contract] missing ${marker}`);
+  }
+}
+
+for (const marker of [
+  "class Ime229InputTransaction",
+  "textareaInputDelta(",
+  "recoverIme229ControlKey("
+]) {
+  if (!terminalImeInput.includes(marker)) {
+    failures.push(`apps/web/src/terminal-ime-input.ts [terminal-ime-contract] missing ${marker}`);
+  }
+}
+
+for (const marker of [
+  "MIN_TERMINAL_FONT_SIZE",
+  "MAX_TERMINAL_FONT_SIZE",
+  "readTerminalFontSize(",
+  "writeTerminalFontSize("
+]) {
+  if (!terminalPreferences.includes(marker)) {
+    failures.push(`apps/web/src/terminal-preferences.ts [terminal-density-contract] missing ${marker}`);
   }
 }
 

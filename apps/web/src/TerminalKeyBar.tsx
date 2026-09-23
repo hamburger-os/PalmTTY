@@ -3,6 +3,10 @@ import {
   encodeControlShortcut,
   type TerminalKey
 } from "./terminal-key-input.js";
+import {
+  MAX_TERMINAL_FONT_SIZE,
+  MIN_TERMINAL_FONT_SIZE
+} from "./terminal-preferences.js";
 
 const SHORTCUTS = {
   ctrlA: encodeControlShortcut("A"),
@@ -30,7 +34,10 @@ export function TerminalKeyBar({
   onToggleMore,
   onSendKey,
   onSendData,
-  onLongInput
+  onLongInput,
+  fontSize,
+  onDecreaseFontSize,
+  onIncreaseFontSize
 }: {
   connected: boolean;
   ctrl: boolean;
@@ -43,6 +50,9 @@ export function TerminalKeyBar({
   onSendKey(key: TerminalKey): void;
   onSendData(data: string): void;
   onLongInput(): void;
+  fontSize: number;
+  onDecreaseFontSize(): void;
+  onIncreaseFontSize(): void;
 }) {
   const { t } = useI18n();
 
@@ -89,6 +99,7 @@ export function TerminalKeyBar({
         {keyButton("Esc", "escape", t("terminal.keyEscape"))}
         {keyButton("Tab", "tab", t("terminal.keyTab"))}
         {keyButton("Enter", "enter", t("terminal.keyEnter"))}
+        {shortcutButton("/", "/")}
         <button
           type="button"
           className={ctrl ? "armed" : ""}
@@ -116,6 +127,24 @@ export function TerminalKeyBar({
         >
           {moreOpen ? t("terminal.lessKeys") : t("terminal.moreKeys")}
         </button>
+        <button
+          type="button"
+          disabled={fontSize <= MIN_TERMINAL_FONT_SIZE}
+          aria-label={t("terminal.fontSmaller")}
+          title={t("terminal.fontSmaller")}
+          onClick={onDecreaseFontSize}
+        >
+          A−
+        </button>
+        <button
+          type="button"
+          disabled={fontSize >= MAX_TERMINAL_FONT_SIZE}
+          aria-label={t("terminal.fontLarger")}
+          title={t("terminal.fontLarger")}
+          onClick={onIncreaseFontSize}
+        >
+          A+
+        </button>
         {keyButton("↑", "arrowUp", t("terminal.keyArrowUp"))}
         {keyButton("↓", "arrowDown", t("terminal.keyArrowDown"))}
         {keyButton("←", "arrowLeft", t("terminal.keyArrowLeft"))}
@@ -139,6 +168,9 @@ export function TerminalKeyBar({
           className="keybar-row keybar-more-row"
           aria-label={t("terminal.moreSpecialKeys")}
         >
+          {shortcutButton("\\", "\\")}
+          {shortcutButton("|", "|")}
+          {shortcutButton("~", "~")}
           {keyButton("PgUp", "pageUp", t("terminal.keyPageUp"))}
           {keyButton("PgDn", "pageDown", t("terminal.keyPageDown"))}
           {keyButton("Home", "home", t("terminal.keyHome"))}

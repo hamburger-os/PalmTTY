@@ -3,7 +3,7 @@ name: palmtty-theme-review
 description: "Audit PalmTTY Web UI for theme SSOT compliance, mobile rendering quality, semantic surface ownership, terminal lifecycle isolation, and visual performance regressions."
 license: Apache-2.0
 metadata:
-  version: "1.8.0"
+  version: "1.9.0"
 ---
 
 # PalmTTY theme and rendering review
@@ -49,7 +49,7 @@ For each relevant combination inspect:
 3. workspace create/edit, including a form tall enough to scroll while header/footer remain reachable;
 4. directory picker;
 5. destructive confirmation;
-6. Session workbench in Terminal / Git / Files / Artifacts views; terminal connected/reconnecting/closed, checking that pane switching does not recreate xterm/WebSocket state and that the frame gutter, xterm viewport remainder and xterm canvas read as one surface; generate more than one viewport of normal-buffer output on a real touch device/emulation and verify one-finger vertical swipes use xterm-owned continuous/inertial scrolling while the page stays fixed, all editable mobile controls compute to at least 16px, a simple tap (or the explicit keyboard button) focuses xterm and opens the mobile soft keyboard without turning swipes into focus gestures, the whole workbench (header/content/key bar) fits inside the visible area above the keyboard both at scale 1 and after pinch zoom, closing the keyboard restores the frame, initial load is not oversized, user pinch zoom still works, the final row is fully visible at the live bottom, and an alternate-buffer/mouse-tracking application keeps xterm-owned touch semantics; use `?viewportDebug=1` when viewport state needs evidence;
+6. Session workbench in Terminal / Git / Files / Artifacts views; terminal connected/reconnecting/closed, checking that pane switching does not recreate xterm/WebSocket state and that the frame gutter, xterm viewport remainder and xterm canvas read as one surface; generate more than one viewport of normal-buffer output on a real touch device/emulation and verify one-finger vertical swipes use xterm-owned continuous/inertial scrolling while the page stays fixed, all editable mobile controls compute to at least 16px, a simple tap (or the explicit keyboard button) focuses xterm and opens the mobile soft keyboard without turning swipes into focus gestures, the whole workbench (header/content/key bar) fits inside the visible area above the keyboard both at scale 1 and after pinch zoom, closing the keyboard restores the frame, initial load is not oversized, user pinch zoom still works, the final row is fully visible at the live bottom, and an alternate-buffer/mouse-tracking application keeps xterm-owned touch semantics; with an iOS Chinese IME verify literal `/`, spaces and punctuation survive keyCode-229 input without duplication, genuine Chinese composition commits once, Ctrl+J/Ctrl+C/Ctrl+Space/Escape remain usable when the platform reports physical codes, the literal slash keybar fallback works, application-cursor mode changes virtual arrow sequences correctly, long text preserves bracketed-paste semantics, and A−/A+ refit the live terminal without reconnecting; use `?viewportDebug=1` when viewport state needs evidence;
 7. Files text/image preview, Artifacts empty/list/image-preview/upload/delete states, and Git status + diff in narrow/mobile and desktop layouts; verify the four-tab row stays usable, Artifacts mobile preview replaces the list rather than causing horizontal overflow, and switching to/from Artifacts does not recreate xterm/WebSocket state; for Git, verify wheel/trackpad/touch scrolling works when the pointer/finger starts over change rows and action buttons, with the sidebar as the single vertical scroll owner rather than nested group/list scrollers;
 8. portrait;
 9. short landscape.
@@ -69,6 +69,7 @@ HIGH:
 - padding/border/clipping placed on the xterm FitAddon mount instead of the outer terminal frame, which can overestimate rows and clip the final line;
 - terminal-level VisualViewport handling that competes with the Session workbench, keyboard opening that leaves controls/input behind the soft keyboard, viewport code that disables framing when `visualViewport.scale !== 1`, or code that disables/overrides user pinch zoom;
 - editable mobile controls below 16px, including compact selects, login/Git inputs, long-input textarea or xterm helper textarea;
+- an IME workaround that sends keyCode-229 text twice, steals real composition ownership from xterm, handles the same control on keydown and keyup, depends on a CLI/vendor, or bypasses bracketed-paste/application-cursor terminal modes;
 - modal content transparency high enough that background cards/actions compete with form text;
 - theme-specific material forks instead of veil/tokens;
 - Performance mode still runs decorative continuous animation;
