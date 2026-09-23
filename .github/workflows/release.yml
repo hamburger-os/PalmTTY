@@ -230,7 +230,12 @@ jobs:
             exit 1
           fi
 
-          jq -n             --arg tag "$TAG"             --arg name "$TAG"             --rawfile body /tmp/palmtty-release-notes.md             --argjson prerelease "$PRERELEASE"             '{
+          jq -n \
+            --arg tag "$TAG" \
+            --arg name "$TAG" \
+            --rawfile body /tmp/palmtty-release-notes.md \
+            --argjson prerelease "$PRERELEASE" \
+            '{
               tag_name: $tag,
               name: $name,
               body: $body,
@@ -238,7 +243,9 @@ jobs:
               prerelease: $prerelease
             }' > /tmp/palmtty-release-create.json
 
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/releases"             --input /tmp/palmtty-release-create.json             > /tmp/palmtty-release.json
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
+            --input /tmp/palmtty-release-create.json \
+            > /tmp/palmtty-release.json
           CREATED_RELEASE=true
 
           RELEASE_ID="$(jq -r '.id // empty' /tmp/palmtty-release.json)"
@@ -266,11 +273,22 @@ jobs:
           for name in "${expected_assets[@]}"; do
             asset="/tmp/palmtty-assets/$name"
             test -s "$asset"
-            curl --fail-with-body --silent --show-error               --request POST               --header "Authorization: Bearer $GH_TOKEN"               --header "Accept: application/vnd.github+json"               --header "X-GitHub-Api-Version: 2022-11-28"               --header "Content-Type: application/octet-stream"               --data-binary "@$asset"               "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets?name=$name"               > "/tmp/upload-$name.json"
-            jq --arg name "$name" -e '.name == $name and .state == "uploaded" and .size > 0'               "/tmp/upload-$name.json" >/dev/null
+            curl --fail-with-body --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --header "Content-Type: application/octet-stream" \
+              --data-binary "@$asset" \
+              "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets?name=$name" \
+              > "/tmp/upload-$name.json"
+            jq --arg name "$name" \
+              -e '.name == $name and .state == "uploaded" and .size > 0' \
+              "/tmp/upload-$name.json" >/dev/null
           done
 
-          gh api "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets?per_page=100"             > /tmp/palmtty-release-assets.json
+          gh api "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID/assets?per_page=100" \
+            > /tmp/palmtty-release-assets.json
           test "$(jq 'length' /tmp/palmtty-release-assets.json)" -eq "${#expected_assets[@]}"
           for name in "${expected_assets[@]}"; do
             local_size="$(stat -c '%s' "/tmp/palmtty-assets/$name")"
@@ -291,7 +309,9 @@ jobs:
           fi
 
           printf '%s\n' '{"draft":false}' > /tmp/palmtty-release-publish.json
-          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID"             --input /tmp/palmtty-release-publish.json             > /tmp/palmtty-release-final.json
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID" \
+            --input /tmp/palmtty-release-publish.json \
+            > /tmp/palmtty-release-final.json
 
           jq --arg tag "$TAG" --argjson prerelease "$PRERELEASE" -e '
             .tag_name == $tag and
