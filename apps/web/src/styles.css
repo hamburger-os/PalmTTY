@@ -348,9 +348,37 @@ button.icon-button {
   margin: -6px -6px var(--space-3) 0;
 }
 
-.palm-mark {
-  margin-bottom: var(--space-2);
-  font-size: 34px;
+.brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.brand-copy {
+  min-width: 0;
+}
+
+.brand-mark {
+  display: block;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.brand-hero {
+  justify-content: center;
+  margin-bottom: var(--space-3);
+}
+
+.brand-hero .brand-mark {
+  width: 72px;
+  height: 72px;
+}
+
+.brand-hero h1 {
+  font-size: clamp(1.9rem, 8vw, 2.4rem);
 }
 
 .error-banner {

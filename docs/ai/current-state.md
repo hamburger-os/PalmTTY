@@ -121,6 +121,7 @@ Status: **alpha foundation implemented with durable per-session workers, Windows
 - native workspace dialog activation is idempotent under React StrictMode, with React state remaining the owner of open/close lifecycle
 - token login
 - English / Simplified Chinese UI with persisted browser language preference
+- first-party PalmTTY branding assets: a canonical transparent `logo.png`, square 192/512 PNG app icons, theme-safe icon + live-text branding in login/loading/home chrome, plus favicon/Apple-touch/PWA manifest wiring; branding is presentation-only and does not enter terminal/session state
 - client-side Spectrum / Obsidian / Frosted visual themes with persisted browser preference, plus Quality / Performance rendering modes and reduced-motion-aware decorative animation
 - PalmTTY-owned semantic glass surface system and four-color ambient field; visual rules live in `.agents/skills/palmtty-theme/SKILL.md` rather than component-local palettes, with dedicated modal and terminal surface ownership instead of stacking generic glass under those regions
 - workspace create/edit/delete UI with terminal profiles as the primary choice; Host/WSL runtime details are hidden behind the Custom advanced path
