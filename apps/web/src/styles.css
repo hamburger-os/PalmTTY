@@ -616,6 +616,10 @@ button.directory-choose {
   height: 100%;
 }
 
+.terminal-mount .xterm-helper-textarea {
+  font-size: 16px;
+}
+
 .terminal-mount .xterm:not(.allow-transparency) .xterm-viewport,
 .terminal-mount .xterm:not(.allow-transparency) .xterm-scrollable-element {
   background-color: var(--terminal-background);
@@ -781,6 +785,14 @@ button.directory-choose {
     max(7px, env(safe-area-inset-left));
   overflow: hidden;
   overscroll-behavior: none;
+}
+
+.workbench-page.has-visual-viewport-frame {
+  position: fixed;
+  top: var(--workbench-visual-top);
+  left: var(--workbench-visual-left);
+  width: var(--workbench-visual-width);
+  height: var(--workbench-visual-height);
 }
 
 .workbench-header {
