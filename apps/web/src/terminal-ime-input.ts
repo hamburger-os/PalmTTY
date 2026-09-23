@@ -26,15 +26,17 @@ export class Ime229InputTransaction {
     this.bufferedData = "";
   }
 
-  finalize(textareaValue: string): string | undefined {
+  flush(
+    textareaValue: string,
+    complete: boolean
+  ): string | undefined {
     const baseline = this.baseline;
     if (baseline === undefined) return undefined;
 
-    const buffered = this.bufferedData;
-    this.cancel();
-
     const delta = textareaInputDelta(baseline, textareaValue);
-    return delta || buffered || undefined;
+    const data = delta || this.bufferedData || undefined;
+    if (data || complete) this.cancel();
+    return data;
   }
 }
 
@@ -44,19 +46,19 @@ export function textareaInputDelta(
 ): string {
   if (previousValue === nextValue) return "";
 
-  const previous = Array.from(previousValue);
-  const next = Array.from(nextValue);
+  if (nextValue.length < previousValue.length) return DEL;
+
   let commonPrefix = 0;
   while (
-    commonPrefix < previous.length &&
-    commonPrefix < next.length &&
-    previous[commonPrefix] === next[commonPrefix]
+    commonPrefix < previousValue.length &&
+    commonPrefix < nextValue.length &&
+    previousValue.charCodeAt(commonPrefix) === nextValue.charCodeAt(commonPrefix)
   ) {
     commonPrefix += 1;
   }
 
-  const removed = previous.length - commonPrefix;
-  const inserted = next.slice(commonPrefix).join("");
+  const removed = previousValue.length - commonPrefix;
+  const inserted = nextValue.substring(commonPrefix);
   return DEL.repeat(removed) + inserted;
 }
 

@@ -20,7 +20,7 @@ describe("terminal IME input compatibility", () => {
     const transaction = new Ime229InputTransaction();
     transaction.begin("");
     expect(transaction.captureTerminalData("/")).toBeUndefined();
-    expect(transaction.finalize("/")).toBe("/");
+    expect(transaction.flush("/", true)).toBe("/");
     expect(transaction.active).toBe(false);
   });
 
@@ -28,7 +28,20 @@ describe("terminal IME input compatibility", () => {
     const transaction = new Ime229InputTransaction();
     transaction.begin("same");
     transaction.captureTerminalData("\r");
-    expect(transaction.finalize("same")).toBe("\r");
+    expect(transaction.flush("same", true)).toBe("\r");
+  });
+
+  it("keeps an empty timer flush pending until keyup can observe the value", () => {
+    const transaction = new Ime229InputTransaction();
+    transaction.begin("same");
+    expect(transaction.flush("same", false)).toBeUndefined();
+    expect(transaction.active).toBe(true);
+    expect(transaction.flush("same/", true)).toBe("/");
+    expect(transaction.active).toBe(false);
+  });
+
+  it("uses one DEL when the hidden textarea shrinks", () => {
+    expect(textareaInputDelta("abc", "a")).toBe("\u007f");
   });
 
   it("cancels a pending fallback when real composition takes ownership", () => {
@@ -36,7 +49,7 @@ describe("terminal IME input compatibility", () => {
     transaction.begin("");
     transaction.captureTerminalData("x");
     transaction.cancel();
-    expect(transaction.finalize("字")).toBeUndefined();
+    expect(transaction.flush("字", true)).toBeUndefined();
   });
 
   it("recovers confirmed control keys hidden behind keyCode 229", () => {

@@ -175,7 +175,11 @@ export function TerminalView({
 
   useEffect(() => {
     fontSizeRef.current = fontSize;
-    writeTerminalFontSize(window.localStorage, fontSize);
+    try {
+      writeTerminalFontSize(window.localStorage, fontSize);
+    } catch {
+      // Accessing localStorage itself may be blocked in hardened contexts.
+    }
     const terminal = terminalRef.current;
     if (!terminal) return;
     terminal.options.fontSize = fontSize;
@@ -249,6 +253,7 @@ export function TerminalView({
     const terminalTextarea = terminal.textarea;
     let imeFallbackTimer: number | undefined;
     let imeKeyupTimer: number | undefined;
+    let compositionActive = false;
 
     const clearImeTimers = () => {
       if (imeFallbackTimer !== undefined) {
@@ -261,22 +266,31 @@ export function TerminalView({
       }
     };
 
-    const finalizeImeInput = () => {
+    const flushImeInput = (complete: boolean) => {
+      const data = imeInput.flush(terminalTextarea?.value ?? "", complete);
+      if (!data) return;
       clearImeTimers();
-      const data = imeInput.finalize(terminalTextarea?.value ?? "");
-      if (data) terminal.input(data, true);
+      terminal.input(data, true);
     };
 
     const scheduleImeFallback = () => {
       if (imeFallbackTimer !== undefined) return;
-      imeFallbackTimer = window.setTimeout(finalizeImeInput, 250);
+      imeFallbackTimer = window.setTimeout(() => {
+        imeFallbackTimer = undefined;
+        flushImeInput(false);
+      }, 0);
     };
 
     const onCompositionStart = () => {
+      compositionActive = true;
       clearImeTimers();
       imeInput.cancel();
     };
+    const onCompositionEnd = () => {
+      compositionActive = false;
+    };
     terminalTextarea?.addEventListener("compositionstart", onCompositionStart);
+    terminalTextarea?.addEventListener("compositionend", onCompositionEnd);
 
     terminal.attachCustomKeyEventHandler((event) => {
       const recoveredControl = recoverIme229ControlKey(event);
@@ -298,7 +312,7 @@ export function TerminalView({
         !event.ctrlKey &&
         !event.altKey &&
         !event.metaKey &&
-        !event.isComposing
+        !compositionActive
       ) {
         imeInput.begin(terminalTextarea?.value ?? "");
         scheduleImeFallback();
@@ -307,7 +321,14 @@ export function TerminalView({
 
       if (event.type === "keyup" && imeInput.active) {
         if (imeKeyupTimer === undefined) {
-          imeKeyupTimer = window.setTimeout(finalizeImeInput, 0);
+          imeKeyupTimer = window.setTimeout(() => {
+            imeKeyupTimer = undefined;
+            if (imeFallbackTimer !== undefined) {
+              window.clearTimeout(imeFallbackTimer);
+              imeFallbackTimer = undefined;
+            }
+            flushImeInput(true);
+          }, 0);
         }
       }
       return true;
@@ -537,6 +558,7 @@ export function TerminalView({
       clearImeTimers();
       imeInput.cancel();
       terminalTextarea?.removeEventListener("compositionstart", onCompositionStart);
+      terminalTextarea?.removeEventListener("compositionend", onCompositionEnd);
       mount.removeEventListener("click", focusTerminal);
       dataDisposable.dispose();
       socketRef.current?.close(1000, "Leaving terminal view");
