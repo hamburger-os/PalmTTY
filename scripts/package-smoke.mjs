@@ -98,10 +98,8 @@ async function main() {
     const manifest = JSON.parse(
       await readFile(path.join(root, "release-manifest.json"), "utf8")
     );
-    const env = {
-      ...process.env,
-      PALMTTY_INSTALL_ROOT: root
-    };
+    const env = { ...process.env };
+    delete env.PALMTTY_INSTALL_ROOT;
     const version = run(node, [cli, "version"], { cwd: root, env }).stdout.trim();
     if (version !== manifest.version) {
       throw new Error(
