@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.8.0"
+  version: "1.9.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -144,6 +144,8 @@ On touch devices, a one-finger vertical drag that starts inside the terminal sur
 
 Keyboard activation is a separate responsibility from touch scrolling. A normal click/tap may synchronously bridge to `terminal.focus()` so mobile Safari/Chrome can activate xterm's hidden textarea, and the mobile key bar may expose an explicit keyboard-focus button. That bridge must not inspect or translate touch deltas, call `preventDefault()`, or become a second gesture recognizer. On coarse-pointer/mobile layouts, every editable `input`, `textarea`, and `select` must render at 16px or larger; this includes xterm's hidden helper textarea and compact appearance/language controls, because sub-16px editable controls can trigger iOS focus zoom.
 
+IME compatibility is a narrow browser-input boundary, not a second terminal implementation. PalmTTY may use xterm's public `textarea`, `attachCustomKeyEventHandler`, `input`, `paste`, and `modes` APIs to compensate for confirmed keyCode-229 gaps, but it must leave genuine composition owned by xterm, buffer/deduplicate xterm `onData` from the same pending transaction, and never inspect terminal output to infer a CLI. Physical Ctrl+letter/Ctrl+Space/Escape recovery is limited to confirmed non-composing keyCode-229 keydown events. Long-text input uses xterm paste semantics so bracketed-paste mode is preserved, with Enter explicit rather than implicit. Virtual cursor keys honor xterm's current DECCKM/application-cursor mode instead of hard-coding normal CSI arrows.
+
 Mobile viewport geometry has one owner above the terminal: the Session workbench follows the current `window.visualViewport` rectangle, including its offset during soft-keyboard/browser-chrome changes and while the user is pinch-zoomed. Resize and scroll events update that presentation frame. `visualViewport.scale` is diagnostic state, never a gate that disables viewport framing; PalmTTY must not write or reset the user's zoom. The viewport meta may opt into `interactive-widget=resizes-content` as progressive enhancement, but correctness must not depend on browser support for that hint. An opt-in `?viewportDebug=1` overlay may report viewport/focus metrics without logging terminal content or secrets.
 
 Fit geometry has a separate ownership rule: the visual `.terminal-frame` may own border, radius, padding and clipping, but xterm must be opened into a nested `.terminal-mount` whose box is geometry-only and has no padding or border. FitAddon measures the xterm element's parent; decorative spacing on that parent can overestimate rows and clip the final rendered line. Resize observation targets the mount. Soft-keyboard/browser-chrome geometry reaches xterm only because the workbench changes the mount's size and its ResizeObserver schedules a fit; TerminalView must not create a competing VisualViewport listener.
@@ -159,7 +161,7 @@ PalmTTY is primarily operated from a phone.
 - Keep mobile editable controls at 16px or larger; achieve compactness with spacing and control dimensions, not sub-16px form text.
 - Keep terminal viewport ownership simple: one decorative frame around one padding-free xterm mount; xterm remains the only terminal scroll-physics implementation.
 - Controls must remain reachable in portrait and short landscape layouts.
-- The mobile terminal keybar may use horizontally scrollable rows, but it must not become a competing vertical scroll owner. Keep high-frequency actions (including Enter) in the core row; lower-frequency actions belong in an optional second horizontal row, and modifier buttons must expose pressed state accessibly.
+- The mobile terminal keybar may use horizontally scrollable rows, but it must not become a competing vertical scroll owner. Keep high-frequency actions (including Enter and a literal `/` fallback) in the core row; lower-frequency symbol/navigation actions belong in an optional second horizontal row, and modifier buttons must expose pressed state accessibly. Browser-local terminal font-size controls may refit the mounted xterm in place, but must not recreate transport/session state.
 - Workspace dialogs keep one intentional body scroll owner with header/footer actions always reachable; nested data regions may scroll only when bounded.
 - Dense workbench regions also need one intentional vertical scroll owner. In particular, the Git sidebar owns scrolling for repository summary, change groups and Git tools; group/list descendants must not create nested competing vertical scrollers. Files and Artifacts use one list scroller plus one independent preview scroller on wide screens; on narrow screens the selected preview replaces the list rather than creating side-by-side overflow. Image previews use ordinary bounded `<img>` content inside `.glass-content`, never a new backdrop/material layer.
 - High-frequency touch targets use the shared 44px target where space allows; compact secondary controls use the shared compact target rather than ad-hoc geometry.
