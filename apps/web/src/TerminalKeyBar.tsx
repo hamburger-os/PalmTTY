@@ -1,7 +1,6 @@
 import { useI18n } from "./i18n.js";
 import {
   encodeControlShortcut,
-  encodeTerminalKey,
   type TerminalKey
 } from "./terminal-key-input.js";
 
