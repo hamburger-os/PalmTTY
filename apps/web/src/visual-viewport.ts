@@ -10,7 +10,6 @@ export type WorkbenchVisualViewportFrame = {
   height: number;
 };
 
-
 export function workbenchVisualViewportFrame(
   viewport: WorkbenchVisualViewport
 ): WorkbenchVisualViewportFrame | null {
