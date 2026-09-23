@@ -50,8 +50,8 @@
 - xterm.js；浏览器端 xterm/fit 由根目录 `terminal-stack.json` 精确锁定，当前浏览器栈使用包含上游触摸滚动修复的 xterm 6.1 beta，而 Worker 端 headless/serialize 暂时保持稳定 6.0/0.14，避免把移动端输入修复与 canonical snapshot/recovery 升级绑在一起；
 - 手机终端不再维护 PalmTTY 自己的逐行 touch adapter：`.xterm-screen` 只用 `touch-action: none` 阻止 Safari/浏览器把手势变成页面平移，触摸事件继续由 xterm 自己的 Gesture/Viewport 路径处理，因此 normal scrollback 使用连续像素滚动与惯性，alternate buffer、mouse tracking、滚动条也保持同一套 xterm 语义；不建立第二个 DOM 滚动层，也不增加应用级 document touch handler。终端普通 click/tap 只承担 `terminal.focus()` 的键盘激活桥接，不读取 touch delta、不拦截 swipe；手机 keybar 另提供显式“键盘”按钮作为可靠入口；在 coarse-pointer/mobile 布局上，所有可编辑 `input/textarea/select`（包括紧凑主题/性能/语言选择器、登录/Git 输入和 xterm helper textarea）统一至少 16px，避免 iOS 因聚焦小字号控件而主动放大页面；
 - 自动重连状态；
-- Esc、Tab、方向键、Ctrl+C、Ctrl+L；
-- 可切换的 Ctrl / Alt 一次性修饰键；
+- 手机快捷键栏不再由 `TerminalView` 手写字节序列：独立的纯函数按键编码层统一负责基础键、Ctrl/Alt 修饰与 xterm CSI 导航组合，UI 组件只声明动作；Enter 作为核心键前置，核心行还提供 Esc、Tab、方向键、Ctrl+C、Ctrl+J、Shift+Tab、Ctrl+D；
+- “更多”展开行为只增加第二条横向可滚动按键行，不建立新的纵向 scroll owner；其中提供 PgUp/PgDn、Home/End、Backspace/Delete，以及 Ctrl+L/R/O/G/K/A/E/U/W。Ctrl / Alt 仍是一键一次性修饰，但现在软键盘字符与虚拟导航键共用同一修饰语义，成功发送或断线后都会清除 armed 状态；
 - 适合粘贴、语音输入和 AI Prompt 的按需长文本弹窗；不再常驻聊天式发送栏，从而把垂直空间还给终端；
 - 竖屏/横屏布局；
 - Safe Area 处理；
