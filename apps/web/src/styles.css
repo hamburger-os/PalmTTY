@@ -692,16 +692,24 @@ button.directory-choose {
 }
 
 .keybar {
-  display: flex;
+  display: grid;
   border-radius: var(--radius-md);
   gap: 6px;
-  overflow-x: auto;
+  overflow: hidden;
   padding: 7px 8px;
+}
+
+.keybar-row {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
   overscroll-behavior-x: contain;
 }
 
-.keybar::-webkit-scrollbar {
+.keybar-row::-webkit-scrollbar {
   display: none;
 }
 
