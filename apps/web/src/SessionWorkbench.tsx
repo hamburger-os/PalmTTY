@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { WorkspacePublic } from "@palmtty/protocol";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { FilesPane } from "./FilesPane.js";
@@ -8,6 +8,7 @@ import {
   TerminalView,
   type ConnectionState
 } from "./TerminalView.js";
+import { workbenchVisualViewportFrame } from "./visual-viewport.js";
 
 type WorkbenchPane = "terminal" | "git" | "files";
 
@@ -33,6 +34,60 @@ export function SessionWorkbench({
   const handleConnectionChange = useCallback((next: ConnectionState) => {
     setConnection(next);
   }, []);
+  const workbenchRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const element = workbenchRef.current;
+    const visualViewport = window.visualViewport;
+    if (!element || !visualViewport) return;
+
+    let animationFrame: number | undefined;
+
+    const clearVisualViewportFrame = () => {
+      element.classList.remove("has-visual-viewport-frame");
+      for (const property of [
+        "--workbench-visual-top",
+        "--workbench-visual-left",
+        "--workbench-visual-width",
+        "--workbench-visual-height"
+      ]) {
+        element.style.removeProperty(property);
+      }
+    };
+
+    const syncVisualViewportFrame = () => {
+      animationFrame = undefined;
+      const frame = workbenchVisualViewportFrame(visualViewport);
+      if (!frame) {
+        clearVisualViewportFrame();
+        return;
+      }
+
+      element.style.setProperty("--workbench-visual-top", `${frame.top}px`);
+      element.style.setProperty("--workbench-visual-left", `${frame.left}px`);
+      element.style.setProperty("--workbench-visual-width", `${frame.width}px`);
+      element.style.setProperty("--workbench-visual-height", `${frame.height}px`);
+      element.classList.add("has-visual-viewport-frame");
+    };
+
+    const scheduleVisualViewportSync = () => {
+      if (animationFrame !== undefined) return;
+      animationFrame = window.requestAnimationFrame(syncVisualViewportFrame);
+    };
+
+    syncVisualViewportFrame();
+    visualViewport.addEventListener("resize", scheduleVisualViewportSync);
+    visualViewport.addEventListener("scroll", scheduleVisualViewportSync);
+    window.addEventListener("resize", scheduleVisualViewportSync);
+
+    return () => {
+      if (animationFrame !== undefined) window.cancelAnimationFrame(animationFrame);
+      visualViewport.removeEventListener("resize", scheduleVisualViewportSync);
+      visualViewport.removeEventListener("scroll", scheduleVisualViewportSync);
+      window.removeEventListener("resize", scheduleVisualViewportSync);
+      clearVisualViewportFrame();
+    };
+  }, []);
 
   const selectPane = (next: WorkbenchPane) => {
     if (next !== "terminal" && !workspace) return;
@@ -40,7 +95,7 @@ export function SessionWorkbench({
   };
 
   return (
-    <main className="workbench-page">
+    <main ref={workbenchRef} className="workbench-page">
       <header className="workbench-header glass-panel">
         <div className="workbench-leading">
           <button
