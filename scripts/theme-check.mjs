@@ -100,6 +100,8 @@ for (const marker of [
   '"--terminal-background"',
   'terminalThemeRef.current',
   'terminal.open(mount)',
+  'mount.addEventListener("click", focusTerminal);',
+  'mount.removeEventListener("click", focusTerminal);',
   'window.visualViewport',
   '}, [sessionId]);'
 ]) {
@@ -128,6 +130,8 @@ for (const forbidden of [
   'terminal-touch-scroll',
   'attachTerminalTouchScroll',
   'terminal.scrollLines(',
+  'touchstart',
+  'touchmove',
   '}, [sessionId, t]);'
 ]) {
   if (terminalView.includes(forbidden)) {
@@ -146,6 +150,41 @@ for (const forbidden of ["padding:", "border:", "overflow: hidden"]) {
       `apps/web/src/styles.css [terminal-fit-contract] .terminal-mount must stay geometry-only; found ${forbidden}`
     );
   }
+}
+
+if (
+  !styles.includes(".terminal-mount .xterm:not(.allow-transparency) .xterm-viewport,") ||
+  !styles.includes("background-color: var(--terminal-background);")
+) {
+  failures.push(
+    "apps/web/src/styles.css [terminal-surface-contract] xterm viewport remainder must inherit --terminal-background"
+  );
+}
+
+const gitSidebarStart = styles.indexOf(".git-sidebar {");
+const gitSidebarEnd = gitSidebarStart === -1 ? -1 : styles.indexOf("\n}", gitSidebarStart);
+const gitSidebarBlock = gitSidebarStart === -1 || gitSidebarEnd === -1
+  ? ""
+  : styles.slice(gitSidebarStart, gitSidebarEnd + 2);
+for (const marker of [
+  "overflow-x: hidden;",
+  "overflow-y: auto;",
+  "overscroll-behavior-y: contain;"
+]) {
+  if (!gitSidebarBlock.includes(marker)) {
+    failures.push(
+      `apps/web/src/styles.css [git-scroll-contract] .git-sidebar missing ${marker}`
+    );
+  }
+}
+
+if (
+  styles.includes(".file-list,\n.git-groups,\n.git-change-list {") ||
+  !styles.includes(".git-groups,\n.git-change-list {\n  min-height: 0;\n  overflow: visible;\n}")
+) {
+  failures.push(
+    "apps/web/src/styles.css [git-scroll-contract] Git groups/change lists must not be nested scroll owners"
+  );
 }
 
 for (const marker of [

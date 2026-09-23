@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.4.0"
+  version: "1.5.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -142,6 +142,8 @@ The Session workbench's Terminal / Git / Files selection is also presentation st
 
 On touch devices, a one-finger vertical drag that starts inside the terminal surface belongs to xterm, not to the surrounding page. The terminal stack version is governed by `terminal-stack.json`. PalmTTY must not translate touch pixels into terminal rows or install application-level `touchstart`/`touchmove` handlers: xterm's own Gesture/Viewport path owns continuous pixel scrolling, inertia, alternate-buffer key translation and mouse-protocol wheel reporting. Browser page panning is suppressed only at the xterm screen boundary with `touch-action: none`, while events continue through xterm's own listener path. Do not add a second DOM scroll viewport, a document-level touch handler, global gesture interception, or a competing scroll physics implementation.
 
+Keyboard activation is a separate responsibility from touch scrolling. A normal click/tap may synchronously bridge to `terminal.focus()` so mobile Safari/Chrome can activate xterm's hidden textarea, and the mobile key bar may expose an explicit keyboard-focus button. That bridge must not inspect or translate touch deltas, call `preventDefault()`, or become a second gesture recognizer. Soft-keyboard viewport changes continue through the existing `visualViewport` refit path.
+
 Fit geometry has a separate ownership rule: the visual `.terminal-frame` may own border, radius, padding and clipping, but xterm must be opened into a nested `.terminal-mount` whose box is geometry-only and has no padding or border. FitAddon measures the xterm element's parent; decorative spacing on that parent can overestimate rows and clip the final rendered line. Resize observation targets the mount, and VisualViewport resize may request a refit without becoming canonical terminal state.
 
 Terminal text contrast wins over decorative transparency. The terminal viewport stays opaque and theme-aligned rather than making xterm transparent merely to expose the ambient field.
@@ -154,6 +156,7 @@ PalmTTY is primarily operated from a phone.
 - Keep terminal viewport ownership simple: one decorative frame around one padding-free xterm mount; xterm remains the only terminal scroll-physics implementation.
 - Controls must remain reachable in portrait and short landscape layouts.
 - Workspace dialogs keep one intentional body scroll owner with header/footer actions always reachable; nested data regions may scroll only when bounded.
+- Dense workbench regions also need one intentional vertical scroll owner. In particular, the Git sidebar owns scrolling for repository summary, change groups and Git tools; group/list descendants must not create nested competing vertical scrollers.
 - High-frequency touch targets use the shared 44px target where space allows; compact secondary controls use the shared compact target rather than ad-hoc geometry.
 - Avoid desktop-only hover as the only affordance.
 - Avoid decorative rendering work that competes with xterm output/reconnect rendering.

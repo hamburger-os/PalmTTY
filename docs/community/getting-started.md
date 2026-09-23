@@ -99,6 +99,8 @@ Vite prints the reachable LAN URLs. On Windows, if another device still times ou
 
 Do **not** expose the Vite development server directly to the Internet. For remote/non-development access, use a private overlay or the authenticated HTTPS reverse-proxy configuration described in [security.md](security.md).
 
+For QNAP/Caddy-style TLS termination, start from `examples/qnap-reverse-proxy.yaml`: the browser-facing Origin stays HTTPS/WSS, while the private upstream may be HTTP. The proxy rule must explicitly support **HTTP + WebSocket** (not HTTP-only forwarding) to the PalmTTY Agent port and preserve WebSocket Upgrade/subprotocol negotiation. If the Web UI loads and REST calls work but the terminal stays in reconnecting state, verify this WebSocket-capable proxy mode first. Keep the upstream port private/restricted to the proxy or trusted LAN.
+
 ## 中文
 
 ### 安装发行版
@@ -196,3 +198,5 @@ pnpm dev
 Vite 会打印可访问的 LAN URL。Windows 上如果其他设备仍然超时，请允许 Node.js/PalmTTY 的 TCP 5173 通过 **专用网络（Private）** 防火墙；PalmTTY 不会自行提权或修改防火墙。若要关闭默认 LAN 开发监听，可在 `pnpm dev` 前设置 `PALMTTY_WEB_HOST=127.0.0.1`。
 
 不要把 Vite 开发服务器直接暴露到公网。正式/远程访问应使用私有组网，或采用 [security.md](security.md) 中描述的 HTTPS 认证反向代理方案。
+
+如果由 QNAP/Caddy 终止 TLS，可从 `examples/qnap-reverse-proxy.yaml` 开始：浏览器侧保持 HTTPS/WSS，私网 upstream 可以使用 HTTP；反向代理规则必须明确选择支持 **HTTP + WebSocket** 的模式（不能只转普通 HTTP），并把 WebSocket Upgrade/子协议协商转发到 PalmTTY Agent 端口。如果页面和普通 REST API 正常但终端一直“正在重连”，应首先检查这一 WebSocket 代理模式。上游端口仍应只对代理或可信局域网开放。

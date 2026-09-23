@@ -174,6 +174,12 @@ export function TerminalView({
     fit.fit();
     terminalRef.current = terminal;
 
+    const focusTerminal = () => {
+      if (!activeRef.current || !inputReadyRef.current) return;
+      terminal.focus();
+    };
+    mount.addEventListener("click", focusTerminal);
+
     const dataDisposable = terminal.onData((raw) => {
       let data = raw;
       const usedCtrl = ctrlRef.current;
@@ -402,6 +408,7 @@ export function TerminalView({
       if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
       observer.disconnect();
       visualViewport?.removeEventListener("resize", handleVisualViewportResize);
+      mount.removeEventListener("click", focusTerminal);
       dataDisposable.dispose();
       socketRef.current?.close(1000, "Leaving terminal view");
       socketRef.current = null;
@@ -451,6 +458,15 @@ export function TerminalView({
       </div>
 
       <div className="keybar glass-panel" aria-label={t("terminal.specialKeys")}>
+        <button
+          type="button"
+          disabled={connection !== "connected"}
+          title={t("terminal.keyboard")}
+          aria-label={t("terminal.keyboard")}
+          onClick={() => terminalRef.current?.focus()}
+        >
+          ⌨
+        </button>
         {key("Esc", "\u001b")}
         {key("Tab", "\t")}
         <button

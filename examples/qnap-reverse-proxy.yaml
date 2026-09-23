@@ -1,5 +1,10 @@
 # Example for HTTPS reverse-proxy access through QNAP/Caddy.
 # Replace the external HTTPS origin and the listenHost as needed.
+# The browser-facing rule is HTTPS/WSS. For QNAP, select a destination protocol
+# mode that explicitly supports HTTP + WebSocket to the PalmTTY Agent; an
+# HTTP-only reverse-proxy rule can serve the UI/API while leaving terminals in
+# a permanent reconnect loop. Preserve WebSocket Upgrade and the
+# Sec-WebSocket-Protocol negotiation.
 #
 # If the reverse proxy runs on the same host, keep listenHost at 127.0.0.1.
 # If the reverse proxy runs on another private-LAN device (for example QNAP),

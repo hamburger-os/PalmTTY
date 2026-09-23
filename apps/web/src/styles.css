@@ -616,6 +616,11 @@ button.directory-choose {
   height: 100%;
 }
 
+.terminal-mount .xterm:not(.allow-transparency) .xterm-viewport,
+.terminal-mount .xterm:not(.allow-transparency) .xterm-scrollable-element {
+  background-color: var(--terminal-background);
+}
+
 .terminal-frame,
 .terminal-mount,
 .terminal-mount .xterm,
@@ -989,12 +994,16 @@ button.directory-choose {
   white-space: nowrap;
 }
 
-.file-list,
-.git-groups,
-.git-change-list {
+.file-list {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+.git-groups,
+.git-change-list {
+  min-height: 0;
+  overflow: visible;
 }
 
 .file-list,
@@ -1137,8 +1146,9 @@ button.directory-choose {
 .git-sidebar {
   display: flex;
   flex-direction: column;
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
 
 .git-main-toolbar {
@@ -1169,9 +1179,6 @@ button.directory-choose {
 }
 
 .git-group-heading {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   padding: 7px 10px;
   color: var(--text-secondary);
   background: var(--flat-content);

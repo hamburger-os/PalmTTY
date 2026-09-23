@@ -147,6 +147,8 @@ Windows/Linux PalmTTY Agent
 
 正常非 loopback 配置必须开启认证、Secure Cookie 与最终 HTTPS Origin allowlist。QNAP/Caddy 只承担 TLS、域名、WebSocket 反代和可选附加认证；真正的 Shell、Codex、Git 与文件留在开发主机。
 
+QNAP 规则的目标协议必须选择其“HTTP + WebSocket”一类组合，而不是普通 HTTP-only 代理；浏览器入口是 HTTPS/WSS，QNAP 到 Agent 可以是受限私网 HTTP。若 Web UI/API 正常但 Session 终端持续重连，先检查代理是否允许 WebSocket Upgrade 并保留 `Sec-WebSocket-Protocol: palmtty.v1` 协商。示例 `examples/qnap-reverse-proxy.yaml` 的 `origins` 必须与浏览器地址栏的最终 HTTPS Origin（含非默认端口）精确一致，上游 17688 之类端口应通过主机/网络防火墙限制为 QNAP 或可信私网来源。
+
 ## 当前不做
 
 - PalmTTY 官方云中继；
