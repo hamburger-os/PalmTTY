@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.7.0"
+  version: "1.8.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -138,7 +138,7 @@ The xterm palette is owned by `theme.tsx`. The terminal host receives the active
 
 Theme work must preserve the reconnect/recovery invariants in `docs/ai/invariants.md`. Presentation state such as theme or locale must not be a dependency of the xterm/WebSocket transport lifecycle.
 
-The Session workbench's Terminal / Git / Files selection is also presentation state. Switching away from Terminal must keep the live terminal mounted, suppress hidden-pane geometry propagation, and safely refit when Terminal becomes active again; it must not reconnect merely because another pane was viewed.
+The Session workbench's Terminal / Git / Files / Artifacts selection is also presentation state. Switching away from Terminal must keep the live terminal mounted, suppress hidden-pane geometry propagation, and safely refit when Terminal becomes active again; it must not reconnect merely because another pane was viewed.
 
 On touch devices, a one-finger vertical drag that starts inside the terminal surface belongs to xterm, not to the surrounding page. The terminal stack version is governed by `terminal-stack.json`. PalmTTY must not translate touch pixels into terminal rows or install application-level `touchstart`/`touchmove` handlers: xterm's own Gesture/Viewport path owns continuous pixel scrolling, inertia, alternate-buffer key translation and mouse-protocol wheel reporting. Browser page panning is suppressed only at the xterm screen boundary with `touch-action: none`, while events continue through xterm's own listener path. Do not add a second DOM scroll viewport, a document-level touch handler, global gesture interception, or a competing scroll physics implementation.
 
@@ -161,7 +161,7 @@ PalmTTY is primarily operated from a phone.
 - Controls must remain reachable in portrait and short landscape layouts.
 - The mobile terminal keybar may use horizontally scrollable rows, but it must not become a competing vertical scroll owner. Keep high-frequency actions (including Enter) in the core row; lower-frequency actions belong in an optional second horizontal row, and modifier buttons must expose pressed state accessibly.
 - Workspace dialogs keep one intentional body scroll owner with header/footer actions always reachable; nested data regions may scroll only when bounded.
-- Dense workbench regions also need one intentional vertical scroll owner. In particular, the Git sidebar owns scrolling for repository summary, change groups and Git tools; group/list descendants must not create nested competing vertical scrollers.
+- Dense workbench regions also need one intentional vertical scroll owner. In particular, the Git sidebar owns scrolling for repository summary, change groups and Git tools; group/list descendants must not create nested competing vertical scrollers. Files and Artifacts use one list scroller plus one independent preview scroller on wide screens; on narrow screens the selected preview replaces the list rather than creating side-by-side overflow. Image previews use ordinary bounded `<img>` content inside `.glass-content`, never a new backdrop/material layer.
 - High-frequency touch targets use the shared 44px target where space allows; compact secondary controls use the shared compact target rather than ad-hoc geometry.
 - Avoid desktop-only hover as the only affordance.
 - Avoid decorative rendering work that competes with xterm output/reconnect rendering.
@@ -185,6 +185,7 @@ At minimum validate:
 - empty and populated workspace/session lists;
 - workspace create/edit + directory picker + destructive confirmation;
 - terminal connected/reconnecting/closed;
+- Files supported-image preview and Artifacts empty/list/preview/upload/delete states on wide and narrow layouts, including four workbench tabs without unreachable controls;
 - portrait and short landscape;
 - theme changes while a terminal remains connected.
 

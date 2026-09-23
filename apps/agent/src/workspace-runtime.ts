@@ -23,6 +23,27 @@ export const RuntimeWorkspaceSchema = z.object({
 });
 export type RuntimeWorkspace = z.infer<typeof RuntimeWorkspaceSchema>;
 
+export const SessionLaunchRuntimeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("host") }).strict(),
+  z.object({
+    kind: z.literal("wsl"),
+    distribution: z.string().min(1).max(128).optional()
+  }).strict()
+]);
+export type SessionLaunchRuntime = z.infer<typeof SessionLaunchRuntimeSchema>;
+
+export function sessionLaunchRuntime(
+  workspace: WorkspaceDefinition
+): SessionLaunchRuntime {
+  if (workspace.runtime.kind === "host") return { kind: "host" };
+  return SessionLaunchRuntimeSchema.parse({
+    kind: "wsl",
+    ...(workspace.runtime.distribution
+      ? { distribution: workspace.runtime.distribution }
+      : {})
+  });
+}
+
 function environmentValue(
   env: NodeJS.ProcessEnv | Record<string, string>,
   key: string

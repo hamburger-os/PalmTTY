@@ -23,6 +23,11 @@ export type ConnectionState =
   | "stopping"
   | "closed";
 
+export type TerminalInsertRequest = {
+  id: number;
+  text: string;
+};
+
 function websocketUrl(sessionId: string) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}/api/v1/sessions/${encodeURIComponent(sessionId)}/terminal`;
@@ -91,10 +96,12 @@ function LongInputDialog({
 export function TerminalView({
   sessionId,
   active,
+  insertRequest,
   onConnectionChange
 }: {
   sessionId: string;
   active: boolean;
+  insertRequest: TerminalInsertRequest | undefined;
   onConnectionChange(connection: ConnectionState): void;
 }) {
   const { t } = useI18n();
@@ -112,6 +119,7 @@ export function TerminalView({
   const inputReadyRef = useRef(false);
   const ctrlRef = useRef(false);
   const altRef = useRef(false);
+  const handledInsertRef = useRef<number | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
@@ -159,6 +167,19 @@ export function TerminalView({
     socket.send(JSON.stringify({ type: "input", data }));
     return true;
   }
+
+  useEffect(() => {
+    if (
+      !insertRequest ||
+      connection !== "connected" ||
+      handledInsertRef.current === insertRequest.id
+    ) {
+      return;
+    }
+    if (!sendInput(insertRequest.text)) return;
+    handledInsertRef.current = insertRequest.id;
+    terminalRef.current?.focus();
+  }, [connection, insertRequest]);
 
   useEffect(() => {
     const mount = terminalMountRef.current;

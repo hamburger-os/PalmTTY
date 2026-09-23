@@ -3,19 +3,21 @@ import { chmod, mkdir, readFile, readdir, rename, stat, unlink, writeFile } from
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
+import { SessionLaunchRuntimeSchema } from "./workspace-runtime.js";
 
 export const WorkerRecordSchema = z.object({
   version: z.literal(1),
   sessionId: z.string().min(16).max(128),
   workspaceId: z.string().min(1).max(64),
   createdAt: z.string().datetime(),
+  launchRuntime: SessionLaunchRuntimeSchema,
   endpointId: z.string().min(16).max(128),
   workerPid: z.number().int().positive(),
   shellPid: z.number().int().positive()
 });
 export type WorkerRecord = z.infer<typeof WorkerRecordSchema>;
 
-export const WORKER_RUNTIME_GENERATION = "runtime-v4" as const;
+export const WORKER_RUNTIME_GENERATION = "runtime-v5" as const;
 
 export function defaultRuntimeDir(): string {
   if (process.platform === "win32") {

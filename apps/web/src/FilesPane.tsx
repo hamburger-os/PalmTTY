@@ -6,7 +6,8 @@ import type {
 import {
   ApiError,
   listWorkspaceFiles,
-  readWorkspaceFile
+  readWorkspaceFile,
+  readWorkspaceImage
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 
@@ -25,6 +26,8 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reading, setReading] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -81,6 +84,52 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
       cancelled = true;
     };
   }, [workspaceId, selectedPath, refreshVersion, translateError]);
+
+  useEffect(() => {
+    setImageUrl(null);
+    if (!selectedPath || !selected?.binary) {
+      setImageLoading(false);
+      return () => undefined;
+    }
+
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setImageLoading(true);
+    void readWorkspaceImage(workspaceId, selectedPath)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setImageUrl(objectUrl);
+      })
+      .catch((cause) => {
+        if (cancelled) return;
+        if (
+          cause instanceof ApiError &&
+          cause.code === "workspace_image_unavailable"
+        ) {
+          setImageUrl(null);
+          return;
+        }
+        const code = cause instanceof ApiError
+          ? cause.code
+          : "workspace_file_unavailable";
+        setPreviewError(translateError(code));
+      })
+      .finally(() => {
+        if (!cancelled) setImageLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [
+    workspaceId,
+    selectedPath,
+    selected?.binary,
+    refreshVersion,
+    translateError
+  ]);
 
   const openFile = (filePath: string) => {
     setSelectedPath(filePath);
@@ -180,6 +229,12 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
           <div className="tool-empty">{t("files.reading")}</div>
         ) : !selectedPath ? (
           <div className="tool-empty">{t("files.select")}</div>
+        ) : imageLoading ? (
+          <div className="tool-empty">{t("files.imageLoading")}</div>
+        ) : selected?.binary && imageUrl ? (
+          <div className="file-image-preview">
+            <img src={imageUrl} alt={selectedPath} draggable={false} />
+          </div>
         ) : selected?.binary ? (
           <div className="tool-empty">{t("files.binary")}</div>
         ) : selected ? (

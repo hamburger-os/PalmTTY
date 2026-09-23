@@ -33,6 +33,12 @@ async function fixture() {
   roots.add(runtimeDir);
   await mkdir(path.join(root, "src"));
   await writeFile(path.join(root, "README.md"), "hello\n", "utf8");
+  const png = Buffer.alloc(24);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(png);
+  png.write("IHDR", 12, "ascii");
+  png.writeUInt32BE(16, 16);
+  png.writeUInt32BE(8, 20);
+  await writeFile(path.join(root, "preview.png"), png);
 
   const workspace: WorkspaceDefinition = {
     id: "workspace-1",
@@ -106,6 +112,28 @@ describe("workspace tool HTTP boundary", () => {
       path: "README.md",
       binary: false,
       content: "hello\n"
+    });
+
+    const image = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspaces/workspace-1/files/image",
+      headers: { cookie, origin: ORIGIN },
+      payload: { path: "preview.png" }
+    });
+    expect(image.statusCode).toBe(200);
+    expect(image.headers["content-type"]).toContain("image/png");
+    expect(image.headers["x-content-type-options"]).toBe("nosniff");
+    expect(image.rawPayload.length).toBe(24);
+
+    const notImage = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspaces/workspace-1/files/image",
+      headers: { cookie, origin: ORIGIN },
+      payload: { path: "README.md" }
+    });
+    expect(notImage.statusCode).toBe(400);
+    expect(notImage.json()).toMatchObject({
+      error: "workspace_image_unavailable"
     });
 
     await app.close();

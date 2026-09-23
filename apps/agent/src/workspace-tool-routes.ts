@@ -4,13 +4,15 @@ import {
   GitHistoryRequestSchema,
   GitMutationRequestSchema,
   GitRemoteRequestSchema,
+  WorkspaceFileImageRequestSchema,
   WorkspaceFileListRequestSchema,
   WorkspaceFileReadRequestSchema
 } from "@palmtty/protocol";
 import { FixedWindowLimiter } from "./security.js";
 import {
   listWorkspaceFiles,
-  readWorkspaceFile
+  readWorkspaceFile,
+  readWorkspaceImage
 } from "./workspace-files.js";
 import {
   GitStateChangedError,
@@ -114,6 +116,40 @@ export function registerWorkspaceToolRoutes(
         return reply.code(400).send({
           error: "workspace_file_unavailable",
           message: error instanceof Error ? error.message : "Workspace file is unavailable"
+        });
+      }
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/v1/workspaces/:id/files/image",
+    { preHandler: [options.requireOrigin, options.requireAuth] },
+    async (request, reply) => {
+      if (!readLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_workspace_tool_requests" });
+      }
+      const workspace = workspaceFor(request.params.id);
+      if (!workspace) return reply.code(404).send({ error: "workspace_not_found" });
+      const parsed = WorkspaceFileImageRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_workspace_file_request" });
+      }
+      try {
+        const image = await readWorkspaceImage(
+          workspace,
+          parsed.data.path,
+          options.sensitiveEnvironmentKeys
+        );
+        return reply
+          .header("content-type", image.mime)
+          .header("content-length", String(image.size))
+          .header("cache-control", "private, no-store")
+          .header("x-content-type-options", "nosniff")
+          .send(image.content);
+      } catch (error) {
+        return reply.code(400).send({
+          error: "workspace_image_unavailable",
+          message: error instanceof Error ? error.message : "Workspace image is unavailable"
         });
       }
     }

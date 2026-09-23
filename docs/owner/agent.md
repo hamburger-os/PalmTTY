@@ -8,7 +8,7 @@ PalmTTY Agent 是开发电脑上的 Web/API 控制面，负责：
 - 登录认证和 Origin 安全检查；
 - 管理当前用户的持久化 workspace 目录与运行时验证；
 - 为 Workspace 编辑器提供受认证 + 精确 Origin 保护的只读目录浏览与统一终端配置发现；Host 侧只探测已知 Shell，WSL 侧只枚举已注册发行版，不通过扫描动作启动发行版；
-- 为 Session Workbench 提供独立的只读 Files/Git HTTP API：Files 限定在 Workspace 根目录，Git 只暴露 status/diff；两者都与 terminal WebSocket/Worker 数据面分离；
+- 为 Session Workbench 提供独立的 Files/Git/Artifacts HTTP API：Files 限定在 Workspace 根目录并保持只读（文本 + 受支持图片预览），Git 暴露有界读取与 typed 写操作，Artifacts 把受限图片存到独立 Session 私有目录；三者都与 terminal WebSocket/Worker 数据面分离；
 - 创建、发现并认证独立 Session Worker；
 - 把浏览器 WebSocket 转发到对应 Worker；
 - 托管编译后的手机端 PWA。
@@ -61,7 +61,9 @@ Agent 正常关闭、升级或异常退出时：
 
 Session Workbench 的文件能力不修改上述目录选择器语义，而是使用单独 API：浏览器只提交规范化 Workspace 相对路径；Host 通过 `realpath` 检查 symlink 后的真实路径仍在根目录内，WSL 在发行版内解析 physical path 并再次检查根目录前缀。文件列表最多 512 项；UTF-8 预览最多 512 KiB，二进制文件不回传可渲染文本。
 
-Git 工作台同样使用单独 API，以 Workspace cwd 所在仓库为上下文，只运行有界的 branch/tracking/status 与 staged/working-tree diff。命令全部使用结构化 argv，diff 禁止 external diff/textconv，status 禁用 fsmonitor；当前不提供 stage/commit/push/pull，因此“查看状态”不会引入新的 Git 写入面。所有 WSL/Git 辅助子进程在启动前剔除 `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量。
+Git 工作台同样使用单独 API，以 Workspace cwd 所在仓库为上下文。读取运行有界的 branch/tracking/status、diff/history/branches，并中和只读路径中的 external diff/textconv/fsmonitor/signature helper 与 working-tree filter driver；写入只通过 typed stage/unstage/restore/commit/branch/stash/fetch/pull/push contract，带状态 token、可信仓库确认与破坏性 diff snapshot 校验，不接受浏览器任意 argv。所有 WSL/Git 辅助子进程在启动前剔除 `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量。
+
+Session Artifacts 使用独立私有 runtime store，而不是 Workspace 或 PTY。上传 API 只接受运行中的 Session，服务端按真实 bytes 检查 PNG/JPEG/WebP/GIF 与尺寸，执行单文件/数量/总容量硬限制并生成随机 storage name；列表、读取、删除都要求认证 + 精确 Origin。Host 返回本机私有路径，WSL 通过结构化 `wsl.exe`/`wslpath` 获取可读路径。路径映射使用 Session 创建时写入 Worker recovery record 的不可变 launch runtime 身份，不读取随后可能被编辑的 Workspace runtime；该字段属于当前 Worker generation 的必需 recovery authority。Agent 重启时会按 Worker records 保留仍有 live recovery authority 的附件，并清理没有对应 Session record 的 orphan 目录；Session clear/restart/retention expiry 也触发清理。
 
 `pnpm dev` 会在 preflight 成功后由根启动器为当前私有 LAN 地址生成 5173 的精确 development Origins，并只在 `--development` Agent 中合并；Agent 自身监听地址仍完全来自正式 config，不因 Vite 的 LAN 监听而改成非 loopback。Windows development 还默认开启不含命令/环境内容的 Worker/PTTY spawn phase trace，用于定位真实桌面上仍可能出现的短暂 console flash。
 
@@ -94,7 +96,7 @@ Session 创建仍是 `POST /api/v1/sessions`。生命周期修改不再复用一
 
 - Agent/Worker 默认都不应以管理员身份运行。
 - 浏览器可以显式管理持久化 workspace 的 cwd/runtime/Shell、有界环境变量与启动命令，但该能力必须经过认证与精确 Origin；Session 创建/重启接口本身不接受临时 cwd/shell/env 覆盖。Workspace 环境变量是本机持久化配置，不是 secret vault。
-- Agent 不理解 Codex 的内部协议；Codex 只是终端里的普通 CLI。Git/Files Workbench 也不是 Session Worker 插件，它们只是受限的 Workspace 检查服务。
+- Agent 不理解 Codex/Antigravity 等 CLI 的内部多模态协议；它们仍是终端里的普通工作负载。Artifacts 只提供受控本地图片文件与路径，路径插入不自动回车；Git/Files/Artifacts Workbench 也不是 Session Worker 插件，而是独立受限 HTTP 能力。
 - Worker secret 不进入浏览器、命令行、URL、普通日志或 PTY 环境。
 - 持久化 PID 只用于诊断，不允许直接作为 kill authority；PID 可能被系统复用。
 - Agent 暂时无法连接 Worker 不是删除其 recovery capability 的充分条件；控制面故障不能被放大成 PTY 生命周期故障。
