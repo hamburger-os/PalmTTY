@@ -59,7 +59,7 @@
 - SessionWorkbench 是移动端可视几何的唯一 owner：无论 `visualViewport.scale` 是否为 1，整个工作台都跟随当前 VisualViewport 的 width/height/offset，因此 Safari 地址栏、双指缩放与软键盘出现/消失时 Header、终端和 keybar 仍留在真实可见区域；scale 只作为诊断值，不作为关闭布局修正的条件，PalmTTY 也不会写入、禁止或强制重置浏览器缩放；viewport meta 同时声明 `interactive-widget=resizes-content` 作为支持浏览器的渐进增强；
 - 首次连接/重连会先 `fit` 得到浏览器实际 rows/cols，并把几何尺寸随 resume 一起提交；snapshot/replay 完成前冻结再次 fit，避免把服务端按旧尺寸序列化的终端状态写进新尺寸 xterm；TerminalView 只监听 terminal mount 的 ResizeObserver，Workbench/软键盘造成的可用高度变化先改变 mount，再由同一 ResizeObserver → FitAddon 路径传播；只有实际 rows/cols 变化才向 Worker 发送 resize；
 - 恢复期间终端输入与长文本发送按钮保持不可用，尚未提交的长文本不会因为连接尚未就绪而被静默清空；
-- PWA manifest；
+- PWA manifest 已补齐 PalmTTY 自有品牌资产：保留透明 `logo.png` 作为标准横版品牌图，提供 192/512 方形应用图标并接入 favicon、Apple touch icon 与安装 manifest；界面标题采用图标 + 主题文字而不是把固定颜色的位图字标强塞进所有主题，保证 Spectrum / Obsidian / Frosted 下的对比度与可访问性；
 - 仅显式使用 `?viewportDebug=1` 时显示移动端 viewport 诊断覆盖层，输出 inner/client/visual viewport 尺寸、offset、scale、screen、DPR 和当前 focus element；它不输出终端内容、输入值或认证信息，用于真机 Safari 定位浏览器级 viewport 状态。
 
 ## 设计边界

@@ -24,6 +24,7 @@ import {
   updateWorkspace
 } from "./api.js";
 import { AppearanceControls } from "./AppearanceControls.js";
+import { Brand } from "./Brand.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { useI18n } from "./i18n.js";
 import { SessionWorkbench } from "./SessionWorkbench.js";
@@ -112,7 +113,7 @@ export function App() {
     return (
       <main className="center-card glass-shell">
         <div className="login-toolbar"><AppearanceControls compact /><LanguageSwitcher /></div>
-        <h1>PalmTTY</h1>
+        <Brand hero />
         <p>{t("auth.connecting")}</p>
       </main>
     );
@@ -254,10 +255,7 @@ export function App() {
   return (
     <main className="app-shell">
       <header className="topbar glass-shell">
-        <div>
-          <div className="eyebrow">{t("app.eyebrow")}</div>
-          <h1>PalmTTY</h1>
-        </div>
+        <Brand eyebrow={t("app.eyebrow")} />
         <div className="topbar-actions">
           <AppearanceControls compact />
           <LanguageSwitcher />
@@ -488,8 +486,7 @@ function Login({
   return (
     <main className="center-card glass-shell">
       <div className="login-toolbar"><AppearanceControls compact /><LanguageSwitcher /></div>
-      <div className="palm-mark">⌁</div>
-      <h1>PalmTTY</h1>
+      <Brand hero />
       <p>{t("auth.description")}</p>
       <form onSubmit={(event) => {
         event.preventDefault();
