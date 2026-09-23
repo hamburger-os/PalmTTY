@@ -65,6 +65,8 @@ const themeTsPath = path.join(webSource, "theme.tsx");
 const themeCss = await readFile(themeCssPath, "utf8");
 const themeTs = await readFile(themeTsPath, "utf8");
 const terminalViewPath = path.join(webSource, "TerminalView.tsx");
+const terminalKeyBarPath = path.join(webSource, "TerminalKeyBar.tsx");
+const terminalKeyInputPath = path.join(webSource, "terminal-key-input.ts");
 const visualViewportPath = path.join(webSource, "visual-viewport.ts");
 const viewportDebugPath = path.join(webSource, "ViewportDebug.tsx");
 const mainPath = path.join(webSource, "main.tsx");
@@ -73,6 +75,8 @@ const stylesPath = path.join(webSource, "styles.css");
 const sessionWorkbenchPath = path.join(webSource, "SessionWorkbench.tsx");
 const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
+const terminalKeyBar = await readFile(terminalKeyBarPath, "utf8");
+const terminalKeyInput = await readFile(terminalKeyInputPath, "utf8");
 const visualViewport = await readFile(visualViewportPath, "utf8");
 const viewportDebug = await readFile(viewportDebugPath, "utf8");
 const mainSource = await readFile(mainPath, "utf8");
@@ -114,6 +118,41 @@ for (const marker of [
 ]) {
   if (!terminalView.includes(marker)) {
     failures.push(`apps/web/src/TerminalView.tsx [terminal-surface-contract] missing ${marker}`);
+  }
+}
+
+for (const marker of [
+  "<TerminalKeyBar",
+  "applyTerminalModifiers(raw, modifiers)",
+  "encodeTerminalKey(key, {"
+]) {
+  if (!terminalView.includes(marker)) {
+    failures.push(`apps/web/src/TerminalView.tsx [terminal-keybar-contract] missing ${marker}`);
+  }
+}
+
+for (const marker of [
+  'keyButton("Enter", "enter"',
+  'shortcutButton("Ctrl+J"',
+  'keyButton("Shift+Tab", "backTab")',
+  'shortcutButton("Ctrl+D"',
+  'aria-pressed={ctrl}',
+  'aria-pressed={alt}',
+  'aria-expanded={moreOpen}'
+]) {
+  if (!terminalKeyBar.includes(marker)) {
+    failures.push(`apps/web/src/TerminalKeyBar.tsx [terminal-keybar-contract] missing ${marker}`);
+  }
+}
+
+for (const marker of [
+  'enter: "\\r"',
+  'backTab: `\${ESC}[Z`',
+  "modifiedNavigationSequence(",
+  "applyTerminalModifiers("
+]) {
+  if (!terminalKeyInput.includes(marker)) {
+    failures.push(`apps/web/src/terminal-key-input.ts [terminal-keybar-contract] missing ${marker}`);
   }
 }
 
