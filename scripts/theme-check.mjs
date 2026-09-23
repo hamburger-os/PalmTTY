@@ -161,7 +161,7 @@ if (
   );
 }
 
-const gitSidebarStart = styles.indexOf(".git-sidebar {");
+const gitSidebarStart = styles.lastIndexOf("\n.git-sidebar {");
 const gitSidebarEnd = gitSidebarStart === -1 ? -1 : styles.indexOf("\n}", gitSidebarStart);
 const gitSidebarBlock = gitSidebarStart === -1 || gitSidebarEnd === -1
   ? ""
