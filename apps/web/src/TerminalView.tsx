@@ -381,12 +381,6 @@ export function TerminalView({
     });
     observer.observe(mount);
 
-    const visualViewport = window.visualViewport;
-    const handleVisualViewportResize = () => {
-      if (ready && activeRef.current) scheduleResize();
-    };
-    visualViewport?.addEventListener("resize", handleVisualViewportResize);
-
     connect();
     heartbeatTimer = window.setInterval(() => {
       const socket = socketRef.current;
@@ -407,7 +401,6 @@ export function TerminalView({
       if (heartbeatTimer !== undefined) window.clearInterval(heartbeatTimer);
       if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
       observer.disconnect();
-      visualViewport?.removeEventListener("resize", handleVisualViewportResize);
       mount.removeEventListener("click", focusTerminal);
       dataDisposable.dispose();
       socketRef.current?.close(1000, "Leaving terminal view");
