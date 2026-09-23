@@ -44,6 +44,17 @@ describe("installed runtime layout", () => {
     expect(readReleaseManifest(env)?.version).toBe("1.2.3");
   });
 
+  it("discovers an installed root from the Agent module location without environment hints", () => {
+    const root = makeReleaseRoot();
+    const moduleUrl = pathToFileURL(
+      path.join(root, "app", "dist", "runtime-layout.js")
+    ).href;
+
+    expect(installedRoot({}, moduleUrl)).toBe(root);
+    expect(defaultWebRoot({}, moduleUrl)).toBe(path.join(root, "web"));
+    expect(readReleaseManifest({}, moduleUrl)?.version).toBe("1.2.3");
+  });
+
   it("rejects an explicit root without the immutable release manifest", () => {
     const root = mkdtempSync(path.join(os.tmpdir(), "palmtty-bad-layout-"));
     temporary.push(root);
