@@ -3,7 +3,7 @@ name: palmtty-theme-review
 description: "Audit PalmTTY Web UI for theme SSOT compliance, mobile rendering quality, semantic surface ownership, terminal lifecycle isolation, and visual performance regressions."
 license: Apache-2.0
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # PalmTTY theme and rendering review
@@ -49,7 +49,7 @@ For each relevant combination inspect:
 3. workspace create/edit, including a form tall enough to scroll while header/footer remain reachable;
 4. directory picker;
 5. destructive confirmation;
-6. Session workbench in Terminal / Git / Files views; terminal connected/reconnecting/closed, checking that pane switching does not recreate xterm/WebSocket state and that the host gutter and xterm canvas read as one surface; generate more than one viewport of normal-buffer output on a real touch device/emulation and verify one-finger vertical swipes scroll terminal history while the page stays fixed, then verify an alternate-buffer/mouse-tracking application still receives xterm-owned touch behavior rather than PalmTTY scrollback interception;
+6. Session workbench in Terminal / Git / Files views; terminal connected/reconnecting/closed, checking that pane switching does not recreate xterm/WebSocket state and that the frame gutter and xterm canvas read as one surface; generate more than one viewport of normal-buffer output on a real touch device/emulation and verify one-finger vertical swipes use xterm-owned continuous/inertial scrolling while the page stays fixed, the final row is fully visible at the live bottom, and an alternate-buffer/mouse-tracking application keeps xterm-owned touch semantics;
 7. Files list + preview and Git status + diff in narrow/mobile and desktop layouts;
 8. portrait;
 9. short landscape.
@@ -66,6 +66,7 @@ CRITICAL:
 HIGH:
 - large-area backdrop blur;
 - duplicate/nested glass ownership, including a generic glass surface behind xterm;
+- padding/border/clipping placed on the xterm FitAddon mount instead of the outer terminal frame, which can overestimate rows and clip the final line;
 - modal content transparency high enough that background cards/actions compete with form text;
 - theme-specific material forks instead of veil/tokens;
 - Performance mode still runs decorative continuous animation;

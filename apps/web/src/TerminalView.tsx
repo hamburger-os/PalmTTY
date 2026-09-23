@@ -9,7 +9,6 @@ import { Terminal } from "@xterm/xterm";
 import { ensureModalDialogOpen } from "./dialog-controller.js";
 import { useI18n } from "./i18n.js";
 import { useTheme } from "./theme.js";
-import { attachTerminalTouchScroll } from "./terminal-touch-scroll.js";
 
 export type ConnectionState =
   | "connecting"
@@ -104,7 +103,7 @@ export function TerminalView({
   const translateRef = useRef(t);
   const terminalThemeRef = useRef(terminalTheme);
   const activeRef = useRef(active);
-  const hostRef = useRef<HTMLDivElement>(null);
+  const terminalMountRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const refitRef = useRef<(() => void) | null>(null);
@@ -154,8 +153,8 @@ export function TerminalView({
   }
 
   useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
+    const mount = terminalMountRef.current;
+    if (!mount) return;
     intentionalCloseRef.current = false;
     sessionExitedRef.current = false;
     inputReadyRef.current = false;
@@ -171,9 +170,8 @@ export function TerminalView({
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
-    terminal.open(host);
+    terminal.open(mount);
     fit.fit();
-    const touchScroll = attachTerminalTouchScroll(host, terminal);
     terminalRef.current = terminal;
 
     const dataDisposable = terminal.onData((raw) => {
@@ -375,7 +373,13 @@ export function TerminalView({
     const observer = new ResizeObserver(() => {
       if (ready && activeRef.current) scheduleResize();
     });
-    observer.observe(host);
+    observer.observe(mount);
+
+    const visualViewport = window.visualViewport;
+    const handleVisualViewportResize = () => {
+      if (ready && activeRef.current) scheduleResize();
+    };
+    visualViewport?.addEventListener("resize", handleVisualViewportResize);
 
     connect();
     heartbeatTimer = window.setInterval(() => {
@@ -397,8 +401,8 @@ export function TerminalView({
       if (heartbeatTimer !== undefined) window.clearInterval(heartbeatTimer);
       if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
       observer.disconnect();
+      visualViewport?.removeEventListener("resize", handleVisualViewportResize);
       dataDisposable.dispose();
-      touchScroll.dispose();
       socketRef.current?.close(1000, "Leaving terminal view");
       socketRef.current = null;
       terminal.dispose();
@@ -440,10 +444,11 @@ export function TerminalView({
   return (
     <section className="terminal-pane-shell">
       <div
-        ref={hostRef}
-        className="terminal-host terminal-surface"
+        className="terminal-frame terminal-surface"
         style={terminalSurfaceStyle}
-      />
+      >
+        <div ref={terminalMountRef} className="terminal-mount" />
+      </div>
 
       <div className="keybar glass-panel" aria-label={t("terminal.specialKeys")}>
         {key("Esc", "\u001b")}

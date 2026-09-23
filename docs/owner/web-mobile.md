@@ -48,15 +48,15 @@
 - Git 视图已经升级为轻量 Source Control 工作台：显式显示“完整仓库”作用域、分支/上游/ahead-behind、冲突、staged/unstaged/untracked；diff 使用结构化 unified diff 行渲染并支持未跟踪文件预览；无选中修改时显示最近提交；支持 rename-aware 的单文件 stage/unstage、显式仓库级 stage-all/unstage-all、带 diff 快照校验的丢弃、commit、分支创建/切换、stash，以及非交互 fetch/pull/push；status 一旦被截断或解析不完整，所有写/remote 控件立即禁用；进入页面、窗口重新聚焦/回到前台和可见页低频轮询都会刷新状态；
 - 文件视图以持久 Workspace 根目录为边界浏览目录和文件，提供 UTF-8 文本只读预览；二进制文件只显示状态，大文件预览在 512 KiB 截断；
 - xterm.js；浏览器端 xterm/fit 由根目录 `terminal-stack.json` 精确锁定，当前浏览器栈使用包含上游触摸滚动修复的 xterm 6.1 beta，而 Worker 端 headless/serialize 暂时保持稳定 6.0/0.14，避免把移动端输入修复与 canonical snapshot/recovery 升级绑在一起；
-- 手机单指在普通终端缓冲区纵向滑动由 PalmTTY 的 `.xterm-screen` 局部 touch adapter 接到 xterm 公共 `scrollLines` API：仅在 normal buffer 且未启用 mouse tracking 时接管内容区单指滑动，并在该终端节点内阻止浏览器页面滚动；xterm 自定义滚动条继续走它自己的 PointerEvent 拖动逻辑，alternate buffer 或启用 mouse tracking 时也继续交给 xterm；不建立第二个 DOM 滚动层，不增加 document 级全局 touch handler，也不改变 Workbench 原有布局几何；
+- 手机终端不再维护 PalmTTY 自己的逐行 touch adapter：`.xterm-screen` 只用 `touch-action: none` 阻止 Safari/浏览器把手势变成页面平移，触摸事件继续由 xterm 自己的 Gesture/Viewport 路径处理，因此 normal scrollback 使用连续像素滚动与惯性，alternate buffer、mouse tracking、滚动条也保持同一套 xterm 语义；不建立第二个 DOM 滚动层，也不增加应用级 document touch handler；
 - 自动重连状态；
 - Esc、Tab、方向键、Ctrl+C、Ctrl+L；
 - 可切换的 Ctrl / Alt 一次性修饰键；
 - 适合粘贴、语音输入和 AI Prompt 的按需长文本弹窗；不再常驻聊天式发送栏，从而把垂直空间还给终端；
 - 竖屏/横屏布局；
 - Safe Area 处理；
-- xterm 使用略大的 lineHeight 与终端底部内边距，避免最后一行字形下缘贴住/被底部工具栏视觉遮挡；炫彩流光主题的终端背景采用与页面基底更接近的深色值，避免形成突兀的纯黑视觉孤岛；
-- 首次连接/重连会先 `fit` 得到浏览器实际 rows/cols，并把几何尺寸随 resume 一起提交；snapshot/replay 完成前冻结再次 fit，避免把服务端按旧尺寸序列化的终端状态写进新尺寸 xterm；
+- 终端视觉框与 Fit 几何已拆成两层：外层 `terminal-frame` 负责主题背景、边框、圆角、padding 与裁剪，内层 `terminal-mount` 保持无 padding/无 border 并作为 `terminal.open()`、FitAddon 与 ResizeObserver 的唯一几何基准；这避免 FitAddon 把外层 padding 误算成可用行高后再被 `overflow:hidden` 裁掉最后一行。xterm 继续使用略大的 lineHeight，主题背景保持与页面基底协调；
+- 首次连接/重连会先 `fit` 得到浏览器实际 rows/cols，并把几何尺寸随 resume 一起提交；snapshot/replay 完成前冻结再次 fit，避免把服务端按旧尺寸序列化的终端状态写进新尺寸 xterm；活动终端同时监听 mount ResizeObserver 与 `visualViewport.resize`，但只有实际 rows/cols 变化才向 Worker 发送 resize；
 - 恢复期间终端输入与长文本发送按钮保持不可用，尚未提交的长文本不会因为连接尚未就绪而被静默清空；
 - PWA manifest。
 
