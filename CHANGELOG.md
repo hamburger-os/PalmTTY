@@ -8,6 +8,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
+- Expand the mobile terminal keybar with first-class Enter, Ctrl+J, Shift+Tab and Ctrl+D, an optional second row for navigation/editing shortcuts, accessible one-shot Ctrl/Alt state, and a shared tested terminal-key encoder so virtual keys and xterm typed input use consistent modifier semantics.
 - Add first-party PalmTTY logo and 192/512 application icons, wire them into login/home branding, favicon/Apple touch metadata, and the installable Web manifest while keeping title text theme-aware.
 - Add self-contained Windows/Linux release distribution with bundled Node.js, production-only Agent deployment, installed runtime manifest, per-user Windows installer, Windows/Linux portable archives, Debian package, installed `palmtty` service CLI, detached installed-runtime smoke tests, CycloneDX SBOMs, SHA256 checksums, build provenance and verified draft Release asset upload before promotion.
 - Add explicit `local`, `lan`, `reverseProxy`, and direct `https` network exposure profiles, plus dedicated private-LAN and direct-HTTPS examples. LAN mode rejects non-private client source addresses and derives exact private/overlay IPv4 Origins automatically; direct HTTPS validates and loads configured certificate/key files.

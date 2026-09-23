@@ -159,6 +159,7 @@ PalmTTY is primarily operated from a phone.
 - Keep mobile editable controls at 16px or larger; achieve compactness with spacing and control dimensions, not sub-16px form text.
 - Keep terminal viewport ownership simple: one decorative frame around one padding-free xterm mount; xterm remains the only terminal scroll-physics implementation.
 - Controls must remain reachable in portrait and short landscape layouts.
+- The mobile terminal keybar may use horizontally scrollable rows, but it must not become a competing vertical scroll owner. Keep high-frequency actions (including Enter) in the core row; lower-frequency actions belong in an optional second horizontal row, and modifier buttons must expose pressed state accessibly.
 - Workspace dialogs keep one intentional body scroll owner with header/footer actions always reachable; nested data regions may scroll only when bounded.
 - Dense workbench regions also need one intentional vertical scroll owner. In particular, the Git sidebar owns scrolling for repository summary, change groups and Git tools; group/list descendants must not create nested competing vertical scrollers.
 - High-frequency touch targets use the shared 44px target where space allows; compact secondary controls use the shared compact target rather than ad-hoc geometry.

@@ -8,6 +8,12 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { ensureModalDialogOpen } from "./dialog-controller.js";
 import { useI18n } from "./i18n.js";
+import { TerminalKeyBar } from "./TerminalKeyBar.js";
+import {
+  applyTerminalModifiers,
+  encodeTerminalKey,
+  type TerminalKey
+} from "./terminal-key-input.js";
 import { useTheme } from "./theme.js";
 
 export type ConnectionState =
@@ -20,13 +26,6 @@ export type ConnectionState =
 function websocketUrl(sessionId: string) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}/api/v1/sessions/${encodeURIComponent(sessionId)}/terminal`;
-}
-
-function controlCharacter(value: string): string | undefined {
-  if (value.length !== 1) return undefined;
-  const code = value.toUpperCase().charCodeAt(0);
-  if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
-  return undefined;
 }
 
 function LongInputDialog({
@@ -116,6 +115,7 @@ export function TerminalView({
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
+  const [moreKeysOpen, setMoreKeysOpen] = useState(false);
   const [longInputOpen, setLongInputOpen] = useState(false);
 
   useEffect(() => {
@@ -138,6 +138,14 @@ export function TerminalView({
     const terminal = terminalRef.current;
     if (terminal) terminal.options.theme = terminalTheme;
   }, [terminalTheme]);
+
+  useEffect(() => {
+    if (connection === "connected") return;
+    ctrlRef.current = false;
+    altRef.current = false;
+    setCtrl(false);
+    setAlt(false);
+  }, [connection]);
 
   const terminalSurfaceStyle = terminalTheme.background
     ? ({ "--terminal-background": terminalTheme.background } as CSSProperties)
@@ -181,23 +189,19 @@ export function TerminalView({
     mount.addEventListener("click", focusTerminal);
 
     const dataDisposable = terminal.onData((raw) => {
-      let data = raw;
-      const usedCtrl = ctrlRef.current;
-      const usedAlt = altRef.current;
-
-      if (usedCtrl) {
-        const control = controlCharacter(raw);
-        if (control) data = control;
-      }
-      if (usedAlt) data = "\u001b" + data;
+      const modifiers = {
+        ctrl: ctrlRef.current,
+        alt: altRef.current
+      };
+      const data = applyTerminalModifiers(raw, modifiers);
 
       if (!sendInput(data)) return;
 
-      if (usedCtrl) {
+      if (modifiers.ctrl) {
         ctrlRef.current = false;
         setCtrl(false);
       }
-      if (usedAlt) {
+      if (modifiers.alt) {
         altRef.current = false;
         setAlt(false);
       }
@@ -424,22 +428,28 @@ export function TerminalView({
     terminalRef.current?.focus();
   };
 
-  const key = (label: string, data: string) => (
-    <button
-      type="button"
-      disabled={connection !== "connected"}
-      onClick={() => {
-        if (!sendInput(data)) return;
-        ctrlRef.current = false;
-        altRef.current = false;
-        setCtrl(false);
-        setAlt(false);
-        terminalRef.current?.focus();
-      }}
-    >
-      {label}
-    </button>
-  );
+  const clearModifiers = () => {
+    ctrlRef.current = false;
+    altRef.current = false;
+    setCtrl(false);
+    setAlt(false);
+  };
+
+  const sendKey = (key: TerminalKey) => {
+    const data = encodeTerminalKey(key, {
+      ctrl: ctrlRef.current,
+      alt: altRef.current
+    });
+    if (!sendInput(data)) return;
+    clearModifiers();
+    terminalRef.current?.focus();
+  };
+
+  const sendKeyData = (data: string) => {
+    if (!sendInput(data)) return;
+    clearModifiers();
+    terminalRef.current?.focus();
+  };
 
   return (
     <section className="terminal-pane-shell">
@@ -450,46 +460,22 @@ export function TerminalView({
         <div ref={terminalMountRef} className="terminal-mount" />
       </div>
 
-      <div className="keybar glass-panel" aria-label={t("terminal.specialKeys")}>
-        <button
-          type="button"
-          disabled={connection !== "connected"}
-          title={t("terminal.keyboard")}
-          aria-label={t("terminal.keyboard")}
-          onClick={() => terminalRef.current?.focus()}
-        >
-          ⌨
-        </button>
-        {key("Esc", "\u001b")}
-        {key("Tab", "\t")}
-        <button
-          className={ctrl ? "armed" : ""}
-          disabled={connection !== "connected"}
-          onClick={toggleCtrl}
-        >
-          Ctrl
-        </button>
-        <button
-          className={alt ? "armed" : ""}
-          disabled={connection !== "connected"}
-          onClick={toggleAlt}
-        >
-          Alt
-        </button>
-        {key("↑", "\u001b[A")}
-        {key("↓", "\u001b[B")}
-        {key("←", "\u001b[D")}
-        {key("→", "\u001b[C")}
-        {key("Ctrl+C", "\u0003")}
-        {key("Ctrl+L", "\u000c")}
-        <button
-          type="button"
-          disabled={connection !== "connected"}
-          onClick={() => setLongInputOpen(true)}
-        >
-          {t("terminal.longInput")}
-        </button>
-      </div>
+      <TerminalKeyBar
+        connected={connection === "connected"}
+        ctrl={ctrl}
+        alt={alt}
+        moreOpen={moreKeysOpen}
+        onFocusKeyboard={() => terminalRef.current?.focus()}
+        onToggleCtrl={toggleCtrl}
+        onToggleAlt={toggleAlt}
+        onToggleMore={() => setMoreKeysOpen((open) => !open)}
+        onSendKey={sendKey}
+        onSendData={sendKeyData}
+        onLongInput={() => {
+          clearModifiers();
+          setLongInputOpen(true);
+        }}
+      />
 
       {longInputOpen && (
         <LongInputDialog
