@@ -691,7 +691,7 @@ button.directory-choose {
   border-color: color-mix(in srgb, var(--spectrum-blue) 70%, transparent);
 }
 
-@media (hover: none) and (pointer: coarse) {
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
   input,
   textarea,
   select,
