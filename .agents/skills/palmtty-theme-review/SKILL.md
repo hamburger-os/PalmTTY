@@ -3,7 +3,7 @@ name: palmtty-theme-review
 description: "Audit PalmTTY Web UI for theme SSOT compliance, mobile rendering quality, semantic surface ownership, terminal lifecycle isolation, and visual performance regressions."
 license: Apache-2.0
 metadata:
-  version: "1.5.0"
+  version: "1.6.0"
 ---
 
 # PalmTTY theme and rendering review
@@ -49,7 +49,7 @@ For each relevant combination inspect:
 3. workspace create/edit, including a form tall enough to scroll while header/footer remain reachable;
 4. directory picker;
 5. destructive confirmation;
-6. Session workbench in Terminal / Git / Files views; terminal connected/reconnecting/closed, checking that pane switching does not recreate xterm/WebSocket state and that the frame gutter, xterm viewport remainder and xterm canvas read as one surface; generate more than one viewport of normal-buffer output on a real touch device/emulation and verify one-finger vertical swipes use xterm-owned continuous/inertial scrolling while the page stays fixed, a simple tap (or the explicit keyboard button) focuses xterm and opens the mobile soft keyboard without turning swipes into focus gestures, the final row is fully visible at the live bottom, and an alternate-buffer/mouse-tracking application keeps xterm-owned touch semantics;
+6. Session workbench in Terminal / Git / Files views; terminal connected/reconnecting/closed, checking that pane switching does not recreate xterm/WebSocket state and that the frame gutter, xterm viewport remainder and xterm canvas read as one surface; generate more than one viewport of normal-buffer output on a real touch device/emulation and verify one-finger vertical swipes use xterm-owned continuous/inertial scrolling while the page stays fixed, a simple tap (or the explicit keyboard button) focuses xterm and opens the mobile soft keyboard without turning swipes into focus gestures, the whole workbench (header/content/key bar) fits inside the visible area above the keyboard, closing the keyboard restores the frame, initial load is not oversized, user pinch zoom still works, the final row is fully visible at the live bottom, and an alternate-buffer/mouse-tracking application keeps xterm-owned touch semantics;
 7. Files list + preview and Git status + diff in narrow/mobile and desktop layouts; for Git, verify wheel/trackpad/touch scrolling works when the pointer/finger starts over change rows and action buttons, with the sidebar as the single vertical scroll owner rather than nested group/list scrollers;
 8. portrait;
 9. short landscape.
@@ -67,6 +67,7 @@ HIGH:
 - large-area backdrop blur;
 - duplicate/nested glass ownership, including a generic glass surface behind xterm;
 - padding/border/clipping placed on the xterm FitAddon mount instead of the outer terminal frame, which can overestimate rows and clip the final line;
+- terminal-level VisualViewport handling that competes with the Session workbench, keyboard opening that leaves controls/input behind the soft keyboard, or viewport code that disables/overrides user pinch zoom;
 - modal content transparency high enough that background cards/actions compete with form text;
 - theme-specific material forks instead of veil/tokens;
 - Performance mode still runs decorative continuous animation;
