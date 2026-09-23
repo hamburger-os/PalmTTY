@@ -78,6 +78,7 @@ MEDIUM:
 - component-owned hard-coded palette;
 - reduced-motion ignored;
 - controls/touch targets become unreachable;
+- the mobile terminal keybar hides Enter behind the expanded row, loses accessible Ctrl/Alt pressed state, or turns the optional second row into a competing vertical scroll region;
 - long modal scroll moves its header/footer actions out of reach;
 - Frosted/Obsidian/Spectrum identity collapses.
 
