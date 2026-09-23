@@ -218,7 +218,7 @@ for (const forbidden of ["padding:", "border:", "overflow: hidden"]) {
 
 if (
   !styles.includes(".terminal-mount .xterm-helper-textarea {\n  font-size: 16px;\n}") ||
-  !styles.includes("@media (hover: none) and (pointer: coarse) {") ||
+  !styles.includes("@media (max-width: 760px), (hover: none) and (pointer: coarse) {") ||
   !styles.includes(".appearance-controls.compact .glass-select,\n  .language-select {\n    font-size: 16px;") ||
   !styles.includes(".workbench-page.has-visual-viewport-frame {") ||
   !styles.includes("height: var(--workbench-visual-height);")
