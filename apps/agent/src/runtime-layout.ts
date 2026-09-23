@@ -40,7 +40,7 @@ export function installedRoot(
   // Installed layout: <installRoot>/app/dist/<module>.js.
   // Source/build layout: <repo>/apps/agent/{src,dist}/<module>.*, whose
   // two-level parent is <repo>/apps and therefore has no release manifest.
-  const candidate = fileURLToPath(new URL("../../", moduleUrl));
+  const candidate = path.resolve(fileURLToPath(new URL("../../", moduleUrl)));
   return validInstalledRoot(candidate) ? candidate : undefined;
 }
 
