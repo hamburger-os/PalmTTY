@@ -81,6 +81,19 @@ For broad changes:
 pnpm check
 ~~~
 
+## Distribution qualification
+
+A publishable release additionally requires native Windows x64 and Linux x64 package jobs from the same locked source SHA. Each job must:
+
+- build the monorepo from the frozen lockfile;
+- create a self-contained runtime with bundled Node, production-only deployed Agent dependencies, compiled Web assets and `release-manifest.json`;
+- ensure workspace `src` trees are not copied into the production deployment;
+- copy the runtime into an unrelated temporary directory and use the bundled Node runtime to verify installed CLI version, Agent preflight, `/api/v1/health`, and compiled Web serving;
+- build Windows installer + portable zip or Linux deb + portable tar as appropriate;
+- emit a platform CycloneDX SBOM.
+
+The publish job must accept only the exact expected asset set, generate `SHA256SUMS`, create GitHub build-provenance attestations, upload all assets while the Release is still draft, compare each remote asset size with the local file, and only then promote the Release. Missing, extra, empty, or size-mismatched assets fail the release and keep the existing rollback semantics.
+
 ## Release qualification
 
 A release PR additionally runs:
@@ -90,7 +103,7 @@ pnpm license:check
 pnpm release:check -- X.Y.Z
 ~~~
 
-The real-device/deployment checks below remain recommended release evidence for behavior that CI cannot observe, but they are not represented by a checkbox and do not block the Release workflow. The Release workflow derives publication authority from protected `main`: it locks the selected `main` SHA, re-runs Windows/Ubuntu `pnpm check`, dependency vulnerability + license policy checks and CodeQL against that exact SHA, rejects existing tags/releases, and aborts if `main` moves before promotion.
+The real-device/deployment checks below remain recommended release evidence for behavior that CI cannot observe, but they are not represented by a checkbox and do not block the Release workflow. The Release workflow derives publication authority from protected `main`: it locks the selected `main` SHA, re-runs Windows/Ubuntu `pnpm check`, dependency vulnerability + license policy checks and CodeQL, requires native Windows/Linux package + detached installed-runtime smoke against that same SHA, rejects existing tags/releases, and aborts if `main` moves before promotion.
 
 ## Host runtime preflight
 

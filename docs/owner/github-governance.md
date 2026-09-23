@@ -119,6 +119,12 @@ GitHub Dependency Review 曾因 Dependency graph 未开启而无法运行，因�
 
 这套流程沿用 TauTerm 的“锁定源码 → 重新资格验证 → 原子化发布”原则，但 PalmTTY 当前没有桌面安装包，因此只发布 Git Tag / GitHub Release 与 GitHub 自动生成的源码归档，不引入无意义的平台打包步骤。
 
+### 发行资产门禁
+
+Release 现在把“可安装软件”而不是源码 tag 作为最终交付物。锁定 SHA 后，Windows/Linux 原生 package job 会构建自包含 runtime，并在脱离 checkout 的临时目录中用 bundled Node 做 installed-runtime smoke。Windows 产出 per-user installer + portable zip，Linux 产出 deb + portable tar；两边同时产出 CycloneDX SBOM。
+
+最终 publish job 只有在 package + CI + Security/License + CodeQL 全通过后才继续。它合并 Actions artifacts、验证预期资产集合、生成 `SHA256SUMS` 和 GitHub build provenance，然后沿用 annotated tag + draft Release + rollback 事务。资产在 draft 阶段通过 Release ID 上传，并逐项比较远端 size 与本地文件；任何缺失、多余、空资产都会阻止 promotion。
+
 ## AI 维护原则
 
 后续 AI 维护 PalmTTY 时：

@@ -45,7 +45,7 @@ PalmTTY is **alpha**. Each terminal now runs in an independent durable Session W
 | Agent restart persistence | Implemented: independent Session Worker + authenticated local rediscovery |
 | Current-user autostart | Windows Task Scheduler + console-free native GUI host; Linux systemd user service; Agent restarts after sign-in/user-manager startup |
 | Multi-user ACL | **Not implemented** |
-| Release process | Guarded manual Release Action: pinned `main` SHA → CI/security/license/CodeQL → annotated tag + verified GitHub Release |
+| Release process | Guarded manual Release Action: pinned `main` SHA → CI/security/license/CodeQL → native Windows/Linux package + detached installed-runtime smoke → checksums/provenance → annotated tag + verified asset-bearing GitHub Release |
 
 ## Why PalmTTY / 为什么做 PalmTTY
 
@@ -89,7 +89,34 @@ Codex / Git / npm / dotnet / ...
 
 A browser disconnect does **not** kill the PTY. Restarting only the PalmTTY Agent also leaves the independent Session Worker and PTY alive; after the Agent returns, sign in again and reconnect to the same Session. PalmTTY can automatically start the Agent again on Windows/Linux, but it does **not** claim PTY persistence across OS reboot, user logoff, or loss of the Worker process itself. Autostart restores the control plane; persisted Workspaces remain available for creating new Sessions.
 
-## Quick start on Windows 11 / 快速开始
+## Install / 安装
+
+Normal users do **not** need Node.js, pnpm, or a source checkout. Releases produced by the current Release workflow publish self-contained host runtimes:
+
+- **Windows x64:** `PalmTTY-Setup-X.Y.Z-win-x64.exe` (recommended) and a portable `.zip`.
+- **Linux x64:** `palmtty_X.Y.Z_amd64.deb` (recommended on Debian/Ubuntu) and a portable `.tar.gz`.
+- Each platform also publishes a CycloneDX SBOM; the Release includes `SHA256SUMS`, and GitHub build-provenance attestations cover the release assets.
+
+The Windows installer is per-user and does not elevate to LocalSystem. It installs PalmTTY under Local AppData, initializes a per-user config and random access token, registers the existing current-user Task Scheduler model, and offers to show the browser address/token at the end. The bundled runtime includes Node.js, PalmTTY production dependencies and the compiled Web UI; the user's machine does not need a separate Node installation.
+
+Installed/portable builds expose the bundled CLI:
+
+~~~text
+palmtty init --install-service
+palmtty info
+palmtty start
+palmtty preflight
+palmtty service status
+palmtty service restart
+palmtty service uninstall
+palmtty version
+~~~
+
+Linux `.deb` installation places the runtime under `/usr/lib/palmtty` and the CLI at `/usr/bin/palmtty`; run `palmtty init --install-service` as the intended PalmTTY user so configuration, credentials and the `systemd --user` service belong to that user. Portable archives keep the same CLI under `bin/`.
+
+普通用户**不再需要安装 Node.js、pnpm 或克隆源码仓库**。Windows 推荐直接下载安装器；Debian/Ubuntu 推荐安装 `.deb`。发行包已经包含 Node 运行时、生产依赖和 Web UI。Windows 安装器按当前用户安装并注册当前用户 Task Scheduler；Linux 由目标用户执行 `palmtty init --install-service` 注册 `systemd --user`。配置、凭据和 Workspace 数据与程序文件分离，因此升级不会覆盖用户状态。
+
+## Build from source on Windows 11 / Windows 11 源码构建
 
 Requirements:
 
@@ -121,7 +148,7 @@ Open `http://127.0.0.1:17688`, sign in with the access token, then create a work
 
 For development, run `pnpm dev`. It invokes PalmTTY's `preflight` package script explicitly before Vite and the Agent are launched, so a bad token or Agent endpoint fails once with an actionable startup error instead of leaving the frontend proxy retrying a dead Agent. The script is intentionally not named `doctor` because pnpm 10 already owns `pnpm doctor` as a package-manager diagnostic command. The root launcher reads the same `PALMTTY_CONFIG`, derives the local Agent URL from the exposure profile and `server.port`, and injects it into Vite as `PALMTTY_AGENT_URL`; an explicitly supplied `PALMTTY_AGENT_URL` still overrides the derived target. **Vite listens on `0.0.0.0:5173` by default**, while the Agent follows its exposure profile (the example remains `local`). The launcher enumerates current private/overlay IPv4 addresses and adds only those exact `http://<address>:5173` Origins to the development Agent at runtime, so a phone on the same LAN can use the printed Network URL without modifying persistent Origin policy. Set `PALMTTY_WEB_HOST=127.0.0.1` to opt out of LAN development listening. On Windows, if another LAN device still times out, allow Node.js/PalmTTY TCP 5173 on the Private network profile; PalmTTY never elevates itself or edits firewall rules. Vite keeps strict port 5173 so it cannot silently move to a different untrusted Origin.
 
-## Quick start on Linux / Linux 快速开始
+## Build from source on Linux / Linux 源码构建
 
 The Linux Host runtime is implemented and exercised by Ubuntu CI. A basic source checkout uses the same Agent/Web build as Windows:
 
@@ -145,16 +172,9 @@ With the example config, open `http://127.0.0.1:17688`. Linux uses the native Ho
 
 ## Autostart / 开机自启
 
-After `pnpm build`, PalmTTY can register the Agent under the **current OS user**:
+Installed builds use `palmtty service install|status|restart|uninstall`. `palmtty init --install-service` creates the current user's default config/credentials when absent and installs the service in one step. Windows uses the same least-privilege Task Scheduler + GUI-subsystem host architecture, but the host is compiled and verified during release packaging rather than compiled on the user's workstation. Linux uses `systemd --user` with `KillMode=process`.
 
-```text
-pnpm autostart install --config <config-path> [--env-file <env-file>]
-pnpm autostart status
-pnpm autostart restart
-pnpm autostart uninstall
-```
-
-Windows uses a current-user Task Scheduler logon trigger rather than LocalSystem. Installation compiles a small GUI-subsystem host into `%LOCALAPPDATA%\\PalmTTY\\autostart`; Task Scheduler launches that host directly, so no long-lived PowerShell/Node console is part of the startup chain. Linux uses a `systemd --user` service; headless hosts may opt into user lingering according to local policy. Secret values stay out of the task/unit command line when `--env-file` is used. See [Autostart / 开机自启](docs/community/autostart.md) for setup and security details.
+Source checkouts retain `pnpm autostart ...` for contributor/development validation. Both paths keep secrets in a separate env file and preserve the existing rule that Agent restart must not redefine independent Session Worker lifetime. See [Autostart / 开机自启](docs/community/autostart.md) for details.
 
 ## Network exposure / 网络暴露
 

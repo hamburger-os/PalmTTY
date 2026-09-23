@@ -8,6 +8,35 @@ PalmTTY 提供的是当前 OS 用户的真实开发 Shell，因此部署层必�
 - HTTPS/私有网络只解决外部入口，不能改变 Workspace/PTY 的本机用户权限；
 - “Agent 自启动”与“旧 PTY 跨 OS reboot 存活”是两回事。前者已实现，后者仍未实现。
 
+## 发行版部署模型
+
+正式 Release 不再把源码 checkout 当作用户运行目录。Windows/Linux 构建 job 都从同一个锁定 source SHA 原生构建，并生成自包含 installed runtime：
+
+~~~text
+installRoot/
+  release-manifest.json
+  runtime/        # bundled Node
+  app/            # pnpm deploy 生成的 Agent + production node_modules
+  web/            # compiled PWA
+  tools/          # installed CLI / service management
+  bin/            # platform launcher; Windows 还包含预编译 GUI service host
+  defaults/
+~~~
+
+Agent 通过 `release-manifest.json` 自动识别 installed layout；即使 Worker bootstrap 为安全边界移除了 `PALMTTY_*` 环境变量，Worker 仍可从模块位置 + manifest 识别同一个安装根，不依赖 `repoRoot`。源码构建仍使用原来的 `apps/agent/dist` / `apps/web/dist` 布局。
+
+Release matrix 当前正式产物：
+
+- Windows x64：per-user Inno Setup `.exe` + portable `.zip`；
+- Linux x64：Debian `.deb` + portable `.tar.gz`；
+- 每个平台各自 CycloneDX SBOM；
+- Release 级 `SHA256SUMS`；
+- GitHub build provenance attestation。
+
+每个平台在上传前会把 runtime 复制到独立临时目录，再使用**发行包自带 Node**完成 preflight、Agent health 与静态 Web smoke，从而证明正常运行不依赖 checkout 目录。Release 只有在 Windows/Linux package job、原有 CI/security/license/CodeQL 全部通过后才允许创建 tag/draft；draft 阶段上传并逐个校验 asset size，最终 promotion 前再次验证 `main` 与 peeled tag SHA。
+
+程序文件与用户状态分离。Windows 程序位于当前用户 Local AppData 的 Programs/PalmTTY，配置/credential 位于 Roaming AppData，Workspace/runtime state 继续位于既有 per-user data/runtime 路径。Linux `.deb` 把程序放在 `/usr/lib/palmtty`，但 config/credential/workspace 仍属于实际 PalmTTY 用户。
+
 ## 本机开发
 
 `pnpm dev` 的默认开发拓扑：
@@ -33,7 +62,7 @@ PalmTTY Agent（配置 endpoint；示例为 127.0.0.1:17688）
 - 触发器：当前用户登录；
 - LogonType：`InteractiveToken`；
 - RunLevel：`LeastPrivilege`；
-- 安装阶段：使用系统 Windows PowerShell 5.1 的 `Add-Type -OutputType WindowsApplication` 一次性把 `scripts/windows-autostart-host.cs` 编译为 `%LOCALAPPDATA%\\PalmTTY\\autostart\\palmtty-autostart-host.exe`；运行阶段不依赖 PowerShell；
+- 源码 checkout 的 `pnpm autostart install` 仍可在安装阶段用系统 Windows PowerShell 5.1 编译 helper，供开发验证；正式 Windows 发行包则在 Release Windows runner 上预编译并验证 GUI-subsystem host，目标用户安装时不再编译 C#；两条路径运行阶段都不依赖 PowerShell；
 - Action：Task Scheduler 直接执行上述 GUI-subsystem host，并只传 `--installation <...\\installation.json>`；task XML 不再携带 Node/Agent/config/env-file 等仓库细节；
 - native host：读取 installation manifest，用 `CREATE_SUSPENDED | CREATE_NO_WINDOW` 创建 Node Agent，先加入 `KILL_ON_JOB_CLOSE | SILENT_BREAKAWAY_OK` Job Object，再恢复、等待并传递退出码；
 - WorkingDirectory、Agent、config 与可选 env-file 都使用安装时的绝对路径；
@@ -75,7 +104,7 @@ env-file 使用严格 `NAME=value`：
 
 ## 路径与升级
 
-自启动定义记录安装时的绝对 Node/仓库/Agent/config 路径。以下变化后必须重新执行 `pnpm build` 与 `pnpm autostart install ...`：
+源码 autostart 定义记录安装时的绝对 Node/仓库/Agent/config 路径；portable 安装版 service 记录解压目录中的 bundled Node/Agent 绝对路径；Windows installer 与 Linux `.deb` 使用稳定安装根。源码模式下以下变化后必须重新执行 `pnpm build` 与 `pnpm autostart install ...`：
 
 - 仓库被移动；
 - Node 安装切换导致 `node` 可执行文件绝对路径变化；

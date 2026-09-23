@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
@@ -34,6 +33,7 @@ import {
   type WorkspaceStore
 } from "./workspace-store.js";
 import { registerWorkspaceToolRoutes } from "./workspace-tool-routes.js";
+import { defaultWebRoot } from "./runtime-layout.js";
 import { PALMTTY_VERSION } from "./version.js";
 
 const LoginSchema = z.object({ token: z.string().min(1).max(4096) });
@@ -504,8 +504,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     }
   );
 
-  const defaultWebRoot = fileURLToPath(new URL("../../web/dist/", import.meta.url));
-  const webRoot = options.webRoot ?? defaultWebRoot;
+  const webRoot = options.webRoot ?? defaultWebRoot();
   const hasWeb = existsSync(path.join(webRoot, "index.html"));
 
   if (hasWeb) {
