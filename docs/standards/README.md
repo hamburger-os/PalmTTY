@@ -8,9 +8,10 @@ This layer records the external technical basis used by PalmTTY. It is not a pla
 - [git-cli.md](git-cli.md) — Git porcelain v2, diff helper controls, hooks path and transport protocol policy
 - [autostart.md](autostart.md) — Microsoft Task Scheduler and systemd user-service behavior used by PalmTTY autostart
 - [github-actions.md](github-actions.md) — GitHub reusable-workflow contexts, inputs and concurrency semantics used by release gates
+- [mobile-web-viewport.md](mobile-web-viewport.md) — VisualViewport, iOS focus zoom and WebKit viewport caveats used by mobile layout
 
 ## Rule
 
 When PalmTTY behavior differs from an external source, document the difference in the owner/AI layers. Do not rewrite this layer to make the implementation appear compliant.
 
-Last reviewed: 2026-09-22.
+Last reviewed: 2026-09-23.

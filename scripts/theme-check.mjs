@@ -66,12 +66,16 @@ const themeCss = await readFile(themeCssPath, "utf8");
 const themeTs = await readFile(themeTsPath, "utf8");
 const terminalViewPath = path.join(webSource, "TerminalView.tsx");
 const visualViewportPath = path.join(webSource, "visual-viewport.ts");
+const viewportDebugPath = path.join(webSource, "ViewportDebug.tsx");
+const mainPath = path.join(webSource, "main.tsx");
 const indexHtmlPath = path.join(root, "apps", "web", "index.html");
 const stylesPath = path.join(webSource, "styles.css");
 const sessionWorkbenchPath = path.join(webSource, "SessionWorkbench.tsx");
 const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
 const visualViewport = await readFile(visualViewportPath, "utf8");
+const viewportDebug = await readFile(viewportDebugPath, "utf8");
+const mainSource = await readFile(mainPath, "utf8");
 const indexHtml = await readFile(indexHtmlPath, "utf8");
 const styles = (await readFile(stylesPath, "utf8")).replaceAll("\r\n", "\n");
 const sessionWorkbench = await readFile(sessionWorkbenchPath, "utf8");
@@ -157,15 +161,40 @@ for (const marker of [
   }
 }
 
+if (
+  visualViewport.includes("ZOOM_EPSILON") ||
+  visualViewport.includes("Math.abs(scale - 1)") ||
+  visualViewport.includes("scale !== 1")
+) {
+  failures.push(
+    "apps/web/src/visual-viewport.ts [mobile-viewport-contract] zoom level must not disable visible-viewport framing"
+  );
+}
+
+if (!visualViewport.includes("return null;")) {
+  failures.push(
+    "apps/web/src/visual-viewport.ts [mobile-viewport-contract] invalid geometry must still fail closed"
+  );
+}
+
 for (const marker of [
-  'Math.abs(scale - 1) > ZOOM_EPSILON',
-  'return null;'
+  'get("viewportDebug") === "1"',
+  'window.visualViewport',
+  'document.documentElement.clientWidth',
+  'viewport.scale',
+  'document.activeElement'
 ]) {
-  if (!visualViewport.includes(marker)) {
+  if (!viewportDebug.includes(marker)) {
     failures.push(
-      `apps/web/src/visual-viewport.ts [mobile-viewport-contract] missing ${marker}`
+      `apps/web/src/ViewportDebug.tsx [mobile-viewport-debug] missing ${marker}`
     );
   }
+}
+
+if (!mainSource.includes("<ViewportDebug />")) {
+  failures.push(
+    "apps/web/src/main.tsx [mobile-viewport-debug] viewport diagnostics must stay globally available behind the query flag"
+  );
 }
 
 if (!indexHtml.includes("interactive-widget=resizes-content")) {
@@ -189,11 +218,13 @@ for (const forbidden of ["padding:", "border:", "overflow: hidden"]) {
 
 if (
   !styles.includes(".terminal-mount .xterm-helper-textarea {\n  font-size: 16px;\n}") ||
+  !styles.includes("@media (max-width: 760px), (hover: none) and (pointer: coarse) {") ||
+  !styles.includes(".appearance-controls.compact .glass-select,\n  .language-select {\n    font-size: 16px;") ||
   !styles.includes(".workbench-page.has-visual-viewport-frame {") ||
   !styles.includes("height: var(--workbench-visual-height);")
 ) {
   failures.push(
-    "apps/web/src/styles.css [mobile-viewport-contract] workbench viewport frame and 16px xterm helper input must remain explicit"
+    "apps/web/src/styles.css [mobile-viewport-contract] workbench frame and mobile-safe 16px editable controls must remain explicit"
   );
 }
 

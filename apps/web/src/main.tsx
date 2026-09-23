@@ -4,6 +4,7 @@ import "@xterm/xterm/css/xterm.css";
 import { AmbientBackground } from "./AmbientBackground.js";
 import { App } from "./App.js";
 import { I18nProvider } from "./i18n.js";
+import { ViewportDebug } from "./ViewportDebug.js";
 import {
   ThemeProvider,
   initializeThemeDocument
@@ -18,6 +19,7 @@ createRoot(document.getElementById("root")!).render(
       <I18nProvider>
         <AmbientBackground />
         <App />
+        <ViewportDebug />
       </I18nProvider>
     </ThemeProvider>
   </StrictMode>

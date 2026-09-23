@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { workbenchVisualViewportFrame } from "./visual-viewport.js";
 
 describe("workbench visual viewport frame", () => {
-  it("uses the unzoomed visual viewport as the workbench frame", () => {
+  it("uses the visual viewport as the workbench frame", () => {
     expect(workbenchVisualViewportFrame({
       width: 390,
       height: 437,
@@ -17,14 +17,19 @@ describe("workbench visual viewport frame", () => {
     });
   });
 
-  it("does not pin the workbench while the user is pinch zooming", () => {
+  it("keeps the workbench framed while the user is pinch zooming", () => {
     expect(workbenchVisualViewportFrame({
       width: 300,
       height: 500,
       offsetLeft: 24,
       offsetTop: 30,
       scale: 1.25
-    })).toBeNull();
+    })).toEqual({
+      width: 300,
+      height: 500,
+      left: 24,
+      top: 30
+    });
   });
 
   it("rejects unusable viewport metrics", () => {

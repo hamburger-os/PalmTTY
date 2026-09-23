@@ -10,21 +10,17 @@ export type WorkbenchVisualViewportFrame = {
   height: number;
 };
 
-const ZOOM_EPSILON = 0.01;
-
 export function workbenchVisualViewportFrame(
   viewport: WorkbenchVisualViewport
 ): WorkbenchVisualViewportFrame | null {
-  const { height, width, offsetLeft, offsetTop, scale } = viewport;
+  const { height, width, offsetLeft, offsetTop } = viewport;
   if (
     !Number.isFinite(height) ||
     !Number.isFinite(width) ||
     !Number.isFinite(offsetLeft) ||
     !Number.isFinite(offsetTop) ||
-    !Number.isFinite(scale) ||
     height <= 0 ||
-    width <= 0 ||
-    Math.abs(scale - 1) > ZOOM_EPSILON
+    width <= 0
   ) {
     return null;
   }
