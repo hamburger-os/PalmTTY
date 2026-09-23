@@ -65,10 +65,14 @@ const themeTsPath = path.join(webSource, "theme.tsx");
 const themeCss = await readFile(themeCssPath, "utf8");
 const themeTs = await readFile(themeTsPath, "utf8");
 const terminalViewPath = path.join(webSource, "TerminalView.tsx");
+const visualViewportPath = path.join(webSource, "visual-viewport.ts");
+const indexHtmlPath = path.join(root, "apps", "web", "index.html");
 const stylesPath = path.join(webSource, "styles.css");
 const sessionWorkbenchPath = path.join(webSource, "SessionWorkbench.tsx");
 const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
+const visualViewport = await readFile(visualViewportPath, "utf8");
+const indexHtml = await readFile(indexHtmlPath, "utf8");
 const styles = (await readFile(stylesPath, "utf8")).replaceAll("\r\n", "\n");
 const sessionWorkbench = await readFile(sessionWorkbenchPath, "utf8");
 const workspaceDialog = await readFile(workspaceDialogPath, "utf8");
@@ -102,7 +106,6 @@ for (const marker of [
   'terminal.open(mount)',
   'mount.addEventListener("click", focusTerminal);',
   'mount.removeEventListener("click", focusTerminal);',
-  'window.visualViewport',
   '}, [sessionId]);'
 ]) {
   if (!terminalView.includes(marker)) {
@@ -132,11 +135,43 @@ for (const forbidden of [
   'terminal.scrollLines(',
   'touchstart',
   'touchmove',
+  'window.visualViewport',
   '}, [sessionId, t]);'
 ]) {
   if (terminalView.includes(forbidden)) {
     failures.push(`apps/web/src/TerminalView.tsx [terminal-lifecycle-contract] forbidden ${forbidden}`);
   }
+}
+
+for (const marker of [
+  'ref={workbenchRef}',
+  'window.visualViewport',
+  'visualViewport.addEventListener("resize", scheduleVisualViewportSync);',
+  'visualViewport.addEventListener("scroll", scheduleVisualViewportSync);',
+  'workbenchVisualViewportFrame(visualViewport)'
+]) {
+  if (!sessionWorkbench.includes(marker)) {
+    failures.push(
+      `apps/web/src/SessionWorkbench.tsx [mobile-viewport-contract] missing ${marker}`
+    );
+  }
+}
+
+for (const marker of [
+  'Math.abs(scale - 1) > ZOOM_EPSILON',
+  'return null;'
+]) {
+  if (!visualViewport.includes(marker)) {
+    failures.push(
+      `apps/web/src/visual-viewport.ts [mobile-viewport-contract] missing ${marker}`
+    );
+  }
+}
+
+if (!indexHtml.includes("interactive-widget=resizes-content")) {
+  failures.push(
+    "apps/web/index.html [mobile-viewport-contract] viewport meta must opt into resizes-content when supported"
+  );
 }
 
 const terminalMountStart = styles.indexOf(".terminal-mount {");
@@ -150,6 +185,16 @@ for (const forbidden of ["padding:", "border:", "overflow: hidden"]) {
       `apps/web/src/styles.css [terminal-fit-contract] .terminal-mount must stay geometry-only; found ${forbidden}`
     );
   }
+}
+
+if (
+  !styles.includes(".terminal-mount .xterm-helper-textarea {\n  font-size: 16px;\n}") ||
+  !styles.includes(".workbench-page.has-visual-viewport-frame {") ||
+  !styles.includes("height: var(--workbench-visual-height);")
+) {
+  failures.push(
+    "apps/web/src/styles.css [mobile-viewport-contract] workbench viewport frame and 16px xterm helper input must remain explicit"
+  );
 }
 
 if (
