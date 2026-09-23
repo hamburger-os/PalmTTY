@@ -140,8 +140,8 @@ Status: **alpha foundation implemented with durable per-session workers, Windows
 - gap detection forces snapshot recovery
 - SessionWorkbench is the single mobile VisualViewport layout owner at every zoom level: it pins the full workbench to the current visual rectangle (including keyboard/browser-chrome offsets) without reading scale as an enable/disable gate or writing browser zoom; `interactive-widget=resizes-content` is progressive enhancement only. TerminalView no longer listens to VisualViewport directly—workbench geometry changes resize the terminal mount, whose existing ResizeObserver/FitAddon path is the only terminal geometry bridge. `?viewportDebug=1` exposes viewport/focus metrics for real-device diagnosis without logging terminal content
 - browser terminal writes are serialized during recovery, fitting is frozen until recovery completes, and terminal input is blocked rather than discarded while disconnected or recovering; switching to Git/Files suppresses resize propagation and switching back performs a safe refit without recreating transport state
-- Esc/Tab/arrows/Ctrl+C/Ctrl+L
-- one-shot Ctrl/Alt modifier
+- mobile terminal keybar is data-driven through a shared terminal-key encoder instead of hard-coded byte writes: Enter is a first-class core key; the core row also exposes Esc/Tab/arrows, Ctrl+C, Ctrl+J, Shift+Tab and Ctrl+D, while an expandable second row provides PgUp/PgDn/Home/End/Backspace/Delete plus common Ctrl navigation/AI-CLI shortcuts
+- one-shot Ctrl/Alt modifiers are shared by xterm typed input and virtual key dispatch; modified navigation keys use xterm CSI modifier parameters, modifiers reset on successful send or disconnect, and fixed shortcuts clear any armed modifier after dispatch
 - on-demand long-text dialog for pasted blocks, voice input and AI prompts; the always-visible chat-like composer has been removed
 - responsive/safe-area layout
 - terminal line-height and bottom spacing tuned so the last rendered row is not clipped by the lower controls
