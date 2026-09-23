@@ -51,9 +51,11 @@
 - xterm.js；浏览器端 xterm/fit 由根目录 `terminal-stack.json` 精确锁定，当前浏览器栈使用包含上游触摸滚动修复的 xterm 6.1 beta，而 Worker 端 headless/serialize 暂时保持稳定 6.0/0.14，避免把移动端输入修复与 canonical snapshot/recovery 升级绑在一起；
 - 手机终端不再维护 PalmTTY 自己的逐行 touch adapter：`.xterm-screen` 只用 `touch-action: none` 阻止 Safari/浏览器把手势变成页面平移，触摸事件继续由 xterm 自己的 Gesture/Viewport 路径处理，因此 normal scrollback 使用连续像素滚动与惯性，alternate buffer、mouse tracking、滚动条也保持同一套 xterm 语义；不建立第二个 DOM 滚动层，也不增加应用级 document touch handler。终端普通 click/tap 只承担 `terminal.focus()` 的键盘激活桥接，不读取 touch delta、不拦截 swipe；手机 keybar 另提供显式“键盘”按钮作为可靠入口；在 coarse-pointer/mobile 布局上，所有可编辑 `input/textarea/select`（包括紧凑主题/性能/语言选择器、登录/Git 输入和 xterm helper textarea）统一至少 16px，避免 iOS 因聚焦小字号控件而主动放大页面；
 - 自动重连状态；
-- 手机快捷键栏不再由 `TerminalView` 手写字节序列：独立的纯函数按键编码层统一负责基础键、Ctrl/Alt 修饰与 xterm CSI 导航组合，UI 组件只声明动作；Enter 作为核心键前置，核心行还提供 Esc、Tab、方向键、Ctrl+C、Ctrl+J、Shift+Tab、Ctrl+D；
-- “更多”展开行为只增加第二条横向可滚动按键行，不建立新的纵向 scroll owner；其中提供 PgUp/PgDn、Home/End、Backspace/Delete，以及 Ctrl+L/R/O/G/K/A/E/U/W。Ctrl / Alt 仍是一键一次性修饰，但现在软键盘字符与虚拟导航键共用同一修饰语义，成功发送或断线后都会清除 armed 状态；
-- 适合粘贴、语音输入和 AI Prompt 的按需长文本弹窗；不再常驻聊天式发送栏，从而把垂直空间还给终端；
+- 浏览器键盘/IME 仍以 xterm 为唯一主 owner；针对 iOS/CJK 输入法 `keyCode=229` 的已知上游缺口，只在 xterm 公开的 textarea / custom-key-handler / input API 外围增加一个窄状态机：暂存同一事务内的 `onData`，等 textarea 最终值后只提交一次差量；真实 `compositionstart` 会立即取消兜底。物理 Ctrl+字母、Ctrl+Space、Escape 只在非 composing 的 229 keydown 且有明确 `KeyboardEvent.code` 时恢复，避免 keyup 重复发送；
+- 手机快捷键栏不再由 `TerminalView` 手写字节序列：独立纯函数编码层统一负责基础键、Ctrl/Alt 修饰、xterm CSI 导航和 DECCKM application-cursor 模式；Enter 与字面量 `/` 作为核心键前置，核心行还提供 Esc、Tab、方向键、Ctrl+C、Ctrl+J、Shift+Tab、Ctrl+D；
+- “更多”展开行为只增加第二条横向可滚动按键行，不建立新的纵向 scroll owner；其中补充 `\\`、`|`、`~`、PgUp/PgDn、Home/End、Backspace/Delete，以及 Ctrl+L/R/O/G/K/A/E/U/W。Ctrl / Alt 仍是一键一次性修饰，软键盘字符与虚拟导航键共用同一修饰语义，成功发送或断线后都会清除 armed 状态；
+- 适合粘贴、语音输入和 AI Prompt 的按需长文本弹窗通过 xterm `paste()` 进入终端，保留 bracketed-paste 语义，并把“仅粘贴”和“粘贴并回车”分成两个显式动作；不再常驻聊天式发送栏；
+- A−/A+ 调整浏览器本地终端字号（11–18px），直接更新已挂载 xterm 后走现有 ResizeObserver/FitAddon refit，不重建 xterm/WebSocket/Session；这用于窄屏宽表格等密集输出的可读性调节，而不是解析或重排 CLI 输出；
 - 竖屏/横屏布局；
 - Safe Area 处理；
 - 终端视觉框与 Fit 几何已拆成两层：外层 `terminal-frame` 负责主题背景、边框、圆角、padding 与裁剪，内层 `terminal-mount` 保持无 padding/无 border 并作为 `terminal.open()`、FitAddon 与 ResizeObserver 的唯一几何基准；这避免 FitAddon 把外层 padding 误算成可用行高后再被 `overflow:hidden` 裁掉最后一行。xterm viewport/scrollable remainder 与 canvas 继承同一个 `--terminal-background`，因此整数行之外的剩余高度不会显示成默认黑条；xterm 继续使用略大的 lineHeight，主题背景保持与页面基底协调；
@@ -65,7 +67,7 @@
 
 ## 设计边界
 
-- 长文本弹窗和附件路径插入最终仍然只作为终端输入发送，不建立 Codex/Antigravity 专用 API；PalmTTY 不保证所有 CLI 对裸路径使用同一种图片引用语法，厂商差异留在 CLI 层。
+- 长文本弹窗通过 xterm 普通 paste/input 语义发送，附件路径插入仍然只作为终端输入，不建立 Codex/Antigravity 专用 API；PalmTTY 不保证所有 CLI 对裸路径使用同一种图片引用语法，也不解析 Markdown 表格并重排终端输出，厂商与呈现差异留在 CLI/终端层。
 - Workspace 修改走独立持久化 API；Session 创建/重启不接收临时 cwd/shell/env。终端 Profile 发现只是受保护、有界的运行环境读取 API，不是通用命令执行接口。
 - 目录选择器仍只读取目录名称/路径，不读取文件内容；会话工作台的文件浏览/预览是另一组独立受保护 API，使用相对 Workspace 路径并在 Agent 端做 canonical/symlink containment 检查，不能复用目录选择器绕开边界。
 - Git 工作台只通过独立、有界、typed 的 Agent API 工作，不把 Git 命令塞进终端 WebSocket，也不进入 Session Worker。读取面使用 porcelain v2 status、diff/history/branches，禁止 external diff/textconv/fsmonitor；working-tree diff 会先解析该路径的 filter attribute，并在本次 diff 中中和 clean/process/required，避免查看动作触发内容过滤程序。写面只接受固定 operation union，不接受浏览器提供任意 argv。所有写操作携带当前 state token，破坏性丢弃还必须匹配刚加载的 diff snapshot；Web 默认关闭写按钮，用户在当前 Session workbench 确认“信任仓库”后才发送写请求，该确认在终端/Git/文件/附件页签切换间保留，离开 Session 页面后失效。PalmTTY 禁用 Git hooks、编辑器/credential 交互提示，但正常 Git filter 仍可能在 stage/switch/stash/pull 等语义中执行，因此这一确认是能力边界提示而不是沙箱。辅助子进程继续剔除 `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量。
