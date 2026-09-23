@@ -180,7 +180,8 @@ for (const marker of [
 
 if (
   styles.includes(".file-list,\n.git-groups,\n.git-change-list {") ||
-  !styles.includes(".git-groups,\n.git-change-list {\n  min-height: 0;\n  overflow: visible;\n}")
+  !styles.includes(".git-groups,\n.git-change-list {\n  overflow: visible;\n}") ||
+  !styles.includes(".git-groups {\n  display: block;\n  flex: 0 0 auto;\n}")
 ) {
   failures.push(
     "apps/web/src/styles.css [git-scroll-contract] Git groups/change lists must not be nested scroll owners"
