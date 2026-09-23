@@ -69,7 +69,7 @@ const stylesPath = path.join(webSource, "styles.css");
 const sessionWorkbenchPath = path.join(webSource, "SessionWorkbench.tsx");
 const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
-const styles = await readFile(stylesPath, "utf8");
+const styles = (await readFile(stylesPath, "utf8")).replaceAll("\r\n", "\n");
 const sessionWorkbench = await readFile(sessionWorkbenchPath, "utf8");
 const workspaceDialog = await readFile(workspaceDialogPath, "utf8");
 
