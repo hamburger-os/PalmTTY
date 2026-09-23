@@ -54,5 +54,32 @@ describe("terminal key input", () => {
     expect(
       applyTerminalModifiers("\u001b[D", { ctrl: false, alt: true })
     ).toBe("\u001b[1;3D");
+    expect(
+      applyTerminalModifiers("\u001bOA", { ctrl: true, alt: false })
+    ).toBe("\u001b[1;5A");
+  });
+
+  it("uses DECCKM application cursor sequences when requested", () => {
+    expect(
+      encodeTerminalKey(
+        "arrowUp",
+        { ctrl: false, alt: false },
+        { applicationCursorKeysMode: true }
+      )
+    ).toBe("\u001bOA");
+    expect(
+      encodeTerminalKey(
+        "arrowLeft",
+        { ctrl: false, alt: false },
+        { applicationCursorKeysMode: true }
+      )
+    ).toBe("\u001bOD");
+    expect(
+      encodeTerminalKey(
+        "arrowUp",
+        { ctrl: true, alt: false },
+        { applicationCursorKeysMode: true }
+      )
+    ).toBe("\u001b[1;5A");
   });
 });

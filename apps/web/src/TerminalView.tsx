@@ -10,10 +10,20 @@ import { ensureModalDialogOpen } from "./dialog-controller.js";
 import { useI18n } from "./i18n.js";
 import { TerminalKeyBar } from "./TerminalKeyBar.js";
 import {
+  Ime229InputTransaction,
+  recoverIme229ControlKey
+} from "./terminal-ime-input.js";
+import {
   applyTerminalModifiers,
   encodeTerminalKey,
   type TerminalKey
 } from "./terminal-key-input.js";
+import {
+  DEFAULT_TERMINAL_FONT_SIZE,
+  normalizeTerminalFontSize,
+  readTerminalFontSize,
+  writeTerminalFontSize
+} from "./terminal-preferences.js";
 import { useTheme } from "./theme.js";
 
 export type ConnectionState =
@@ -36,11 +46,11 @@ function websocketUrl(sessionId: string) {
 function LongInputDialog({
   connected,
   onCancel,
-  onSend
+  onPaste
 }: {
   connected: boolean;
   onCancel(): void;
-  onSend(data: string): void;
+  onPaste(data: string, submit: boolean): void;
 }) {
   const { t } = useI18n();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -82,11 +92,19 @@ function LongInputDialog({
         </button>
         <button
           type="button"
+          className="ghost"
+          disabled={!connected || value.length === 0}
+          onClick={() => onPaste(value, false)}
+        >
+          {t("terminal.paste")}
+        </button>
+        <button
+          type="button"
           className="prism-primary"
           disabled={!connected || value.length === 0}
-          onClick={() => onSend(value)}
+          onClick={() => onPaste(value, true)}
         >
-          {t("terminal.send")}
+          {t("terminal.pasteAndEnter")}
         </button>
       </div>
     </dialog>
@@ -108,6 +126,14 @@ export function TerminalView({
   const { terminalTheme } = useTheme();
   const translateRef = useRef(t);
   const terminalThemeRef = useRef(terminalTheme);
+  const [fontSize, setFontSize] = useState(() => {
+    try {
+      return readTerminalFontSize(window.localStorage);
+    } catch {
+      return DEFAULT_TERMINAL_FONT_SIZE;
+    }
+  });
+  const fontSizeRef = useRef(fontSize);
   const activeRef = useRef(active);
   const terminalMountRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -146,6 +172,16 @@ export function TerminalView({
     const terminal = terminalRef.current;
     if (terminal) terminal.options.theme = terminalTheme;
   }, [terminalTheme]);
+
+  useEffect(() => {
+    fontSizeRef.current = fontSize;
+    writeTerminalFontSize(window.localStorage, fontSize);
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+    terminal.options.fontSize = fontSize;
+    const frame = window.requestAnimationFrame(() => refitRef.current?.());
+    return () => window.cancelAnimationFrame(frame);
+  }, [fontSize]);
 
   useEffect(() => {
     if (connection === "connected") return;
@@ -190,7 +226,7 @@ export function TerminalView({
 
     const terminal = new Terminal({
       cursorBlink: true,
-      fontSize: 14,
+      fontSize: fontSizeRef.current,
       lineHeight: 1.15,
       fontFamily: '"Cascadia Mono", "SFMono-Regular", Consolas, monospace',
       scrollback: 10000,
@@ -209,13 +245,80 @@ export function TerminalView({
     };
     mount.addEventListener("click", focusTerminal);
 
-    const dataDisposable = terminal.onData((raw) => {
+    const imeInput = new Ime229InputTransaction();
+    const terminalTextarea = terminal.textarea;
+    let imeFallbackTimer: number | undefined;
+    let imeKeyupTimer: number | undefined;
+
+    const clearImeTimers = () => {
+      if (imeFallbackTimer !== undefined) {
+        window.clearTimeout(imeFallbackTimer);
+        imeFallbackTimer = undefined;
+      }
+      if (imeKeyupTimer !== undefined) {
+        window.clearTimeout(imeKeyupTimer);
+        imeKeyupTimer = undefined;
+      }
+    };
+
+    const finalizeImeInput = () => {
+      clearImeTimers();
+      const data = imeInput.finalize(terminalTextarea?.value ?? "");
+      if (data) terminal.input(data, true);
+    };
+
+    const scheduleImeFallback = () => {
+      if (imeFallbackTimer !== undefined) return;
+      imeFallbackTimer = window.setTimeout(finalizeImeInput, 250);
+    };
+
+    const onCompositionStart = () => {
+      clearImeTimers();
+      imeInput.cancel();
+    };
+    terminalTextarea?.addEventListener("compositionstart", onCompositionStart);
+
+    terminal.attachCustomKeyEventHandler((event) => {
+      const recoveredControl = recoverIme229ControlKey(event);
+      if (recoveredControl !== undefined) {
+        clearImeTimers();
+        imeInput.cancel();
+        ctrlRef.current = false;
+        altRef.current = false;
+        setCtrl(false);
+        setAlt(false);
+        event.preventDefault();
+        terminal.input(recoveredControl, true);
+        return false;
+      }
+
+      if (
+        event.type === "keydown" &&
+        event.keyCode === 229 &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !event.isComposing
+      ) {
+        imeInput.begin(terminalTextarea?.value ?? "");
+        scheduleImeFallback();
+        return true;
+      }
+
+      if (event.type === "keyup" && imeInput.active) {
+        if (imeKeyupTimer === undefined) {
+          imeKeyupTimer = window.setTimeout(finalizeImeInput, 0);
+        }
+      }
+      return true;
+    });
+
+    const forwardTerminalData = (raw: string) => {
       const modifiers = {
         ctrl: ctrlRef.current,
         alt: altRef.current
       };
       const data = applyTerminalModifiers(raw, modifiers);
-
       if (!sendInput(data)) return;
 
       if (modifiers.ctrl) {
@@ -226,6 +329,11 @@ export function TerminalView({
         altRef.current = false;
         setAlt(false);
       }
+    };
+
+    const dataDisposable = terminal.onData((raw) => {
+      const data = imeInput.captureTerminalData(raw);
+      if (data !== undefined) forwardTerminalData(data);
     });
 
     let reconnectTimer: number | undefined;
@@ -426,6 +534,9 @@ export function TerminalView({
       if (heartbeatTimer !== undefined) window.clearInterval(heartbeatTimer);
       if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
       observer.disconnect();
+      clearImeTimers();
+      imeInput.cancel();
+      terminalTextarea?.removeEventListener("compositionstart", onCompositionStart);
       mount.removeEventListener("click", focusTerminal);
       dataDisposable.dispose();
       socketRef.current?.close(1000, "Leaving terminal view");
@@ -457,10 +568,17 @@ export function TerminalView({
   };
 
   const sendKey = (key: TerminalKey) => {
-    const data = encodeTerminalKey(key, {
-      ctrl: ctrlRef.current,
-      alt: altRef.current
-    });
+    const data = encodeTerminalKey(
+      key,
+      {
+        ctrl: ctrlRef.current,
+        alt: altRef.current
+      },
+      {
+        applicationCursorKeysMode:
+          terminalRef.current?.modes.applicationCursorKeysMode ?? false
+      }
+    );
     if (!sendInput(data)) return;
     clearModifiers();
     terminalRef.current?.focus();
@@ -470,6 +588,10 @@ export function TerminalView({
     if (!sendInput(data)) return;
     clearModifiers();
     terminalRef.current?.focus();
+  };
+
+  const adjustFontSize = (delta: number) => {
+    setFontSize((current) => normalizeTerminalFontSize(current + delta));
   };
 
   return (
@@ -496,16 +618,23 @@ export function TerminalView({
           clearModifiers();
           setLongInputOpen(true);
         }}
+        fontSize={fontSize}
+        onDecreaseFontSize={() => adjustFontSize(-1)}
+        onIncreaseFontSize={() => adjustFontSize(1)}
       />
 
       {longInputOpen && (
         <LongInputDialog
           connected={connection === "connected"}
           onCancel={() => setLongInputOpen(false)}
-          onSend={(data) => {
-            if (!sendInput(data + "\r")) return;
+          onPaste={(data, submit) => {
+            const terminal = terminalRef.current;
+            if (!terminal || !inputReadyRef.current) return;
+            clearModifiers();
+            terminal.paste(data);
+            if (submit) terminal.input("\r", true);
             setLongInputOpen(false);
-            terminalRef.current?.focus();
+            terminal.focus();
           }}
         />
       )}
