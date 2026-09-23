@@ -275,10 +275,13 @@ export function TerminalView({
 
     const scheduleImeFallback = () => {
       if (imeFallbackTimer !== undefined) return;
+      // xterm 6.1 beta still has its own keydown-229 zero-delay textarea
+      // fallback. Let that run first so any resulting onData is buffered by
+      // this transaction before we choose one canonical payload.
       imeFallbackTimer = window.setTimeout(() => {
         imeFallbackTimer = undefined;
         flushImeInput(false);
-      }, 0);
+      }, 250);
     };
 
     const onCompositionStart = () => {
@@ -293,7 +296,9 @@ export function TerminalView({
     terminalTextarea?.addEventListener("compositionend", onCompositionEnd);
 
     terminal.attachCustomKeyEventHandler((event) => {
-      const recoveredControl = recoverIme229ControlKey(event);
+      const recoveredControl = compositionActive
+        ? undefined
+        : recoverIme229ControlKey(event);
       if (recoveredControl !== undefined) {
         clearImeTimers();
         imeInput.cancel();
@@ -651,7 +656,11 @@ export function TerminalView({
           onCancel={() => setLongInputOpen(false)}
           onPaste={(data, submit) => {
             const terminal = terminalRef.current;
-            if (!terminal || !inputReadyRef.current) return;
+            if (
+              !terminal ||
+              !inputReadyRef.current ||
+              socketRef.current?.readyState !== WebSocket.OPEN
+            ) return;
             clearModifiers();
             terminal.paste(data);
             if (submit) terminal.input("\r", true);

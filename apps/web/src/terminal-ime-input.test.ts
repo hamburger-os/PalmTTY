@@ -31,7 +31,7 @@ describe("terminal IME input compatibility", () => {
     expect(transaction.flush("same", true)).toBe("\r");
   });
 
-  it("keeps an empty timer flush pending until keyup can observe the value", () => {
+  it("keeps an empty delayed fallback pending until keyup can observe the value", () => {
     const transaction = new Ime229InputTransaction();
     transaction.begin("same");
     expect(transaction.flush("same", false)).toBeUndefined();
