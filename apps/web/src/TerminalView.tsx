@@ -471,7 +471,10 @@ export function TerminalView({
         onToggleMore={() => setMoreKeysOpen((open) => !open)}
         onSendKey={sendKey}
         onSendData={sendKeyData}
-        onLongInput={() => setLongInputOpen(true)}
+        onLongInput={() => {
+          clearModifiers();
+          setLongInputOpen(true);
+        }}
       />
 
       {longInputOpen && (
