@@ -227,6 +227,11 @@ body,
   background: var(--bg-base);
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   color: var(--text-primary);
   font-family: var(--font-ui);
