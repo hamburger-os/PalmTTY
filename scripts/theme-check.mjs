@@ -69,7 +69,7 @@ const stylesPath = path.join(webSource, "styles.css");
 const sessionWorkbenchPath = path.join(webSource, "SessionWorkbench.tsx");
 const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
-const styles = await readFile(stylesPath, "utf8");
+const styles = (await readFile(stylesPath, "utf8")).replaceAll("\r\n", "\n");
 const sessionWorkbench = await readFile(sessionWorkbenchPath, "utf8");
 const workspaceDialog = await readFile(workspaceDialogPath, "utf8");
 
@@ -100,6 +100,8 @@ for (const marker of [
   '"--terminal-background"',
   'terminalThemeRef.current',
   'terminal.open(mount)',
+  'mount.addEventListener("click", focusTerminal);',
+  'mount.removeEventListener("click", focusTerminal);',
   'window.visualViewport',
   '}, [sessionId]);'
 ]) {
@@ -128,6 +130,8 @@ for (const forbidden of [
   'terminal-touch-scroll',
   'attachTerminalTouchScroll',
   'terminal.scrollLines(',
+  'touchstart',
+  'touchmove',
   '}, [sessionId, t]);'
 ]) {
   if (terminalView.includes(forbidden)) {
@@ -146,6 +150,42 @@ for (const forbidden of ["padding:", "border:", "overflow: hidden"]) {
       `apps/web/src/styles.css [terminal-fit-contract] .terminal-mount must stay geometry-only; found ${forbidden}`
     );
   }
+}
+
+if (
+  !styles.includes(".terminal-mount .xterm:not(.allow-transparency) .xterm-viewport,") ||
+  !styles.includes("background-color: var(--terminal-background);")
+) {
+  failures.push(
+    "apps/web/src/styles.css [terminal-surface-contract] xterm viewport remainder must inherit --terminal-background"
+  );
+}
+
+const gitSidebarStart = styles.lastIndexOf("\n.git-sidebar {");
+const gitSidebarEnd = gitSidebarStart === -1 ? -1 : styles.indexOf("\n}", gitSidebarStart);
+const gitSidebarBlock = gitSidebarStart === -1 || gitSidebarEnd === -1
+  ? ""
+  : styles.slice(gitSidebarStart, gitSidebarEnd + 2);
+for (const marker of [
+  "overflow-x: hidden;",
+  "overflow-y: auto;",
+  "overscroll-behavior-y: contain;"
+]) {
+  if (!gitSidebarBlock.includes(marker)) {
+    failures.push(
+      `apps/web/src/styles.css [git-scroll-contract] .git-sidebar missing ${marker}`
+    );
+  }
+}
+
+if (
+  styles.includes(".file-list,\n.git-groups,\n.git-change-list {") ||
+  !styles.includes(".git-groups,\n.git-change-list {\n  overflow: visible;\n}") ||
+  !styles.includes(".git-groups {\n  display: block;\n  flex: 0 0 auto;\n}")
+) {
+  failures.push(
+    "apps/web/src/styles.css [git-scroll-contract] Git groups/change lists must not be nested scroll owners"
+  );
 }
 
 for (const marker of [
