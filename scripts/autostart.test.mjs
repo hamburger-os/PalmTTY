@@ -175,7 +175,10 @@ test("Windows native host compiles as GUI, propagates Agent exit, and preserves 
         "-EncodedCommand",
         encodePowerShellCommand(compileCommand)
       ],
-      { encoding: "utf8", windowsHide: true, timeout: 30_000 }
+      // Add-Type can spend well over 30s starting the Windows compiler on
+      // a cold/shared GitHub runner. Keep the smoke test bounded, but do not
+      // mistake runner startup latency for a product failure.
+      { encoding: "utf8", windowsHide: true, timeout: 90_000 }
     );
     assert.equal(compile.status, 0, compile.stderr || compile.stdout);
     assert.equal(peSubsystem(hostPath), 2, "PE subsystem must be Windows GUI");
