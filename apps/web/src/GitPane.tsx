@@ -74,6 +74,10 @@ function basename(path: string): string {
   return path.split("/").at(-1) ?? path;
 }
 
+function repositoryFilePath(workspacePath: string, filePath: string): string {
+  return workspacePath ? `${workspacePath}/${filePath}` : filePath;
+}
+
 export function GitPane({
   workspaceId,
   writesEnabled,
@@ -185,13 +189,18 @@ export function GitPane({
     cursor?: string,
     append = false
   ) => {
+    if (historyPath && !status?.repository) return;
+    const requestedPath = historyPath && status?.repository
+      ? repositoryFilePath(status.repository.workspacePath, historyPath)
+      : undefined;
+
     append ? setHistoryLoadingMore(true) : setHistoryLoading(true);
     setHistoryError(null);
     try {
       const result = await workspaceGitHistory(workspaceId, {
         limit: 30,
         ...(cursor ? { cursor } : {}),
-        ...(historyPath ? { path: historyPath } : {})
+        ...(requestedPath ? { path: requestedPath } : {})
       });
       setHistory((current) => append
         ? [...current, ...result.commits]
@@ -208,7 +217,12 @@ export function GitPane({
     } finally {
       append ? setHistoryLoadingMore(false) : setHistoryLoading(false);
     }
-  }, [historyPath, translateError, workspaceId]);
+  }, [
+    historyPath,
+    status?.repository,
+    translateError,
+    workspaceId
+  ]);
 
   useEffect(() => {
     void refreshAll(true);
