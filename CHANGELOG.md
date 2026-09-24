@@ -8,6 +8,8 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
+- Add mobile-first Git history browsing with a first-class Changes/History switch, snapshot-stable cursor pagination, file-scoped history, commit metadata/changed-file inspection and per-commit file diff, plus a direct Files → History path.
+- Add bounded complete Workspace file export (8 MiB) behind the existing authenticated exact-Origin/containment boundary, with text “Copy content”, Web Share file handoff and download fallback; 512 KiB preview truncation can no longer be mistaken for complete-file copy.
 - Add vendor-neutral Session image artifacts: authenticated bounded PNG/JPEG/WebP/GIF upload/preview/delete outside the Git workspace, Host/WSL-readable local paths that can be inserted into the live terminal without implicit execution, lifecycle cleanup/recovery across Agent restart, and direct safe image preview for supported Workspace files.
 - Expand the mobile terminal keybar with first-class Enter, Ctrl+J, Shift+Tab and Ctrl+D, an optional second row for navigation/editing shortcuts, accessible one-shot Ctrl/Alt state, and a shared tested terminal-key encoder so virtual keys and xterm typed input use consistent modifier semantics.
 - Add first-party PalmTTY logo and 192/512 application icons, wire them into login/home branding, favicon/Apple touch metadata, and the installable Web manifest while keeping title text theme-aware.
