@@ -2,6 +2,7 @@ import { lstat, open, opendir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import {
   MAX_SESSION_ARTIFACT_BYTES,
+  MAX_WORKSPACE_FILE_CONTENT_BYTES,
   WorkspaceFileListResponseSchema,
   WorkspaceFileReadResponseSchema,
   type WorkspaceDefinition,
@@ -387,6 +388,95 @@ export async function readWorkspaceFile(
     : readHostFile(workspace, relativePath);
 }
 
+export type WorkspaceFileContentReadResult = {
+  size: number;
+  content: Buffer;
+};
+
+async function readHostFileContent(
+  workspace: WorkspaceDefinition,
+  relativePath: string
+): Promise<WorkspaceFileContentReadResult> {
+  const { target } = await resolveHostTarget(workspace, relativePath);
+  const handle = await open(target, "r");
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) throw new Error("Workspace path is not a file");
+    if (info.size > MAX_WORKSPACE_FILE_CONTENT_BYTES) {
+      throw new Error("Workspace file exceeds the export size limit");
+    }
+    const content = await readOpenedFileStableBounded(
+      handle,
+      info.size,
+      MAX_WORKSPACE_FILE_CONTENT_BYTES,
+      "Workspace file"
+    );
+    return { size: content.length, content };
+  } finally {
+    await handle.close();
+  }
+}
+
+const WSL_CONTENT_READ_SCRIPT = [
+  'root="$1"',
+  'rel="$2"',
+  'cd -- "$root" || exit 20',
+  'root_physical="$(pwd -P)"',
+  'target="$root_physical/$rel"',
+  'resolved="$(readlink -f -- "$target" 2>/dev/null || true)"',
+  '[ -n "$resolved" ] || exit 21',
+  'case "$resolved" in "$root_physical"|"$root_physical"/*) ;; *) exit 22 ;; esac',
+  '[ -f "$resolved" ] || exit 23',
+  'size="$(stat -c %s -- "$resolved" 2>/dev/null)" || exit 24',
+  'printf "%s\\0" "$size"',
+  `[ "$size" -le ${MAX_WORKSPACE_FILE_CONTENT_BYTES} ] || exit 25`,
+  'cat -- "$resolved"'
+].join("\n");
+
+async function readWslFileContent(
+  workspace: WorkspaceDefinition,
+  relativePath: string,
+  excludedEnvironmentKeys: string[]
+): Promise<WorkspaceFileContentReadResult> {
+  const result = await runWslScript(
+    workspace,
+    WSL_CONTENT_READ_SCRIPT,
+    [workspace.cwd, relativePath],
+    MAX_WORKSPACE_FILE_CONTENT_BYTES + 64 * 1024,
+    excludedEnvironmentKeys
+  );
+  const separator = result.stdout.indexOf(0);
+  const size = separator < 0
+    ? Number.NaN
+    : Number.parseInt(result.stdout.subarray(0, separator).toString("utf8"), 10);
+
+  if (result.code === 25 || size > MAX_WORKSPACE_FILE_CONTENT_BYTES) {
+    throw new Error("Workspace file exceeds the export size limit");
+  }
+  if (result.code !== 0 || result.stdoutTruncated || separator < 0) {
+    throw new Error(result.stderr.trim() || "WSL file export failed");
+  }
+  if (!Number.isSafeInteger(size) || size < 0) {
+    throw new Error("WSL file size was invalid");
+  }
+  const content = result.stdout.subarray(separator + 1);
+  if (content.length !== size) {
+    throw new Error("WSL file content was incomplete");
+  }
+  return { size, content };
+}
+
+export async function readWorkspaceFileContent(
+  workspace: WorkspaceDefinition,
+  requestedPath: string,
+  excludedEnvironmentKeys: string[] = []
+): Promise<WorkspaceFileContentReadResult> {
+  const relativePath = normalizeWorkspaceRelativePath(requestedPath);
+  if (!relativePath) throw new Error("File path is required");
+  return workspace.runtime.kind === "wsl"
+    ? readWslFileContent(workspace, relativePath, excludedEnvironmentKeys)
+    : readHostFileContent(workspace, relativePath);
+}
 
 export type WorkspaceImageReadResult = ImageArtifactInfo & {
   size: number;
