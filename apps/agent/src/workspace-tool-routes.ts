@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
+  GitCommitDiffRequestSchema,
+  GitCommitRequestSchema,
   GitDiffRequestSchema,
   GitHistoryRequestSchema,
   GitMutationRequestSchema,
@@ -19,6 +21,8 @@ import {
 import {
   GitStateChangedError,
   getWorkspaceGitBranches,
+  getWorkspaceGitCommit,
+  getWorkspaceGitCommitDiff,
   getWorkspaceGitDiff,
   getWorkspaceGitHistory,
   getWorkspaceGitStatus,
@@ -263,7 +267,7 @@ export function registerWorkspaceToolRoutes(
       try {
         return await getWorkspaceGitHistory(
           workspace,
-          parsed.data.limit,
+          parsed.data,
           options.sensitiveEnvironmentKeys
         );
       } catch (error) {
@@ -272,6 +276,67 @@ export function registerWorkspaceToolRoutes(
           error,
           "git_unavailable",
           "Git history is unavailable"
+        );
+      }
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/v1/workspaces/:id/git/commit",
+    { preHandler: [options.requireOrigin, options.requireAuth] },
+    async (request, reply) => {
+      if (!readLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_workspace_tool_requests" });
+      }
+      const workspace = workspaceFor(request.params.id);
+      if (!workspace) return reply.code(404).send({ error: "workspace_not_found" });
+      const parsed = GitCommitRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_git_request" });
+      }
+      try {
+        return await getWorkspaceGitCommit(
+          workspace,
+          parsed.data.oid,
+          options.sensitiveEnvironmentKeys
+        );
+      } catch (error) {
+        return gitFailure(
+          reply,
+          error,
+          "git_unavailable",
+          "Git commit is unavailable"
+        );
+      }
+    }
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/v1/workspaces/:id/git/commit-diff",
+    { preHandler: [options.requireOrigin, options.requireAuth] },
+    async (request, reply) => {
+      if (!readLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_workspace_tool_requests" });
+      }
+      const workspace = workspaceFor(request.params.id);
+      if (!workspace) return reply.code(404).send({ error: "workspace_not_found" });
+      const parsed = GitCommitDiffRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_git_request" });
+      }
+      try {
+        return await getWorkspaceGitCommitDiff(
+          workspace,
+          parsed.data.oid,
+          parsed.data.path,
+          options.sensitiveEnvironmentKeys
+        );
+      } catch (error) {
+        return gitFailure(
+          reply,
+          error,
+          "git_unavailable",
+          "Git commit diff is unavailable"
         );
       }
     }
