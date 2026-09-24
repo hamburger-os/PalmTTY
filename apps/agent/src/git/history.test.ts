@@ -78,6 +78,7 @@ describe("Git history inspection", () => {
     expect(page.commits[0]?.oid).toBe(second);
     expect(page.snapshot).toBe(second);
     expect(page.nextCursor).toBeTruthy();
+    expect(page.nextCursor!.length).toBeLessThanOrEqual(512);
 
     await writeFile(path.join(root, "notes.md"), "new note\n", "utf8");
     await git(root, ["add", "notes.md"]);
