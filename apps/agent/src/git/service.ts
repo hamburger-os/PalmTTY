@@ -373,6 +373,30 @@ function gitCommitFileStatus(code: string): GitCommitFile["status"] | undefined 
   }
 }
 
+async function getGitCommitParents(
+  workspace: WorkspaceDefinition,
+  root: string,
+  oid: string,
+  excludedEnvironmentKeys: string[]
+): Promise<string[]> {
+  const result = await runWorkspaceGit(
+    workspace,
+    root,
+    ["show", "-s", "--no-color", "--format=%P", oid],
+    excludedEnvironmentKeys,
+    { maxStdoutBytes: 32 * 1024 }
+  );
+  const parents = result.stdout
+    .toString("utf8")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parents.length > 32 || parents.some((parent) => !isGitObjectId(parent))) {
+    throw new Error("Git commit parent metadata is invalid");
+  }
+  return parents;
+}
+
 function parseGitCommitFiles(
   output: Buffer,
   outputTruncated: boolean
@@ -495,17 +519,27 @@ export async function getWorkspaceGitCommit(
   const changed = await runWorkspaceGit(
     workspace,
     repository.root,
-    [
-      "diff-tree",
-      "--root",
-      "--no-commit-id",
-      "--name-status",
-      "-r",
-      "-z",
-      "-M",
-      "-C",
-      requestedOid
-    ],
+    parents.length === 0
+      ? [
+          "diff-tree",
+          "--root",
+          "--no-commit-id",
+          "--name-status",
+          "-r",
+          "-z",
+          "-M",
+          "-C",
+          requestedOid
+        ]
+      : [
+          "diff",
+          "--name-status",
+          "-z",
+          "-M",
+          "-C",
+          parents[0]!,
+          requestedOid
+        ],
     excludedEnvironmentKeys,
     {
       maxStdoutBytes: GIT_COMMIT_FILES_LIMIT_BYTES,
@@ -540,20 +574,37 @@ export async function getWorkspaceGitCommitDiff(
   const repository = await requireRepository(workspace, excludedEnvironmentKeys);
   if (!isGitObjectId(requestedOid)) throw new Error("Git commit object id is invalid");
   const path = validateGitPath(requestedPath);
+  const parents = await getGitCommitParents(
+    workspace,
+    repository.root,
+    requestedOid,
+    excludedEnvironmentKeys
+  );
 
   const result = await runWorkspaceGit(
     workspace,
     repository.root,
-    [
-      "show",
-      "--format=",
-      "--no-ext-diff",
-      "--no-textconv",
-      "--no-color",
-      requestedOid,
-      "--",
-      path
-    ],
+    parents.length === 0
+      ? [
+          "show",
+          "--format=",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--no-color",
+          requestedOid,
+          "--",
+          path
+        ]
+      : [
+          "diff",
+          "--no-ext-diff",
+          "--no-textconv",
+          "--no-color",
+          parents[0]!,
+          requestedOid,
+          "--",
+          path
+        ],
     excludedEnvironmentKeys,
     {
       maxStdoutBytes: GIT_DIFF_LIMIT_BYTES,
