@@ -32,6 +32,7 @@ export function SessionWorkbench({
   const [restarting, setRestarting] = useState(false);
   const [restartError, setRestartError] = useState<string | null>(null);
   const [gitWritesEnabled, setGitWritesEnabled] = useState(false);
+  const [gitHistoryPath, setGitHistoryPath] = useState<string>();
   const [terminalInsert, setTerminalInsert] = useState<TerminalInsertRequest>();
   const terminalInsertSequence = useRef(0);
 
@@ -95,7 +96,14 @@ export function SessionWorkbench({
 
   const selectPane = (next: WorkbenchPane) => {
     if ((next === "git" || next === "files") && !workspace) return;
+    if (next === "git") setGitHistoryPath(undefined);
     setPane(next);
+  };
+
+  const showFileHistory = (path: string) => {
+    if (!workspace) return;
+    setGitHistoryPath(path);
+    setPane("git");
   };
 
   const insertArtifactPath = (artifactPath: string) => {
@@ -178,13 +186,17 @@ export function SessionWorkbench({
               workspaceId={workspace.id}
               writesEnabled={gitWritesEnabled}
               onEnableWrites={() => setGitWritesEnabled(true)}
+              initialHistoryPath={gitHistoryPath}
             />
           </div>
         )}
 
         {workspace && pane === "files" && (
           <div className="workbench-pane is-active">
-            <FilesPane workspaceId={workspace.id} />
+            <FilesPane
+              workspaceId={workspace.id}
+              onShowHistory={showFileHistory}
+            />
           </div>
         )}
 
