@@ -102,6 +102,36 @@ describe("Git history inspection", () => {
     expect(chapterHistory.path).toBe("chapter.md");
   });
 
+  it("inspects merge commits against their first parent", async () => {
+    const { root, workspace, first } = await fixture();
+
+    await git(root, ["branch", "topic", first]);
+    await git(root, ["switch", "topic"]);
+    await writeFile(path.join(root, "topic.md"), "topic change\n", "utf8");
+    await git(root, ["add", "topic.md"]);
+    await git(root, ["commit", "-m", "topic change"]);
+
+    await git(root, ["switch", "main"]);
+    await git(root, ["merge", "--no-ff", "topic", "-m", "merge topic"]);
+    const mergeOid = await git(root, ["rev-parse", "HEAD"]);
+
+    const detail = await getWorkspaceGitCommit(workspace, mergeOid);
+    expect(detail.parents).toHaveLength(2);
+    expect(detail.files).toEqual([
+      expect.objectContaining({
+        path: "topic.md",
+        status: "added"
+      })
+    ]);
+
+    const diff = await getWorkspaceGitCommitDiff(
+      workspace,
+      mergeOid,
+      "topic.md"
+    );
+    expect(diff.diff).toContain("+topic change");
+  });
+
   it("returns commit metadata, changed files and bounded textual diff", async () => {
     const { workspace, second } = await fixture();
 
