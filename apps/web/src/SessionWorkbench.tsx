@@ -186,7 +186,7 @@ export function SessionWorkbench({
               workspaceId={workspace.id}
               writesEnabled={gitWritesEnabled}
               onEnableWrites={() => setGitWritesEnabled(true)}
-              initialHistoryPath={gitHistoryPath}
+              {...(gitHistoryPath ? { initialHistoryPath: gitHistoryPath } : {})}
             />
           </div>
         )}
