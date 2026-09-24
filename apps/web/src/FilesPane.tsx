@@ -204,10 +204,11 @@ export function FilesPane({
       await copyText(text);
       setFileActionStatus(t("files.copied"));
     } catch (cause) {
-      const code = cause instanceof ApiError
-        ? cause.code
-        : "workspace_file_content_unavailable";
-      setFileActionError(translateError(code));
+      setFileActionError(
+        cause instanceof ApiError
+          ? translateError(cause.code)
+          : t("files.copyFailed")
+      );
     } finally {
       setFileAction(null);
     }
@@ -240,7 +241,8 @@ export function FilesPane({
           return;
         } catch (cause) {
           if (cause instanceof DOMException && cause.name === "AbortError") return;
-          throw cause;
+          // A browser may expose navigator.share but still reject file sharing.
+          // Fall through to the download path instead of turning that into a dead end.
         }
       }
 
@@ -257,10 +259,11 @@ export function FilesPane({
         window.setTimeout(() => URL.revokeObjectURL(url), 0);
       }
     } catch (cause) {
-      const code = cause instanceof ApiError
-        ? cause.code
-        : "workspace_file_content_unavailable";
-      setFileActionError(translateError(code));
+      setFileActionError(
+        cause instanceof ApiError
+          ? translateError(cause.code)
+          : t("files.shareFailed")
+      );
     } finally {
       setFileAction(null);
     }
