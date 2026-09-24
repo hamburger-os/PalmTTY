@@ -2,7 +2,10 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { WorkspaceDefinition } from "@palmtty/protocol";
+import {
+  MAX_WORKSPACE_FILE_CONTENT_BYTES,
+  type WorkspaceDefinition
+} from "@palmtty/protocol";
 import {
   listWorkspaceFiles,
   normalizeWorkspaceRelativePath,
@@ -91,6 +94,21 @@ describe("workspace file access", () => {
     const exported = await readWorkspaceFileContent(definition, "chapter.md");
     expect(exported.size).toBe(Buffer.byteLength(content));
     expect(exported.content.toString("utf8")).toBe(content);
+  });
+
+  it("bounds complete file export and keeps traversal rejected", async () => {
+    const definition = await workspace();
+    await writeFile(
+      path.join(definition.cwd, "too-large.txt"),
+      Buffer.alloc(MAX_WORKSPACE_FILE_CONTENT_BYTES + 1, 0x78)
+    );
+
+    await expect(
+      readWorkspaceFileContent(definition, "too-large.txt")
+    ).rejects.toThrow("export size limit");
+    await expect(
+      readWorkspaceFileContent(definition, "../outside")
+    ).rejects.toThrow();
   });
 
   it("keeps truncated UTF-8 text classified as text", async () => {
