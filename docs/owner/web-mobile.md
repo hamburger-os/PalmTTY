@@ -22,7 +22,7 @@
 - 已运行会话列表；
 - 会话状态和连接数；运行/终止中的会话显示连接数，已退出会话显示退出码（如果可用）；
 - 会话动作按生命周期分离：运行中的会话显示“终止”，已退出/失败会话显示“清除”；会话工作台提供经确认的“重启终端”，它会替换 PTY/Session 并重新读取最新 Workspace/宿主环境；不再使用含义模糊的红色 ×；
-- 会话页面升级为轻量工作台，顶栏提供“终端 / Git / 文件”一级切换；Git 与文件视图使用 Workspace authority，而不是尝试从 PTY 猜测当前 `cd`；
+- 会话页面是轻量工作台，顶栏提供“终端 / Git / 文件 / 附件”一级切换；Git 与文件视图使用 Workspace authority，而不是尝试从 PTY 猜测当前 `cd`；
 - 登录/退出；
 - 中文 / English 语言切换并在浏览器本地保存偏好。
 
@@ -45,8 +45,8 @@
 
 - “终端 / Git / 文件 / 附件”四个一级视图，终端始终是核心视图；
 - 切到 Git/文件/附件时 Terminal 组件保持 mounted，xterm、WebSocket、`lastSeq` 与重连循环不被展示状态重建；隐藏时不传播 resize，切回终端再安全 `fit`；
-- Git 视图已经升级为轻量 Source Control 工作台：显式显示“完整仓库”作用域、分支/上游/ahead-behind、冲突、staged/unstaged/untracked；diff 使用结构化 unified diff 行渲染并支持未跟踪文件预览；无选中修改时显示最近提交；支持 rename-aware 的单文件 stage/unstage、显式仓库级 stage-all/unstage-all、带 diff 快照校验的丢弃、commit、分支创建/切换、stash，以及非交互 fetch/pull/push；status 一旦被截断或解析不完整，所有写/remote 控件立即禁用；进入页面、窗口重新聚焦/回到前台和可见页低频轮询都会刷新状态；左侧 Git sidebar 是 repository summary、change groups、commit/branch/stash 的唯一纵向滚动 owner，change group/list 自身不再创建嵌套滚动区，因此鼠标滚轮、触控板和手机一指滑动在 change row 上都能自然滚动；
-- 文件视图以持久 Workspace 根目录为边界浏览目录和文件，提供 UTF-8 文本只读预览；PNG/JPEG/WebP/GIF 通过独立受保护接口按真实签名、尺寸/像素边界校验并使用稳定有界读取后直接预览，其他二进制文件只显示状态，大文本预览在 512 KiB 截断；
+- Git 视图是轻量 Source Control 工作台，并在页内提供“更改 / 历史”两个一级子视图。“更改”显式显示完整仓库作用域、分支/上游/ahead-behind、冲突、staged/unstaged/untracked；diff 使用结构化 unified diff 行渲染并支持未跟踪文件预览；支持 rename-aware 的单文件 stage/unstage、显式仓库级 stage-all/unstage-all、带 diff 快照校验的丢弃、commit、分支创建/切换、stash，以及非交互 fetch/pull/push；status 一旦被截断或解析不完整，所有写/remote 控件立即禁用。“历史”始终只读，不需要启用 Git 写权限，按需加载基于首次 HEAD snapshot 的 opaque cursor 分页；支持全仓库 history、文件级 `--follow` history、commit 元数据/changed files 与单文件 commit diff。Files 可直接把当前文件路径带入 History，形成“章节/文件 → 历史 → 提交 → diff”的移动端链路。进入页面、窗口重新聚焦/回到前台和可见页低频轮询都会刷新 status；Git sidebar 仍是 changes/history/tools 的唯一纵向滚动 owner，列表自身不建立第二层纵向滚动区；
+- 文件视图以持久 Workspace 根目录为边界浏览目录和文件，提供 UTF-8 文本只读预览；PNG/JPEG/WebP/GIF 通过独立受保护接口按真实签名、尺寸/像素边界校验并使用稳定有界读取后直接预览，其他二进制文件只显示状态，大文本预览在 512 KiB 截断。预览与“完整文件”语义明确分离：复制完整文本、系统 Share Sheet 文件分享和下载 fallback 使用独立、同 containment 的 8 MiB 有界完整文件接口，因此不会把 512 KiB 截断预览误当成完整内容；手机预览标题优先显示 basename，把父目录作为次级信息，并可一键进入该文件 Git 历史；
 - 附件视图是 Session 范围的图片入口：手机/桌面浏览器可选择 PNG/JPEG/WebP/GIF，上传后显示尺寸/大小与大图预览，支持删除，并可把基于 Session 创建时不可变运行身份得到的 runtime 可读文件路径写入当前终端输入流。该动作只写路径文本 + 空格，不发送 Enter；附件不进入 Workspace/Git，Agent 重启时跟随仍存活 Session 恢复，旧 Session retirement 后清理；
 - xterm.js；浏览器端 xterm/fit 由根目录 `terminal-stack.json` 精确锁定，当前浏览器栈使用包含上游触摸滚动修复的 xterm 6.1 beta，而 Worker 端 headless/serialize 暂时保持稳定 6.0/0.14，避免把移动端输入修复与 canonical snapshot/recovery 升级绑在一起；
 - 手机终端不再维护 PalmTTY 自己的逐行 touch adapter：`.xterm-screen` 只用 `touch-action: none` 阻止 Safari/浏览器把手势变成页面平移，触摸事件继续由 xterm 自己的 Gesture/Viewport 路径处理，因此 normal scrollback 使用连续像素滚动与惯性，alternate buffer、mouse tracking、滚动条也保持同一套 xterm 语义；不建立第二个 DOM 滚动层，也不增加应用级 document touch handler。终端普通 click/tap 只承担 `terminal.focus()` 的键盘激活桥接，不读取 touch delta、不拦截 swipe；手机 keybar 另提供显式“键盘”按钮作为可靠入口；在 coarse-pointer/mobile 布局上，所有可编辑 `input/textarea/select`（包括紧凑主题/性能/语言选择器、登录/Git 输入和 xterm helper textarea）统一至少 16px，避免 iOS 因聚焦小字号控件而主动放大页面；
@@ -69,8 +69,8 @@
 
 - 长文本弹窗通过 xterm 普通 paste/input 语义发送，附件路径插入仍然只作为终端输入，不建立 Codex/Antigravity 专用 API；PalmTTY 不保证所有 CLI 对裸路径使用同一种图片引用语法，也不解析 Markdown 表格并重排终端输出，厂商与呈现差异留在 CLI/终端层。
 - Workspace 修改走独立持久化 API；Session 创建/重启不接收临时 cwd/shell/env。终端 Profile 发现只是受保护、有界的运行环境读取 API，不是通用命令执行接口。
-- 目录选择器仍只读取目录名称/路径，不读取文件内容；会话工作台的文件浏览/预览是另一组独立受保护 API，使用相对 Workspace 路径并在 Agent 端做 canonical/symlink containment 检查，不能复用目录选择器绕开边界。
-- Git 工作台只通过独立、有界、typed 的 Agent API 工作，不把 Git 命令塞进终端 WebSocket，也不进入 Session Worker。读取面使用 porcelain v2 status、diff/history/branches，禁止 external diff/textconv/fsmonitor；working-tree diff 会先解析该路径的 filter attribute，并在本次 diff 中中和 clean/process/required，避免查看动作触发内容过滤程序。写面只接受固定 operation union，不接受浏览器提供任意 argv。所有写操作携带当前 state token，破坏性丢弃还必须匹配刚加载的 diff snapshot；Web 默认关闭写按钮，用户在当前 Session workbench 确认“信任仓库”后才发送写请求，该确认在终端/Git/文件/附件页签切换间保留，离开 Session 页面后失效。PalmTTY 禁用 Git hooks、编辑器/credential 交互提示，但正常 Git filter 仍可能在 stage/switch/stash/pull 等语义中执行，因此这一确认是能力边界提示而不是沙箱。辅助子进程继续剔除 `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量。
+- 目录选择器仍只读取目录名称/路径，不读取文件内容；会话工作台的文件浏览/预览/完整文件导出是另一组独立受保护 API，使用相对 Workspace 路径并在 Agent 端做 canonical/symlink containment 检查。完整文件导出仍是只读、有界能力，不改变 Workspace authority，也不能复用目录选择器绕开边界。
+- Git 工作台只通过独立、有界、typed 的 Agent API 工作，不把 Git 命令塞进终端 WebSocket，也不进入 Session Worker。读取面使用 porcelain v2 status、diff/branches，以及 snapshot-stable 的分页 history、文件 history、commit detail/file diff；禁止 external diff/textconv/fsmonitor，history/commit metadata 同样关闭 signature helper；working-tree diff 会先解析该路径的 filter attribute，并在本次 diff 中中和 clean/process/required，避免查看动作触发内容过滤程序。写面只接受固定 operation union，不接受浏览器提供任意 argv。所有写操作携带当前 state token，破坏性丢弃还必须匹配刚加载的 diff snapshot；Web 默认关闭写按钮，用户在当前 Session workbench 确认“信任仓库”后才发送写请求，该确认在终端/Git/文件/附件页签切换间保留，离开 Session 页面后失效。PalmTTY 禁用 Git hooks、编辑器/credential 交互提示，但正常 Git filter 仍可能在 stage/switch/stash/pull 等语义中执行，因此这一确认是能力边界提示而不是沙箱。辅助子进程继续剔除 `PALMTTY_*` 控制环境命名空间以及单独配置的认证 token 环境变量。
 - 浏览器丢失状态时以服务端 snapshot 为准。
 - 终端依赖升级必须把 `terminal-stack.json`、两个 package manifest 与 frozen lockfile 作为一个变更集，并通过 `pnpm terminal:check`；浏览器 xterm 与 Worker headless 可以为了明确的浏览器修复暂时处在同一 major 的不同 minor/pre-release，但 Worker 端升级必须单独验证 serialize/replay/geometry recovery。
 - `stopping` Session 可以继续被查看，但终端输入、resize 与长文本发送保持禁用，直到 Worker 报告最终退出。
@@ -80,7 +80,7 @@
 ## 后续可以做
 
 - 自定义快捷键；
-- 更好的移动端剪贴板；
+- 文件多选与批量上下文导出（只有真实创作/审查流程证明单文件复制/分享不足时再设计）；
 - Git 写能力已经采用 typed operation + stale-state/diff-snapshot + 明确信任确认模型落地；后续如需 force push、interactive rebase/cherry-pick、reflog/submodule/LFS 管理，应继续逐项建模，不能退化成任意 Git argv API；文件编辑仍需单独设计并发修改、编码与原子写入；
 - Codex 等 AI CLI 的状态提示，但保持 CLI 厂商无关。
 
