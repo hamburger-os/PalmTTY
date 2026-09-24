@@ -1221,6 +1221,42 @@ button.directory-choose {
   font-size: var(--text-xs);
 }
 
+.file-preview-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.file-preview-heading {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.file-preview-heading strong,
+.file-preview-heading span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-preview-heading span {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.file-preview-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.file-action-status {
+  color: var(--success);
+}
+
 .file-preview-content,
 .git-diff-content {
   min-height: 0;
@@ -1322,6 +1358,50 @@ button.directory-choose {
   z-index: 4;
   flex: 0 0 auto;
   background: var(--flat-content);
+}
+
+.git-view-tabs {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--flat-content);
+}
+
+.git-view-tabs button {
+  min-height: var(--touch-target-compact);
+  padding: 6px 10px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-secondary);
+}
+
+.git-view-tabs button:hover:not(:disabled),
+.git-view-tabs button.selected {
+  transform: none;
+  background: var(--control-hover);
+  color: var(--text-primary);
+}
+
+.git-history-filter {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.git-history-filter > span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .git-tracking,
@@ -1457,21 +1537,38 @@ button.directory-choose {
   font-size: var(--text-xs);
 }
 
-.git-history {
+.git-history-list {
+  flex: 0 0 auto;
   display: grid;
   align-content: start;
 }
 
 .git-history-row {
+  width: 100%;
   min-width: 0;
+  min-height: 52px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
   gap: var(--space-3);
   padding: 9px var(--space-4);
+  border: 0;
   border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  text-align: left;
+}
+
+.git-history-row:hover:not(:disabled),
+.git-history-row.selected {
+  transform: none;
+  background: var(--control-hover);
 }
 
 .git-history-row > code {
+  padding-top: 2px;
   color: var(--text-muted);
   font-size: var(--text-xs);
 }
@@ -1492,6 +1589,84 @@ button.directory-choose {
 .git-history-row small {
   color: var(--text-muted);
   font-size: var(--text-xs);
+}
+
+.git-history-more {
+  margin: 10px;
+}
+
+.git-commit-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.git-commit-toolbar code {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.git-commit-detail {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.git-commit-meta,
+.git-commit-body {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.git-commit-meta span {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.git-commit-body > strong {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.git-commit-body pre {
+  margin: 0;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.git-commit-files {
+  display: grid;
+  align-content: start;
+}
+
+.git-commit-file {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  text-align: left;
+}
+
+.git-commit-file:hover:not(:disabled) {
+  transform: none;
+  background: var(--control-hover);
 }
 
 .git-diff-toolbar {
@@ -1643,7 +1818,22 @@ button.directory-choose {
     display: inline-flex;
   }
 
-  .file-preview-toolbar,
+  .file-preview-toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .file-preview-actions {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  .file-preview-actions > button {
+    flex: 1 1 auto;
+    min-height: var(--touch-target);
+  }
+
   .artifact-preview-toolbar {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1652,6 +1842,11 @@ button.directory-choose {
   .git-diff-toolbar {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .git-commit-toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 }
 
