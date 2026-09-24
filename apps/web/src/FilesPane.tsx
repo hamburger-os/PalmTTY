@@ -225,8 +225,16 @@ export function FilesPane({
         type: fileMime(selectedPath, selected.binary)
       });
       const shareData: ShareData = { files: [file], title: name };
+      let canShareFile = typeof navigator.share === "function";
+      if (canShareFile && navigator.canShare) {
+        try {
+          canShareFile = navigator.canShare(shareData);
+        } catch {
+          canShareFile = false;
+        }
+      }
 
-      if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
+      if (canShareFile) {
         try {
           await navigator.share(shareData);
           return;
