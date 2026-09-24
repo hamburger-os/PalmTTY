@@ -6,7 +6,8 @@ import type { WorkspaceDefinition } from "@palmtty/protocol";
 import {
   listWorkspaceFiles,
   normalizeWorkspaceRelativePath,
-  readWorkspaceFile
+  readWorkspaceFile,
+  readWorkspaceFileContent
 } from "./workspace-files.js";
 
 const roots = new Set<string>();
@@ -77,6 +78,19 @@ describe("workspace file access", () => {
     expect(file.binary).toBe(false);
     expect(file.truncated).toBe(true);
     expect(Buffer.byteLength(file.content, "utf8")).toBe(512 * 1024);
+  });
+
+  it("keeps preview bounds separate from complete file export", async () => {
+    const definition = await workspace();
+    const content = "chapter-line\n".repeat(50_000);
+    await writeFile(path.join(definition.cwd, "chapter.md"), content, "utf8");
+
+    const preview = await readWorkspaceFile(definition, "chapter.md");
+    expect(preview.truncated).toBe(true);
+
+    const exported = await readWorkspaceFileContent(definition, "chapter.md");
+    expect(exported.size).toBe(Buffer.byteLength(content));
+    expect(exported.content.toString("utf8")).toBe(content);
   });
 
   it("keeps truncated UTF-8 text classified as text", async () => {
