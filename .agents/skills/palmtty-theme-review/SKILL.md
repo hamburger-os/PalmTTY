@@ -3,7 +3,7 @@ name: palmtty-theme-review
 description: "Audit PalmTTY Web UI for theme SSOT compliance, mobile rendering quality, semantic surface ownership, terminal lifecycle isolation, and visual performance regressions."
 license: Apache-2.0
 metadata:
-  version: "1.9.0"
+  version: "1.10.0"
 ---
 
 # PalmTTY theme and rendering review
@@ -50,7 +50,7 @@ For each relevant combination inspect:
 4. directory picker;
 5. destructive confirmation;
 6. Session workbench in Terminal / Git / Files / Artifacts views; terminal connected/reconnecting/closed, checking that pane switching does not recreate xterm/WebSocket state and that the frame gutter, xterm viewport remainder and xterm canvas read as one surface; generate more than one viewport of normal-buffer output on a real touch device/emulation and verify one-finger vertical swipes use xterm-owned continuous/inertial scrolling while the page stays fixed, all editable mobile controls compute to at least 16px, a simple tap (or the explicit keyboard button) focuses xterm and opens the mobile soft keyboard without turning swipes into focus gestures, the whole workbench (header/content/key bar) fits inside the visible area above the keyboard both at scale 1 and after pinch zoom, closing the keyboard restores the frame, initial load is not oversized, user pinch zoom still works, the final row is fully visible at the live bottom, and an alternate-buffer/mouse-tracking application keeps xterm-owned touch semantics; with an iOS Chinese IME verify literal `/`, spaces and punctuation survive keyCode-229 input without duplication, genuine Chinese composition commits once, Ctrl+J/Ctrl+C/Ctrl+Space/Escape remain usable when the platform reports physical codes, the literal slash keybar fallback works, application-cursor mode changes virtual arrow sequences correctly, long text preserves bracketed-paste semantics, and A−/A+ refit the live terminal without reconnecting; use `?viewportDebug=1` when viewport state needs evidence;
-7. Files text/image preview, Artifacts empty/list/image-preview/upload/delete states, and Git status + diff in narrow/mobile and desktop layouts; verify the four-tab row stays usable, Artifacts mobile preview replaces the list rather than causing horizontal overflow, and switching to/from Artifacts does not recreate xterm/WebSocket state; for Git, verify wheel/trackpad/touch scrolling works when the pointer/finger starts over change rows and action buttons, with the sidebar as the single vertical scroll owner rather than nested group/list scrollers;
+7. Files text/image preview, complete-text Copy, file Share/download fallback and Files → Git History navigation; Artifacts empty/list/image-preview/upload/delete states; and Git Changes/History in narrow/mobile and desktop layouts. Verify the four-tab row stays usable, deep file paths prioritize basename without hiding actions, the file action row remains reachable, Artifacts mobile preview replaces the list rather than causing horizontal overflow, and switching to/from Artifacts does not recreate xterm/WebSocket state. For Git, verify a clean worktree still exposes History, history rows scroll under the sidebar's single vertical scroll owner, file-scoped history is visibly distinguishable, commit detail → changed file → diff navigation keeps its back action reachable on both widths, and no read-only history action requires enabling Git writes;
 8. portrait;
 9. short landscape.
 
@@ -78,7 +78,7 @@ HIGH:
 MEDIUM:
 - component-owned hard-coded palette;
 - reduced-motion ignored;
-- controls/touch targets become unreachable;
+- controls/touch targets become unreachable, including file copy/share/history or Git history back navigation;
 - the mobile terminal keybar hides Enter behind the expanded row, loses accessible Ctrl/Alt pressed state, or turns the optional second row into a competing vertical scroll region;
 - long modal scroll moves its header/footer actions out of reach;
 - Frosted/Obsidian/Spectrum identity collapses.
