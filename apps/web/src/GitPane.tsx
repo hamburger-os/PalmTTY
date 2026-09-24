@@ -6,15 +6,19 @@ import {
 } from "react";
 import type {
   GitBranch,
+  GitChange,
+  GitCommitDetailResponse,
+  GitCommitFile,
   GitCommitSummary,
   GitDiffResponse,
   GitMutationOperation,
-  GitStatusResponse,
-  GitChange
+  GitStatusResponse
 } from "@palmtty/protocol";
 import {
   ApiError,
   workspaceGitBranches,
+  workspaceGitCommit,
+  workspaceGitCommitDiff,
   workspaceGitDiff,
   workspaceGitHistory,
   workspaceGitMutate,
@@ -27,6 +31,7 @@ import {
   gitMutationPaths
 } from "./git-change.js";
 import { parseUnifiedDiff } from "./git-diff.js";
+import { repositoryFileHistoryPath } from "./git-history.js";
 import { useI18n } from "./i18n.js";
 
 type Selection = {
@@ -39,6 +44,8 @@ type RestoreConfirmation = {
   snapshot: string;
 } | null;
 
+type GitView = "changes" | "history";
+
 const STATUS_CODES: Record<string, string> = {
   modified: "M",
   typeChanged: "T",
@@ -49,24 +56,41 @@ const STATUS_CODES: Record<string, string> = {
   unmerged: "U"
 };
 
+const COMMIT_STATUS_CODES: Record<GitCommitFile["status"], string> = {
+  modified: "M",
+  typeChanged: "T",
+  added: "A",
+  deleted: "D",
+  renamed: "R",
+  copied: "C"
+};
+
 function statusCode(entry: GitChange, staged: boolean): string {
   if (entry.untracked) return "?";
   const value = staged ? entry.indexStatus : entry.worktreeStatus;
   return value ? (STATUS_CODES[value] ?? "·") : "·";
 }
 
+function basename(path: string): string {
+  return path.split("/").at(-1) ?? path;
+}
+
 export function GitPane({
   workspaceId,
   writesEnabled,
-  onEnableWrites
+  onEnableWrites,
+  initialHistoryPath
 }: {
   workspaceId: string;
   writesEnabled: boolean;
   onEnableWrites(): void;
+  initialHistoryPath?: string;
 }) {
   const { t, error: translateError } = useI18n();
+  const [view, setView] = useState<GitView>(
+    initialHistoryPath ? "history" : "changes"
+  );
   const [status, setStatus] = useState<GitStatusResponse | null>(null);
-  const [history, setHistory] = useState<GitCommitSummary[]>([]);
   const [branches, setBranches] = useState<GitBranch[]>([]);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [diff, setDiff] = useState<GitDiffResponse | null>(null);
@@ -81,6 +105,34 @@ export function GitPane({
   const [commitMessage, setCommitMessage] = useState("");
   const [branchName, setBranchName] = useState("");
   const [branchSelection, setBranchSelection] = useState("");
+
+  const [historyPath, setHistoryPath] = useState<string | undefined>(
+    initialHistoryPath
+  );
+  const [history, setHistory] = useState<GitCommitSummary[]>([]);
+  const [historyNextCursor, setHistoryNextCursor] = useState<string>();
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [selectedCommitOid, setSelectedCommitOid] = useState<string | null>(null);
+  const [selectedCommit, setSelectedCommit] = useState<GitCommitDetailResponse | null>(null);
+  const [commitLoading, setCommitLoading] = useState(false);
+  const [commitError, setCommitError] = useState<string | null>(null);
+  const [selectedCommitFile, setSelectedCommitFile] = useState<string | null>(null);
+  const [commitDiff, setCommitDiff] = useState<string | null>(null);
+  const [commitDiffBinary, setCommitDiffBinary] = useState(false);
+  const [commitDiffTruncated, setCommitDiffTruncated] = useState(false);
+  const [commitDiffLoading, setCommitDiffLoading] = useState(false);
+  const [commitDiffError, setCommitDiffError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initialHistoryPath) return;
+    setView("history");
+    setHistoryPath(initialHistoryPath);
+    setSelectedCommitOid(null);
+    setSelectedCommit(null);
+    setSelectedCommitFile(null);
+  }, [initialHistoryPath]);
 
   const applyStatus = useCallback((result: GitStatusResponse) => {
     setStatus(result);
@@ -109,15 +161,11 @@ export function GitPane({
     }
   }, [applyStatus, translateError, workspaceId]);
 
-  const loadRepositoryMetadata = useCallback(async () => {
+  const loadBranches = useCallback(async () => {
     try {
-      const [historyResult, branchResult] = await Promise.all([
-        workspaceGitHistory(workspaceId, 20),
-        workspaceGitBranches(workspaceId)
-      ]);
-      setHistory(historyResult.commits);
-      setBranches(branchResult.branches);
-      const current = branchResult.branches.find((item) => item.current);
+      const result = await workspaceGitBranches(workspaceId);
+      setBranches(result.branches);
+      const current = result.branches.find((item) => item.current);
       setBranchSelection(current?.name ?? "");
     } catch (cause) {
       const code = cause instanceof ApiError ? cause.code : "git_unavailable";
@@ -128,16 +176,63 @@ export function GitPane({
   const refreshAll = useCallback(async (showLoading = false) => {
     const result = await loadStatus(showLoading);
     if (result?.available) {
-      await loadRepositoryMetadata();
+      await loadBranches();
     } else {
-      setHistory([]);
       setBranches([]);
     }
-  }, [loadRepositoryMetadata, loadStatus]);
+  }, [loadBranches, loadStatus]);
+
+  const loadHistory = useCallback(async (
+    cursor?: string,
+    append = false
+  ) => {
+    const workspaceRepositoryPath = status?.repository?.workspacePath;
+    if (historyPath && workspaceRepositoryPath === undefined) return;
+    const requestedPath = historyPath
+      ? repositoryFileHistoryPath(workspaceRepositoryPath ?? "", historyPath)
+      : undefined;
+
+    append ? setHistoryLoadingMore(true) : setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const result = await workspaceGitHistory(workspaceId, {
+        limit: 30,
+        ...(cursor ? { cursor } : {}),
+        ...(requestedPath ? { path: requestedPath } : {})
+      });
+      setHistory((current) => append
+        ? [...current, ...result.commits]
+        : result.commits
+      );
+      setHistoryNextCursor(result.nextCursor);
+    } catch (cause) {
+      const code = cause instanceof ApiError ? cause.code : "git_unavailable";
+      setHistoryError(translateError(code));
+      if (!append) {
+        setHistory([]);
+        setHistoryNextCursor(undefined);
+      }
+    } finally {
+      append ? setHistoryLoadingMore(false) : setHistoryLoading(false);
+    }
+  }, [
+    historyPath,
+    status?.repository?.workspacePath,
+    translateError,
+    workspaceId
+  ]);
 
   useEffect(() => {
     void refreshAll(true);
   }, [refreshAll]);
+
+  useEffect(() => {
+    if (view !== "history") return;
+    setSelectedCommitOid(null);
+    setSelectedCommit(null);
+    setSelectedCommitFile(null);
+    void loadHistory();
+  }, [historyPath, loadHistory, view]);
 
   useEffect(() => {
     const refreshVisible = () => {
@@ -188,6 +283,75 @@ export function GitPane({
     workspaceId
   ]);
 
+  useEffect(() => {
+    if (!selectedCommitOid) {
+      setSelectedCommit(null);
+      setCommitLoading(false);
+      setCommitError(null);
+      return;
+    }
+    let cancelled = false;
+    setCommitLoading(true);
+    setCommitError(null);
+    setSelectedCommit(null);
+    setSelectedCommitFile(null);
+    void workspaceGitCommit(workspaceId, selectedCommitOid)
+      .then((result) => {
+        if (!cancelled) setSelectedCommit(result);
+      })
+      .catch((cause) => {
+        if (cancelled) return;
+        const code = cause instanceof ApiError ? cause.code : "git_unavailable";
+        setCommitError(translateError(code));
+      })
+      .finally(() => {
+        if (!cancelled) setCommitLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCommitOid, translateError, workspaceId]);
+
+  useEffect(() => {
+    setCommitDiff(null);
+    setCommitDiffBinary(false);
+    setCommitDiffTruncated(false);
+    setCommitDiffError(null);
+    if (!selectedCommitOid || !selectedCommitFile) {
+      setCommitDiffLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setCommitDiffLoading(true);
+    void workspaceGitCommitDiff(
+      workspaceId,
+      selectedCommitOid,
+      selectedCommitFile
+    )
+      .then((result) => {
+        if (cancelled) return;
+        setCommitDiff(result.diff);
+        setCommitDiffBinary(result.binary);
+        setCommitDiffTruncated(result.truncated);
+      })
+      .catch((cause) => {
+        if (cancelled) return;
+        const code = cause instanceof ApiError ? cause.code : "git_unavailable";
+        setCommitDiffError(translateError(code));
+      })
+      .finally(() => {
+        if (!cancelled) setCommitDiffLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedCommitFile,
+    selectedCommitOid,
+    translateError,
+    workspaceId
+  ]);
+
   const runMutation = useCallback(async (operation: GitMutationOperation) => {
     const repository = status?.repository;
     if (!repository || busy || !writesEnabled || status?.truncated) return;
@@ -203,7 +367,7 @@ export function GitPane({
       setDiff(null);
       if (operation.type === "commit") setCommitMessage("");
       if (operation.type === "branch.create") setBranchName("");
-      await loadRepositoryMetadata();
+      await loadBranches();
     } catch (cause) {
       const code = cause instanceof ApiError ? cause.code : "git_operation_failed";
       setActionError(translateError(code));
@@ -214,7 +378,7 @@ export function GitPane({
   }, [
     applyStatus,
     busy,
-    loadRepositoryMetadata,
+    loadBranches,
     refreshAll,
     status?.repository,
     translateError,
@@ -234,7 +398,7 @@ export function GitPane({
         operation
       });
       applyStatus(result.status);
-      await loadRepositoryMetadata();
+      await loadBranches();
     } catch (cause) {
       const code = cause instanceof ApiError ? cause.code : "git_remote_failed";
       setActionError(translateError(code));
@@ -245,7 +409,7 @@ export function GitPane({
   }, [
     applyStatus,
     busy,
-    loadRepositoryMetadata,
+    loadBranches,
     refreshAll,
     status?.repository,
     translateError,
@@ -265,6 +429,10 @@ export function GitPane({
   const diffLines = useMemo(
     () => parseUnifiedDiff(diff?.diff ?? ""),
     [diff?.diff]
+  );
+  const commitDiffLines = useMemo(
+    () => parseUnifiedDiff(commitDiff ?? ""),
+    [commitDiff]
   );
 
   const renderGroup = (
@@ -332,9 +500,20 @@ export function GitPane({
     : undefined;
   const currentBranch = repository?.head.branch ?? t("git.detached");
   const clean = Boolean(status?.available && status.changes.length === 0);
+  const hasPreview = view === "changes"
+    ? Boolean(selection)
+    : Boolean(selectedCommitOid);
+
+  const selectView = (next: GitView) => {
+    setView(next);
+    setSelection(null);
+    setSelectedCommitOid(null);
+    setSelectedCommit(null);
+    setSelectedCommitFile(null);
+  };
 
   return (
-    <section className={`git-pane tool-pane glass-content${selection ? " has-preview" : ""}`}>
+    <section className={`git-pane tool-pane glass-content${hasPreview ? " has-preview" : ""}`}>
       <div className="git-sidebar">
         <div className="tool-pane-toolbar git-main-toolbar">
           <div className="tool-pane-title">
@@ -348,17 +527,105 @@ export function GitPane({
           <button
             type="button"
             className="ghost compact"
-            disabled={busy}
-            onClick={() => void refreshAll(true)}
+            disabled={busy || historyLoading || historyLoadingMore}
+            onClick={() => {
+              if (view === "history") {
+                void loadHistory();
+              } else {
+                void refreshAll(true);
+              }
+            }}
           >
             {t("git.refresh")}
           </button>
         </div>
 
-        {statusError && <div className="tool-inline-error">{statusError}</div>}
-        {actionError && <div className="tool-inline-error">{actionError}</div>}
+        <div className="git-view-tabs" role="tablist" aria-label={t("git.title")}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "changes"}
+            className={view === "changes" ? "selected" : ""}
+            onClick={() => selectView("changes")}
+          >
+            {t("git.viewChanges")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "history"}
+            className={view === "history" ? "selected" : ""}
+            onClick={() => selectView("history")}
+          >
+            {t("git.viewHistory")}
+          </button>
+        </div>
 
-        {loading ? (
+        {statusError && <div className="tool-inline-error">{statusError}</div>}
+        {actionError && view === "changes" && (
+          <div className="tool-inline-error">{actionError}</div>
+        )}
+
+        {view === "history" ? (
+          <>
+            {historyPath && (
+              <div className="git-history-filter">
+                <span title={historyPath}>
+                  {t("git.historyPath", { path: basename(historyPath) })}
+                </span>
+                <button
+                  type="button"
+                  className="ghost compact"
+                  disabled={historyLoading || historyLoadingMore}
+                  onClick={() => setHistoryPath(undefined)}
+                >
+                  {t("git.historyAll")}
+                </button>
+              </div>
+            )}
+            {loading ? (
+              <div className="tool-empty">{t("git.loading")}</div>
+            ) : status && !status.available ? (
+              <div className="tool-empty">{t("git.notRepository")}</div>
+            ) : statusError && historyPath ? null
+            : historyError ? (
+              <div className="tool-inline-error">{historyError}</div>
+            ) : historyLoading ? (
+              <div className="tool-empty">{t("git.historyLoading")}</div>
+            ) : history.length === 0 ? (
+              <div className="tool-empty">{t("git.noCommits")}</div>
+            ) : (
+              <div className="git-history-list">
+                {history.map((commit) => (
+                  <button
+                    type="button"
+                    className={`git-history-row${selectedCommitOid === commit.oid ? " selected" : ""}`}
+                    key={commit.oid}
+                    onClick={() => setSelectedCommitOid(commit.oid)}
+                  >
+                    <code>{commit.shortOid}</code>
+                    <span>
+                      <strong>{commit.subject}</strong>
+                      <small>{commit.author} · {commit.authoredAt}</small>
+                    </span>
+                  </button>
+                ))}
+                {historyNextCursor && (
+                  <button
+                    type="button"
+                    className="ghost compact git-history-more"
+                    disabled={historyLoadingMore}
+                    onClick={() => void loadHistory(historyNextCursor, true)}
+                  >
+                    {historyLoadingMore
+                      ? t("git.historyLoadingMore")
+                      : t("git.historyLoadMore")}
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        ) : loading ? (
           <div className="tool-empty">{t("git.loading")}</div>
         ) : status && !status.available ? (
           <div className="tool-empty">{t("git.notRepository")}</div>
@@ -422,23 +689,27 @@ export function GitPane({
                   conflicts,
                   false,
                   t("git.stage"),
-                  (entry) => void runMutation({ type: "stage", paths: gitMutationPaths(entry) })
+                  (entry) => void runMutation({
+                    type: "stage",
+                    paths: gitMutationPaths(entry)
+                  })
                 )}
                 {renderGroup(
                   t("git.staged"),
                   staged,
                   true,
                   t("git.unstage"),
-                  (entry) => void runMutation({ type: "unstage", paths: gitMutationPaths(entry) })
+                  (entry) => void runMutation({
+                    type: "unstage",
+                    paths: gitMutationPaths(entry)
+                  })
                 )}
                 {staged.length > 0 && (
                   <button
                     type="button"
                     className="ghost compact git-group-action"
                     disabled={!writeReady || busy}
-                    onClick={() => void runMutation({
-                      type: "unstage.all"
-                    })}
+                    onClick={() => void runMutation({ type: "unstage.all" })}
                   >
                     {t("git.unstageAll")}
                   </button>
@@ -448,16 +719,17 @@ export function GitPane({
                   changes,
                   false,
                   t("git.stage"),
-                  (entry) => void runMutation({ type: "stage", paths: gitMutationPaths(entry) })
+                  (entry) => void runMutation({
+                    type: "stage",
+                    paths: gitMutationPaths(entry)
+                  })
                 )}
                 {changes.length > 0 && (
                   <button
                     type="button"
                     className="ghost compact git-group-action"
                     disabled={!writeReady || busy}
-                    onClick={() => void runMutation({
-                      type: "stage.all"
-                    })}
+                    onClick={() => void runMutation({ type: "stage.all" })}
                   >
                     {t("git.stageAll")}
                   </button>
@@ -583,93 +855,190 @@ export function GitPane({
       </div>
 
       <div className="git-diff">
-        {selection && (
-          <div className="tool-pane-toolbar git-diff-toolbar">
-            <button
-              type="button"
-              className="ghost compact git-preview-back"
-              onClick={() => setSelection(null)}
-            >
-              ← {t("git.back")}
-            </button>
-            <strong title={selection.path}>{selection.path}</strong>
-            <span>
-              {selection.staged ? t("git.stagedBadge") : t("git.workingTreeBadge")}
-            </span>
-            {!selection.staged &&
-              diff &&
-              !diff.binary &&
-              !diff.truncated &&
-              canRestoreWorkingTreeChange(selectedChange) && (
+        {view === "changes" ? (
+          <>
+            {selection && (
+              <div className="tool-pane-toolbar git-diff-toolbar">
+                <button
+                  type="button"
+                  className="ghost compact git-preview-back"
+                  onClick={() => setSelection(null)}
+                >
+                  ← {t("git.back")}
+                </button>
+                <strong title={selection.path}>{selection.path}</strong>
+                <span>
+                  {selection.staged
+                    ? t("git.stagedBadge")
+                    : t("git.workingTreeBadge")}
+                </span>
+                {!selection.staged &&
+                  diff &&
+                  !diff.binary &&
+                  !diff.truncated &&
+                  canRestoreWorkingTreeChange(selectedChange) && (
+                  <button
+                    type="button"
+                    className="danger compact"
+                    disabled={!writeReady || busy}
+                    onClick={() => setRestoreConfirm({
+                      path: selection.path,
+                      snapshot: diff.snapshot
+                    })}
+                  >
+                    {t("git.restore")}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {diffError ? (
+              <div className="tool-inline-error">{diffError}</div>
+            ) : selection && diffLoading ? (
+              <div className="tool-empty">{t("git.diffLoading")}</div>
+            ) : selection && diff ? (
+              diff.binary ? (
+                <div className="tool-empty">{t("git.binaryDiff")}</div>
+              ) : (
+                <>
+                  <div className="git-diff-content" tabIndex={0}>
+                    {diffLines.length === 0 ? (
+                      <div className="tool-empty">{t("git.noDiff")}</div>
+                    ) : diffLines.map((line, index) => (
+                      <div
+                        className={`git-diff-line ${line.kind}`}
+                        key={`${index}:${line.text}`}
+                      >
+                        <span className="git-line-number">{line.oldLine ?? ""}</span>
+                        <span className="git-line-number">{line.newLine ?? ""}</span>
+                        <code>{line.text || " "}</code>
+                      </div>
+                    ))}
+                  </div>
+                  {diff.truncated && (
+                    <div className="tool-hint">{t("git.diffTruncated")}</div>
+                  )}
+                </>
+              )
+            ) : (
+              <div className="git-overview">
+                <div className="git-overview-header">
+                  <strong>{clean ? t("git.clean") : t("git.select")}</strong>
+                  {repository?.head.oid && (
+                    <code>{repository.head.oid.slice(0, 12)}</code>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        ) : selectedCommitOid ? (
+          <>
+            <div className="tool-pane-toolbar git-commit-toolbar">
               <button
                 type="button"
-                className="danger compact"
-                disabled={!writeReady || busy}
-                onClick={() => setRestoreConfirm({
-                  path: selection.path,
-                  snapshot: diff.snapshot
-                })}
+                className="ghost compact git-commit-back"
+                onClick={() => {
+                  if (selectedCommitFile) {
+                    setSelectedCommitFile(null);
+                  } else {
+                    setSelectedCommitOid(null);
+                    setSelectedCommit(null);
+                  }
+                }}
               >
-                {t("git.restore")}
+                ← {selectedCommitFile
+                  ? t("git.commitDiffBack")
+                  : t("git.commitBack")}
               </button>
-            )}
-          </div>
-        )}
+              <strong title={selectedCommitFile ?? selectedCommit?.subject ?? ""}>
+                {selectedCommitFile
+                  ? basename(selectedCommitFile)
+                  : selectedCommit?.subject ?? selectedCommitOid.slice(0, 12)}
+              </strong>
+              <code>{selectedCommitOid.slice(0, 12)}</code>
+            </div>
 
-        {diffError ? (
-          <div className="tool-inline-error">{diffError}</div>
-        ) : selection && diffLoading ? (
-          <div className="tool-empty">{t("git.diffLoading")}</div>
-        ) : selection && diff ? (
-          diff.binary ? (
-            <div className="tool-empty">{t("git.binaryDiff")}</div>
-          ) : (
-            <>
-              <div className="git-diff-content" tabIndex={0}>
-                {diffLines.length === 0 ? (
-                  <div className="tool-empty">{t("git.noDiff")}</div>
-                ) : diffLines.map((line, index) => (
-                  <div
-                    className={`git-diff-line ${line.kind}`}
-                    key={`${index}:${line.text}`}
-                  >
-                    <span className="git-line-number">{line.oldLine ?? ""}</span>
-                    <span className="git-line-number">{line.newLine ?? ""}</span>
-                    <code>{line.text || " "}</code>
+            {selectedCommitFile ? (
+              commitDiffError ? (
+                <div className="tool-inline-error">{commitDiffError}</div>
+              ) : commitDiffLoading ? (
+                <div className="tool-empty">{t("git.commitDiffLoading")}</div>
+              ) : commitDiffBinary ? (
+                <div className="tool-empty">{t("git.binaryDiff")}</div>
+              ) : commitDiff !== null ? (
+                <>
+                  <div className="git-diff-content" tabIndex={0}>
+                    {commitDiffLines.length === 0 ? (
+                      <div className="tool-empty">{t("git.noDiff")}</div>
+                    ) : commitDiffLines.map((line, index) => (
+                      <div
+                        className={`git-diff-line ${line.kind}`}
+                        key={`commit:${index}:${line.text}`}
+                      >
+                        <span className="git-line-number">{line.oldLine ?? ""}</span>
+                        <span className="git-line-number">{line.newLine ?? ""}</span>
+                        <code>{line.text || " "}</code>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              {diff.truncated && (
-                <div className="tool-hint">{t("git.diffTruncated")}</div>
-              )}
-            </>
-          )
-        ) : (
-          <div className="git-overview">
-            <div className="git-overview-header">
-              <strong>{clean ? t("git.clean") : t("git.select")}</strong>
-              {repository?.head.oid && (
-                <code>{repository.head.oid.slice(0, 12)}</code>
-              )}
-            </div>
-            <div className="git-history">
-              <div className="git-group-heading">
-                <strong>{t("git.recentCommits")}</strong>
-                <span>{history.length}</span>
-              </div>
-              {history.length === 0 ? (
-                <div className="tool-empty">{t("git.noCommits")}</div>
-              ) : history.map((commit) => (
-                <div className="git-history-row" key={commit.oid}>
-                  <code>{commit.shortOid}</code>
-                  <span>
-                    <strong>{commit.subject}</strong>
-                    <small>{commit.author} · {commit.authoredAt}</small>
-                  </span>
+                  {commitDiffTruncated && (
+                    <div className="tool-hint">{t("git.commitDiffTruncated")}</div>
+                  )}
+                </>
+              ) : null
+            ) : commitError ? (
+              <div className="tool-inline-error">{commitError}</div>
+            ) : commitLoading ? (
+              <div className="tool-empty">{t("git.historyLoading")}</div>
+            ) : selectedCommit ? (
+              <div className="git-commit-detail">
+                <div className="git-commit-meta">
+                  <strong>{selectedCommit.subject}</strong>
+                  <span>{selectedCommit.author} &lt;{selectedCommit.email}&gt;</span>
+                  <span>{selectedCommit.authoredAt}</span>
                 </div>
-              ))}
-            </div>
-          </div>
+                {selectedCommit.body.trim() && (
+                  <div className="git-commit-body">
+                    <strong>{t("git.commitBody")}</strong>
+                    <pre>{selectedCommit.body}</pre>
+                  </div>
+                )}
+                <div className="git-group-heading">
+                  <strong>{t("git.commitFiles")}</strong>
+                  <span>{selectedCommit.files.length}</span>
+                </div>
+                {selectedCommit.files.length === 0 ? (
+                  <div className="tool-empty">{t("git.commitNoFiles")}</div>
+                ) : (
+                  <div className="git-commit-files">
+                    {selectedCommit.files.map((file) => (
+                      <button
+                        type="button"
+                        className="git-commit-file"
+                        key={`${file.status}:${file.originalPath ?? ""}:${file.path}`}
+                        onClick={() => setSelectedCommitFile(file.path)}
+                      >
+                        <span className="git-status-code">
+                          {COMMIT_STATUS_CODES[file.status]}
+                        </span>
+                        <span className="git-change-path" title={file.path}>
+                          {file.path}
+                          {file.originalPath && (
+                            <small>{file.originalPath} →</small>
+                          )}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedCommit.truncated && (
+                  <div className="tool-hint">{t("git.commitTruncated")}</div>
+                )}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="tool-empty">{t("git.selectCommit")}</div>
         )}
       </div>
 

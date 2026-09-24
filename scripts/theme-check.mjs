@@ -76,6 +76,8 @@ const indexHtmlPath = path.join(root, "apps", "web", "index.html");
 const stylesPath = path.join(webSource, "styles.css");
 const sessionWorkbenchPath = path.join(webSource, "SessionWorkbench.tsx");
 const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
+const gitPanePath = path.join(webSource, "GitPane.tsx");
+const filesPanePath = path.join(webSource, "FilesPane.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
 const terminalKeyBar = await readFile(terminalKeyBarPath, "utf8");
 const terminalImeInput = await readFile(terminalImeInputPath, "utf8");
@@ -88,6 +90,8 @@ const indexHtml = await readFile(indexHtmlPath, "utf8");
 const styles = (await readFile(stylesPath, "utf8")).replaceAll("\r\n", "\n");
 const sessionWorkbench = await readFile(sessionWorkbenchPath, "utf8");
 const workspaceDialog = await readFile(workspaceDialogPath, "utf8");
+const gitPane = await readFile(gitPanePath, "utf8");
+const filesPane = await readFile(filesPanePath, "utf8");
 
 for (const marker of [
   '<TerminalView',
@@ -332,6 +336,41 @@ if (
 ) {
   failures.push(
     "apps/web/src/styles.css [git-scroll-contract] Git groups/change lists must not be nested scroll owners"
+  );
+}
+
+for (const marker of [
+  'type GitView = "changes" | "history"',
+  'className="git-view-tabs"',
+  'workspaceGitHistory(workspaceId',
+  'workspaceGitCommit(workspaceId',
+  'workspaceGitCommitDiff(',
+  'repositoryFileHistoryPath('
+]) {
+  if (!gitPane.includes(marker)) {
+    failures.push(`apps/web/src/GitPane.tsx [mobile-git-history-contract] missing ${marker}`);
+  }
+}
+
+for (const marker of [
+  'readWorkspaceFileContent(',
+  'copySelectedFile',
+  'shareSelectedFile',
+  'onShowHistory',
+  'file-preview-actions'
+]) {
+  if (!filesPane.includes(marker)) {
+    failures.push(`apps/web/src/FilesPane.tsx [mobile-file-export-contract] missing ${marker}`);
+  }
+}
+
+if (
+  !styles.includes(".git-view-tabs {") ||
+  !styles.includes(".git-history-list {") ||
+  !styles.includes(".file-preview-actions {")
+) {
+  failures.push(
+    "apps/web/src/styles.css [mobile-workbench-contract] Git history and file actions must retain explicit themed mobile layout"
   );
 }
 

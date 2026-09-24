@@ -1,5 +1,7 @@
 export {
   getWorkspaceGitBranches,
+  getWorkspaceGitCommit,
+  getWorkspaceGitCommitDiff,
   getWorkspaceGitDiff,
   getWorkspaceGitHistory,
   getWorkspaceGitStatus,

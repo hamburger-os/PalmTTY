@@ -209,6 +209,12 @@ export const WorkspaceFileReadResponseSchema = z.object({
 }).strict();
 export type WorkspaceFileReadResponse = z.infer<typeof WorkspaceFileReadResponseSchema>;
 
+export const MAX_WORKSPACE_FILE_CONTENT_BYTES = 8 * 1024 * 1024;
+export const WorkspaceFileContentRequestSchema = WorkspaceFileReadRequestSchema;
+export type WorkspaceFileContentRequest = z.infer<
+  typeof WorkspaceFileContentRequestSchema
+>;
+
 export const WorkspaceFileImageRequestSchema = WorkspaceFileReadRequestSchema;
 export type WorkspaceFileImageRequest = z.infer<typeof WorkspaceFileImageRequestSchema>;
 
@@ -341,7 +347,9 @@ export const GitDiffResponseSchema = z.object({
 export type GitDiffResponse = z.infer<typeof GitDiffResponseSchema>;
 
 export const GitHistoryRequestSchema = z.object({
-  limit: z.number().int().min(1).max(50).default(20)
+  limit: z.number().int().min(1).max(50).default(30),
+  cursor: z.string().min(1).max(512).optional(),
+  path: GitPathSchema.optional()
 }).strict();
 export type GitHistoryRequest = z.infer<typeof GitHistoryRequestSchema>;
 
@@ -355,9 +363,67 @@ export const GitCommitSummarySchema = z.object({
 export type GitCommitSummary = z.infer<typeof GitCommitSummarySchema>;
 
 export const GitHistoryResponseSchema = z.object({
-  commits: z.array(GitCommitSummarySchema).max(50)
+  commits: z.array(GitCommitSummarySchema).max(50),
+  snapshot: GitObjectIdSchema.optional(),
+  nextCursor: z.string().min(1).max(512).optional(),
+  path: GitPathSchema.optional()
 }).strict();
 export type GitHistoryResponse = z.infer<typeof GitHistoryResponseSchema>;
+
+export const GitCommitFileStatusSchema = z.enum([
+  "modified",
+  "typeChanged",
+  "added",
+  "deleted",
+  "renamed",
+  "copied"
+]);
+export type GitCommitFileStatus = z.infer<typeof GitCommitFileStatusSchema>;
+
+export const GitCommitFileSchema = z.object({
+  path: GitPathSchema,
+  originalPath: GitPathSchema.optional(),
+  status: GitCommitFileStatusSchema
+}).strict();
+export type GitCommitFile = z.infer<typeof GitCommitFileSchema>;
+
+export const GitCommitRequestSchema = z.object({
+  oid: GitObjectIdSchema
+}).strict();
+export type GitCommitRequest = z.infer<typeof GitCommitRequestSchema>;
+
+export const GitCommitDetailResponseSchema = z.object({
+  oid: GitObjectIdSchema,
+  shortOid: z.string().min(4).max(64),
+  author: z.string().max(512),
+  email: z.string().max(1024),
+  authoredAt: z.string().max(64),
+  subject: z.string().max(4096),
+  body: z.string().max(256 * 1024),
+  parents: z.array(GitObjectIdSchema).max(32),
+  files: z.array(GitCommitFileSchema).max(2048),
+  truncated: z.boolean()
+}).strict();
+export type GitCommitDetailResponse = z.infer<
+  typeof GitCommitDetailResponseSchema
+>;
+
+export const GitCommitDiffRequestSchema = z.object({
+  oid: GitObjectIdSchema,
+  path: GitPathSchema
+}).strict();
+export type GitCommitDiffRequest = z.infer<typeof GitCommitDiffRequestSchema>;
+
+export const GitCommitDiffResponseSchema = z.object({
+  oid: GitObjectIdSchema,
+  path: GitPathSchema,
+  diff: z.string().max(1024 * 1024),
+  truncated: z.boolean(),
+  binary: z.boolean()
+}).strict();
+export type GitCommitDiffResponse = z.infer<
+  typeof GitCommitDiffResponseSchema
+>;
 
 export const GitBranchSchema = z.object({
   name: z.string().min(1).max(512),

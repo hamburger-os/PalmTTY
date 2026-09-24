@@ -4,7 +4,10 @@ import type {
   CreateWorkspaceInput,
   DirectoryListing,
   GitBranchesResponse,
+  GitCommitDetailResponse,
+  GitCommitDiffResponse,
   GitDiffResponse,
+  GitHistoryRequest,
   GitHistoryResponse,
   GitMutationRequest,
   GitMutationResponse,
@@ -142,6 +145,21 @@ export async function readWorkspaceFile(
   ));
 }
 
+export async function readWorkspaceFileContent(
+  workspaceId: string,
+  path: string
+) {
+  return responseBlob(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/files/content`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path })
+    }
+  ));
+}
+
 export async function readWorkspaceImage(
   workspaceId: string,
   path: string
@@ -187,7 +205,7 @@ export async function workspaceGitDiff(
 
 export async function workspaceGitHistory(
   workspaceId: string,
-  limit = 20
+  input: GitHistoryRequest = { limit: 30 }
 ) {
   return responseJson<GitHistoryResponse>(await fetch(
     `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/git/history`,
@@ -195,7 +213,38 @@ export async function workspaceGitHistory(
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ limit })
+      body: JSON.stringify(input)
+    }
+  ));
+}
+
+export async function workspaceGitCommit(
+  workspaceId: string,
+  oid: string
+) {
+  return responseJson<GitCommitDetailResponse>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/git/commit`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ oid })
+    }
+  ));
+}
+
+export async function workspaceGitCommitDiff(
+  workspaceId: string,
+  oid: string,
+  path: string
+) {
+  return responseJson<GitCommitDiffResponse>(await fetch(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/git/commit-diff`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ oid, path })
     }
   ));
 }

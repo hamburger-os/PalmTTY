@@ -7,6 +7,7 @@ import {
   ApiError,
   listWorkspaceFiles,
   readWorkspaceFile,
+  readWorkspaceFileContent,
   readWorkspaceImage
 } from "./api.js";
 import { useI18n } from "./i18n.js";
@@ -18,7 +19,55 @@ function displaySize(bytes: number | undefined): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function FilesPane({ workspaceId }: { workspaceId: string }) {
+function fileName(path: string): string {
+  return path.split("/").at(-1) ?? path;
+}
+
+function parentPath(path: string): string {
+  const index = path.lastIndexOf("/");
+  return index < 0 ? "" : path.slice(0, index);
+}
+
+function fileMime(path: string, binary: boolean): string {
+  const extension = path.split(".").at(-1)?.toLowerCase();
+  if (extension === "png") return "image/png";
+  if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
+  if (extension === "webp") return "image/webp";
+  if (extension === "gif") return "image/gif";
+  return binary ? "application/octet-stream" : "text/plain;charset=utf-8";
+}
+
+async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall back for browsers/contexts that reject the async Clipboard API.
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  textarea.style.pointerEvents = "none";
+  document.body.append(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, text.length);
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("Clipboard write failed");
+}
+
+export function FilesPane({
+  workspaceId,
+  onShowHistory
+}: {
+  workspaceId: string;
+  onShowHistory?(path: string): void;
+}) {
   const { t, error: translateError } = useI18n();
   const [path, setPath] = useState("");
   const [listing, setListing] = useState<WorkspaceFileListResponse | null>(null);
@@ -30,6 +79,9 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [fileActionError, setFileActionError] = useState<string | null>(null);
+  const [fileActionStatus, setFileActionStatus] = useState<string | null>(null);
+  const [fileAction, setFileAction] = useState<"copy" | "share" | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
@@ -57,6 +109,8 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
   const currentLabel = useMemo(() => path || t("files.root"), [path, t]);
 
   useEffect(() => {
+    setFileActionError(null);
+    setFileActionStatus(null);
     if (!selectedPath) {
       setSelected(null);
       setReading(false);
@@ -134,6 +188,88 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
   const openFile = (filePath: string) => {
     setSelectedPath(filePath);
   };
+
+  const copySelectedFile = async () => {
+    if (!selectedPath || !selected || selected.binary || fileAction) return;
+    setFileAction("copy");
+    setFileActionError(null);
+    setFileActionStatus(null);
+    try {
+      let text = selected.content;
+      if (selected.truncated) {
+        const blob = await readWorkspaceFileContent(workspaceId, selectedPath);
+        const bytes = await blob.arrayBuffer();
+        text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      }
+      await copyText(text);
+      setFileActionStatus(t("files.copied"));
+    } catch (cause) {
+      setFileActionError(
+        cause instanceof ApiError
+          ? translateError(cause.code)
+          : t("files.copyFailed")
+      );
+    } finally {
+      setFileAction(null);
+    }
+  };
+
+  const shareSelectedFile = async () => {
+    if (!selectedPath || !selected || fileAction) return;
+    setFileAction("share");
+    setFileActionError(null);
+    setFileActionStatus(null);
+    try {
+      const blob = await readWorkspaceFileContent(workspaceId, selectedPath);
+      const name = fileName(selectedPath);
+      const file = new File([blob], name, {
+        type: fileMime(selectedPath, selected.binary)
+      });
+      const shareData: ShareData = { files: [file], title: name };
+      let canShareFile = typeof navigator.share === "function";
+      if (canShareFile && navigator.canShare) {
+        try {
+          canShareFile = navigator.canShare(shareData);
+        } catch {
+          canShareFile = false;
+        }
+      }
+
+      if (canShareFile) {
+        try {
+          await navigator.share(shareData);
+          return;
+        } catch (cause) {
+          if (cause instanceof DOMException && cause.name === "AbortError") return;
+          // A browser may expose navigator.share but still reject file sharing.
+          // Fall through to the download path instead of turning that into a dead end.
+        }
+      }
+
+      const url = URL.createObjectURL(file);
+      try {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = name;
+        anchor.rel = "noopener";
+        document.body.append(anchor);
+        anchor.click();
+        anchor.remove();
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      }
+    } catch (cause) {
+      setFileActionError(
+        cause instanceof ApiError
+          ? translateError(cause.code)
+          : t("files.shareFailed")
+      );
+    } finally {
+      setFileAction(null);
+    }
+  };
+
+  const shareSupported = typeof navigator.share === "function";
 
   return (
     <section className={`files-pane tool-pane glass-content${selectedPath ? " has-preview" : ""}`}>
@@ -219,8 +355,51 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
             >
               ← {t("files.back")}
             </button>
-            <strong title={selectedPath}>{selectedPath}</strong>
-            {selected && <span>{displaySize(selected.size)}</span>}
+            <div className="file-preview-heading">
+              <strong title={selectedPath}>{fileName(selectedPath)}</strong>
+              <span title={parentPath(selectedPath)}>
+                {parentPath(selectedPath)
+                  ? t("files.parentPath", { path: parentPath(selectedPath) })
+                  : t("files.root")}
+                {selected ? ` · ${displaySize(selected.size)}` : ""}
+              </span>
+            </div>
+            <div className="file-preview-actions">
+              {selected && !selected.binary && (
+                <button
+                  type="button"
+                  className="ghost compact"
+                  disabled={fileAction !== null}
+                  onClick={() => void copySelectedFile()}
+                >
+                  {fileAction === "copy" ? t("files.copying") : t("files.copy")}
+                </button>
+              )}
+              {selected && (
+                <button
+                  type="button"
+                  className="ghost compact"
+                  disabled={fileAction !== null}
+                  onClick={() => void shareSelectedFile()}
+                >
+                  {fileAction === "share"
+                    ? t("files.exporting")
+                    : shareSupported
+                      ? t("files.share")
+                      : t("files.download")}
+                </button>
+              )}
+              {onShowHistory && selected && (
+                <button
+                  type="button"
+                  className="ghost compact"
+                  disabled={fileAction !== null}
+                  onClick={() => onShowHistory(selectedPath)}
+                >
+                  {t("files.history")}
+                </button>
+              )}
+            </div>
           </div>
         )}
         {previewError ? (
@@ -245,6 +424,8 @@ export function FilesPane({ workspaceId }: { workspaceId: string }) {
             )}
           </>
         ) : null}
+        {fileActionError && <div className="tool-inline-error">{fileActionError}</div>}
+        {fileActionStatus && <div className="tool-hint file-action-status">{fileActionStatus}</div>}
       </div>
     </section>
   );

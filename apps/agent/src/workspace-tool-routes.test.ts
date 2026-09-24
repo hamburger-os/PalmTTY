@@ -114,6 +114,18 @@ describe("workspace tool HTTP boundary", () => {
       content: "hello\n"
     });
 
+    const content = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspaces/workspace-1/files/content",
+      headers: { cookie, origin: ORIGIN },
+      payload: { path: "README.md" }
+    });
+    expect(content.statusCode).toBe(200);
+    expect(content.headers["content-type"]).toContain("application/octet-stream");
+    expect(content.headers["cache-control"]).toBe("private, no-store");
+    expect(content.headers["x-content-type-options"]).toBe("nosniff");
+    expect(content.rawPayload.toString("utf8")).toBe("hello\n");
+
     const image = await app.inject({
       method: "POST",
       url: "/api/v1/workspaces/workspace-1/files/image",

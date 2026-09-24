@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   BrowseDirectoryRequestSchema,
   CreateSessionSchema,
+  GitCommitDiffRequestSchema,
+  GitCommitRequestSchema,
   GitDiffRequestSchema,
   GitHistoryRequestSchema,
   GitMutationRequestSchema,
   GitRemoteRequestSchema,
   SessionArtifactSchema,
+  WorkspaceFileContentRequestSchema,
   WorkspaceFileImageRequestSchema,
   WorkspaceFileListRequestSchema,
   WorkspaceFileReadRequestSchema,
@@ -113,6 +116,9 @@ describe("protocol", () => {
     expect(WorkspaceFileImageRequestSchema.parse({ path: "shot.png" })).toEqual({
       path: "shot.png"
     });
+    expect(WorkspaceFileContentRequestSchema.parse({ path: "chapter.md" })).toEqual({
+      path: "chapter.md"
+    });
 
     expect(SessionArtifactSchema.parse({
       id: "abcdefghijklmnop",
@@ -142,7 +148,30 @@ describe("protocol", () => {
     expect(() => GitDiffRequestSchema.parse({ path: "../outside" })).toThrow();
     expect(() => GitDiffRequestSchema.parse({ path: "src\\index.ts" })).toThrow();
 
-    expect(GitHistoryRequestSchema.parse({})).toEqual({ limit: 20 });
+    expect(GitHistoryRequestSchema.parse({})).toEqual({ limit: 30 });
+    expect(GitHistoryRequestSchema.parse({
+      limit: 10,
+      cursor: "cursor-token",
+      path: "chapters/0009.md"
+    })).toEqual({
+      limit: 10,
+      cursor: "cursor-token",
+      path: "chapters/0009.md"
+    });
+    expect(() => GitHistoryRequestSchema.parse({
+      path: "../outside"
+    })).toThrow();
+    expect(GitCommitRequestSchema.parse({
+      oid: "a".repeat(40)
+    }).oid).toBe("a".repeat(40));
+    expect(GitCommitDiffRequestSchema.parse({
+      oid: "b".repeat(40),
+      path: "chapters/0009.md"
+    }).path).toBe("chapters/0009.md");
+    expect(() => GitCommitDiffRequestSchema.parse({
+      oid: "b".repeat(40),
+      path: "../outside"
+    })).toThrow();
     expect(GitMutationRequestSchema.parse({
       expectedState: "a".repeat(64),
       allowRepositoryCodeExecution: true,

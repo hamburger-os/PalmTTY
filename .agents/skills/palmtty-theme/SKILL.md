@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.9.0"
+  version: "1.10.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -163,7 +163,7 @@ PalmTTY is primarily operated from a phone.
 - Controls must remain reachable in portrait and short landscape layouts.
 - The mobile terminal keybar may use horizontally scrollable rows, but it must not become a competing vertical scroll owner. Keep high-frequency actions (including Enter and a literal `/` fallback) in the core row; lower-frequency symbol/navigation actions belong in an optional second horizontal row, and modifier buttons must expose pressed state accessibly. Browser-local terminal font-size controls may refit the mounted xterm in place, but must not recreate transport/session state.
 - Workspace dialogs keep one intentional body scroll owner with header/footer actions always reachable; nested data regions may scroll only when bounded.
-- Dense workbench regions also need one intentional vertical scroll owner. In particular, the Git sidebar owns scrolling for repository summary, change groups and Git tools; group/list descendants must not create nested competing vertical scrollers. Files and Artifacts use one list scroller plus one independent preview scroller on wide screens; on narrow screens the selected preview replaces the list rather than creating side-by-side overflow. Image previews use ordinary bounded `<img>` content inside `.glass-content`, never a new backdrop/material layer.
+- Dense workbench regions also need one intentional vertical scroll owner. In particular, the Git sidebar owns scrolling for repository summary, the first-class Changes/History switch, change/history lists and Git tools; group/list descendants must not create nested competing vertical scrollers. Commit detail/diff replaces the Git list on narrow screens and must keep an explicit back action reachable. Files and Artifacts use one list scroller plus one independent preview scroller on wide screens; on narrow screens the selected preview replaces the list rather than creating side-by-side overflow. File preview actions (copy/share-download/history) belong to the preview toolbar/action row, must remain reachable as touch targets, and must not create a new vertical scroll owner. Image previews use ordinary bounded `<img>` content inside `.glass-content`, never a new backdrop/material layer.
 - High-frequency touch targets use the shared 44px target where space allows; compact secondary controls use the shared compact target rather than ad-hoc geometry.
 - Avoid desktop-only hover as the only affordance.
 - Avoid decorative rendering work that competes with xterm output/reconnect rendering.
@@ -187,7 +187,7 @@ At minimum validate:
 - empty and populated workspace/session lists;
 - workspace create/edit + directory picker + destructive confirmation;
 - terminal connected/reconnecting/closed;
-- Files supported-image preview and Artifacts empty/list/preview/upload/delete states on wide and narrow layouts, including four workbench tabs without unreachable controls;
+- Files text/image preview plus copy/share-download/history actions, Git Changes/History list → commit detail → file diff navigation, and Artifacts empty/list/preview/upload/delete states on wide and narrow layouts, including four workbench tabs without unreachable controls;
 - portrait and short landscape;
 - theme changes while a terminal remains connected.
 
