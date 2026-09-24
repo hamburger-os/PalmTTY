@@ -27,6 +27,20 @@ Source: https://git-scm.com/docs/gitattributes
 - Filter drivers may define `clean`, `smudge`, or long-running `process` commands; `process` takes precedence when configured.
 - The clean side participates in Git's check-in conversion of working-tree content. A working-tree comparison must therefore account for filter execution separately from diff drivers/textconv.
 
+## History and commit inspection
+
+Sources:
+
+- https://git-scm.com/docs/git-log
+- https://git-scm.com/docs/git-show
+- https://git-scm.com/docs/git-diff-tree
+
+- `git log <commit>` can anchor history traversal at a specific commit; PalmTTY uses the initially observed HEAD object ID as the immutable pagination snapshot instead of paging against a moving branch name.
+- `--skip=<n>` and `-n <count>` provide bounded offset/count pagination. PalmTTY keeps the snapshot object ID and offset inside an opaque bounded cursor.
+- `--follow -- <path>` follows history beyond renames for one path. The path remains a validated repository-relative path and is separated from revisions/options by `--`.
+- `git show -s --format=...` provides commit metadata without rendering the patch. `git diff-tree --root --name-status -r -z -M -C <commit>` provides machine-oriented changed-path records, including rename/copy records with NUL-delimited paths.
+- Per-file historical diff uses `git show --format= --no-ext-diff --no-textconv <commit> -- <path>`; it therefore preserves the same external-diff/textconv avoidance used by the working-tree diff surface.
+
 ## Log signature verification
 
 Source: https://git-scm.com/docs/git-config#Documentation/git-config.txt-logshowSignature
@@ -51,4 +65,4 @@ Source: https://git-scm.com/docs/git-config#Documentation/git-config.txt-protoco
 - `protocol.<name>.allow` can override the policy for a named protocol.
 - PalmTTY's project-specific remote allowlist and trust model are documented in the owner/security and AI invariant layers, not here.
 
-Last reviewed: 2026-09-22.
+Last reviewed: 2026-09-24.
