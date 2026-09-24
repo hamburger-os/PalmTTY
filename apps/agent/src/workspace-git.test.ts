@@ -264,7 +264,7 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
       })
     ]));
 
-    const history = await getWorkspaceGitHistory(workspace, 20);
+    const history = await getWorkspaceGitHistory(workspace, { limit: 20 });
     expect(history.commits[0]).toEqual(expect.objectContaining({
       subject: "test: Git workbench commit"
     }));
