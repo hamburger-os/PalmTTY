@@ -377,7 +377,11 @@ function parseGitCommitFiles(
   output: Buffer,
   outputTruncated: boolean
 ): { files: GitCommitFile[]; truncated: boolean } {
-  const fields = output.toString("utf8").split("\0");
+  const text = output.toString("utf8");
+  const fields = text.split("\0");
+  if (outputTruncated && !text.endsWith("\0")) {
+    fields.pop();
+  }
   const files: GitCommitFile[] = [];
   let index = 0;
   let malformed = false;
