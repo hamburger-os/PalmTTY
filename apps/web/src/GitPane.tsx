@@ -582,7 +582,12 @@ export function GitPane({
                 </button>
               </div>
             )}
-            {historyError ? (
+            {loading ? (
+              <div className="tool-empty">{t("git.loading")}</div>
+            ) : status && !status.available ? (
+              <div className="tool-empty">{t("git.notRepository")}</div>
+            ) : statusError && historyPath ? null
+            : historyError ? (
               <div className="tool-inline-error">{historyError}</div>
             ) : historyLoading ? (
               <div className="tool-empty">{t("git.historyLoading")}</div>
