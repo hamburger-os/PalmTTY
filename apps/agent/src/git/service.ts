@@ -409,6 +409,7 @@ function parseGitCommitFiles(
       break;
     }
 
+
     try {
       if (status === "renamed" || status === "copied") {
         const secondPath = fields[index++] ?? "";
