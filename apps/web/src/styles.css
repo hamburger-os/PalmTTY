@@ -1184,6 +1184,7 @@ button.directory-choose {
 .git-change-path,
 .file-preview-toolbar strong,
 .git-diff-toolbar strong,
+.git-commit-toolbar strong,
 .artifact-preview-toolbar strong {
   min-width: 0;
   overflow: hidden;
@@ -1597,7 +1598,7 @@ button.directory-choose {
 
 .git-commit-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .git-commit-toolbar code {
