@@ -576,6 +576,7 @@ export function GitPane({
                 <button
                   type="button"
                   className="ghost compact"
+                  disabled={historyLoading || historyLoadingMore}
                   onClick={() => setHistoryPath(undefined)}
                 >
                   {t("git.historyAll")}
