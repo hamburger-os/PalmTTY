@@ -189,9 +189,10 @@ export function GitPane({
     cursor?: string,
     append = false
   ) => {
-    if (historyPath && !status?.repository) return;
-    const requestedPath = historyPath && status?.repository
-      ? repositoryFilePath(status.repository.workspacePath, historyPath)
+    const workspaceRepositoryPath = status?.repository?.workspacePath;
+    if (historyPath && workspaceRepositoryPath === undefined) return;
+    const requestedPath = historyPath
+      ? repositoryFilePath(workspaceRepositoryPath ?? "", historyPath)
       : undefined;
 
     append ? setHistoryLoadingMore(true) : setHistoryLoading(true);
@@ -219,7 +220,7 @@ export function GitPane({
     }
   }, [
     historyPath,
-    status?.repository,
+    status?.repository?.workspacePath,
     translateError,
     workspaceId
   ]);
