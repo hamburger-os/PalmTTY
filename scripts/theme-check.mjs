@@ -345,7 +345,7 @@ for (const marker of [
   'workspaceGitHistory(workspaceId',
   'workspaceGitCommit(workspaceId',
   'workspaceGitCommitDiff(',
-  'repositoryFilePath('
+  'repositoryFileHistoryPath('
 ]) {
   if (!gitPane.includes(marker)) {
     failures.push(`apps/web/src/GitPane.tsx [mobile-git-history-contract] missing ${marker}`);
