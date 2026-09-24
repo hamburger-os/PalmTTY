@@ -31,6 +31,7 @@ import {
   gitMutationPaths
 } from "./git-change.js";
 import { parseUnifiedDiff } from "./git-diff.js";
+import { repositoryFileHistoryPath } from "./git-history.js";
 import { useI18n } from "./i18n.js";
 
 type Selection = {
@@ -72,10 +73,6 @@ function statusCode(entry: GitChange, staged: boolean): string {
 
 function basename(path: string): string {
   return path.split("/").at(-1) ?? path;
-}
-
-function repositoryFilePath(workspacePath: string, filePath: string): string {
-  return workspacePath ? `${workspacePath}/${filePath}` : filePath;
 }
 
 export function GitPane({
@@ -192,7 +189,7 @@ export function GitPane({
     const workspaceRepositoryPath = status?.repository?.workspacePath;
     if (historyPath && workspaceRepositoryPath === undefined) return;
     const requestedPath = historyPath
-      ? repositoryFilePath(workspaceRepositoryPath ?? "", historyPath)
+      ? repositoryFileHistoryPath(workspaceRepositoryPath ?? "", historyPath)
       : undefined;
 
     append ? setHistoryLoadingMore(true) : setHistoryLoading(true);
