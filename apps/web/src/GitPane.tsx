@@ -918,7 +918,7 @@ export function GitPane({
             <div className="tool-pane-toolbar git-commit-toolbar">
               <button
                 type="button"
-                className="ghost compact git-preview-back"
+                className="ghost compact git-commit-back"
                 onClick={() => {
                   if (selectedCommitFile) {
                     setSelectedCommitFile(null);
