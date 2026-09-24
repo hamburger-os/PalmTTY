@@ -18,9 +18,9 @@ Mobile-first · self-hosted · Windows-first · Host + WSL runtimes · xterm.js
 > [!WARNING]
 > PalmTTY exposes an interactive shell with the privileges of the OS user running the Agent. Treat compromise as workstation compromise. Use a private HTTPS entry point or an authenticated HTTPS reverse proxy; do not expose an unauthenticated Agent port to the Internet.
 
-PalmTTY is a mobile-first, self-hosted remote development workbench centered on a durable terminal. Windows 11 remains the primary host target, with native host shells and WSL workspaces; the same host-runtime path is exercised on Ubuntu CI and is designed for Linux/macOS hosts. Each Session workbench keeps the terminal alive while exposing bounded typed Git source control, read-only workspace file/text-image preview, and Session-scoped image artifacts that can be uploaded, previewed, deleted, and inserted into the live terminal as local file paths. Codex and other terminal agents remain ordinary shell workloads; PalmTTY does not encode a vendor-specific multimodal protocol.
+PalmTTY is a mobile-first, self-hosted remote development workbench centered on a durable terminal. Windows 11 remains the primary host target, with native host shells and WSL workspaces; the same host-runtime path is exercised on Ubuntu CI and is designed for Linux/macOS hosts. Each Session workbench keeps the terminal alive while exposing bounded typed Git source control with mobile-first commit/file history inspection, read-only workspace file/text-image preview plus bounded complete-file copy/share/download, and Session-scoped image artifacts that can be uploaded, previewed, deleted, and inserted into the live terminal as local file paths. Codex and other terminal agents remain ordinary shell workloads; PalmTTY does not encode a vendor-specific multimodal protocol.
 
-PalmTTY 是一个以持久终端为核心、面向手机、自托管的远程开发工作台。Windows 11 仍是首要宿主平台，同时支持宿主机 Shell 与 WSL 工作区；同一套宿主运行时也在 Ubuntu CI 中验证，并按 Linux/macOS 宿主扩展设计。每个 Session 工作台在保持终端连接的同时提供有界、typed 的 Git Source Control、只读工作区文件/图片预览，以及 Session 范围的图片附件上传、预览、删除与本地路径插入。Codex 等终端 Agent 仍只是普通 Shell 工作负载；PalmTTY 核心不编码某个厂商的多模态协议。
+PalmTTY 是一个以持久终端为核心、面向手机、自托管的远程开发工作台。Windows 11 仍是首要宿主平台，同时支持宿主机 Shell 与 WSL 工作区；同一套宿主运行时也在 Ubuntu CI 中验证，并按 Linux/macOS 宿主扩展设计。每个 Session 工作台在保持终端连接的同时提供有界、typed 的 Git Source Control（含面向手机的提交/文件历史查看）、只读工作区文件/图片预览与有界完整文件复制/分享/下载，以及 Session 范围的图片附件上传、预览、删除与本地路径插入。Codex 等终端 Agent 仍只是普通 Shell 工作负载；PalmTTY 核心不编码某个厂商的多模态协议。
 
 ## Status / 当前状态
 
@@ -38,7 +38,7 @@ PalmTTY is **alpha**. Each terminal now runs in an independent durable Session W
 | Browser or network disconnect | PTY survives while the Agent stays alive |
 | Reconnect | Sequence replay + server-side terminal snapshot fallback |
 | Session lifecycle | Explicit terminate / restart-as-replacement / retained clear; no ambiguous close/kill control |
-| Session workbench | Terminal / Git / Files / Artifacts tabs; terminal stays mounted while switching views; image artifacts stay outside the Git workspace and can be inserted as local paths without implicit execution |
+| Session workbench | Terminal / Git / Files / Artifacts tabs; terminal stays mounted while switching views; Git has Changes/History with paged commit inspection and file history; Files can copy/share/download complete bounded files; image artifacts stay outside Git |
 | Mobile terminal | xterm.js PWA, touch special-key bar, on-demand long-text input |
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
 | Network exposure | Explicit `local` / `lan` / `reverseProxy` / direct `https` profiles; HTTPS/private entry is recommended |
@@ -62,8 +62,9 @@ PalmTTY is intentionally narrower than a browser IDE:
 ```text
 Phone / PWA
  ├─ Terminal pane (WSS → Session Worker)
- ├─ Git pane (bounded typed Source Control HTTP API)
- └─ Files pane (workspace-scoped read-only HTTP API)
+ ├─ Git pane (bounded typed Source Control + history HTTP API)
+ ├─ Files pane (workspace-scoped read-only preview/export HTTP API)
+ └─ Artifacts pane (Session-scoped bounded image context)
     │ HTTPS / WSS
     ▼
 Private HTTPS entry point
