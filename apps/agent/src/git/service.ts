@@ -213,11 +213,15 @@ type GitHistoryCursor = {
   v: number;
   snapshot: string;
   offset: number;
-  path?: string;
+  pathHash?: string;
 };
 
 function isGitObjectId(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{40,64}$/i.test(value);
+}
+
+function gitHistoryPathHash(path: string): string {
+  return createHash("sha256").update(path, "utf8").digest("hex");
 }
 
 function encodeGitHistoryCursor(cursor: GitHistoryCursor): string {
@@ -243,15 +247,21 @@ function decodeGitHistoryCursor(
     !isGitObjectId(candidate.snapshot) ||
     !Number.isSafeInteger(candidate.offset) ||
     (candidate.offset ?? -1) < 0 ||
-    (candidate.path !== undefined && typeof candidate.path !== "string")
+    (
+      candidate.pathHash !== undefined &&
+      (
+        typeof candidate.pathHash !== "string" ||
+        !/^[0-9a-f]{64}$/i.test(candidate.pathHash)
+      )
+    )
   ) {
     throw new Error("Git history cursor is invalid");
   }
 
-  const cursorPath = candidate.path === undefined
-    ? undefined
-    : validateGitPath(candidate.path);
-  if (cursorPath !== requestedPath) {
+  const requestedPathHash = requestedPath
+    ? gitHistoryPathHash(requestedPath)
+    : undefined;
+  if (candidate.pathHash !== requestedPathHash) {
     throw new Error("Git history cursor does not match the requested path");
   }
 
@@ -259,7 +269,7 @@ function decodeGitHistoryCursor(
     v: GIT_HISTORY_CURSOR_VERSION,
     snapshot: candidate.snapshot,
     offset: candidate.offset!,
-    ...(cursorPath ? { path: cursorPath } : {})
+    ...(candidate.pathHash ? { pathHash: candidate.pathHash } : {})
   };
 }
 
@@ -339,7 +349,7 @@ export async function getWorkspaceGitHistory(
         v: GIT_HISTORY_CURSOR_VERSION,
         snapshot,
         offset: offset + request.limit,
-        ...(requestedPath ? { path: requestedPath } : {})
+        ...(requestedPath ? { pathHash: gitHistoryPathHash(requestedPath) } : {})
       })
     : undefined;
 
