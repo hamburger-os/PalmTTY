@@ -433,6 +433,9 @@ function parseGitCommitFiles(
       break;
     }
 
+    if (files.length >= MAX_GIT_COMMIT_FILES) {
+      return { files, truncated: true };
+    }
 
     try {
       if (status === "renamed" || status === "copied") {
@@ -455,10 +458,6 @@ function parseGitCommitFiles(
     } catch {
       malformed = true;
       break;
-    }
-
-    if (files.length >= MAX_GIT_COMMIT_FILES) {
-      return { files, truncated: true };
     }
   }
 
