@@ -24,7 +24,7 @@ PalmTTY 是一个以持久终端为核心、面向手机、自托管的远程开
 
 ## Status / 当前状态
 
-PalmTTY is **alpha**. Each terminal now runs in an independent durable Session Worker, so restarting only the HTTP/API Agent does not terminate the live PTY. Windows and Ubuntu CI cover authenticated Worker IPC, Agent restart rediscovery, replay/snapshot recovery and detached-process survival; Windows CI also uses real node-pty + PowerShell 7 / ConPTY for Unicode and resize smoke coverage. Release publication is guarded by pinned-SHA CI/security/license/CodeQL gates. Real phone + real workstation + long-running Codex checks remain recommended release evidence, but are not represented by a manual publication checkbox.
+PalmTTY is **alpha** and the current source line targets **0.2.0**. Each terminal runs in an independent durable Session Worker, so restarting only the HTTP/API Agent does not terminate the live PTY. Windows and Ubuntu CI cover authenticated Worker IPC, Agent restart rediscovery, replay/snapshot recovery and detached-process survival; Windows CI also uses real node-pty + PowerShell 7 / ConPTY for Unicode and resize smoke coverage. Release publication is guarded by pinned-SHA CI/security/license/CodeQL gates. Real phone + real workstation + long-running Codex checks remain recommended release evidence, but are not represented by a manual publication checkbox.
 
 | Capability | Alpha status |
 |---|---|
