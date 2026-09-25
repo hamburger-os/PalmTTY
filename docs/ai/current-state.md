@@ -1,6 +1,6 @@
 # Current implementation state
 
-Status: **alpha foundation implemented with durable per-session workers, Windows/Ubuntu CI, current-user Windows/Linux Agent autostart, and installable Windows/Linux release packaging. Release qualification now requires native package builds plus detached installed-runtime smoke before asset-bearing publication. Real mobile/Codex/deployment checks remain recommended release evidence rather than a workflow gate.**
+Status: **0.2.x alpha foundation implemented with durable per-session workers, Windows/Ubuntu CI, current-user Windows/Linux Agent autostart, installable Windows/Linux release packaging, and a mobile-first Terminal/Git/Files/Artifacts workbench. Release qualification requires native package builds plus detached installed-runtime smoke before asset-bearing publication. Real mobile/Codex/deployment checks remain recommended release evidence rather than a workflow gate.**
 
 ## Implemented
 
@@ -17,6 +17,7 @@ Status: **alpha foundation implemented with durable per-session workers, Windows
 - production dependency vulnerability audit, fail-closed production dependency license-policy review, and CodeQL
 - CODEOWNERS, PR/Issue templates, contribution/security/governance/release documentation
 - root `package.json` is the single release/runtime version source; private workspace manifests intentionally omit duplicate versions and the Agent health endpoint reads the root version
+- the source tree targets `0.2.0`; `CHANGELOG.md` keeps `[Unreleased]` empty at publication time and carries the explicit `0.1.0` → `0.2.0` exposure-profile migration note instead of compatibility code
 - guarded manual Release workflow locks an exact `main` SHA, reuses the Windows/Ubuntu CI + Security Audit + CodeQL workflows against that SHA, rejects tag/release reuse, aborts if `main` advances, and publishes an annotated tag plus verified GitHub Release with rollback before finalization; reusable gates consume `inputs.ref` directly and use separate CI/Security/CodeQL concurrency namespaces so sibling release gates cannot cancel one another; publication binds source authority through the remote peeled annotated tag, creates the draft through the Release REST API and retains its returned ID directly, and does not treat either list-enumeration visibility or Release `target_commitish` as source proof once the tag exists; it intentionally has no manual acceptance checkbox
 - Apache-2.0 licensing
 - self-contained installed distribution layout with bundled Node.js, production-only deployed Agent dependencies, compiled Web/PWA assets and an immutable `release-manifest.json`; installed runtime discovery does not depend on repository layout or on preserving `PALMTTY_INSTALL_ROOT` into Session Workers

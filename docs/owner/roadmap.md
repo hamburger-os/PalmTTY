@@ -1,6 +1,6 @@
 # 当前状态与路线
 
-## 当前阶段：具备 Agent 重启持久化的 Alpha
+## 当前阶段：0.2.x Alpha，具备 Agent 重启持久化与可安装发行链
 
 仓库基础已经包含：
 
@@ -68,6 +68,14 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 - Draft Release 资产逐项上传/大小校验后再 promotion。
 
 代码签名凭据仍属于发布运营配置，不应硬编码进仓库；当前流水线已经把 installer 生成与后续 signing boundary 分开，后续可在拥有签名身份时接入 Authenticode，而不需要重构 runtime/package 边界。
+
+## 0.2.0 发布基线
+
+- 根 `package.json` 是唯一版本源，当前目标版本为 `0.2.0`；私有 workspace package 继续不重复维护 version；
+- `CHANGELOG.md` 已把本阶段用户可见变化收敛到 `0.2.0`，发布时 `[Unreleased]` 保持为空；
+- `0.1.0` 的旧网络暴露字段升级到 `0.2.0` 时必须显式改写为 `local` / `lan` / `reverseProxy` / `https` profile，不提供兼容迁移层；
+- 0.2.0 发布继续只由 guarded Release Action 执行：锁定 `main` SHA，重新跑质量/安全/许可证/CodeQL/原生发行包 smoke 后再创建 Tag 和 Release；
+- 当前手机实测已经提供正向可用性证据，但未实际验证的平台、浏览器、WSL/Linux 长期路径仍保持为已知验证缺口，不为了发布而虚假关闭。
 
 ## 下一阶段优先级
 

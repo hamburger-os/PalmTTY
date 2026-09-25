@@ -6,9 +6,9 @@ PalmTTY 会提供交互式 Shell。任何安全问题都应按“可能获得开
 
 ## Supported versions / 支持范围
 
-PalmTTY is currently pre-release alpha software and has no tagged release yet. During this phase, security fixes are made against the latest `main` branch unless a release note explicitly says otherwise.
+PalmTTY is alpha software with tagged releases. Security fixes target the latest tagged release and the latest `main` branch; older `0.x` releases are not maintained as separate security branches unless a release note explicitly says otherwise.
 
-当前尚未发布正式 Tag；Alpha 阶段默认只维护最新 `main`。
+PalmTTY 当前为已有 Tag 的 Alpha 软件。安全修复面向最新已发布版本与最新 `main`；除非 Release Notes 明确说明，否则不会为旧的 `0.x` 版本单独维护安全分支。
 
 ## Reporting a vulnerability / 报告漏洞
 
