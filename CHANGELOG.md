@@ -6,6 +6,10 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+<!-- Add changes here after the latest release. Publishing requires this section to be empty. -->
+
+## [0.2.0]
+
 ### Added
 
 - Add mobile-first Git history browsing with a first-class Changes/History switch, snapshot-stable cursor pagination, file-scoped history, commit metadata/changed-file inspection and per-commit file diff, plus a direct Files → History path.
@@ -22,6 +26,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - Govern the browser/Worker xterm family through exact pins in `terminal-stack.json` plus `pnpm terminal:check`. Browser xterm/fit move to the exact 6.1 beta pair containing the upstream touch-scroll fix, while Worker headless/serialize remain on the exact stable 6.0/0.14 pair pending separate recovery qualification.
 - Replace Windows Task Scheduler's long-lived PowerShell supervisor with a console-free native GUI-subsystem host compiled during install into the current user's Local AppData. The host supervises only the Agent through a kill-on-close/silent-breakaway Job Object, creates Node with `CREATE_NO_WINDOW`, and propagates Agent exit status while independent Session Workers retain their separate lifetime.
 - Replace the low-level `server.host`, `trustedOrigins`, `secureCookies`, and `unsafeAllowInsecureLan` configuration with the exposure-profile model. Removed fields are rejected rather than silently migrated.
+- **Upgrade note:** moving from `0.1.0` to `0.2.0` requires replacing those legacy exposure fields with one explicit `local`, `lan`, `reverseProxy`, or `https` profile. PalmTTY intentionally provides no compatibility migration; review the current examples before restarting the Agent.
 
 ### Fixed
 
@@ -31,8 +36,6 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - Fix mobile/workbench interaction ownership after iPhone and desktop validation: a tap/click-only xterm focus bridge plus explicit keyboard control activates the mobile soft keyboard without taking over swipe scrolling; xterm viewport remainder uses the theme terminal background instead of exposing a black strip; and the Git sidebar becomes the single vertical scroll owner so wheel/trackpad/touch input over change rows scrolls normally. Document QNAP reverse-proxy rules as requiring HTTP + WebSocket upstream forwarding.
 - Refine one-finger mobile terminal scrollback after iPhone validation: remove PalmTTY's row-quantized touch shim so xterm's own continuous Gesture/Viewport path provides release inertia and mode-aware touch semantics, while `.xterm-screen` still suppresses browser page panning. Split the decorative terminal frame from a padding-free xterm mount so FitAddon no longer counts frame padding as usable terminal height and the final rendered row is not clipped; active terminals also refit on VisualViewport resize without sending redundant geometry.
 - Keep Windows scheduled-task status locale-independent by querying structured UTF-8 data instead of forwarding localized `schtasks /FO LIST /V` text, and make normal build/start/autostart documentation explicit that port `5173` belongs only to Vite development.
-
-<!-- Add changes here after the latest release. Publishing requires this section to be empty. -->
 
 ## [0.1.0]
 
