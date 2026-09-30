@@ -16,9 +16,9 @@ export const RemoteAppProfileSchema = z.object({
   name: z.string().trim().min(1).max(100),
   executable: z.string().trim().min(1).max(4096),
   args: z.array(z.string().max(4096)).max(32).default([]),
-  frameRate: z.number().int().min(5).max(30).default(15),
-  maxWidth: z.number().int().min(320).max(2560).default(1600),
-  maxHeight: z.number().int().min(240).max(1600).default(1200)
+  frameRate: z.number().int().min(5).max(15).default(12),
+  maxWidth: z.number().int().min(320).max(1600).default(1280),
+  maxHeight: z.number().int().min(240).max(1000).default(800)
 }).strict();
 export type RemoteAppProfile = z.infer<typeof RemoteAppProfileSchema>;
 
