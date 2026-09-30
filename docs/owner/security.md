@@ -87,6 +87,22 @@ Agent 的 `--env-file` 只允许从本地文件载入严格 `NAME=value`，不�
 
 systemd unit 使用 `KillMode=process` 是为了保持既有“Agent lifetime != Worker lifetime”不变量；停止/restart Agent 不应因为 service manager 的默认进程组清理而杀掉 detached Worker。该行为不表示 OS reboot 后 Worker 可存活。
 
+## Remote Apps 安全边界
+
+Remote Apps 的风险等级与 Shell 一样按“当前 OS 用户可执行能力”处理，但它不是浏览器任意桌面控制权限。
+
+- App 创建只接受持久 Workspace 中已保存的 Profile ID，不接受临时 executable/argv/env/PID/HWND；
+- AppWorker 与 Terminal Worker 使用不同的 secret、protocol generation 和 runtime 目录；
+- Windows helper 只捕获/控制自己启动的根进程树拥有的可见顶层窗口；每次输入前重新校验 ownership；
+- 捕获失败不会降级成 monitor/desktop capture；
+- helper 使用普通用户 token，PalmTTY 不提升完整性级别，也不绕过 SendInput/UIPI 对 elevated App 的限制；
+- Meta/Win 与 Alt+Tab 等系统切换键不在当前输入能力内；
+- WebRTC SDP、DataChannel 消息、帧尺寸/字节、Profile 数量和 App Session 数量都必须有硬上限；
+- video/data media peer 在 AppWorker 中处理，Agent 只做认证后的 signaling；当前不配置 TURN/cloud relay；
+- clipboard、audio、camera、microphone、drag/drop 等额外敏感通道当前不存在，未来新增必须单独设计 authority、数据保留和日志策略；
+- AppWorker/控制管道丢失时，native helper 必须终止其 Job Object，不能留下失去 PalmTTY recovery authority 的孤儿应用进程树；
+- 默认日志不得记录视频帧、Unicode 文本输入、DataChannel payload、AppWorker secret 或 Workspace environment。
+
 ## 仍需加强
 
 当前仍是 Alpha 安全模型，后续可以增加 Passkey/WebAuthn、按设备管理和吊销登录、更完整但不记录终端内容的审计事件，以及 Windows Worker runtime 文件 ACL 的专项实机审计。
