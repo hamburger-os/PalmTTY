@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  isActiveAppSessionState,
   isActiveSessionState,
+  isTerminalAppSessionState,
   isTerminalSessionState,
+  type AppSessionPublic,
   type CreateWorkspaceInput,
+  type RemoteAppCapabilities,
   type RuntimeCapabilities,
   type SessionPublic,
   type WorkspacePublic
@@ -10,16 +14,21 @@ import {
 import {
   ApiError,
   authStatus,
+  createAppSession,
   createSession,
   createWorkspace,
+  deleteAppSession,
   deleteSession,
   deleteWorkspace,
+  listAppSessions,
   listSessions,
   listWorkspaces,
   login,
   logout,
+  remoteAppCapabilities,
   restartSession,
   runtimeCapabilities,
+  terminateAppSession,
   terminateSession,
   updateWorkspace
 } from "./api.js";
@@ -27,7 +36,7 @@ import { AppearanceControls } from "./AppearanceControls.js";
 import { Brand } from "./Brand.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { useI18n } from "./i18n.js";
-import { SessionWorkbench } from "./SessionWorkbench.js";
+import { WorkspaceWorkbench } from "./WorkspaceWorkbench.js";
 import {
   WorkspaceDialog,
   workspaceRuntimeSummary
@@ -38,6 +47,11 @@ type WorkspaceEditor = WorkspacePublic | "new" | null;
 type SessionAction =
   | { kind: "terminate"; session: SessionPublic }
   | { kind: "clear"; session: SessionPublic }
+  | null;
+
+type AppSessionAction =
+  | { kind: "terminate"; session: AppSessionPublic }
+  | { kind: "clear"; session: AppSessionPublic }
   | null;
 
 function formatError(
@@ -57,14 +71,19 @@ export function App() {
   const { t, error: translateError, connections } = useI18n();
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null);
+  const [appCapabilities, setAppCapabilities] = useState<RemoteAppCapabilities | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspacePublic[]>([]);
   const [sessions, setSessions] = useState<SessionPublic[]>([]);
+  const [appSessions, setAppSessions] = useState<AppSessionPublic[]>([]);
   const [activeSession, setActiveSession] = useState<SessionPublic | null>(null);
+  const [activeAppSession, setActiveAppSession] = useState<AppSessionPublic | null>(null);
   const [workspaceEditor, setWorkspaceEditor] = useState<WorkspaceEditor>(null);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
   const [sessionAction, setSessionAction] = useState<SessionAction>(null);
+  const [appSessionBusyId, setAppSessionBusyId] = useState<string | null>(null);
+  const [appSessionAction, setAppSessionAction] = useState<AppSessionAction>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshCatalog = useCallback(async () => {
