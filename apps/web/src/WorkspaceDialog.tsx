@@ -648,9 +648,9 @@ export function WorkspaceDialog({
                           name: "",
                           executable: "",
                           args: [],
-                          frameRate: 15,
-                          maxWidth: 1600,
-                          maxHeight: 1200
+                          frameRate: 12,
+                          maxWidth: 1280,
+                          maxHeight: 800
                         }
                       ]);
                     }}
@@ -748,7 +748,7 @@ export function WorkspaceDialog({
                                 className="glass-input"
                                 type="number"
                                 min={5}
-                                max={30}
+                                max={15}
                                 value={profile.frameRate}
                                 onChange={(event) => setRemoteApps((current) =>
                                   current.map((candidate, candidateIndex) =>
@@ -757,7 +757,7 @@ export function WorkspaceDialog({
                                           ...candidate,
                                           frameRate: Math.max(
                                             5,
-                                            Math.min(30, Number(event.target.value) || 15)
+                                            Math.min(30, Number(event.target.value) || 12)
                                           )
                                         }
                                       : candidate
@@ -771,7 +771,7 @@ export function WorkspaceDialog({
                                 className="glass-input"
                                 type="number"
                                 min={320}
-                                max={2560}
+                                max={1000}
                                 value={profile.maxWidth}
                                 onChange={(event) => setRemoteApps((current) =>
                                   current.map((candidate, candidateIndex) =>
@@ -780,7 +780,7 @@ export function WorkspaceDialog({
                                           ...candidate,
                                           maxWidth: Math.max(
                                             320,
-                                            Math.min(2560, Number(event.target.value) || 1600)
+                                            Math.min(2560, Number(event.target.value) || 1280)
                                           )
                                         }
                                       : candidate
@@ -794,7 +794,7 @@ export function WorkspaceDialog({
                                 className="glass-input"
                                 type="number"
                                 min={240}
-                                max={1600}
+                                max={1000}
                                 value={profile.maxHeight}
                                 onChange={(event) => setRemoteApps((current) =>
                                   current.map((candidate, candidateIndex) =>
@@ -803,7 +803,7 @@ export function WorkspaceDialog({
                                           ...candidate,
                                           maxHeight: Math.max(
                                             240,
-                                            Math.min(1600, Number(event.target.value) || 1200)
+                                            Math.min(1600, Number(event.target.value) || 800)
                                           )
                                         }
                                       : candidate
