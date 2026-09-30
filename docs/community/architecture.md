@@ -106,3 +106,24 @@ Workspace 现在是 Agent 持有的独立持久化状态，通过“认证 + 精
 浏览器端交互也保持单一所有权：终端滚动物理由 xterm 独占，PalmTTY 只用普通 click/tap focus bridge（以及手机 keybar 的显式键盘按钮）激活 xterm 隐藏 textarea；coarse-pointer/mobile 布局中的可编辑控件统一至少 16px，避免 iOS 聚焦放大。SessionWorkbench 在所有缩放级别都负责当前 VisualViewport 的展示几何，浏览器栏、双指缩放和软键盘先调整整个工作台，再由 terminal mount 的 ResizeObserver/FitAddon 推导终端尺寸；TerminalView 不再直接监听 VisualViewport，`visualViewport.scale` 不会关闭 framing，PalmTTY 也不会写入用户缩放；`?viewportDebug=1` 只输出几何/focus 诊断，不包含终端内容。Git 左侧 sidebar 是“更改 / 历史”与 Git tools 的唯一纵向滚动容器，内部 change/history list 只是内容，不再成为嵌套 scroll owner；Files 可以把当前文件直接带入文件级 Git history，而不改变 Workspace/Session authority。 手机终端快捷键栏只是浏览器侧通用输入适配层，不感知具体 AI CLI：共享纯函数编码器负责 Enter、导航键、Ctrl/Alt 组合和固定控制字符，UI 使用核心横向按键行加可选第二行；Codex、Claude Code、Antigravity 等都消费同一套普通终端输入。
 
 PTY 输出、headless mirror、seq 与 replay 都在 Worker 内按同一有序流水线更新，因此 Agent 不在线期间状态仍连续。浏览器恢复时把已 fit 的 rows/cols 与 lastSeq 一起提交；Worker 先把 canonical PTY/headless mirror 调整到该 geometry，尺寸未变且历史仍可用时才 replay，尺寸变化或历史过旧时使用新 geometry 下的 snapshot。恢复帧之后的 `hello` 表示恢复完成，恢复边界与实时订阅之间不留消息窗口。
+
+### Remote App activity / 远程 App Activity
+
+Remote Apps form a second, terminal-independent activity data plane:
+
+~~~text
+Mobile browser / PWA
+  | Workspace tools: Git / Files
+  | Activities:
+  |   Terminal -> WSS -> Terminal Worker -> PTY
+  |   Remote App -> WebRTC -> AppWorker -> Windows app host -> owned app window
+        |
+   authenticated lifecycle/signaling
+        |
+   PalmTTY Agent
+~~~
+
+The Agent remains the authentication/authority/control plane. A Remote App browser request selects only a persisted Workspace profile. Media/input never travels through the terminal WebSocket, and AppWorker recovery is versioned separately from terminal recovery.
+
+Remote Apps 当前形成第二条与终端独立的数据面：Terminal 继续由 PTY/xterm Worker 持有；Remote App 由独立 AppWorker + Windows native host + WebRTC 持有。Agent 只负责认证、持久 Workspace Profile authority、生命周期和 signaling。浏览器不能临时指定 executable/PID/HWND，Remote App 媒体/输入也不会进入 terminal WebSocket。
+
