@@ -52,9 +52,9 @@ describe("protocol", () => {
     expect(workspace.remoteApps[0]).toMatchObject({
       id: "codex-desktop",
       args: [],
-      frameRate: 15,
-      maxWidth: 1600,
-      maxHeight: 1200
+      frameRate: 12,
+      maxWidth: 1280,
+      maxHeight: 800
     });
     expect(() => WorkspaceDefinitionSchema.parse({
       id: "duplicates",
