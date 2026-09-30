@@ -547,6 +547,70 @@ export function App() {
         </div>
       </section>
 
+      <section>
+        <div className="section-heading">
+          <h2>{t("remoteApps.sessionsTitle")}</h2>
+          <button
+            className="ghost compact"
+            onClick={() => void refreshCatalog()}
+          >
+            {t("sessions.refresh")}
+          </button>
+        </div>
+        <div className="session-list">
+          {appSessions.length === 0 && (
+            <div className="empty session-empty glass-content">
+              {t("remoteApps.sessionsEmpty")}
+            </div>
+          )}
+          {appSessions.map((session) => {
+            const active = isActiveAppSessionState(session.state);
+            const busy = appSessionBusyId === session.id;
+            const workspaceName = workspaces.find(
+              (workspace) => workspace.id === session.workspaceId
+            )?.name ?? session.workspaceId;
+            return (
+              <div className="session-row glass-card" key={session.id}>
+                <button
+                  className="session-main"
+                  disabled={!active}
+                  onClick={() => {
+                    if (active) setActiveAppSession(session);
+                  }}
+                >
+                  <span className={`status-dot ${session.state}`} />
+                  <span>
+                    <strong>{workspaceName} · {session.profileName}</strong>
+                    <small>{appSessionDetail(session)}</small>
+                  </span>
+                </button>
+                {active ? (
+                  <button
+                    type="button"
+                    className="session-action danger-outline compact"
+                    disabled={appSessionBusyId !== null || session.state === "stopping"}
+                    onClick={() => setAppSessionAction({ kind: "terminate", session })}
+                  >
+                    {busy || session.state === "stopping"
+                      ? t("sessions.terminating")
+                      : t("sessions.terminate")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="session-action danger-outline compact"
+                    disabled={appSessionBusyId !== null}
+                    onClick={() => setAppSessionAction({ kind: "clear", session })}
+                  >
+                    {busy ? t("sessions.clearing") : t("sessions.clear")}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       {workspaceEditor && (
         <WorkspaceDialog
           capabilities={capabilities}
@@ -557,6 +621,32 @@ export function App() {
           error={workspaceError}
           onClose={closeWorkspaceEditor}
           onSave={saveWorkspace}
+        />
+      )}
+
+      {appSessionAction && (
+        <ConfirmDialog
+          title={appSessionAction.kind === "terminate"
+            ? t("remoteApps.terminateTitle")
+            : t("remoteApps.clearTitle")}
+          message={appSessionAction.kind === "terminate"
+            ? t("remoteApps.terminateConfirm")
+            : t("remoteApps.clearConfirm")}
+          confirmLabel={appSessionAction.kind === "terminate"
+            ? t("sessions.terminate")
+            : t("sessions.clear")}
+          danger
+          busy={appSessionBusyId === appSessionAction.session.id}
+          onCancel={() => setAppSessionAction(null)}
+          onConfirm={() => {
+            const action = appSessionAction;
+            setAppSessionAction(null);
+            if (action.kind === "terminate") {
+              void stopAppSession(action.session);
+            } else {
+              void clearAppSession(action.session);
+            }
+          }}
         />
       )}
 
