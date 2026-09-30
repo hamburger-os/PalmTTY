@@ -16,7 +16,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Changed
 
-- Bound first-generation Remote App capture to 5–15 fps and 320×240–1600×1000 (1280×800 @ 12 fps default) to keep the raw native capture pipe explicitly resource-bounded.
+- Bound first-generation Remote App capture to 5–15 fps and 320×240–1600×1000 (1280×800 @ 12 fps default), with an additional 4096×4096 / 12 MP source-window allocation ceiling to keep the raw native capture pipe explicitly resource-bounded.
 - Windows packages now include a precompiled GUI-subsystem Remote App host; source mode compiles the same helper into the private per-user App runtime on first use.
 
 ## [0.2.0]
