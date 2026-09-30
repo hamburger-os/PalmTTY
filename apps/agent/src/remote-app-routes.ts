@@ -40,6 +40,18 @@ export function registerRemoteAppRoutes(
     async () => ({ sessions: options.manager.list() })
   );
 
+  app.get<{ Params: { id: string } }>(
+    "/api/v1/app-sessions/:id",
+    { preHandler: options.requireAuth },
+    async (request, reply) => {
+      const session = options.manager.get(request.params.id);
+      if (!session) {
+        return reply.code(404).send({ error: "app_session_not_found" });
+      }
+      return { session };
+    }
+  );
+
   app.post(
     "/api/v1/app-sessions",
     { preHandler: [options.requireOrigin, options.requireAuth] },
