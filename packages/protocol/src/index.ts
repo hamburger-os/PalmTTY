@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { RemoteAppProfileSchema } from "./remote-app.js";
+import { RemoteAppProfilesSchema } from "./remote-app.js";
 
 export const PROTOCOL_VERSION = 3 as const;
 export const WS_SUBPROTOCOL = "palmtty.v3";
@@ -89,7 +89,7 @@ export const WorkspaceDefinitionSchema = z.object({
   runtime: WorkspaceRuntimeSchema,
   environment: WorkspaceEnvironmentSchema.optional(),
   startupCommand: z.string().max(8192).optional(),
-  remoteApps: z.array(RemoteAppProfileSchema).max(16).default([])
+  remoteApps: RemoteAppProfilesSchema.default([])
 }).strict();
 export type WorkspaceDefinition = z.infer<typeof WorkspaceDefinitionSchema>;
 
