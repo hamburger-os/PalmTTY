@@ -71,6 +71,12 @@ const SessionConfigSchema = z.object({
   maxSocketBufferedBytes: z.number().int().min(65536).max(64 * 1024 * 1024).default(2 * 1024 * 1024)
 }).strict();
 
+const RemoteAppsConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  maxSessions: z.number().int().min(1).max(16).default(4),
+  exitedRetentionMinutes: z.number().int().min(1).max(1440).default(30)
+}).strict();
+
 export const PalmTTYConfigSchema = z.object({
   server: ServerConfigSchema.default({
     port: 7688,
@@ -88,6 +94,11 @@ export const PalmTTYConfigSchema = z.object({
     scrollbackLines: 10000,
     replayBytes: 2 * 1024 * 1024,
     maxSocketBufferedBytes: 2 * 1024 * 1024
+  }),
+  remoteApps: RemoteAppsConfigSchema.default({
+    enabled: true,
+    maxSessions: 4,
+    exitedRetentionMinutes: 30
   })
 }).strict();
 
