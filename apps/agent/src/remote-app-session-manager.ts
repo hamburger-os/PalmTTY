@@ -322,8 +322,16 @@ export class RemoteAppSessionManager {
   private async reconnect(managed: ManagedRemoteApp): Promise<void> {
     if (managed.reconnecting || this.closing) return;
     managed.reconnecting = true;
+    let attempt = 0;
     try {
-      for (const delay of RECONNECT_DELAYS_MS) {
+      while (
+        !this.closing &&
+        this.sessions.get(managed.record.sessionId) === managed
+      ) {
+        const delay = RECONNECT_DELAYS_MS[
+          Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)
+        ] ?? 5000;
+        attempt += 1;
         if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
         try {
           const worker = await RemoteAppWorkerClient.connect({
@@ -351,6 +359,9 @@ export class RemoteAppSessionManager {
             await removeRemoteAppWorkerState(this.runtimeDir, managed.record);
             return;
           }
+          // A live or unverifiable AppWorker retains recovery authority.
+          // Keep retrying rather than converting a local IPC outage into
+          // Remote App Session loss.
         }
       }
     } finally {
