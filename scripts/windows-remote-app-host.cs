@@ -287,6 +287,9 @@ internal static class PalmTTYRemoteAppHost
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool AssignProcessToJobObject(IntPtr hJob, IntPtr hProcess);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateJobObject(IntPtr hJob, uint uExitCode);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool CreateProcess(
         string lpApplicationName,
@@ -388,6 +391,7 @@ internal static class PalmTTYRemoteAppHost
 
     private static readonly object TargetLock = new object();
     private static readonly object OutputLock = new object();
+    private static IntPtr JobHandle = IntPtr.Zero;
     private static IntPtr TargetWindow = IntPtr.Zero;
     private static RECT TargetRect;
     private static uint RootPid;
@@ -419,6 +423,7 @@ internal static class PalmTTYRemoteAppHost
             ValidateConfig(config);
 
             job = CreateConfiguredJob();
+            JobHandle = job;
             process = StartApplicationSuspended(config);
             RootPid = process.dwProcessId;
             if (!AssignProcessToJobObject(job, process.hProcess))
@@ -472,6 +477,7 @@ internal static class PalmTTYRemoteAppHost
             if (process.hThread != IntPtr.Zero) CloseHandle(process.hThread);
             if (process.hProcess != IntPtr.Zero) CloseHandle(process.hProcess);
             if (job != IntPtr.Zero) CloseHandle(job);
+            JobHandle = IntPtr.Zero;
             if (Output != null) Output.Dispose();
             if (ErrorOutput != null) ErrorOutput.Dispose();
         }
@@ -638,6 +644,11 @@ internal static class PalmTTYRemoteAppHost
         }
         catch { }
         Stopping = true;
+        IntPtr job = JobHandle;
+        if (job != IntPtr.Zero)
+        {
+            TerminateJobObject(job, 0);
+        }
     }
 
     private static void CaptureLoop(AppConfig config, IntPtr processHandle)
