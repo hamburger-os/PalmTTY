@@ -9,6 +9,7 @@ This layer is for contributors who want to build, review, deploy, or extend Palm
 - [security.md](security.md) — security model and contributor requirements
 - [development.md](development.md) — repository workflow and testing expectations
 - [autostart.md](autostart.md) — Windows/Linux current-user autostart and service lifecycle
+- [remote-apps.md](remote-apps.md) — Windows Remote Apps architecture, security boundaries and mobile controls
 
 For external technical sources, use [../standards/README.md](../standards/README.md).
 
@@ -21,5 +22,6 @@ For external technical sources, use [../standards/README.md](../standards/README
 - [security.md](security.md) — 安全模型与贡献要求
 - [development.md](development.md) — 仓库工作流与测试要求
 - [autostart.md](autostart.md) — Windows/Linux 当前用户自启动与服务生命周期
+- [remote-apps.md](remote-apps.md) — Windows Remote Apps 架构、安全边界与手机操作
 
 外部权威技术依据请查看 [../standards/README.md](../standards/README.md)。
