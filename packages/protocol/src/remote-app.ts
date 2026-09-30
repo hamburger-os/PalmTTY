@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const REMOTE_APP_PROTOCOL_VERSION = 1 as const;
 export const REMOTE_APP_DATA_MAX_BYTES = 32 * 1024;
-export const REMOTE_APP_MAX_SDP_BYTES = 256 * 1024;
+export const REMOTE_APP_MAX_SDP_BYTES = 64 * 1024;
 
 const encoder = new TextEncoder();
 
@@ -76,7 +76,7 @@ export type CreateAppSessionInput = z.infer<typeof CreateAppSessionSchema>;
 
 const SdpSchema = z.string().min(1).superRefine((value, ctx) => {
   if (encoder.encode(value).byteLength > REMOTE_APP_MAX_SDP_BYTES) {
-    ctx.addIssue({ code: "custom", message: "WebRTC SDP exceeds 256 KiB" });
+    ctx.addIssue({ code: "custom", message: "WebRTC SDP exceeds 64 KiB" });
   }
 });
 
