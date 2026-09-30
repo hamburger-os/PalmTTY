@@ -14,7 +14,7 @@ const DetachSchema = z.object({
 type Guard = (
   request: FastifyRequest,
   reply: FastifyReply
-) => Promise<unknown> | unknown;
+) => Promise<unknown>;
 
 export function registerRemoteAppRoutes(
   app: FastifyInstance,
