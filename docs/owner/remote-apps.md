@@ -9,7 +9,7 @@ Remote Apps 是 PalmTTY 的第二类交互 Activity，用于从手机远程操�
 - 每个 App Session 一个独立 AppWorker；
 - AppWorker 与 Terminal Worker 使用不同的 IPC protocol generation 和 runtime 目录；
 - 浏览器只按持久化 Workspace 中的 Remote App Profile ID 启动，不能在创建请求里临时提交 executable、argv、PID 或 HWND；
-- 原生 helper 只选择自己启动的PalmTTY Job Object 成员进程拥有的可见顶层窗口；
+- 原生 helper 只选择自己创建的 PalmTTY Job Object 中成员进程拥有的可见顶层窗口；
 - 画面通过 WebRTC video track 直接传给浏览器，受限输入通过 WebRTC DataChannel 回到 AppWorker；
 - Agent 仍只负责认证、Origin、Workspace authority、Session registry 和 signaling。
 
@@ -66,7 +66,7 @@ App Session 采用和终端相似但独立的 durability 原则：
 
 当前 Windows native host 还把源窗口限制为最大 4096×4096 且不超过 12 MP，避免在缩放前为异常大窗口分配无界 Bitmap；AppWorker 帧缓冲固定上限 8 MiB，控制通道和 helper stdin backpressure 也有独立上限。
 
-当前 Windows native host 使用 PrintWindow(PW_RENDERFULLCONTENT) 捕获**已验证属于 PalmTTY 启动进程树的单个窗口**，并按 Profile 尺寸上限缩放后送入 AppWorker 的 WebRTC video source。
+当前 Windows native host 使用 PrintWindow(PW_RENDERFULLCONTENT) 捕获**已验证属于 PalmTTY-owned Job Object 的单个窗口**，并按 Profile 尺寸上限缩放后送入 AppWorker 的 WebRTC video source。
 
 有意不提供：
 
@@ -80,7 +80,7 @@ App Session 采用和终端相似但独立的 durability 原则：
 
 ## 输入边界
 
-DataChannel 只接受 typed、大小有界的 absolute pointer、relative pointer、wheel、allowlisted keyboard key 和 Unicode text。原生 host 在每次注入前再次验证目标窗口仍属于当前 App 的进程树，并尝试把它带到前台。Meta/Win 键和 Alt+Tab 被拒绝。PalmTTY 不绕过 Windows UIPI；因此低完整性 PalmTTY 无法向 elevated App 注入输入，这是安全边界，不是需要规避的错误。
+DataChannel 只接受 typed、大小有界的 absolute pointer、relative pointer、wheel、allowlisted keyboard key 和 Unicode text。原生 host 在每次注入前再次验证目标窗口 PID 仍属于当前 PalmTTY-owned Job Object，并尝试把它带到前台。Meta/Win 键和 Alt+Tab 被拒绝。PalmTTY 不绕过 Windows UIPI；因此低完整性 PalmTTY 无法向 elevated App 注入输入，这是安全边界，不是需要规避的错误。
 
 当前没有 clipboard、文件拖放、音频、摄像头、麦克风或系统级任意快捷键通道。
 
@@ -112,7 +112,7 @@ WorkspaceWorkbench 现在区分 Activity 和 Workspace Tool：Terminal / Remote 
 
 1. 是否把 Remote App 能力塞回 Terminal Worker / terminal WebSocket；
 2. 是否允许浏览器临时指定 executable、PID、HWND 或任意 input payload；
-3. capture target 是否仍能证明属于 AppWorker 启动的进程树；
+3. capture target 是否仍能证明属于 AppWorker 持有的 PalmTTY-owned Job Object；
 4. 是否出现整桌面 fallback；
 5. 是否试图绕过 UIPI/UAC；
 6. AppWorker secret 是否泄漏到浏览器、argv、URL、App 环境或日志；
