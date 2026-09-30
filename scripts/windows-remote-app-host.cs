@@ -598,7 +598,7 @@ internal static class PalmTTYRemoteAppHost
 
     private static string QuoteArgument(string value)
     {
-        if (value.Length == 0) return "\\\"\\\"";
+        if (value.Length == 0) return "\"\"";
         bool needsQuotes = false;
         foreach (char character in value)
         {
