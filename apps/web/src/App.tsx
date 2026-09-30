@@ -256,6 +256,36 @@ export function App() {
     }
   };
 
+  const stopAppSession = async (session: AppSessionPublic) => {
+    if (!isActiveAppSessionState(session.state) || session.state === "stopping") return;
+
+    setAppSessionBusyId(session.id);
+    setError(null);
+    try {
+      await terminateAppSession(session.id);
+      await refreshCatalog();
+    } catch (cause) {
+      setError(formatError(cause, "app_session_action_failed", translateError));
+    } finally {
+      setAppSessionBusyId(null);
+    }
+  };
+
+  const clearAppSession = async (session: AppSessionPublic) => {
+    if (!isTerminalAppSessionState(session.state)) return;
+
+    setAppSessionBusyId(session.id);
+    setError(null);
+    try {
+      await deleteAppSession(session.id);
+      setAppSessions((current) => current.filter((item) => item.id !== session.id));
+    } catch (cause) {
+      setError(formatError(cause, "app_session_action_failed", translateError));
+    } finally {
+      setAppSessionBusyId(null);
+    }
+  };
+
   const closeWorkspaceEditor = () => {
     if (workspaceBusy) return;
     setWorkspaceEditor(null);
