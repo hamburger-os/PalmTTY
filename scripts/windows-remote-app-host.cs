@@ -799,6 +799,24 @@ internal static class PalmTTYRemoteAppHost
         return exitCode;
     }
 
+    private static bool TryGetWindowBounds(IntPtr hwnd, out RECT bounds)
+    {
+        if (!IsOwnedWindow(hwnd))
+        {
+            bounds = new RECT();
+            return false;
+        }
+        if (DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_EXTENDED_FRAME_BOUNDS,
+            out bounds,
+            Marshal.SizeOf(typeof(RECT))) != 0)
+        {
+            if (!GetWindowRect(hwnd, out bounds)) return false;
+        }
+        return bounds.Width >= 1 && bounds.Height >= 1;
+    }
+
     private static void CaptureWindow(IntPtr hwnd, RECT rect, int maxWidth, int maxHeight)
     {
         int sourceWidth = rect.Width;
@@ -924,43 +942,45 @@ internal static class PalmTTYRemoteAppHost
 
         if (message.Type == "pointer")
         {
-            if (!ActivateWindow(hwnd)) return;
+            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect)) return;
             int x = rect.Left + (int)Math.Round(Clamp01(message.X) * Math.Max(1, rect.Width - 1));
             int y = rect.Top + (int)Math.Round(Clamp01(message.Y) * Math.Max(1, rect.Height - 1));
             MoveAbsolute(x, y);
+            if (GetForegroundWindow() != hwnd) return;
             ApplyPointerAction(message.Action, message.Button);
             return;
         }
 
         if (message.Type == "pointerRelative")
         {
-            if (!ActivateWindow(hwnd)) return;
+            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect)) return;
             POINT point;
             if (!GetCursorPos(out point)) return;
             int x = Math.Max(rect.Left, Math.Min(rect.Right - 1, point.X + (int)Math.Round(message.Dx * rect.Width)));
             int y = Math.Max(rect.Top, Math.Min(rect.Bottom - 1, point.Y + (int)Math.Round(message.Dy * rect.Height)));
             MoveAbsolute(x, y);
+            if (GetForegroundWindow() != hwnd) return;
             ApplyPointerAction(message.Action, message.Button);
             return;
         }
 
         if (message.Type == "wheel")
         {
-            if (!ActivateWindow(hwnd)) return;
+            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd) return;
             SendWheel(message.DeltaX, message.DeltaY);
             return;
         }
 
         if (message.Type == "text")
         {
-            if (!ActivateWindow(hwnd)) return;
+            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd) return;
             SendUnicodeText(message.Text);
             return;
         }
 
         if (message.Type == "key")
         {
-            if (!ActivateWindow(hwnd)) return;
+            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd) return;
             SendRestrictedKey(message);
         }
     }
@@ -1085,7 +1105,15 @@ internal static class PalmTTYRemoteAppHost
     {
         if (message.Meta) return;
         string key = message.Key ?? "";
-        if (message.Alt && String.Equals(key, "Tab", StringComparison.OrdinalIgnoreCase)) return;
+        if (
+            (message.Alt && (
+                String.Equals(key, "Tab", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(key, "Escape", StringComparison.OrdinalIgnoreCase))) ||
+            (message.Ctrl && String.Equals(key, "Escape", StringComparison.OrdinalIgnoreCase)) ||
+            (message.Ctrl && message.Alt))
+        {
+            return;
+        }
 
         ushort vk;
         if (!TryMapVirtualKey(key, out vk)) return;
