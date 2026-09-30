@@ -22,6 +22,22 @@ export const RemoteAppProfileSchema = z.object({
 }).strict();
 export type RemoteAppProfile = z.infer<typeof RemoteAppProfileSchema>;
 
+export const RemoteAppProfilesSchema = z.array(RemoteAppProfileSchema)
+  .max(16)
+  .superRefine((profiles, ctx) => {
+    const ids = new Set<string>();
+    for (const [index, profile] of profiles.entries()) {
+      if (ids.has(profile.id)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [index, "id"],
+          message: "Remote App profile ids must be unique"
+        });
+      }
+      ids.add(profile.id);
+    }
+  });
+
 export const AppSessionStateSchema = z.enum([
   "starting",
   "running",
