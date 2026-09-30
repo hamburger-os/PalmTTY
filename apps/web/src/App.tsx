@@ -226,6 +226,17 @@ export function App() {
     return `${stateLabel(session.state)} · ${connections(session.connections)}`;
   };
 
+  const appSessionDetail = (session: AppSessionPublic) => {
+    if (isTerminalAppSessionState(session.state)) {
+      return session.exitCode === undefined
+        ? stateLabel(session.state)
+        : `${stateLabel(session.state)} · ${t("sessions.exitCode", {
+            code: session.exitCode
+          })}`;
+    }
+    return `${stateLabel(session.state)} · ${connections(session.connections)}`;
+  };
+
   const stopSession = async (session: SessionPublic) => {
     if (!isActiveSessionState(session.state) || session.state === "stopping") return;
 
@@ -343,8 +354,10 @@ export function App() {
                 await logout();
                 setAuth({ enabled: true, authenticated: false });
                 setCapabilities(null);
+                setAppCapabilities(null);
                 setWorkspaces([]);
                 setSessions([]);
+                setAppSessions([]);
               })()}
             >
               {t("auth.signOut")}
@@ -421,6 +434,53 @@ export function App() {
                 >
                   {t("workspaces.newSession")} →
                 </button>
+                {workspace.remoteApps.length > 0 && (
+                  <div className="workspace-remote-apps">
+                    <small className="workspace-remote-apps-label">
+                      {t("workspaces.remoteApps")}
+                    </small>
+                    <div className="workspace-remote-app-buttons">
+                      {workspace.remoteApps.map((profile) => (
+                        <button
+                          type="button"
+                          className="ghost workspace-remote-app-launch"
+                          key={profile.id}
+                          disabled={appCapabilities?.supported !== true}
+                          title={
+                            appCapabilities?.supported === false
+                              ? appCapabilities.reason
+                              : undefined
+                          }
+                          onClick={() => void (async () => {
+                            setError(null);
+                            try {
+                              const result = await createAppSession(
+                                workspace.id,
+                                profile.id
+                              );
+                              setActiveAppSession(result.session);
+                            } catch (cause) {
+                              setError(
+                                formatError(
+                                  cause,
+                                  "app_session_create_failed",
+                                  translateError
+                                )
+                              );
+                            }
+                          })()}
+                        >
+                          {profile.name} →
+                        </button>
+                      ))}
+                    </div>
+                    {appCapabilities?.supported === false && (
+                      <small className="workspace-remote-app-unavailable">
+                        {appCapabilities.reason ?? t("remoteApps.unavailable")}
+                      </small>
+                    )}
+                  </div>
+                )}
               </article>
             ))}
           </div>
