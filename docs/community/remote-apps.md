@@ -25,7 +25,7 @@ A special-key strip provides Ctrl/Alt/Shift and common navigation keys. The text
 
 ### Security model
 
-PalmTTY launches the configured application under the same normal OS user as the Agent. The Windows helper owns the launched process tree in a Job Object and only accepts a visible top-level window owned by that tree as its capture/input target.
+PalmTTY launches the configured application under the same normal OS user as the Agent. The Windows helper places the launched application into its own Job Object and only accepts a visible top-level window whose process is still a member of that Job as its capture/input target.
 
 The current implementation deliberately does **not** provide full-desktop or monitor capture, browser-selected windows/PIDs, UAC/elevated application control, clipboard/audio/microphone/camera/file-drag channels, or arbitrary keyboard/input command execution.
 
@@ -67,7 +67,7 @@ App 画面有三种显式模式：
 
 ### 安全模型
 
-Remote App 与 Agent 使用同一个普通 OS 用户。Windows helper 把 PalmTTY 启动的应用进程树放入自己的 Job Object，并且只把该进程树拥有的可见顶层窗口作为画面和输入目标。
+Remote App 与 Agent 使用同一个普通 OS 用户。Windows helper 把 PalmTTY 启动的应用放入自己持有的 Job Object，并且只把仍属于该 Job 的进程所拥有的可见顶层窗口作为画面和输入目标。
 
 当前明确不提供整桌面/显示器捕获、浏览器选择任意窗口/PID、UAC/elevated 应用控制、clipboard/音频/麦克风/摄像头/文件拖放通道，也不提供任意键盘/输入命令执行。
 
