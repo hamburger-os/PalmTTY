@@ -790,8 +790,10 @@ internal static class PalmTTYRemoteAppHost
             double scale = Math.Min(
                 1.0,
                 Math.Min((double)maxWidth / sourceWidth, (double)maxHeight / sourceHeight));
-            int width = Math.Max(1, (int)Math.Round(sourceWidth * scale));
-            int height = Math.Max(1, (int)Math.Round(sourceHeight * scale));
+            int width = Math.Max(2, (int)Math.Round(sourceWidth * scale));
+            int height = Math.Max(2, (int)Math.Round(sourceHeight * scale));
+            width &= ~1;
+            height &= ~1;
 
             if (width == sourceWidth && height == sourceHeight)
             {
