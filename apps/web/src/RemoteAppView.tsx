@@ -83,7 +83,6 @@ export function RemoteAppView({
   const [textOpen, setTextOpen] = useState(false);
   const [text, setText] = useState("");
   const activePointers = useRef(new Map<number, Point>());
-  const pointerOrigin = useRef<Point | undefined>();
   const pointerMoved = useRef(false);
   const connectionChangeRef = useRef(onConnectionChange);
 
@@ -266,7 +265,6 @@ export function RemoteAppView({
       return;
     }
 
-    pointerOrigin.current = point;
     pointerMoved.current = false;
   };
 
@@ -333,7 +331,6 @@ export function RemoteAppView({
       send({ type: "pointerRelative", dx: 0, dy: 0, action: "down", button: 0 });
       send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
     }
-    pointerOrigin.current = undefined;
   };
 
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
@@ -435,7 +432,7 @@ export function RemoteAppView({
           className={shift ? "selected compact" : "ghost compact"}
           onClick={() => setShift((value) => !value)}
         >Shift</button>
-        {[
+        {([
           ["Escape", "Esc"],
           ["Tab", "Tab"],
           ["Enter", "Enter"],
@@ -445,7 +442,7 @@ export function RemoteAppView({
           ["ArrowRight", "→"],
           ["Backspace", "⌫"],
           ["Delete", "Del"]
-        ].map(([key, label]) => (
+        ] as const).map(([key, label]) => (
           <button
             type="button"
             className="ghost compact"
