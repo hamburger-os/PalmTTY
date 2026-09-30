@@ -16,8 +16,6 @@ using System.Threading;
 internal static class PalmTTYRemoteAppHost
 {
     private const uint CREATE_SUSPENDED = 0x00000004;
-    private const uint INFINITE = 0xFFFFFFFF;
-    private const uint WAIT_OBJECT_0 = 0x00000000;
     private const uint RESUME_FAILED = 0xFFFFFFFF;
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
     private const int JobObjectBasicAccountingInformation = 1;
@@ -304,9 +302,6 @@ internal static class PalmTTYRemoteAppHost
     private static extern uint ResumeThread(IntPtr hThread);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -515,6 +510,12 @@ internal static class PalmTTYRemoteAppHost
             throw new DirectoryNotFoundException("Remote App working directory does not exist: " + config.Cwd);
         }
         if (config.Args == null || config.Args.Length > 32) throw new InvalidDataException("Remote App args are invalid");
+        int argumentCharacters = 0;
+        foreach (string argument in config.Args)
+        {
+            if (argument != null) argumentCharacters = checked(argumentCharacters + argument.Length);
+        }
+        if (argumentCharacters > 24000) throw new InvalidDataException("Remote App argv is too large");
         if (config.FrameRate < 5 || config.FrameRate > 15) throw new InvalidDataException("Remote App frame rate is invalid");
         if (config.MaxWidth < 320 || config.MaxWidth > 1600) throw new InvalidDataException("Remote App maxWidth is invalid");
         if (config.MaxHeight < 240 || config.MaxHeight > 1000) throw new InvalidDataException("Remote App maxHeight is invalid");
@@ -564,6 +565,10 @@ internal static class PalmTTYRemoteAppHost
         {
             commandLine.Append(' ');
             commandLine.Append(QuoteArgument(argument ?? ""));
+        }
+        if (commandLine.Length > 30000)
+        {
+            throw new InvalidDataException("Remote App command line exceeds the Windows process limit");
         }
 
         if (!CreateProcess(
@@ -781,7 +786,15 @@ internal static class PalmTTYRemoteAppHost
     {
         int sourceWidth = rect.Width;
         int sourceHeight = rect.Height;
-        if (sourceWidth <= 0 || sourceHeight <= 0 || sourceWidth > 8192 || sourceHeight > 8192) return;
+        if (
+            sourceWidth <= 0 ||
+            sourceHeight <= 0 ||
+            sourceWidth > 4096 ||
+            sourceHeight > 4096 ||
+            (long)sourceWidth * (long)sourceHeight > 12000000L)
+        {
+            return;
+        }
 
         using (Bitmap source = new Bitmap(sourceWidth, sourceHeight, PixelFormat.Format32bppArgb))
         {
