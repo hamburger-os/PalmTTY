@@ -757,7 +757,7 @@ export function WorkspaceDialog({
                                           ...candidate,
                                           frameRate: Math.max(
                                             5,
-                                            Math.min(30, Number(event.target.value) || 12)
+                                            Math.min(15, Number(event.target.value) || 12)
                                           )
                                         }
                                       : candidate
@@ -771,7 +771,7 @@ export function WorkspaceDialog({
                                 className="glass-input"
                                 type="number"
                                 min={320}
-                                max={1000}
+                                max={1600}
                                 value={profile.maxWidth}
                                 onChange={(event) => setRemoteApps((current) =>
                                   current.map((candidate, candidateIndex) =>
@@ -780,7 +780,7 @@ export function WorkspaceDialog({
                                           ...candidate,
                                           maxWidth: Math.max(
                                             320,
-                                            Math.min(2560, Number(event.target.value) || 1280)
+                                            Math.min(1600, Number(event.target.value) || 1280)
                                           )
                                         }
                                       : candidate
@@ -803,7 +803,7 @@ export function WorkspaceDialog({
                                           ...candidate,
                                           maxHeight: Math.max(
                                             240,
-                                            Math.min(1600, Number(event.target.value) || 800)
+                                            Math.min(1000, Number(event.target.value) || 800)
                                           )
                                         }
                                       : candidate
