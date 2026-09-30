@@ -189,20 +189,16 @@ export function App() {
     const activeWorkspace = workspaces.find(
       (workspace) => workspace.id === activeAppSession.workspaceId
     );
-    if (!activeWorkspace) {
-      setActiveAppSession(null);
-    } else {
-      return (
-        <WorkspaceWorkbench
-          workspace={activeWorkspace}
-          activity={{ kind: "remoteApp", session: activeAppSession }}
-          onBack={() => {
-            setActiveAppSession(null);
-            void refreshCatalog();
-          }}
-        />
-      );
-    }
+    return (
+      <WorkspaceWorkbench
+        {...(activeWorkspace ? { workspace: activeWorkspace } : {})}
+        activity={{ kind: "remoteApp", session: activeAppSession }}
+        onBack={() => {
+          setActiveAppSession(null);
+          void refreshCatalog();
+        }}
+      />
+    );
   }
 
   const stateLabel = (state: SessionPublic["state"]) => {
