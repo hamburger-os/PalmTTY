@@ -148,7 +148,8 @@ async function buildHarness() {
       kind: "host",
       shell: process.execPath,
       args: []
-    }
+    },
+    remoteApps: []
   }]);
   const app = await buildApp(config, {
     sessionManager: { runtimeDir, workerSpawner: spawner },
@@ -331,7 +332,8 @@ describe("session lifecycle API", () => {
         kind: "host",
         shell: "definitely-not-a-real-palmtty-shell",
         args: []
-      }
+      },
+      remoteApps: []
     });
 
     const restarted = await app.inject({
