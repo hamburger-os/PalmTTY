@@ -19,7 +19,8 @@ internal static class PalmTTYRemoteAppHost
     private const uint INFINITE = 0xFFFFFFFF;
     private const uint WAIT_OBJECT_0 = 0x00000000;
     private const uint RESUME_FAILED = 0xFFFFFFFF;
-    private const uint TH32CS_SNAPPROCESS = 0x00000002;
+    private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    private const int JobObjectBasicAccountingInformation = 1;
     private const int JobObjectExtendedLimitInformation = 9;
     private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
 
@@ -146,21 +147,17 @@ internal static class PalmTTYRemoteAppHost
         public int Y;
     }
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct PROCESSENTRY32
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JOBOBJECT_BASIC_ACCOUNTING_INFORMATION
     {
-        public uint dwSize;
-        public uint cntUsage;
-        public uint th32ProcessID;
-        public IntPtr th32DefaultHeapID;
-        public uint th32ModuleID;
-        public uint cntThreads;
-        public uint th32ParentProcessID;
-        public int pcPriClassBase;
-        public uint dwFlags;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string szExeFile;
+        public long TotalUserTime;
+        public long TotalKernelTime;
+        public long ThisPeriodTotalUserTime;
+        public long ThisPeriodTotalKernelTime;
+        public uint TotalPageFaultCount;
+        public uint TotalProcesses;
+        public uint ActiveProcesses;
+        public uint TotalTerminatedProcesses;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -316,13 +313,24 @@ internal static class PalmTTYRemoteAppHost
     private static extern bool CloseHandle(IntPtr hObject);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
+    private static extern bool QueryInformationJobObject(
+        IntPtr hJob,
+        int jobObjectInfoClass,
+        out JOBOBJECT_BASIC_ACCOUNTING_INFORMATION lpJobObjectInfo,
+        uint cbJobObjectInfoLength,
+        IntPtr lpReturnLength);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+    private static extern IntPtr OpenProcess(
+        uint dwDesiredAccess,
+        bool bInheritHandle,
+        uint dwProcessId);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+    private static extern bool IsProcessInJob(
+        IntPtr processHandle,
+        IntPtr jobHandle,
+        out bool result);
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
@@ -444,22 +452,14 @@ internal static class PalmTTYRemoteAppHost
             control.Name = "PalmTTY Remote App input";
             control.Start();
 
-            Thread capture = new Thread(delegate() { CaptureLoop(config, process.hProcess); });
+            Thread capture = new Thread(delegate() { CaptureLoop(config); });
             capture.IsBackground = true;
             capture.Name = "PalmTTY Remote App capture";
             capture.Start();
 
-            uint wait = WaitForSingleObject(process.hProcess, INFINITE);
-            if (wait != WAIT_OBJECT_0)
-            {
-                ThrowLastError("WaitForSingleObject");
-            }
-            uint exitCode;
-            if (!GetExitCodeProcess(process.hProcess, out exitCode))
-            {
-                ThrowLastError("GetExitCodeProcess");
-            }
+            uint exitCode = WaitForJobExit(job, process.hProcess);
             Stopping = true;
+            capture.Join(1000);
             return unchecked((int)exitCode);
         }
         catch (Exception error)
@@ -651,12 +651,11 @@ internal static class PalmTTYRemoteAppHost
         }
     }
 
-    private static void CaptureLoop(AppConfig config, IntPtr processHandle)
+    private static void CaptureLoop(AppConfig config)
     {
         int delay = Math.Max(33, 1000 / config.FrameRate);
         while (!Stopping)
         {
-            if (WaitForSingleObject(processHandle, 0) == WAIT_OBJECT_0) return;
             try
             {
                 IntPtr hwnd;
@@ -676,7 +675,6 @@ internal static class PalmTTYRemoteAppHost
 
     private static bool TryResolveOwnedWindow(out IntPtr hwnd, out RECT rect)
     {
-        HashSet<uint> owned = OwnedProcessIds();
         IntPtr best = IntPtr.Zero;
         RECT bestRect = new RECT();
         long bestArea = 0;
@@ -696,7 +694,7 @@ internal static class PalmTTYRemoteAppHost
 
             uint pid;
             GetWindowThreadProcessId(candidate, out pid);
-            if (!owned.Contains(pid)) return true;
+            if (!IsOwnedProcess(pid)) return true;
 
             RECT bounds;
             if (DwmGetWindowAttribute(
@@ -732,47 +730,51 @@ internal static class PalmTTYRemoteAppHost
         return true;
     }
 
-    private static HashSet<uint> OwnedProcessIds()
+    private static bool IsOwnedProcess(uint pid)
     {
-        List<PROCESSENTRY32> entries = new List<PROCESSENTRY32>();
-        IntPtr snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if (snapshot.ToInt64() == -1) return new HashSet<uint>(new uint[] { RootPid });
+        IntPtr job = JobHandle;
+        if (job == IntPtr.Zero || pid == 0) return false;
+
+        IntPtr processHandle = OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION,
+            false,
+            pid);
+        if (processHandle == IntPtr.Zero) return false;
         try
         {
-            PROCESSENTRY32 entry = new PROCESSENTRY32();
-            entry.dwSize = (uint)Marshal.SizeOf(typeof(PROCESSENTRY32));
-            if (Process32First(snapshot, ref entry))
-            {
-                do
-                {
-                    entries.Add(entry);
-                    entry.dwSize = (uint)Marshal.SizeOf(typeof(PROCESSENTRY32));
-                }
-                while (Process32Next(snapshot, ref entry));
-            }
+            bool inJob;
+            return IsProcessInJob(processHandle, job, out inJob) && inJob;
         }
         finally
         {
-            CloseHandle(snapshot);
+            CloseHandle(processHandle);
+        }
+    }
+
+    private static uint WaitForJobExit(IntPtr job, IntPtr rootProcess)
+    {
+        while (true)
+        {
+            JOBOBJECT_BASIC_ACCOUNTING_INFORMATION accounting;
+            if (!QueryInformationJobObject(
+                job,
+                JobObjectBasicAccountingInformation,
+                out accounting,
+                (uint)Marshal.SizeOf(typeof(JOBOBJECT_BASIC_ACCOUNTING_INFORMATION)),
+                IntPtr.Zero))
+            {
+                ThrowLastError("QueryInformationJobObject");
+            }
+            if (accounting.ActiveProcesses == 0) break;
+            Thread.Sleep(100);
         }
 
-        HashSet<uint> owned = new HashSet<uint>();
-        owned.Add(RootPid);
-        bool changed;
-        do
+        uint exitCode;
+        if (!GetExitCodeProcess(rootProcess, out exitCode))
         {
-            changed = false;
-            foreach (PROCESSENTRY32 entry in entries)
-            {
-                if (!owned.Contains(entry.th32ProcessID) && owned.Contains(entry.th32ParentProcessID))
-                {
-                    owned.Add(entry.th32ProcessID);
-                    changed = true;
-                }
-            }
+            ThrowLastError("GetExitCodeProcess");
         }
-        while (changed);
-        return owned;
+        return exitCode;
     }
 
     private static void CaptureWindow(IntPtr hwnd, RECT rect, int maxWidth, int maxHeight)
@@ -935,9 +937,10 @@ internal static class PalmTTYRemoteAppHost
 
     private static bool IsOwnedWindow(IntPtr hwnd)
     {
+        if (hwnd == IntPtr.Zero) return false;
         uint pid;
         GetWindowThreadProcessId(hwnd, out pid);
-        return OwnedProcessIds().Contains(pid);
+        return IsOwnedProcess(pid);
     }
 
     private static bool ActivateWindow(IntPtr hwnd)
