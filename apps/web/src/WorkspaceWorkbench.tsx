@@ -47,7 +47,7 @@ export function WorkspaceWorkbench({
   activity,
   onBack
 }: {
-  workspace: WorkspacePublic;
+  workspace?: WorkspacePublic;
   activity: WorkbenchActivity;
   onBack(): void;
 }) {
@@ -128,11 +128,14 @@ export function WorkspaceWorkbench({
     };
   }, []);
 
-  const tabs: WorkbenchPane[] = activity.kind === "terminal"
-    ? ["terminal", "git", "files", "artifacts"]
-    : ["remoteApp", "git", "files"];
+  const tabs: WorkbenchPane[] = [
+    activity.kind === "terminal" ? "terminal" : "remoteApp",
+    ...(workspace ? (["git", "files"] as const) : []),
+    ...(activity.kind === "terminal" ? (["artifacts"] as const) : [])
+  ];
 
   const showFileHistory = (path: string) => {
+    if (!workspace) return;
     setGitHistoryPath(path);
     setPane("git");
   };
@@ -164,7 +167,7 @@ export function WorkspaceWorkbench({
             ← {t("workbench.back")}
           </button>
           <strong className="workbench-name">
-            {workspace.name}
+            {workspace?.name ?? t("workbench.session")}
           </strong>
           {activity.kind === "remoteApp" && (
             <span className="workbench-activity-name">
@@ -243,7 +246,7 @@ export function WorkspaceWorkbench({
           </div>
         )}
 
-        {pane === "git" && (
+        {workspace && pane === "git" && (
           <div className="workbench-pane is-active">
             <GitPane
               workspaceId={workspace.id}
@@ -254,7 +257,7 @@ export function WorkspaceWorkbench({
           </div>
         )}
 
-        {pane === "files" && (
+        {workspace && pane === "files" && (
           <div className="workbench-pane is-active">
             <FilesPane
               workspaceId={workspace.id}
