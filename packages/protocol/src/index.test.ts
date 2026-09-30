@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BrowseDirectoryRequestSchema,
+  CreateAppSessionSchema,
   CreateSessionSchema,
   GitCommitDiffRequestSchema,
   GitCommitRequestSchema,
@@ -19,6 +20,9 @@ import {
   MAX_INPUT_BYTES,
   WorkspaceDefinitionSchema,
   WorkspaceEnvironmentSchema,
+  RemoteAppControlMessageSchema,
+  isActiveAppSessionState,
+  isTerminalAppSessionState,
   isActiveSessionState,
   isTerminalSessionState,
   parseClientMessage
@@ -31,6 +35,59 @@ describe("protocol", () => {
       cols: 80,
       rows: 24
     });
+  });
+
+  it("parses bounded Remote App profiles and control messages", () => {
+    const workspace = WorkspaceDefinitionSchema.parse({
+      id: "host-apps",
+      name: "Host apps",
+      cwd: "C:\\workspace",
+      runtime: { kind: "host" },
+      remoteApps: [{
+        id: "codex-desktop",
+        name: "Codex Desktop",
+        executable: "codex.exe"
+      }]
+    });
+    expect(workspace.remoteApps[0]).toMatchObject({
+      id: "codex-desktop",
+      args: [],
+      frameRate: 15,
+      maxWidth: 1600,
+      maxHeight: 1200
+    });
+    expect(() => WorkspaceDefinitionSchema.parse({
+      id: "duplicates",
+      name: "Duplicates",
+      cwd: "C:\\workspace",
+      runtime: { kind: "host" },
+      remoteApps: [
+        { id: "app", name: "One", executable: "one.exe" },
+        { id: "app", name: "Two", executable: "two.exe" }
+      ]
+    })).toThrow();
+
+    expect(CreateAppSessionSchema.parse({
+      workspaceId: "host-apps",
+      profileId: "codex-desktop"
+    })).toEqual({
+      workspaceId: "host-apps",
+      profileId: "codex-desktop"
+    });
+    expect(RemoteAppControlMessageSchema.parse({
+      type: "pointer",
+      action: "move",
+      x: 0.5,
+      y: 0.25
+    })).toMatchObject({ type: "pointer", button: 0 });
+    expect(() => RemoteAppControlMessageSchema.parse({
+      type: "pointer",
+      action: "move",
+      x: 2,
+      y: 0
+    })).toThrow();
+    expect(isActiveAppSessionState("running")).toBe(true);
+    expect(isTerminalAppSessionState("exited")).toBe(true);
   });
 
   it("parses host and WSL workspace definitions", () => {
