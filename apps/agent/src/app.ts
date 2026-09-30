@@ -143,14 +143,14 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     ));
   }
 
-  async function validateWorkspaceRemoteApps(
+  async function validateWorkspaceLaunchTargets(
     workspace: ReturnType<typeof WorkspaceDefinitionSchema.parse>
   ): Promise<void> {
+    const runtime = await resolveRuntimeWorkspace(workspace);
     if (workspace.remoteApps.length === 0) return;
     if (workspace.runtime.kind !== "host") {
       throw new Error("Remote Apps require a Host workspace");
     }
-    const runtime = await resolveRuntimeWorkspace(workspace);
     for (const profile of workspace.remoteApps) {
       try {
         await resolveExecutable(profile.executable, {
@@ -322,8 +322,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
         ...parsed.data
       });
       try {
-        await resolveRuntimeWorkspace(workspace);
-        await validateWorkspaceRemoteApps(workspace);
+        await validateWorkspaceLaunchTargets(workspace);
         await workspaceStore.create(workspace);
         return reply.code(201).send({ workspace });
       } catch (error) {
@@ -361,8 +360,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
         ...parsed.data
       });
       try {
-        await resolveRuntimeWorkspace(workspace);
-        await validateWorkspaceRemoteApps(workspace);
+        await validateWorkspaceLaunchTargets(workspace);
         if (!await workspaceStore.replace(request.params.id, workspace)) {
           return reply.code(404).send({ error: "workspace_not_found" });
         }
