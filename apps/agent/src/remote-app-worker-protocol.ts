@@ -19,9 +19,9 @@ export const ResolvedRemoteAppProfileSchema = z.object({
   args: z.array(z.string().max(4096)).max(32),
   cwd: z.string().min(1).max(4096),
   environment: z.record(z.string(), z.string()),
-  frameRate: z.number().int().min(5).max(30),
-  maxWidth: z.number().int().min(320).max(2560),
-  maxHeight: z.number().int().min(240).max(1600)
+  frameRate: z.number().int().min(5).max(15),
+  maxWidth: z.number().int().min(320).max(1600),
+  maxHeight: z.number().int().min(240).max(1000)
 }).strict();
 export type ResolvedRemoteAppProfile = z.infer<typeof ResolvedRemoteAppProfileSchema>;
 
