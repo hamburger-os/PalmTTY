@@ -1,6 +1,6 @@
 # Current implementation state
 
-Status: **0.2.x alpha foundation implemented with durable per-session workers, Windows/Ubuntu CI, current-user Windows/Linux Agent autostart, installable Windows/Linux release packaging, and a mobile-first Terminal/Git/Files/Artifacts workbench. Release qualification requires native package builds plus detached installed-runtime smoke before asset-bearing publication. Real mobile/Codex/deployment checks remain recommended release evidence rather than a workflow gate.**
+Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus a Windows-x64 Remote App Session data plane, Windows/Ubuntu CI, current-user Windows/Linux Agent autostart, installable Windows/Linux release packaging, and a mobile-first Workspace Workbench. Release qualification requires native package builds plus detached installed-runtime smoke before asset-bearing publication. Real mobile/Codex Desktop/CLI/deployment checks remain recommended release evidence rather than a workflow gate.**
 
 ## Implemented
 
@@ -50,6 +50,25 @@ Status: **0.2.x alpha foundation implemented with durable per-session workers, W
 - bounded client message size and terminal dimensions
 - no intentional terminal I/O logging
 - Agent is a replaceable control plane and no longer owns PTYs or canonical terminal state
+
+### Remote App Sessions (Windows x64 alpha)
+
+- Remote Apps are a separate Activity/data plane from terminal Sessions; no Remote App media or control message enters the terminal WebSocket or Terminal Worker protocol.
+- Workspace definitions can persist up to 16 typed Remote App profiles. A browser starts one only by workspace ID + saved profile ID; executable/argv/PID/HWND cannot be injected into the create request.
+- Remote App profiles are Host-only. Workspace mutation validates the profile executable and App Session creation resolves the current persisted Workspace/environment and executable again before bootstrap.
+- the Agent exposes separate authenticated + exact-Origin App Session lifecycle/signaling routes and a capability endpoint; App Session and signaling mutations are independently rate-limited.
+- one detached AppWorker owns each App Session. Remote Apps use worker protocol v1 plus the separate `app-runtime-v1` recovery directory, their own per-session secret, READY + idempotent authenticated adoption, heartbeat/reconnect, Worker-owned recovery metadata and bounded exited-session retention.
+- Agent restart disconnects AppWorker control but does not intentionally terminate an adopted App Session. A new Agent re-discovers/authenticates the AppWorker. Persisted Worker/App PIDs remain diagnostic only and are not process-kill authority.
+- a Windows GUI-subsystem native helper launches the saved application suspended under the PalmTTY user, assigns it to a `KILL_ON_JOB_CLOSE` Job Object before resume, and terminates that Job Object when its AppWorker control pipe disappears. This prevents an AppWorker failure from leaving a PalmTTY-owned app process tree unmanaged.
+- the helper discovers only visible top-level windows owned by the launched root process or its descendants. Current capture is window-only `PrintWindow(PW_RENDERFULLCONTENT)`; PalmTTY has no desktop/monitor/BitBlt fallback and accepts capture incompatibility rather than widening authority.
+- capture frames are bounded/downscaled before entering an isolated native WebRTC source in AppWorker. Browser media uses a WebRTC video track; browser control uses a typed, 32 KiB-bounded DataChannel.
+- AppWorker currently accepts one media peer. A later browser negotiation replaces the previous peer. WebRTC currently uses host ICE candidates only and no TURN/cloud relay.
+- restricted input supports owned-window absolute/relative pointer, wheel, an allowlisted keyboard subset and bounded Unicode text. The native helper re-validates window ownership before input, blocks Meta/Win and Alt+Tab, and does not bypass Windows UIPI/elevation boundaries.
+- no full desktop, arbitrary existing-window capture, elevated/UAC control, clipboard, audio, microphone, camera, file drag/drop or arbitrary input-command channel is implemented.
+- the Web app now uses `WorkspaceWorkbench`: Terminal and Remote App are Activities; Git/Files are Workspace tools; Artifacts remains Terminal Session-scoped. Switching tools keeps the active Terminal/WebRTC surface mounted.
+- mobile Remote App interaction has explicit View / Touch / Trackpad modes, two-finger scroll, common special keys and a separate Unicode text/IME/dictation surface.
+- Windows distributions precompile and include `palmtty-remote-app-host.exe`; installed-runtime smoke verifies the helper exists as a native executable. Source mode compiles the same helper into the user's private App runtime on first use.
+- current known gaps: Windows x64 only; no WSL/macOS/Linux adapter; no TURN; current PrintWindow backend may not produce usable frames for some GPU-accelerated/protected windows; Codex Desktop/VS Code/other app compatibility and mobile gesture quality still require real-device validation; no OS-reboot/logoff/AppWorker-death recovery.
 
 ### Durable Session Workers
 
