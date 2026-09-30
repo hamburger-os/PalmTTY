@@ -87,12 +87,14 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
 
   const refreshCatalog = useCallback(async () => {
-    const [workspaceResult, sessionResult] = await Promise.all([
+    const [workspaceResult, sessionResult, appSessionResult] = await Promise.all([
       listWorkspaces(),
-      listSessions()
+      listSessions(),
+      listAppSessions()
     ]);
     setWorkspaces(workspaceResult.workspaces);
     setSessions(sessionResult.sessions);
+    setAppSessions(appSessionResult.sessions);
   }, []);
 
   const loadAuthenticatedState = useCallback(async () => {
@@ -104,6 +106,9 @@ export function App() {
         setCapabilities(null);
         setError(translateError("runtime_capabilities_failed"));
       });
+    void remoteAppCapabilities()
+      .then(setAppCapabilities)
+      .catch(() => setAppCapabilities(null));
     await refreshCatalog();
   }, [refreshCatalog, translateError]);
 
@@ -120,13 +125,13 @@ export function App() {
   }, [loadAuthenticatedState, translateError]);
 
   useEffect(() => {
-    if (!auth?.authenticated || activeSession) return;
+    if (!auth?.authenticated || activeSession || activeAppSession) return;
     const timer = window.setInterval(
       () => void refreshCatalog().catch(() => undefined),
       3000
     );
     return () => window.clearInterval(timer);
-  }, [auth?.authenticated, activeSession, refreshCatalog]);
+  }, [auth?.authenticated, activeAppSession, activeSession, refreshCatalog]);
 
   if (auth === null) {
     return (
@@ -162,19 +167,42 @@ export function App() {
       (workspace) => workspace.id === activeSession.workspaceId
     );
     return (
-      <SessionWorkbench
-        sessionId={activeSession.id}
+      <WorkspaceWorkbench
         {...(activeWorkspace ? { workspace: activeWorkspace } : {})}
+        activity={{
+          kind: "terminal",
+          sessionId: activeSession.id,
+          onRestart: async () => {
+            const result = await restartSession(activeSession.id);
+            setActiveSession(result.session);
+          }
+        }}
         onBack={() => {
           setActiveSession(null);
           void refreshCatalog();
         }}
-        onRestart={async () => {
-          const result = await restartSession(activeSession.id);
-          setActiveSession(result.session);
-        }}
       />
     );
+  }
+
+  if (activeAppSession) {
+    const activeWorkspace = workspaces.find(
+      (workspace) => workspace.id === activeAppSession.workspaceId
+    );
+    if (!activeWorkspace) {
+      setActiveAppSession(null);
+    } else {
+      return (
+        <WorkspaceWorkbench
+          workspace={activeWorkspace}
+          activity={{ kind: "remoteApp", session: activeAppSession }}
+          onBack={() => {
+            setActiveAppSession(null);
+            void refreshCatalog();
+          }}
+        />
+      );
+    }
   }
 
   const stateLabel = (state: SessionPublic["state"]) => {
