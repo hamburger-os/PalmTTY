@@ -63,6 +63,40 @@ function normalizedPoint(
   };
 }
 
+function normalizedVideoPoint(
+  element: HTMLElement,
+  video: HTMLVideoElement | null,
+  clientX: number,
+  clientY: number,
+  clamp: boolean
+): Point | undefined {
+  const bounds = element.getBoundingClientRect();
+  const videoWidth = video?.videoWidth ?? 0;
+  const videoHeight = video?.videoHeight ?? 0;
+  if (
+    bounds.width <= 0 ||
+    bounds.height <= 0 ||
+    videoWidth <= 0 ||
+    videoHeight <= 0
+  ) return undefined;
+
+  const scale = Math.min(
+    bounds.width / videoWidth,
+    bounds.height / videoHeight
+  );
+  const contentWidth = videoWidth * scale;
+  const contentHeight = videoHeight * scale;
+  const left = bounds.left + (bounds.width - contentWidth) / 2;
+  const top = bounds.top + (bounds.height - contentHeight) / 2;
+  let x = (clientX - left) / contentWidth;
+  let y = (clientY - top) / contentHeight;
+
+  if (!clamp && (x < 0 || x > 1 || y < 0 || y > 1)) return undefined;
+  x = Math.max(0, Math.min(1, x));
+  y = Math.max(0, Math.min(1, y));
+  return { x, y };
+}
+
 export function RemoteAppView({
   sessionId,
   active,
@@ -251,10 +285,16 @@ export function RemoteAppView({
     if (mode === "view") return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    const point = normalizedPoint(event.currentTarget, event.clientX, event.clientY);
-    activePointers.current.set(event.pointerId, point);
-
     if (mode === "direct") {
+      const point = normalizedVideoPoint(
+        event.currentTarget,
+        videoRef.current,
+        event.clientX,
+        event.clientY,
+        false
+      );
+      if (!point) return;
+      activePointers.current.set(event.pointerId, point);
       send({
         type: "pointer",
         action: "down",
@@ -265,6 +305,12 @@ export function RemoteAppView({
       return;
     }
 
+    const point = normalizedPoint(
+      event.currentTarget,
+      event.clientX,
+      event.clientY
+    );
+    activePointers.current.set(event.pointerId, point);
     pointerMoved.current = false;
   };
 
@@ -272,10 +318,17 @@ export function RemoteAppView({
     if (mode === "view" || !activePointers.current.has(event.pointerId)) return;
     event.preventDefault();
     const previous = activePointers.current.get(event.pointerId)!;
-    const point = normalizedPoint(event.currentTarget, event.clientX, event.clientY);
-    activePointers.current.set(event.pointerId, point);
 
     if (mode === "direct") {
+      const point = normalizedVideoPoint(
+        event.currentTarget,
+        videoRef.current,
+        event.clientX,
+        event.clientY,
+        true
+      );
+      if (!point) return;
+      activePointers.current.set(event.pointerId, point);
       send({
         type: "pointer",
         action: "move",
@@ -286,6 +339,12 @@ export function RemoteAppView({
       return;
     }
 
+    const point = normalizedPoint(
+      event.currentTarget,
+      event.clientX,
+      event.clientY
+    );
+    activePointers.current.set(event.pointerId, point);
     const pointers = [...activePointers.current.values()];
     if (pointers.length >= 2) {
       send({
@@ -312,11 +371,19 @@ export function RemoteAppView({
   const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (mode === "view") return;
     event.preventDefault();
-    const point = normalizedPoint(event.currentTarget, event.clientX, event.clientY);
+    const previous = activePointers.current.get(event.pointerId);
     activePointers.current.delete(event.pointerId);
     try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* ignore */ }
 
     if (mode === "direct") {
+      const point = normalizedVideoPoint(
+        event.currentTarget,
+        videoRef.current,
+        event.clientX,
+        event.clientY,
+        true
+      ) ?? previous;
+      if (!point) return;
       send({
         type: "pointer",
         action: "up",
