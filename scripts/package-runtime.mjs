@@ -193,6 +193,36 @@ async function compileWindowsServiceHost(outputPath) {
   await requireFile(outputPath, "Compiled Windows service host");
 }
 
+function quotePowerShellLiteral(value) {
+  if (/\r|\n|[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(value)) {
+    throw new Error("PowerShell path contains an unsupported control character");
+  }
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+async function compileWindowsRemoteAppHost(outputPath) {
+  const sourcePath = path.join(repoRoot, "scripts", "windows-remote-app-host.cs");
+  await requireFile(sourcePath, "Windows Remote App host source");
+  const powershell = defaultWindowsPowerShellPath();
+  await requireFile(powershell, "Windows PowerShell");
+  const command = [
+    "$ErrorActionPreference = 'Stop'",
+    "Add-Type `",
+    `  -Path ${quotePowerShellLiteral(sourcePath)} \``,
+    `  -OutputAssembly ${quotePowerShellLiteral(outputPath)} \``,
+    "  -OutputType WindowsApplication `",
+    "  -ReferencedAssemblies 'System.dll','System.Core.dll','System.Drawing.dll','System.Runtime.Serialization.dll','System.Xml.dll'"
+  ].join("\n");
+  run(powershell, [
+    "-NoLogo",
+    "-NoProfile",
+    "-NonInteractive",
+    "-EncodedCommand",
+    encodePowerShellCommand(command)
+  ]);
+  await requireFile(outputPath, "Compiled Windows Remote App host");
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const outputValue = option(args, "--out");
@@ -316,6 +346,9 @@ async function main() {
   if (platform === "win32") {
     await compileWindowsServiceHost(
       path.join(binDir, "palmtty-autostart-host.exe")
+    );
+    await compileWindowsRemoteAppHost(
+      path.join(binDir, "palmtty-remote-app-host.exe")
     );
     await writeFile(
       path.join(binDir, "palmtty.cmd"),
