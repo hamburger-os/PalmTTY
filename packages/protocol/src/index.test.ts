@@ -67,6 +67,19 @@ describe("protocol", () => {
       ]
     })).toThrow();
 
+    expect(() => WorkspaceDefinitionSchema.parse({
+      id: "oversized-app-argv",
+      name: "Oversized app argv",
+      cwd: "C:\\workspace",
+      runtime: { kind: "host" },
+      remoteApps: [{
+        id: "app",
+        name: "App",
+        executable: "app.exe",
+        args: Array.from({ length: 8 }, () => "x".repeat(4096))
+      }]
+    })).toThrow();
+
     expect(CreateAppSessionSchema.parse({
       workspaceId: "host-apps",
       profileId: "codex-desktop"
