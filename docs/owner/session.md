@@ -101,3 +101,10 @@ Workspace CRUD 属于明确的高权限配置操作。网页可以管理 cwd/She
 任何把 canonical terminal state 从 Worker 复制回 Agent 的设计，都需要重新论证 Agent 重启一致性。
 
 会话按钮语义也属于生命周期契约：运行中的 Session 使用明确“终止”动作，已退出 Session 使用明确“清除”动作，不再用一个含义模糊的 × 同时承担关闭、杀进程或删除资源。
+
+## 与 Remote App Session 的边界
+
+本文的 Session Worker、PTY、headless xterm、seq/replay 与 `runtime-v5` 只描述 **Terminal Session**。Remote App Session 使用独立 AppWorker、`app-runtime-v1`、WebRTC 媒体/控制协议和 Windows App Job Object；两类 Session 不共享 canonical state 或 lifecycle protocol。
+
+Workspace 删除现在必须同时确认没有活动 Terminal Session 和活动 Remote App Session。Terminal restart 仍只替换 PTY Session，不会隐式启动/终止 Remote App。
+
