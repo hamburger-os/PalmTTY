@@ -12,6 +12,7 @@ import {
 } from "@palmtty/protocol";
 import {
   detachRemoteApp,
+  getAppSession,
   negotiateRemoteApp
 } from "./api.js";
 import { useI18n } from "./i18n.js";
@@ -106,7 +107,9 @@ export function RemoteAppView({
     let connection: RTCPeerConnection | undefined;
     let connectionId: string | undefined;
     let retryTimer: number | undefined;
+    let stateTimer: number | undefined;
     let firstAttempt = true;
+    let ended = false;
 
     const cleanupPeer = () => {
       channelRef.current = null;
@@ -117,7 +120,7 @@ export function RemoteAppView({
     };
 
     const connect = async () => {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || ended) return;
       cleanupPeer();
       connectionChangeRef.current(firstAttempt ? "connecting" : "reconnecting");
       firstAttempt = false;
@@ -141,7 +144,11 @@ export function RemoteAppView({
           connectionChangeRef.current("connected");
           return;
         }
-        if (peer.connectionState === "failed" || peer.connectionState === "closed") {
+        if (
+          peer.connectionState === "failed" ||
+          peer.connectionState === "closed" ||
+          peer.connectionState === "disconnected"
+        ) {
           scheduleReconnect();
         }
       };
@@ -158,14 +165,43 @@ export function RemoteAppView({
         connectionId = answer.connectionId;
         await peer.setRemoteDescription({ type: "answer", sdp: answer.sdp });
       } catch {
-        if (!controller.signal.aborted && connection === peer) {
+        if (!controller.signal.aborted && connection === peer && !ended) {
+          try {
+            const current = await getAppSession(sessionId);
+            if (current.session.state === "exited" || current.session.state === "failed") {
+              ended = true;
+              cleanupPeer();
+              connectionChangeRef.current("closed");
+              return;
+            }
+          } catch {
+            // The Agent may be restarting. Preserve reconnect semantics.
+          }
           scheduleReconnect();
         }
       }
     };
 
+    const pollSessionState = async () => {
+      if (controller.signal.aborted || ended) return;
+      try {
+        const current = await getAppSession(sessionId);
+        if (current.session.state === "exited" || current.session.state === "failed") {
+          ended = true;
+          cleanupPeer();
+          connectionChangeRef.current("closed");
+          return;
+        }
+      } catch {
+        // Session-state polling is advisory; media reconnect remains authoritative.
+      }
+      if (!controller.signal.aborted && !ended) {
+        stateTimer = window.setTimeout(() => void pollSessionState(), 3000);
+      }
+    };
+
     const scheduleReconnect = () => {
-      if (controller.signal.aborted || retryTimer !== undefined) return;
+      if (controller.signal.aborted || ended || retryTimer !== undefined) return;
       cleanupPeer();
       connectionChangeRef.current("reconnecting");
       retryTimer = window.setTimeout(() => {
@@ -175,10 +211,12 @@ export function RemoteAppView({
     };
 
     void connect();
+    stateTimer = window.setTimeout(() => void pollSessionState(), 3000);
 
     return () => {
       controller.abort();
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+      if (stateTimer !== undefined) window.clearTimeout(stateTimer);
       cleanupPeer();
       if (connectionId) {
         void detachRemoteApp(sessionId, connectionId).catch(() => undefined);
