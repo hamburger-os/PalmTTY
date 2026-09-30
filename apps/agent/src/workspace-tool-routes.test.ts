@@ -44,7 +44,8 @@ async function fixture() {
     id: "workspace-1",
     name: "Workspace",
     cwd: root,
-    runtime: { kind: "host", args: [] }
+    runtime: { kind: "host", args: [] },
+    remoteApps: []
   };
   const app = await buildApp(config(), {
     sessionManager: { runtimeDir },
