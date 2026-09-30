@@ -19,7 +19,19 @@ export const RemoteAppProfileSchema = z.object({
   frameRate: z.number().int().min(5).max(15).default(12),
   maxWidth: z.number().int().min(320).max(1600).default(1280),
   maxHeight: z.number().int().min(240).max(1000).default(800)
-}).strict();
+}).strict().superRefine((profile, ctx) => {
+  const argumentCharacters = profile.args.reduce(
+    (total, argument) => total + argument.length,
+    0
+  );
+  if (argumentCharacters > 24_000) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["args"],
+      message: "Remote App argv exceeds 24,000 characters"
+    });
+  }
+});
 export type RemoteAppProfile = z.infer<typeof RemoteAppProfileSchema>;
 
 export const RemoteAppProfilesSchema = z.array(RemoteAppProfileSchema)
