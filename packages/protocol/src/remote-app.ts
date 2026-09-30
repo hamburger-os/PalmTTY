@@ -14,8 +14,12 @@ export const RemoteAppProfileIdSchema = z.string()
 export const RemoteAppProfileSchema = z.object({
   id: RemoteAppProfileIdSchema,
   name: z.string().trim().min(1).max(100),
-  executable: z.string().trim().min(1).max(4096),
-  args: z.array(z.string().max(4096)).max(32).default([]),
+  executable: z.string().trim().min(1).max(4096)
+    .refine((value) => !value.includes("\0"), "Remote App executable must not contain NUL"),
+  args: z.array(
+    z.string().max(4096)
+      .refine((value) => !value.includes("\0"), "Remote App argv must not contain NUL")
+  ).max(32).default([]),
   frameRate: z.number().int().min(5).max(15).default(12),
   maxWidth: z.number().int().min(320).max(1600).default(1280),
   maxHeight: z.number().int().min(240).max(1000).default(800)
