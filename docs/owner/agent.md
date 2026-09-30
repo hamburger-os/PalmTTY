@@ -120,3 +120,12 @@ Session 创建仍是 `POST /api/v1/sessions`。生命周期修改不再复用一
 - 是否按记录的 PID 直接杀进程；
 - Workspace CRUD 是否仍是显式持久化修改面，而不是把 cwd/shell/env 重新塞进 Session 创建请求；
 - IPC 与浏览器 backpressure 是否仍有硬上限。
+
+## Remote Apps 控制面
+
+Remote Apps 不属于 Terminal Worker。Agent 额外维护 `RemoteAppSessionManager`，只负责持久 Workspace Profile authority、AppWorker registry/rediscovery、生命周期 API 与 WebRTC signaling。AppWorker 使用独立 `app-runtime-v1`、独立 per-session secret 与 adoption，不读取 Terminal `runtime-v5` recovery state。
+
+浏览器创建 App Session 只能提交持久化 `workspaceId + profileId`。Agent 会重新读取 Workspace、确认 Host runtime、重新解析 executable 与当前宿主环境，并剔除 PalmTTY 控制/认证环境后才 bootstrap AppWorker。浏览器不能临时提供 executable、argv、PID、HWND 或环境覆盖。
+
+Agent restart 只关闭 AppWorker IPC client；已 adoption 的 AppWorker/应用继续。新 Agent 从 Remote App recovery record + secret 重新认证。AppWorker 丢失时 Windows helper 的控制 pipe EOF 会终止其 Job Object，避免留下无人管理的 PalmTTY-owned 应用。
+
