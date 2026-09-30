@@ -30,6 +30,8 @@ internal static class PalmTTYRemoteAppHost
     private const int DWMWA_CLOAKED = 14;
     private const uint PW_RENDERFULLCONTENT = 0x00000002;
     private const int SW_RESTORE = 9;
+    private static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 =
+        new IntPtr(-4);
 
     private const uint INPUT_MOUSE = 0;
     private const uint INPUT_KEYBOARD = 1;
@@ -328,6 +330,9 @@ internal static class PalmTTYRemoteAppHost
         out bool result);
 
     [DllImport("user32.dll")]
+    private static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+
+    [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
     [DllImport("user32.dll")]
@@ -409,6 +414,9 @@ internal static class PalmTTYRemoteAppHost
         IntPtr job = IntPtr.Zero;
         try
         {
+            try { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2); }
+            catch { /* Windows 11 target, but capture can fail closed without DPI opt-in. */ }
+
             Stream inputStream = OpenStandardStream(STD_INPUT_HANDLE, FileAccess.Read);
             Stream outputStream = OpenStandardStream(STD_OUTPUT_HANDLE, FileAccess.Write);
             Stream errorStream = OpenStandardStream(STD_ERROR_HANDLE, FileAccess.Write);
@@ -683,6 +691,7 @@ internal static class PalmTTYRemoteAppHost
         IntPtr best = IntPtr.Zero;
         RECT bestRect = new RECT();
         long bestArea = 0;
+        IntPtr foreground = GetForegroundWindow();
 
         EnumWindows(delegate(IntPtr candidate, IntPtr unused)
         {
@@ -711,7 +720,15 @@ internal static class PalmTTYRemoteAppHost
                 if (!GetWindowRect(candidate, out bounds)) return true;
             }
             long area = (long)bounds.Width * (long)bounds.Height;
-            if (bounds.Width < 64 || bounds.Height < 64 || area <= bestArea) return true;
+            if (bounds.Width < 64 || bounds.Height < 64) return true;
+            if (candidate == foreground)
+            {
+                best = candidate;
+                bestRect = bounds;
+                bestArea = Int64.MaxValue;
+                return true;
+            }
+            if (area <= bestArea) return true;
             best = candidate;
             bestRect = bounds;
             bestArea = area;
@@ -985,8 +1002,7 @@ internal static class PalmTTYRemoteAppHost
             if (attachedTarget) AttachThreadInput(currentThread, targetThread, false);
         }
 
-        IntPtr active = GetForegroundWindow();
-        return active == hwnd || IsOwnedWindow(active);
+        return GetForegroundWindow() == hwnd;
     }
 
     private static double Clamp01(double value)
