@@ -18,13 +18,13 @@ Mobile-first · self-hosted · Windows-first · Host + WSL runtimes · xterm.js
 > [!WARNING]
 > PalmTTY exposes an interactive shell with the privileges of the OS user running the Agent. Treat compromise as workstation compromise. Use a private HTTPS entry point or an authenticated HTTPS reverse proxy; do not expose an unauthenticated Agent port to the Internet.
 
-PalmTTY is a mobile-first, self-hosted remote development workbench centered on a durable terminal. Windows 11 remains the primary host target, with native host shells and WSL workspaces; the same host-runtime path is exercised on Ubuntu CI and is designed for Linux/macOS hosts. Each Session workbench keeps the terminal alive while exposing bounded typed Git source control with mobile-first commit/file history inspection, read-only workspace file/text-image preview plus bounded complete-file copy/share/download, and Session-scoped image artifacts that can be uploaded, previewed, deleted, and inserted into the live terminal as local file paths. Codex and other terminal agents remain ordinary shell workloads; PalmTTY does not encode a vendor-specific multimodal protocol.
+PalmTTY is a mobile-first, self-hosted remote development workbench centered on durable workstation activities. Terminal Sessions remain the core across Windows host shells, WSL and the Linux host path; Windows x64 also has an **Unreleased Remote Apps alpha** that launches a saved Workspace application profile and exposes only that PalmTTY-owned application window over a separate WebRTC/AppWorker data plane. Git/Files stay bounded Workspace tools, Terminal Artifacts remain Session-scoped, and Codex/Claude/OpenCode integrations remain vendor-neutral workloads rather than private PalmTTY protocols.
 
-PalmTTY 是一个以持久终端为核心、面向手机、自托管的远程开发工作台。Windows 11 仍是首要宿主平台，同时支持宿主机 Shell 与 WSL 工作区；同一套宿主运行时也在 Ubuntu CI 中验证，并按 Linux/macOS 宿主扩展设计。每个 Session 工作台在保持终端连接的同时提供有界、typed 的 Git Source Control（含面向手机的提交/文件历史查看）、只读工作区文件/图片预览与有界完整文件复制/分享/下载，以及 Session 范围的图片附件上传、预览、删除与本地路径插入。Codex 等终端 Agent 仍只是普通 Shell 工作负载；PalmTTY 核心不编码某个厂商的多模态协议。
+PalmTTY 是一个面向手机、自托管的远程开发工作台，核心是工作站上可持久的 Activity。Terminal Session 继续覆盖 Windows Host、WSL 和 Linux Host；Windows x64 额外加入 **Unreleased Remote Apps alpha**：按持久 Workspace Profile 启动桌面应用，并通过独立 AppWorker/WebRTC 数据面只呈现 PalmTTY 自己启动的应用窗口。Git/Files 仍是有界 Workspace Tool，Artifacts 仍属于 Terminal Session；Codex/Claude/OpenCode 等继续作为 vendor-neutral workload，不把厂商私有协议写进 PalmTTY 核心。
 
 ## Status / 当前状态
 
-PalmTTY is **alpha** and the current source line targets **0.2.0**. Each terminal runs in an independent durable Session Worker, so restarting only the HTTP/API Agent does not terminate the live PTY. Windows and Ubuntu CI cover authenticated Worker IPC, Agent restart rediscovery, replay/snapshot recovery and detached-process survival; Windows CI also uses real node-pty + PowerShell 7 / ConPTY for Unicode and resize smoke coverage. Release publication is guarded by pinned-SHA CI/security/license/CodeQL gates. Real phone + real workstation + long-running Codex checks remain recommended release evidence, but are not represented by a manual publication checkbox.
+PalmTTY is **alpha**. **0.2.0** is the current release baseline; this source line carries Unreleased Remote Apps work. Each terminal runs in an independent durable Session Worker, so restarting only the HTTP/API Agent does not terminate the live PTY. Windows and Ubuntu CI cover authenticated Worker IPC, Agent restart rediscovery, replay/snapshot recovery and detached-process survival; Windows CI also uses real node-pty + PowerShell 7 / ConPTY for Unicode and resize smoke coverage. Release publication is guarded by pinned-SHA CI/security/license/CodeQL gates. Real phone + real workstation + long-running Codex checks remain recommended release evidence, but are not represented by a manual publication checkbox.
 
 | Capability | Alpha status |
 |---|---|
@@ -38,8 +38,10 @@ PalmTTY is **alpha** and the current source line targets **0.2.0**. Each termina
 | Browser or network disconnect | PTY survives while the Agent stays alive |
 | Reconnect | Sequence replay + server-side terminal snapshot fallback |
 | Session lifecycle | Explicit terminate / restart-as-replacement / retained clear; no ambiguous close/kill control |
-| Session workbench | Terminal / Git / Files / Artifacts tabs; terminal stays mounted while switching views; Git has Changes/History with paged commit inspection and file history; Files can copy/share/download complete bounded files; image artifacts stay outside Git |
+| Workspace workbench | Activity-aware Terminal / Remote App surface plus shared Git / Files; switching tools keeps the active terminal/WebRTC surface mounted; Artifacts remain Terminal Session-scoped |
+| Windows Remote Apps | **Unreleased alpha:** persisted Host profiles → detached AppWorker → single owned app window → WebRTC video + bounded typed input; no full desktop/UAC/clipboard/audio; real-app device validation still required |
 | Mobile terminal | xterm.js PWA, touch special-key bar, on-demand long-text input |
+| Mobile Remote App | View / direct-touch / trackpad modes, two-finger scroll, special keys and bounded Unicode text/IME input |
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
 | Network exposure | Explicit `local` / `lan` / `reverseProxy` / direct `https` profiles; HTTPS/private entry is recommended |
 | Agent restart persistence | Implemented: independent Session Worker + authenticated local rediscovery |
@@ -61,11 +63,11 @@ PalmTTY is intentionally narrower than a browser IDE:
 
 ```text
 Phone / PWA
- ├─ Terminal pane (WSS → Session Worker)
- ├─ Git pane (bounded typed Source Control + history HTTP API)
- ├─ Files pane (workspace-scoped read-only preview/export HTTP API)
- └─ Artifacts pane (Session-scoped bounded image context)
-    │ HTTPS / WSS
+ ├─ Terminal activity (WSS → Terminal Worker)
+ ├─ Remote App activity (WebRTC → AppWorker; Windows x64 alpha)
+ ├─ Git / Files workspace tools (bounded typed HTTP APIs)
+ └─ Terminal Artifacts (Session-scoped bounded image context)
+    │ HTTPS / WSS + WebRTC signaling
     ▼
 Private HTTPS entry point
 (Tailscale Serve / QNAP / Caddy / equivalent)
@@ -74,18 +76,20 @@ Private HTTPS entry point
 PalmTTY Agent
  ├─ authentication + exact Origin policy
  ├─ persistent workspace catalog + runtime validation
- ├─ Worker registry / WebSocket proxy
+ ├─ Terminal/App Worker registries
+ ├─ terminal WebSocket proxy + Remote App signaling
  └─ static Web/PWA
     │ authenticated local IPC
-    ▼
-Session Worker (one per terminal)
- ├─ node-pty / ConPTY
- ├─ headless xterm snapshot
- └─ bounded sequenced replay
-    │
+    ├───────────────┐
+    ▼               ▼
+Terminal Worker     AppWorker (Windows x64 alpha)
+ ├─ node-pty        ├─ WebRTC video/control
+ ├─ headless xterm  └─ native single-window app host
+ └─ seq + replay             │
+    │                        └─ Codex Desktop / VS Code / ...
 Host shell / WSL shell
     │
-Codex / Git / npm / dotnet / ...
+Codex CLI / Git / npm / dotnet / ...
 ```
 
 A browser disconnect does **not** kill the PTY. Restarting only the PalmTTY Agent also leaves the independent Session Worker and PTY alive; after the Agent returns, sign in again and reconnect to the same Session. PalmTTY can automatically start the Agent again on Windows/Linux, but it does **not** claim PTY persistence across OS reboot, user logoff, or loss of the Worker process itself. Autostart restores the control plane; persisted Workspaces remain available for creating new Sessions.
@@ -195,6 +199,7 @@ Deployment references:
 - [QNAP/reverse-proxy example](examples/qnap-reverse-proxy.yaml)
 - [Caddy example](examples/Caddyfile.example)
 - [Community security guide](docs/community/security.md)
+- [Remote Apps / 远程 App](docs/community/remote-apps.md)
 - [Security policy](SECURITY.md)
 
 ## Repository quality gates / 质量门禁
