@@ -458,6 +458,14 @@ export async function listAppSessions() {
   );
 }
 
+export async function getAppSession(id: string) {
+  return responseJson<{ session: AppSessionPublic }>(
+    await fetch(`/api/v1/app-sessions/${encodeURIComponent(id)}`, {
+      credentials: "same-origin"
+    })
+  );
+}
+
 export async function createAppSession(workspaceId: string, profileId: string) {
   return responseJson<{ session: AppSessionPublic }>(await fetch(
     "/api/v1/app-sessions",
