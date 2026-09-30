@@ -515,9 +515,9 @@ internal static class PalmTTYRemoteAppHost
             throw new DirectoryNotFoundException("Remote App working directory does not exist: " + config.Cwd);
         }
         if (config.Args == null || config.Args.Length > 32) throw new InvalidDataException("Remote App args are invalid");
-        if (config.FrameRate < 5 || config.FrameRate > 30) throw new InvalidDataException("Remote App frame rate is invalid");
-        if (config.MaxWidth < 320 || config.MaxWidth > 2560) throw new InvalidDataException("Remote App maxWidth is invalid");
-        if (config.MaxHeight < 240 || config.MaxHeight > 1600) throw new InvalidDataException("Remote App maxHeight is invalid");
+        if (config.FrameRate < 5 || config.FrameRate > 15) throw new InvalidDataException("Remote App frame rate is invalid");
+        if (config.MaxWidth < 320 || config.MaxWidth > 1600) throw new InvalidDataException("Remote App maxWidth is invalid");
+        if (config.MaxHeight < 240 || config.MaxHeight > 1000) throw new InvalidDataException("Remote App maxHeight is invalid");
     }
 
     private static IntPtr CreateConfiguredJob()
