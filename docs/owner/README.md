@@ -11,6 +11,7 @@
 - [reconnect.md](reconnect.md) — 断线重连与终端状态恢复
 - [security.md](security.md) — 安全模型、认证与公网边界
 - [web-mobile.md](web-mobile.md) — 手机端 Web/PWA 交互
+- [remote-apps.md](remote-apps.md) — Windows Remote Apps、AppWorker/WebRTC 与移动控制边界
 - [deployment.md](deployment.md) — Windows、QNAP 与反向代理部署
 - [github-governance.md](github-governance.md) — GitHub Ruleset、合并策略、社区治理与仓库设置
 - [roadmap.md](roadmap.md) — 当前完成度与后续阶段
