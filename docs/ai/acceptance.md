@@ -152,11 +152,11 @@ Real Windows + phone acceptance before claiming a specific desktop application i
 
 - configure a Host Workspace Remote App profile and confirm save-time plus launch-time executable validation;
 - launch the profile and confirm the browser request contains only workspaceId + profileId, while no executable/PID/HWND is browser-selected;
-- verify the helper captures only a window owned by the PalmTTY-launched process tree and does not fall back to the desktop when the target cannot be captured;
+- verify the helper captures only a window whose process is a member of the PalmTTY-owned Job Object and does not fall back to the desktop when the target cannot be captured;
 - test View / Touch / Trackpad, two-finger scroll, Ctrl/Alt/Shift/common keys, Chinese IME/voice text and device rotation;
 - background/foreground or switch phone network and confirm WebRTC reconnect does not create a second application process;
 - restart only the Agent and confirm the adopted AppWorker/application remain alive and are rediscovered;
-- terminate the App Session and confirm the PalmTTY Job Object closes the launched process tree;
+- terminate the App Session and confirm the PalmTTY Job Object closes all member processes;
 - kill the AppWorker/control path during a disposable test and confirm the native helper terminates its Job Object instead of leaving an orphan application;
 - confirm an elevated/UAC application cannot be controlled from normal-user PalmTTY and do **not** bypass UIPI;
 - test intended apps such as Codex Desktop/VS Code individually. If PrintWindow returns blank/protected/GPU-incompatible frames, record the app as unvalidated/unsupported instead of enabling whole-desktop capture.
