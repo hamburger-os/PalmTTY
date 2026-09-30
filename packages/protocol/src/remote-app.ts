@@ -72,7 +72,8 @@ export type RemoteAppOfferRequest = z.infer<typeof RemoteAppOfferRequestSchema>;
 
 export const RemoteAppAnswerResponseSchema = z.object({
   type: z.literal("answer"),
-  sdp: SdpSchema
+  sdp: SdpSchema,
+  connectionId: z.string().min(1).max(128)
 }).strict();
 export type RemoteAppAnswerResponse = z.infer<typeof RemoteAppAnswerResponseSchema>;
 
