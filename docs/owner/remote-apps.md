@@ -9,7 +9,7 @@ Remote Apps 是 PalmTTY 的第二类交互 Activity，用于从手机远程操�
 - 每个 App Session 一个独立 AppWorker；
 - AppWorker 与 Terminal Worker 使用不同的 IPC protocol generation 和 runtime 目录；
 - 浏览器只按持久化 Workspace 中的 Remote App Profile ID 启动，不能在创建请求里临时提交 executable、argv、PID 或 HWND；
-- 原生 helper 只选择自己启动的根进程及其后代拥有的可见顶层窗口；
+- 原生 helper 只选择自己启动的PalmTTY Job Object 成员进程拥有的可见顶层窗口；
 - 画面通过 WebRTC video track 直接传给浏览器，受限输入通过 WebRTC DataChannel 回到 AppWorker；
 - Agent 仍只负责认证、Origin、Workspace authority、Session registry 和 signaling。
 
@@ -30,7 +30,7 @@ Phone / PWA
              ├─ native WebRTC
              └─ Windows Remote App host
                     ├─ PalmTTY-owned Job Object
-                    ├─ owned-process-tree window discovery
+                    ├─ Job-membership window validation
                     ├─ window-only capture
                     └─ restricted SendInput
                          │
@@ -63,6 +63,8 @@ App Session 采用和终端相似但独立的 durability 原则：
 和 Terminal Worker 一样，recovery record 中的 PID 只能用于诊断，不能作为 Agent 任意 kill 进程的 authority。
 
 ## 捕获边界
+
+当前 Windows native host 还把源窗口限制为最大 4096×4096 且不超过 12 MP，避免在缩放前为异常大窗口分配无界 Bitmap；AppWorker 帧缓冲固定上限 8 MiB，控制通道和 helper stdin backpressure 也有独立上限。
 
 当前 Windows native host 使用 PrintWindow(PW_RENDERFULLCONTENT) 捕获**已验证属于 PalmTTY 启动进程树的单个窗口**，并按 Profile 尺寸上限缩放后送入 AppWorker 的 WebRTC video source。
 
