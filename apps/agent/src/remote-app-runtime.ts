@@ -19,7 +19,7 @@ type Peer = {
 };
 
 const FRAME_HEADER_BYTES = 16;
-const MAX_FRAME_BYTES = 32 * 1024 * 1024;
+const MAX_FRAME_BYTES = 8 * 1024 * 1024;
 const MAX_HELPER_STDERR_BYTES = 16 * 1024;
 const HELPER_READY_PREFIX = "PALMTTY_APP_HOST_READY ";
 const ICE_GATHER_TIMEOUT_MS = 5_000;
@@ -183,7 +183,7 @@ export class RemoteAppRuntime {
         return;
       }
       channel.onmessage = (message: any) => {
-        if (typeof message.data !== "string") return;
+        if (typeof message.data !== "string" || message.data.length > 32 * 1024) return;
         this.forwardControl(message.data);
       };
     };
@@ -250,7 +250,12 @@ export class RemoteAppRuntime {
 
   private forwardControl(source: string): void {
     const helper = this.helper;
-    if (!helper || helper.stdin.destroyed || this.state !== "running") return;
+    if (
+      !helper ||
+      helper.stdin.destroyed ||
+      helper.stdin.writableNeedDrain ||
+      this.state !== "running"
+    ) return;
     try {
       const message = parseRemoteAppControlMessage(source);
       const encoded = JSON.stringify(message);
@@ -290,7 +295,7 @@ export class RemoteAppRuntime {
       const expected = width * height * 4;
       if (
         width < 2 || height < 2 ||
-        width > 2560 || height > 1600 ||
+        width > 1600 || height > 1000 ||
         width % 2 !== 0 || height % 2 !== 0 ||
         length !== expected ||
         length < 1 || length > MAX_FRAME_BYTES
