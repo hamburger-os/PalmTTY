@@ -19,7 +19,8 @@ function workspaceForProcessWorker(): WorkspaceDefinition {
           kind: "host",
           shell: requiredWindowsShellPath(),
           args: ["-NoLogo", "-NoProfile"]
-        }
+        },
+        remoteApps: []
       }
     : {
         id: "process",
@@ -29,7 +30,8 @@ function workspaceForProcessWorker(): WorkspaceDefinition {
           kind: "host",
           shell: "/bin/sh",
           args: ["-i"]
-        }
+        },
+        remoteApps: []
       };
 }
 
