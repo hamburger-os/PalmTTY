@@ -34,7 +34,7 @@ export class RemoteAppRuntime {
   private helper: ChildProcessWithoutNullStreams | undefined;
   private appPid: number | undefined;
   private exitCode: number | undefined;
-  private frameBuffer = Buffer.alloc(0);
+  private frameBuffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   private readonly statusListeners = new Set<StatusListener>();
   private readonly exitListeners = new Set<ExitListener>();
   private peer: Peer | undefined;
