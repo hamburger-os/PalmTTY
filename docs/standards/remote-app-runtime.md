@@ -14,9 +14,9 @@ Authoritative references used by the Windows/Web implementation:
 
 Project interpretation:
 
-- capture authority is the PalmTTY-launched application process tree, not the logged-in desktop;
+- capture authority is the PalmTTY-launched PalmTTY-owned Job Object, not the logged-in desktop;
 - failure to capture one app is not authorization to fall back to whole-desktop capture;
-- input is allowed only after re-validating that the target window belongs to the owned process tree;
+- input is allowed only after re-validating that the target window belongs to the PalmTTY-owned Job Object;
 - Windows UIPI / integrity-level restrictions documented with SendInput remain a security boundary and must not be bypassed;
 - the AppWorker is a disposable native-media boundary and has a separate authenticated recovery generation from Terminal Workers;
 - no TURN/cloud relay is part of the core architecture at this stage.
