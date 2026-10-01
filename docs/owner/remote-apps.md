@@ -135,7 +135,7 @@ PID 仍只用于诊断，不能成为 Agent 任意 kill 进程的 authority。
 - `streaming`
 - `capture-unavailable`
 
-Web 端分别显示原生捕获状态、AppWorker 收到帧/成功提交帧/转换失败计数、浏览器实际已解码首帧状态。WebRTC 已连接但无首帧会触发明确诊断；浏览器禁止自动播放时提供手动播放动作。
+Web 端分别管理原生捕获状态、AppWorker 收到帧/成功提交帧/转换失败计数、浏览器实际已解码首帧状态。首帧前可在空画面区域显示等待/失败信息；收到首帧后即使 Worker 的轮询状态暂时仍是等待，也不能覆盖正常视频。后续连接重建、卡帧和捕获异常以 Dock 内不遮挡画面的提示表示。媒体诊断计数收纳到按需展开的工具菜单；浏览器禁止自动播放时保留明确的手动重播动作。
 
 ## ICE / TURN
 
@@ -186,7 +186,7 @@ Workbench 顶部可以在同一 Workspace 的 live Terminal/App Activity 间切�
 
 Windows Host 的启动阶段为 `validate-profile → create-job → activate-msix/create-win32 → assign-job → resume-process → ready`；失败时以有限长度输出阶段、异常类型和 HRESULT。原生 WebRTC 在 Host READY 后才加载，避免激活失败又触发 native teardown 崩溃。MSIX 包身份尚未验证时禁止终止所返回 PID；系统复用单实例或拒绝 Job 归属仍严格拒绝接管。
 
-手机客户端以画面和当前 VisualViewport 为主，顶部工作区导航收成一行，工具菜单按需显示 Git/文件；在视频内提供操作模式、诊断和完整显示/裁切填充。底部固定核心快捷键栏，额外导航键展开后仍不能越过 Safari 安全区域。触控板由单独状态机管理单指相对移动、轻点及双指中心滚动，取消手势不发送误点击；仅远程控制模式使用原生非被动 touchmove 抑制浏览器滚动。
+手机客户端以画面和当前 VisualViewport 为主，顶部工作区导航收成一行，工具菜单按需显示 Git/文件。根布局把普通页面 section 的留白限定在首页；沉浸模式同时隐藏标题栏和移除对应 Grid 行，保证绝对定位的活动内容仍占满唯一可用行。操作模式、常驻沉浸切换和按需工具/媒体诊断位于视频外的紧凑底部控制条，快捷键栏紧随其后，整个 Dock 不能越过 Safari 安全区域。完整显示、裁切填充和已验证可实际调整 Windows 应用窗口的「适应手机」继续分别承担不同功能；不为已工作的窗口尺寸调整增加新的权限/API。触控板由独立状态机管理单指相对移动、轻点及双指中心滚动，取消手势不发送误点击；仅远程控制模式使用原生非被动 touchmove 抑制浏览器滚动。
 
 浏览器 display hint 继续按同一比例因子缩放宽高；显式 `adaptWindow` 只可尝试调整当前 Job-owned HWND 的尺寸，关闭或 Helper 退出时恢复原尺寸，不得选择其他窗口或桌面。深色 UI 在两种 PrintWindow 模式下均为黑色时标记诊断歧义并继续发送帧；不能把颜色采样当成确定的捕获失败。Windows Graphics Capture 仍未完成独立的真实设备安全验收。
 

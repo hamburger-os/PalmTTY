@@ -250,10 +250,10 @@ if (
 }
 
 // Remote App video and controls must never inherit a global section margin or collapse in immersive mode.
-if (/^section\\s*\\{/m.test(styles) || !styles.includes(".app-shell > section {")) {
+if (/^section\s*\{/m.test(styles) || !styles.includes(".app-shell > section {")) {
   failures.push("apps/web/src/styles.css [remote-app-spacing] unscoped section margin");
 }
-if (!styles.includes(".workbench-page.is-remote-app.remote-app-immersive {\\n    grid-template-rows: minmax(0, 1fr);")) {
+if (!styles.includes(".workbench-page.is-remote-app.remote-app-immersive {\n    grid-template-rows: minmax(0, 1fr);")) {
   failures.push("apps/web/src/styles.css [remote-app-immersive] missing single-row content grid");
 }
 if (!remoteAppView.includes('className="remote-app-dock"') ||
