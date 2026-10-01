@@ -1174,9 +1174,24 @@ internal static class PalmTTYRemoteAppHost
                 AdaptedWindow = hwnd;
             }
             if (LastAppliedWidth == width && LastAppliedHeight == height) return;
-            // Only resize the current Job-owned HWND. Never move it, select
-            // another window, resize the desktop or elevate to bypass the OS.
-            if (SetWindowPos(hwnd, IntPtr.Zero, 0, 0, width, height,
+            // SetWindowPos sizes the outer HWND, while capture uses the DWM
+            // visible frame (which omits invisible Win32 resize borders).
+            // Compensate only those small bounded non-client margins so the
+            // captured frame matches the phone's requested presentation ratio.
+            int extraWidth = 0;
+            int extraHeight = 0;
+            RECT outer;
+            RECT visible;
+            if (GetWindowRect(hwnd, out outer) &&
+                TryGetWindowBounds(hwnd, out visible))
+            {
+                extraWidth = Math.Max(0, Math.Min(32, outer.Width - visible.Width));
+                extraHeight = Math.Max(0, Math.Min(32, outer.Height - visible.Height));
+            }
+            // Still only resize the verified Job-owned HWND: no desktop
+            // capture, window selection, DPI bypass or elevation.
+            if (SetWindowPos(hwnd, IntPtr.Zero, 0, 0,
+                width + extraWidth, height + extraHeight,
                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE))
             {
                 LastAppliedWidth = width;
