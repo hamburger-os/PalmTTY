@@ -145,7 +145,6 @@ export function parseInstalledAppDiscovery(value: unknown): RemoteAppCatalogEntr
       typeof record.name !== "string" ||
       typeof record.executable !== "string" ||
       record.name.trim().length === 0 ||
-      record.name.trim().length === 0 ||
       !/^[A-Za-z]:\\/.test(record.executable) ||
       path.win32.extname(record.executable).toLowerCase() !== ".exe" ||
       record.executable.length > 4096
