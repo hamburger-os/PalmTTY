@@ -13,7 +13,9 @@ function frame(width: number, height: number): Buffer {
 
 describe("Remote App bounded streaming frame parser", () => {
   it("accepts every possible split of a native frame", () => {
-    const source = frame(32, 16);
+    // Exercise every boundary without turning a parser unit test into a
+    // multi-second quadratic assertion benchmark in Windows/Ubuntu CI.
+    const source = frame(8, 4);
     for (let split = 1; split < source.length; split++) {
       const decoder = new RemoteAppFrameDecoder();
       const received: Buffer[] = [];
