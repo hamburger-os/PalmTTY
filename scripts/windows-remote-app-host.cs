@@ -476,17 +476,26 @@ internal static class PalmTTYRemoteAppHost
 
             job = CreateConfiguredJob();
             JobHandle = job;
-            process = StartApplicationSuspended(config);
+            bool packaged = String.Equals(config.Kind, "packaged", StringComparison.Ordinal);
+            process = packaged
+                ? StartPackagedApplication(config)
+                : StartApplicationSuspended(config);
             if (!AssignProcessToJobObject(job, process.hProcess))
             {
-                ThrowLastError("AssignProcessToJobObject");
+                // Windows Store may deny assignment to an existing OS Job.
+                // Reject that app rather than broadening capture to external PIDs.
+                if (packaged) TerminateProcess(process.hProcess, 1);
+                ThrowLastError("AssignProcessToJobObject (the packaged app must be newly launched and job-ownable)");
             }
-            if (ResumeThread(process.hThread) == RESUME_FAILED)
+            if (!packaged)
             {
-                ThrowLastError("ResumeThread");
+                if (ResumeThread(process.hThread) == RESUME_FAILED)
+                {
+                    ThrowLastError("ResumeThread");
+                }
+                CloseHandle(process.hThread);
+                process.hThread = IntPtr.Zero;
             }
-            CloseHandle(process.hThread);
-            process.hThread = IntPtr.Zero;
 
             ErrorOutput.WriteLine("PALMTTY_APP_HOST_READY " + process.dwProcessId.ToString());
             PublishMediaState("waiting-for-window");
@@ -550,10 +559,20 @@ internal static class PalmTTYRemoteAppHost
     private static void ValidateConfig(AppConfig config)
     {
         if (config == null) throw new InvalidDataException("Remote App config is missing");
-        if (String.IsNullOrWhiteSpace(config.Executable) || !File.Exists(config.Executable))
+        if (String.Equals(config.Kind, "win32", StringComparison.Ordinal))
         {
-            throw new FileNotFoundException("Remote App executable does not exist", config.Executable);
+            if (String.IsNullOrWhiteSpace(config.Executable) || !File.Exists(config.Executable))
+                throw new FileNotFoundException("Remote App executable does not exist", config.Executable);
         }
+        else if (String.Equals(config.Kind, "packaged", StringComparison.Ordinal))
+        {
+            if (String.IsNullOrWhiteSpace(config.PackageFamilyName) ||
+                String.IsNullOrWhiteSpace(config.AppUserModelId) ||
+                !config.AppUserModelId.StartsWith(
+                    config.PackageFamilyName + "!", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("MSIX package identity is invalid");
+        }
+        else throw new InvalidDataException("Unsupported Remote App launch kind");
         if (String.IsNullOrWhiteSpace(config.Cwd) || !Directory.Exists(config.Cwd))
         {
             throw new DirectoryNotFoundException("Remote App working directory does not exist: " + config.Cwd);
