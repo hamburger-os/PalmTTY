@@ -310,6 +310,10 @@ async function main() {
       path.join(toolsDir, "installed-cli.mjs")
     ),
     copyFile(
+      path.join(repoRoot, "scripts", "remote-app-video-smoke.mjs"),
+      path.join(toolsDir, "remote-app-video-smoke.mjs")
+    ),
+    copyFile(
       path.join(repoRoot, "scripts", "autostart-core.mjs"),
       path.join(toolsDir, "autostart-core.mjs")
     ),
