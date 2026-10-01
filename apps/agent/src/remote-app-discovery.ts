@@ -8,6 +8,7 @@ import {
 import { resolveExecutable } from "./workspace-runtime.js";
 
 const MAX_DISCOVERY_RESULTS = 64;
+const MAX_PACKAGED_RESULTS = 256;
 const MAX_DISCOVERY_OUTPUT_BYTES = 128 * 1024;
 const DISCOVERY_TIMEOUT_MS = 8000;
 
@@ -154,7 +155,7 @@ export function parseInstalledAppDiscovery(value: unknown): RemoteAppCatalogEntr
     seen.add(key);
     result.push({
       name: record.name.trim().slice(0, 100),
-      executable: record.executable,
+      launch: { kind: "win32", executable: record.executable },
       source: "detected"
     });
   }
@@ -221,7 +222,9 @@ export async function discoverRemoteApps(
   const results: RemoteAppCatalogEntry[] = [];
   const seen = new Set<string>();
   const add = (entry: RemoteAppCatalogEntry) => {
-    const key = path.win32.normalize(entry.executable).toLowerCase();
+    const key = entry.launch.kind === "win32"
+      ? path.win32.normalize(entry.launch.executable).toLowerCase()
+      : entry.launch.appUserModelId.toLowerCase();
     if (!seen.has(key) && results.length < MAX_DISCOVERY_RESULTS) {
       seen.add(key);
       results.push(entry);
@@ -251,7 +254,7 @@ export async function discoverRemoteApps(
       }
     }
     if (resolved) add({
-      name: candidate.name, executable: resolved, source: "detected"
+      name: candidate.name, launch: { kind: "win32", executable: resolved }, source: "detected"
     });
   }
   for (const entry of await queryInstalledApps(environment)) add(entry);
