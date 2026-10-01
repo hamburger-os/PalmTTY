@@ -1,9 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint } from "./remote-app-presentation.js";
+import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition } from "./remote-app-presentation.js";
 
 const limits = { minWidth: 320, minHeight: 240, maxWidth: 1600, maxHeight: 1000 };
 
 describe("Remote App video presentation", () => {
+  it("positions the remote cursor exactly where the same video point would click", () => {
+    const surface = { left: 0, top: 0, width: 360, height: 700 };
+    const video = { width: 1280, height: 720 };
+    for (const fit of ["contain", "cover"] as const) {
+      const pixel = remoteVideoCursorPosition(surface, video, { x: 0.5, y: 0.5 }, fit);
+      expect(pixel).toBeDefined();
+      const back = remoteVideoPoint(surface, video, pixel!.x, pixel!.y, fit, false);
+      expect(back?.x).toBeCloseTo(0.5);
+      expect(back?.y).toBeCloseTo(0.5);
+    }
+    expect(remoteVideoCursorPosition(surface, video, { x: 0, y: 0.5 }, "cover")).toBeUndefined();
+    expect(remoteVideoCursorPosition(surface, video, { x: 0.5, y: 0 }, "contain")!.y)
+      .toBeGreaterThan(0);
+    expect(remoteVideoCursorPosition(surface, { width: 0, height: 0 }, { x: 1, y: 1 }, "contain"))
+      .toBeUndefined();
+  });
+
   it("does not report a Safari stall when native video callbacks never fired", () => {
     expect(hasStalledVideoFrames(false, 1000, 30_000)).toBe(false);
     expect(hasStalledVideoFrames(true, 1000, 30_000)).toBe(true);

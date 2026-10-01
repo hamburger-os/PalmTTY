@@ -1,48 +1,42 @@
 import { describe, expect, it } from "vitest";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
 
-describe("remote trackpad gesture ownership", () => {
-  it("sends a click only for an unmodified single-finger tap", () => {
+describe("remote trackpad gestures", () => {
+  it("recognizes a one-finger tap and suppresses moved and long taps", () => {
     const gesture = new RemoteTouchpadGesture();
-    gesture.down(1, { x: 0.2, y: 0.3 });
-    expect(gesture.up(1)).toBe(true);
-    gesture.down(2, { x: 0.2, y: 0.3 });
-    expect(gesture.move(2, { x: 0.4, y: 0.5 })).toEqual({
-      type: "move", dx: 0.2, dy: 0.2
-    });
-    expect(gesture.up(2)).toBe(false);
+    gesture.down(1, { x: .2, y: .3 }, 100);
+    expect(gesture.canLongPress(1)).toBe(true);
+    expect(gesture.up(1, 200)).toBe("left");
+    gesture.down(2, { x: .2, y: .3 }, 1000);
+    expect(gesture.move(2, { x: .4, y: .5 })).toEqual({ type: "move", dx: .2, dy: .2 });
+    expect(gesture.canLongPress(2)).toBe(false);
+    expect(gesture.up(2, 1100)).toBeNull();
+    gesture.down(3, { x: .2, y: .3 }, 2000);
+    expect(gesture.up(3, 2450)).toBeNull();
   });
-
-  it("uses two-finger centroid movement, resets when either finger lifts, and never taps", () => {
+  it("uses two-finger tap for right click without synthesizing a left click", () => {
     const gesture = new RemoteTouchpadGesture();
-    gesture.down(1, { x: 0.1, y: 0.1 });
-    gesture.down(2, { x: 0.3, y: 0.1 });
-    const first = gesture.move(1, { x: 0.1, y: 0.2 });
+    gesture.down(1, { x: .2, y: .2 }, 100);
+    gesture.down(2, { x: .3, y: .2 }, 130);
+    expect(gesture.canLongPress(1)).toBe(false);
+    expect(gesture.up(1, 200)).toBeNull();
+    expect(gesture.up(2, 230)).toBe("right");
+  });
+  it("scrolls by centroid and never clicks after partial lift or cancellation", () => {
+    const gesture = new RemoteTouchpadGesture();
+    gesture.down(1, { x: .1, y: .1 }, 100);
+    gesture.down(2, { x: .3, y: .1 }, 100);
+    const first = gesture.move(1, { x: .1, y: .2 });
     expect(first?.type).toBe("scroll");
-    if (first?.type === "scroll") expect(first.dy).toBeCloseTo(0.05);
-    const second = gesture.move(2, { x: 0.3, y: 0.2 });
+    if (first?.type === "scroll") expect(first.dy).toBeCloseTo(.05);
+    const second = gesture.move(2, { x: .3, y: .2 });
     expect(second?.type).toBe("scroll");
-    if (second?.type === "scroll") expect(second.dy).toBeCloseTo(0.05);
-    expect(gesture.up(1)).toBe(false);
-    const motion = gesture.move(2, { x: 0.35, y: 0.25 });
-    expect(motion?.type).toBe("move");
-    if (motion?.type === "move") {
-      expect(motion.dx).toBeCloseTo(0.05);
-      expect(motion.dy).toBeCloseTo(0.05);
-    }
-    expect(gesture.up(2)).toBe(false);
-  });
-
-  it("does not interpret a cancelled or partial two-finger gesture as a click", () => {
-    const gesture = new RemoteTouchpadGesture();
-    gesture.down(1, { x: 0.2, y: 0.2 });
+    if (second?.type === "scroll") expect(second.dy).toBeCloseTo(.05);
+    expect(gesture.up(1)).toBeNull();
+    expect(gesture.move(2, { x: .35, y: .25 })?.type).toBe("move");
+    expect(gesture.up(2)).toBeNull();
+    gesture.down(3, { x: .2, y: .2 }, 1000);
     gesture.cancel();
-    expect(gesture.up(1)).toBe(false);
-    gesture.down(2, { x: 0.2, y: 0.2 });
-    gesture.down(3, { x: 0.3, y: 0.3 });
-    expect(gesture.up(3)).toBe(false);
-    expect(gesture.up(2)).toBe(false);
-    gesture.down(4, { x: 0.4, y: 0.4 });
-    expect(gesture.up(4)).toBe(true);
+    expect(gesture.up(3)).toBeNull();
   });
 });

@@ -1,4 +1,5 @@
 export type GesturePoint = { x: number; y: number };
+export type TouchpadTap = "left" | "right" | null;
 export type TouchpadMotion =
   | { type: "move"; dx: number; dy: number }
   | { type: "scroll"; dx: number; dy: number };
@@ -14,18 +15,20 @@ export class RemoteTouchpadGesture {
   private centroid: GesturePoint | null = null;
   private usedTwoFingers = false;
   private moved = false;
+  private startedAt = 0;
   private origin: GesturePoint | null = null;
 
   has(pointerId: number): boolean {
     return this.pointers.has(pointerId);
   }
 
-  down(pointerId: number, point: GesturePoint): void {
+  down(pointerId: number, point: GesturePoint, now = Date.now()): void {
     if (this.pointers.has(pointerId)) return;
     if (this.pointers.size === 0) {
       this.usedTwoFingers = false;
       this.moved = false;
       this.origin = point;
+      this.startedAt = now;
     }
     this.pointers.set(pointerId, point);
     if (this.pointers.size > 1) this.usedTwoFingers = true;
@@ -58,14 +61,20 @@ export class RemoteTouchpadGesture {
     return { type: "move", dx, dy };
   }
 
-  up(pointerId: number): boolean {
-    if (!this.pointers.has(pointerId)) return false;
+  canLongPress(pointerId: number): boolean {
+    return this.pointers.size === 1 && this.pointers.has(pointerId) &&
+      !this.usedTwoFingers && !this.moved;
+  }
+
+  up(pointerId: number, now = Date.now()): TouchpadTap {
+    if (!this.pointers.has(pointerId)) return null;
     this.pointers.delete(pointerId);
     this.centroid = this.currentCentroid();
-    if (this.pointers.size > 0) return false;
-    const click = !this.moved && !this.usedTwoFingers;
+    if (this.pointers.size > 0) return null;
+    const tap = !this.moved && now - this.startedAt <= 380
+      ? (this.usedTwoFingers ? "right" : "left") : null;
     this.cancel();
-    return click;
+    return tap;
   }
 
   cancel(): void {
@@ -74,6 +83,7 @@ export class RemoteTouchpadGesture {
     this.usedTwoFingers = false;
     this.moved = false;
     this.origin = null;
+    this.startedAt = 0;
   }
 
   private currentCentroid(): GesturePoint | null {
