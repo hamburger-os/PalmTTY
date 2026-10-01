@@ -1,6 +1,15 @@
 export type VideoFit = "contain" | "cover";
 export type RemoteAppVisualState = "waiting" | "playing" | "interrupted";
 
+/** Safari can paint an attached live WebRTC frame before its video-frame callback fires. */
+export function hasPresentableVideoFrame(
+  liveTrack: boolean, sourceAttached: boolean, mediaReadyState: number,
+  videoWidth: number, videoHeight: number
+): boolean {
+  return liveTrack && sourceAttached && mediaReadyState >= 2 &&
+    videoWidth > 0 && videoHeight > 0;
+}
+
 /** Only browser-decoded frames can clear initial loading; hints and worker polling cannot. */
 export function remoteAppVisualState(
   hasRenderedFrame: boolean, currentTrackRendered: boolean, hasPlaybackIssue: boolean

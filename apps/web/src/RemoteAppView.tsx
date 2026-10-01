@@ -25,7 +25,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
-import { remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, type VideoFit } from "./remote-app-presentation.js";
+import { hasPresentableVideoFrame, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, type VideoFit } from "./remote-app-presentation.js";
 
 export type RemoteAppConnectionState =
   | "connecting"
@@ -184,6 +184,15 @@ export function RemoteAppView({
     setEverRendered(false);
   }, [session.id]);
 
+  const attemptPlayback = useCallback((
+    video: HTMLVideoElement, isCurrent: () => boolean
+  ) => {
+    void video.play().then(
+      () => { if (isCurrent()) setPlayRejected(false); },
+      () => { if (isCurrent()) setPlayRejected(true); }
+    );
+  }, []);
+
   useEffect(() => {
     if (!optionsOpen) return;
     const closeOutside = (event: PointerEvent) => {
@@ -266,10 +275,10 @@ export function RemoteAppView({
     }
     const timer = window.setInterval(() => {
       if (stopped) return;
-      if (!videoRenderedRef.current && currentTrackRef.current?.readyState === "live" &&
-          video.srcObject !== null &&
-          video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-          video.videoWidth > 0 && video.videoHeight > 0) {
+      if (!videoRenderedRef.current && hasPresentableVideoFrame(
+        currentTrackRef.current?.readyState === "live",
+        video.srcObject !== null, video.readyState, video.videoWidth, video.videoHeight
+      )) {
         // iOS may paint a WebRTC frame before (or without) invoking rVFC.
         if (callbackId !== undefined) video.cancelVideoFrameCallback?.(callbackId);
         frame();
@@ -361,7 +370,7 @@ export function RemoteAppView({
         currentTrackRef.current = event.track;
         const stream = event.streams[0] ?? new MediaStream([event.track]);
         video.srcObject = stream;
-        void video.play().then(() => setPlayRejected(false), () => setPlayRejected(true));
+        attemptPlayback(video, () => connection === peer && !controller.signal.aborted);
       };
       peer.onconnectionstatechange = () => {
         if (connection !== peer || controller.signal.aborted) return;
@@ -464,7 +473,7 @@ export function RemoteAppView({
       const video = videoRef.current;
       if (video) video.srcObject = null;
     };
-  }, [capabilities?.iceServers, sendDisplayHint, session.id]);
+  }, [attemptPlayback, capabilities?.iceServers, sendDisplayHint, session.id]);
 
   useEffect(() => {
     if (!active) return;
@@ -617,6 +626,11 @@ export function RemoteAppView({
     });
   };
 
+  const retryPlayback = () => {
+    const video = videoRef.current;
+    if (video) attemptPlayback(video, () => videoRef.current === video);
+  };
+
   const diagnostic = networkIssue
     ? (capabilities?.relayConfigured
       ? t("remoteApp.networkUnavailable")
@@ -676,13 +690,7 @@ export function RemoteAppView({
             <span>{blockingNotice}</span>
             {playRejected && (
               <button type="button" className="ghost"
-                onClick={() => {
-                  const video = videoRef.current;
-                  if (video) void video.play().then(
-                    () => setPlayRejected(false),
-                    () => setPlayRejected(true)
-                  );
-                }}>{t("remoteApp.retryPlay")}</button>
+                onClick={retryPlayback}>{t("remoteApp.retryPlay")}</button>
             )}
           </div>
         )}
@@ -724,13 +732,7 @@ export function RemoteAppView({
             <span>{warningNotice}</span>
             {playRejected && (
               <button type="button" className="ghost compact"
-                onClick={() => {
-                  const video = videoRef.current;
-                  if (video) void video.play().then(
-                    () => setPlayRejected(false),
-                    () => setPlayRejected(true)
-                  );
-                }}>{t("remoteApp.retryPlay")}</button>
+                onClick={retryPlayback}>{t("remoteApp.retryPlay")}</button>
             )}
           </div>
         )}

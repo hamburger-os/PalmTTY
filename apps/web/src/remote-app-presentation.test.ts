@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { remoteAppVisualState, remoteDisplaySize, remoteVideoPoint } from "./remote-app-presentation.js";
+import { hasPresentableVideoFrame, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint } from "./remote-app-presentation.js";
 
 const limits = { minWidth: 320, minHeight: 240, maxWidth: 1600, maxHeight: 1000 };
 
 describe("Remote App video presentation", () => {
+  it("recognizes a Safari-presentable frame only from an attached live track", () => {
+    expect(hasPresentableVideoFrame(true, true, 2, 640, 480)).toBe(true);
+    expect(hasPresentableVideoFrame(true, true, 4, 640, 480)).toBe(true);
+    expect(hasPresentableVideoFrame(false, true, 4, 640, 480)).toBe(false);
+    expect(hasPresentableVideoFrame(true, false, 4, 640, 480)).toBe(false);
+    expect(hasPresentableVideoFrame(true, true, 1, 640, 480)).toBe(false);
+    expect(hasPresentableVideoFrame(true, true, 4, 0, 480)).toBe(false);
+  });
+
   it("does not return to the waiting overlay when a decoded frame is already visible", () => {
     expect(remoteAppVisualState(false, false, false)).toBe("waiting");
     expect(remoteAppVisualState(false, false, true)).toBe("waiting");
