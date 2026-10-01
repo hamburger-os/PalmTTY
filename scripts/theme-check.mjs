@@ -80,6 +80,9 @@ const gitPanePath = path.join(webSource, "GitPane.tsx");
 const filesPanePath = path.join(webSource, "FilesPane.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
 const terminalKeyBar = await readFile(terminalKeyBarPath, "utf8");
+const mobilePrimaryInputs = await readFile(path.join(webSource, "MobilePrimaryInputActions.tsx"), "utf8");
+const remoteAppKeybar = await readFile(path.join(webSource, "RemoteAppKeybar.tsx"), "utf8");
+const remoteAppLiveKeyboard = await readFile(path.join(webSource, "remote-app-live-keyboard.ts"), "utf8");
 const remoteAppPresentation = await readFile(path.join(webSource, "remote-app-presentation.ts"), "utf8");
 const terminalImeInput = await readFile(terminalImeInputPath, "utf8");
 const terminalKeyInput = await readFile(terminalKeyInputPath, "utf8");
@@ -259,7 +262,11 @@ if (!/\.workbench-page\.is-remote-app\.remote-app-immersive\s*\{[^}]*grid-templa
 }
 if (!terminalKeyBar.includes('className="keybar-pinned"') ||
     !terminalKeyBar.includes('onClick={onToggleMore}') ||
-    !terminalKeyBar.includes('onClick={onLongInput}') ||
+    !terminalKeyBar.includes('onLongText={onLongInput}') ||
+    !terminalKeyBar.includes('<MobilePrimaryInputActions') ||
+    !mobilePrimaryInputs.includes('onClick={onKeyboard}') ||
+    !mobilePrimaryInputs.includes('onClick={onLongText}') ||
+    mobilePrimaryInputs.indexOf('onClick={onKeyboard}') > mobilePrimaryInputs.indexOf('onClick={onLongText}') ||
     !terminalKeyBar.includes('id="terminal-keybar-more"') ||
     terminalKeyBar.includes('dockMode') ||
     !workspaceWorkbench.includes('mobile-workbench-tools') ||
@@ -273,7 +280,15 @@ if (!remoteAppView.includes('className="remote-app-dock"') ||
     remoteAppView.includes('className="remote-app-waiting"') ||
     !remoteAppView.includes('<details className="remote-app-diagnostics">') ||
     !remoteAppView.includes('className="remote-app-cursor"') ||
-    !remoteAppView.includes('className="remote-app-keybar-shell glass-panel"') ||
+    !remoteAppKeybar.includes('className="remote-app-keybar-shell glass-panel"') ||
+    !remoteAppKeybar.includes('<MobilePrimaryInputActions') ||
+    !remoteAppView.includes('onKeyboard={toggleKeyboard}') ||
+    !remoteAppView.includes('onLongText={toggleLongText}') ||
+    !remoteAppView.includes('ref={liveKeyboardRef}') ||
+    !remoteAppView.includes('liveKeyboardRef.current?.focus') ||
+    !remoteAppView.includes('onCompositionEnd=') ||
+    !remoteAppLiveKeyboard.includes('shouldCommitRemoteLiveText(') ||
+    !styles.includes('.remote-app-live-keyboard textarea {') ||
     !remoteAppView.includes('className="remote-app-extra-keys glass-panel"') ||
     !remoteAppView.includes('ref={cursorOverlayRef}') ||
     !remoteAppView.includes('queueRelativeMotion(relative)') ||
@@ -459,11 +474,10 @@ for (const marker of [
   }
 }
 
-const appKeybar = remoteAppView.split('<div className="remote-app-keybar"')[1]?.split('</div>')[0] ?? "";
-if (!appKeybar.includes('aria-pressed={textOpen}') ||
-    appKeybar.indexOf('aria-pressed={textOpen}') > appKeybar.indexOf('aria-pressed={ctrl}') ||
+if (!remoteAppKeybar.includes('keyboardOpen, textOpen, moreKeysOpen') ||
+    !remoteAppKeybar.includes('onKeyboard={onKeyboard} onLongText={onLongText}') ||
     remoteAppView.split('<div className="remote-app-options">')[1]?.split('</div>')[0]?.includes('t("remoteApp.text")')) {
-  failures.push("apps/web [remote-app-text-dock] Text must be the first bottom key and absent from display options");
+  failures.push("apps/web [remote-app-primary-inputs] Keyboard and Long Text must share the CLI ordering; do not duplicate Text in options");
 }
 
 if (failures.length) {
