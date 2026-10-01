@@ -113,11 +113,17 @@ export async function browseRemoteAppExecutables(
   const localAppData = environmentValue(environment, "LOCALAPPDATA");
   const programFiles = environmentValue(environment, "ProgramFiles");
   const programFilesX86 = environmentValue(environment, "ProgramFiles(x86)");
-  const defaultPath = localAppData
+  const programsPath = localAppData
     ? path.join(localAppData, "Programs")
-    : os.homedir();
-
-  const target = requestedPath ?? defaultPath;
+    : undefined;
+  const locations = uniqueLocations(await Promise.all([
+    existingDirectoryLocation("Programs", programsPath),
+    existingDirectoryLocation("Local AppData", localAppData),
+    existingDirectoryLocation("Program Files", programFiles),
+    existingDirectoryLocation("Program Files (x86)", programFilesX86),
+    existingDirectoryLocation("~", os.homedir())
+  ]));
+  const target = requestedPath ?? locations[0]?.path ?? os.homedir();
   if (!path.isAbsolute(target)) {
     throw new Error("Remote App browser path must be absolute");
   }
@@ -126,14 +132,6 @@ export async function browseRemoteAppExecutables(
   if (!(await stat(currentPath)).isDirectory()) {
     throw new Error("Selected Remote App path is not a directory");
   }
-
-  const locations = uniqueLocations(await Promise.all([
-    existingDirectoryLocation("Programs", defaultPath),
-    existingDirectoryLocation("Local AppData", localAppData),
-    existingDirectoryLocation("Program Files", programFiles),
-    existingDirectoryLocation("Program Files (x86)", programFilesX86),
-    existingDirectoryLocation("~", os.homedir())
-  ]));
 
   const directories: RemoteAppExecutableLocation[] = [];
   const executables: RemoteAppCatalogEntry[] = [];
