@@ -13,7 +13,7 @@ describe("Remote App video presentation", () => {
     expect(contained.y).toBeGreaterThan(covered.y);
     expect(contained.x).toBeCloseTo(.16);
     expect(covered.y).toBeCloseTo(.16);
-    expect(remoteTouchpadDelta({ x: 2, y: -2 }, surface, video, "cover"))
+    expect(remoteTouchpadDelta({ x: 100, y: -100 }, surface, video, "cover"))
       .toEqual({ x: 1, y: -1 });
   });
 
