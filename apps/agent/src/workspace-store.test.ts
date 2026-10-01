@@ -3,7 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { WorkspaceDefinition } from "@palmtty/protocol";
-import { FileWorkspaceStore, MemoryWorkspaceStore } from "./workspace-store.js";
+import {
+  FileWorkspaceStore,
+  MemoryWorkspaceStore,
+  WORKSPACE_STORE_VERSION
+} from "./workspace-store.js";
 
 const tempDirs = new Set<string>();
 
@@ -43,7 +47,7 @@ describe("workspace store", () => {
       version: number;
       workspaces: WorkspaceDefinition[];
     };
-    expect(document.version).toBe(1);
+    expect(document.version).toBe(WORKSPACE_STORE_VERSION);
     expect(document.workspaces[0]?.name).toBe("Renamed");
 
     const reloaded = new FileWorkspaceStore(filePath);
@@ -52,6 +56,20 @@ describe("workspace store", () => {
 
     await store.delete("main");
     expect(store.list()).toEqual([]);
+  });
+
+  it("rejects previous Workspace persistence generations", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "palmtty-workspaces-"));
+    tempDirs.add(directory);
+    const filePath = path.join(directory, "workspaces.json");
+    await import("node:fs/promises").then(({ writeFile }) =>
+      writeFile(filePath, JSON.stringify({
+        version: 1,
+        workspaces: []
+      }))
+    );
+    const store = new FileWorkspaceStore(filePath);
+    await expect(store.initialize()).rejects.toThrow();
   });
 
   it("rejects duplicate workspace ids in initialized state", async () => {
