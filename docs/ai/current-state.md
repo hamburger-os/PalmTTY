@@ -29,7 +29,7 @@ Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus 
 ### Agent and security
 
 - Fastify HTTP/WebSocket service
-- versioned per-user persistent Workspace store managed through authenticated + exact-Origin CRUD API; the layered schema uses store generation v2 (`workspaces-v2.json`) and intentionally does not read/migrate v1, leaving the old file untouched instead of blocking Agent startup
+- versioned per-user persistent Workspace store managed through authenticated + exact-Origin CRUD API; the typed Win32/MSIX launch schema uses store generation v3 (`workspaces-v3.json`); v1/v2 catalogs are intentionally not read or migrated and remain available for manual reference
 - built-in single-user bootstrap-token login
 - random in-memory login session cookie with bounded active-session count
 - explicit `local` / `lan` / `reverseProxy` / direct `https` exposure profiles: bind host, trusted Origins and Secure-cookie behavior are derived from the profile; `lan` additionally rejects non-private client source addresses; legacy low-level exposure switches are rejected

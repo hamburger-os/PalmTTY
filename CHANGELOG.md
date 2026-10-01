@@ -19,7 +19,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Changed
 
-- Replace the Remote App executable-only profile with a typed Win32/MSIX launch identity; this intentionally breaks the pre-release profile format. The native AppWorker receives bounded single-allocation PTF1 frames rather than repeatedly concatenating large stdout chunks.
+- Replace the Remote App executable-only profile with a typed Win32/MSIX launch identity and increment the persistence generation to `workspaces-v3.json`; v1/v2 catalogs are left untouched and Workspaces must be recreated. This intentionally breaks the pre-release profile format. The native AppWorker receives bounded single-allocation PTF1 frames rather than repeatedly concatenating large stdout chunks.
 
 - Separate Workspace basics, nested Terminal launch settings and Remote App profiles. Remote App profiles now persist only app identity/executable/argv; capture size is automatically adapted from the live phone surface inside a 320×240–1600×1000 envelope, with a 1280×800 @ 12 fps runtime default and 4096×4096 / 12 MP source-window allocation ceiling.
 - Windows packages now include a precompiled GUI-subsystem Remote App host; source mode compiles the same helper into the private per-user App runtime on first use.

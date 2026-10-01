@@ -9,7 +9,7 @@ import {
 import { z } from "zod";
 
 const MAX_WORKSPACES = 256;
-export const WORKSPACE_STORE_VERSION = 2 as const;
+export const WORKSPACE_STORE_VERSION = 3 as const;
 
 const WorkspaceFileSchema = z.object({
   version: z.literal(WORKSPACE_STORE_VERSION),

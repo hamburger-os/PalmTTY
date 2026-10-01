@@ -17,7 +17,7 @@ A Remote App profile contains an ID, display name, typed Win32 executable or reg
 
 The normal flow is **Add application → choose a detected Win32/Store app or browse for an .exe → optionally add argv → save**. Discovery is bounded: PalmTTY prioritizes Get-StartApps entries verified against current-user MSIX package registrations, then checks known PATH entries, installation roots, App Paths and capped Start Menu shortcuts. The detected catalog is searchable and limited to 64 applications; the separate executable browser exposes only directories and `.exe` files. A manual executable path remains an Advanced fallback.
 
-An App Session is created only by persisted `workspaceId + profileId`. The browser cannot provide an arbitrary executable, PID, HWND, environment override or capture target when starting a session.
+This breaking pre-release launch schema uses `workspaces-v3.json`; old v1/v2 files stay untouched but Workspace profiles must be recreated. An App Session is created only by persisted `workspaceId + profileId`. The browser cannot provide an arbitrary executable, PID, HWND, environment override or capture target when starting a session.
 
 Remote Apps are Windows-host activities even when the Workspace Terminal uses WSL. Terminal/Git/Files may use the persisted WSL runtime while a Remote App still launches as the current Windows user.
 
@@ -77,7 +77,7 @@ Remote App Profile 只包含 ID、显示名称、Win32 可执行文件或已注�
 
 正常流程是：**添加应用 → 选择检测到的 Win32/Store 应用或浏览 .exe → 可选填写 argv → 保存**。应用检测是有界能力：PalmTTY 优先读取 Get-StartApps 中与当前用户 Get-AppxPackage 注册信息匹配的 MSIX 应用，再有界检查已知应用、PATH、App Paths 和开始菜单快捷方式；可执行文件浏览器只暴露目录和 `.exe`。手动路径仍保留在“高级”中作为兜底。
 
-创建 App Session 时浏览器仍只能提交持久化的 `workspaceId + profileId`，不能临时提交 executable、PID、HWND、环境覆盖或捕获目标。
+新的不兼容启动格式使用 `workspaces-v3.json`，旧 v1/v2 文件保持原样但需要重新创建 Workspace。创建 App Session 时浏览器仍只能提交持久化的 `workspaceId + profileId`，不能临时提交 executable、PID、HWND、环境覆盖或捕获目标。
 
 Remote App 是 Windows 宿主 Activity，即使 Workspace 的 Terminal 使用 WSL 也可以独立存在。Terminal/Git/Files 可以继续使用持久化 WSL runtime，而 Remote App 仍以当前 Windows 普通用户启动。
 

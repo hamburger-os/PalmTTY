@@ -338,7 +338,7 @@ export async function discoverRemoteApps(
   };
 
   // Place Store apps first so alias EXEs and a large Start Menu cannot hide Codex.
-  for (const entry of await queryPackagedApps(environment)) add(entry);
+  for (const entry of (await queryPackagedApps(environment)).slice(0, 24)) add(entry);
 
   // Resolve well-known apps before the generic catalog, so a large Start
   // Menu cannot crowd out the most useful default selections.

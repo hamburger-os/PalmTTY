@@ -67,12 +67,16 @@ try {
       frames = setInterval(() => source.onFrame({ width, height, data: i420 }), 60);
     } catch (error) { reject(error); }
   });
-  console.log("Remote App synthetic RGBA → I420 → WebRTC → RTCVideoSink: passed");
-} finally {
   clearTimeout(timer);
   clearInterval(frames);
-  sink?.stop();
-  track.stop();
-  sender.close();
-  receiver.close();
+  // @roamhq/wrtc may crash on Windows during libwebrtc teardown. AppWorkers
+  // likewise isolate this native lifecycle in a disposable process. Assert a
+  // real received video frame above, then exit before unsafe addon teardown.
+  process.stdout.write("Remote App synthetic RGBA → I420 → WebRTC → RTCVideoSink: passed\n",
+    () => process.exit(0));
+} catch (error) {
+  clearTimeout(timer);
+  clearInterval(frames);
+  console.error(error);
+  process.exit(1);
 }

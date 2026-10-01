@@ -62,12 +62,14 @@ describe("workspace store", () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "palmtty-workspaces-"));
     tempDirs.add(directory);
     const filePath = path.join(directory, "workspaces.json");
-    await writeFile(filePath, JSON.stringify({
-      version: 1,
-      workspaces: []
-    }));
-    const store = new FileWorkspaceStore(filePath);
-    await expect(store.initialize()).rejects.toThrow();
+    for (const previousVersion of [1, 2]) {
+      await writeFile(filePath, JSON.stringify({
+        version: previousVersion,
+        workspaces: []
+      }));
+      const store = new FileWorkspaceStore(filePath);
+      await expect(store.initialize()).rejects.toThrow();
+    }
   });
 
   it("rejects duplicate workspace ids in initialized state", async () => {

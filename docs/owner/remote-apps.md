@@ -59,7 +59,7 @@ Workspace 持久化：
 - 一个 Terminal launch profile；
 - 一组 Remote App profile。
 
-创建/修改 Workspace 仍属于“认证 + 精确 Origin”的高权限持久操作。
+创建/修改 Workspace 仍属于“认证 + 精确 Origin”的高权限持久操作。当前 typed launch catalog 使用 `workspaces-v3.json`，故意不读取旧的 v1/v2 文件，用户需重新创建 Workspace。
 
 ### Terminal
 

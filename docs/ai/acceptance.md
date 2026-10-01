@@ -44,7 +44,7 @@ Security, session and reconnect changes should include or update tests for:
 - exit delivery and retention-expiry cleanup
 - concurrent maxSessions enforcement
 - workspace CRUD requires authentication + exact Origin
-- workspace persistence round-trip and duplicate-ID rejection
+- workspace v3 persistence round-trip, v1/v2 rejection and duplicate-ID rejection
 - workspace deletion blocked while a Session is active, but allowed after exit even during retention
 - Host runtime executable/cwd validation, Windows fresh Machine/User environment rebuilding, workspace-environment override/exclusion behavior, and removal/reservation of PalmTTY control variables before Worker bootstrap
 - bounded unified terminal-profile discovery with exact-Origin authentication, known Host-shell detection, WSL distribution enumeration without distro startup, and a manual Custom fallback in the Web editor
