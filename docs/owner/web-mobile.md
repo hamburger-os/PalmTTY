@@ -52,8 +52,8 @@
 - 手机终端不再维护 PalmTTY 自己的逐行 touch adapter：`.xterm-screen` 只用 `touch-action: none` 阻止 Safari/浏览器把手势变成页面平移，触摸事件继续由 xterm 自己的 Gesture/Viewport 路径处理，因此 normal scrollback 使用连续像素滚动与惯性，alternate buffer、mouse tracking、滚动条也保持同一套 xterm 语义；不建立第二个 DOM 滚动层，也不增加应用级 document touch handler。终端普通 click/tap 只承担 `terminal.focus()` 的键盘激活桥接，不读取 touch delta、不拦截 swipe；手机 keybar 另提供显式“键盘”按钮作为可靠入口；在 coarse-pointer/mobile 布局上，所有可编辑 `input/textarea/select`（包括紧凑主题/性能/语言选择器、登录/Git 输入和 xterm helper textarea）统一至少 16px，避免 iOS 因聚焦小字号控件而主动放大页面；
 - 自动重连状态；
 - 浏览器键盘/IME 仍以 xterm 为唯一主 owner；针对 iOS/CJK 输入法 `keyCode=229` 的已知上游缺口，只在 xterm 公开的 textarea / custom-key-handler / input API 外围增加一个窄状态机：暂存同一事务内的 `onData`，等 textarea 最终值后只提交一次差量；真实 `compositionstart` 会立即取消兜底。物理 Ctrl+字母、Ctrl+Space、Escape 只在非 composing 的 229 keydown 且有明确 `KeyboardEvent.code` 时恢复，避免 keyup 重复发送；
-- 手机快捷键栏不再由 `TerminalView` 手写字节序列：独立纯函数编码层统一负责基础键、Ctrl/Alt 修饰、xterm CSI 导航和 DECCKM application-cursor 模式；Enter 与字面量 `/` 作为核心键前置，核心行还提供 Esc、Tab、方向键、Ctrl+C、Ctrl+J、Shift+Tab、Ctrl+D；
-- “更多”展开行为只增加第二条横向可滚动按键行，不建立新的纵向 scroll owner；其中补充 `\\`、`|`、`~`、PgUp/PgDn、Home/End、Backspace/Delete，以及 Ctrl+L/R/O/G/K/A/E/U/W。Ctrl / Alt 仍是一键一次性修饰，软键盘字符与虚拟导航键共用同一修饰语义，成功发送或断线后都会清除 armed 状态；
+- 手机快捷键栏不再由 `TerminalView` 手写字节序列：独立纯函数编码层统一负责基础键、Ctrl/Alt 修饰、xterm CSI 导航和 DECCKM application-cursor 模式；手机键盘和高频长文本固定为前两项，常用行还保留 Esc、Tab、Enter、`/`、Ctrl；方向键、Ctrl+C/J/D、Shift+Tab 等通过固定在滚动区外的“更多”一次展开；
+- “更多”固定在第一行滚动区外，一次点击直接打开第二条横向可滚动按键行，再点“收起”关闭，不再经过完整模式或保留几乎不节省高度的隐藏态；其中补充 `\\`、`|`、`~`、PgUp/PgDn、Home/End、Backspace/Delete，以及 Ctrl+L/R/O/G/K/A/E/U/W。Ctrl / Alt 仍是一键一次性修饰，软键盘字符与虚拟导航键共用同一修饰语义，成功发送或断线后都会清除 armed 状态；
 - 适合粘贴、语音输入和 AI Prompt 的按需长文本弹窗通过 xterm `paste()` 进入终端，保留 bracketed-paste 语义，并把“仅粘贴”和“粘贴并回车”分成两个显式动作；不再常驻聊天式发送栏；
 - A−/A+ 调整浏览器本地终端字号（11–18px），直接更新已挂载 xterm 后走现有 ResizeObserver/FitAddon refit，不重建 xterm/WebSocket/Session；这用于窄屏宽表格等密集输出的可读性调节，而不是解析或重排 CLI 输出；
 - 竖屏/横屏布局；
@@ -121,6 +121,10 @@ Remote App 画面状态必须可诊断：等待窗口、等待首帧、正在串
 
 ## 精简 CLI 与手机导航
 
-Terminal/Remote App 在手机上共用单行工作台标题栏，通过按需展开的「工具」访问 Git、文件及终端附件。Terminal 键栏默认精简（手机键盘、Esc、Tab、Enter、`/`、Ctrl），完整模式包含 Alt、方向键、Ctrl 快捷键、字体大小、长文本和第二排更多键，隐藏模式保留明显的恢复按钮；展开/隐藏入口永远固定在可横向滚动的按键区之外。三态只改变浏览器展示布局，由原有 mount ResizeObserver/FitAddon 重新计算终端行列，不能重建 xterm 或 WebSocket。
+Terminal/Remote App 在手机上共用单行工作台标题栏，通过按需展开的「工具」访问 Git、文件及终端附件。Terminal 键栏直接显示手机键盘、长文本、Esc、Tab、Enter、`/`、Ctrl，“更多/收起”固定在横向滚动区之外，一次点击展开或收起包含 Alt、方向键、Ctrl 快捷键、字体大小及编辑按键的第二行。已移除多余的完整/隐藏状态；展开仅改变浏览器布局，由原有 mount ResizeObserver/FitAddon 重新计算终端行列，不能重建 xterm 或 WebSocket。
 
 Remote App 视频仅叠加不接管触摸事件的主题 SVG 鼠标，坐标来自受控 Windows 窗口；支持长按拖动和双指右键，DataChannel 就绪与 Windows 原生输入被拒绝分别显示。
+
+## 本轮 CLI 与 Remote App 微调
+
+CLI 将长文本固定在键盘之后第二位，仅保留始终可见的核心行和直接展开的“更多/收起”，不再提供收益有限的隐藏态或中间完整模式。Remote App 底部常用/额外按键均使用共享 `.glass-panel` 主题材质与标准控制令牌，不再以不透明 `--flat-content` 单独铺底。鼠标光标由 26×34 缩小为 17×24 CSS px，描边与阴影同步减轻，保留受控窗口验证与 contain/cover 映射。真机主题矩阵仍需部署后验收。
