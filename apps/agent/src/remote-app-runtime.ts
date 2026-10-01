@@ -7,7 +7,8 @@ import {
   REMOTE_APP_CAPTURE_DEFAULT_WIDTH,
   parseRemoteAppControlMessage,
   type AppSessionMediaState,
-  type AppSessionPublic
+  type AppSessionPublic,
+  type RemoteAppIceServer
 } from "@palmtty/protocol";
 import type {
   RemoteAppWorkerBootstrap
@@ -191,13 +192,15 @@ export class RemoteAppRuntime {
     });
   }
 
-  async negotiate(clientId: string, offerSdp: string): Promise<string> {
+  async negotiate(
+    clientId: string,
+    offerSdp: string,
+    iceServers: RemoteAppIceServer[]
+  ): Promise<string> {
     if (this.state !== "running") throw new Error("Remote App is not running");
     this.closePeer();
 
-    const connection = new this.wrtc.RTCPeerConnection({
-      iceServers: this.bootstrap.iceServers
-    });
+    const connection = new this.wrtc.RTCPeerConnection({ iceServers });
     this.peer = { clientId, connection };
 
     connection.addTrack(this.videoTrack);
