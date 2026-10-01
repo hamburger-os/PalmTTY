@@ -463,6 +463,9 @@ internal static class PalmTTYRemoteAppHost
     private static volatile int CaptureMaxHeight = 800;
     private static string LastMediaState = "";
     private static string LastCaptureReason = "";
+    private static int LastCursorX = -2;
+    private static int LastCursorY = -2;
+    private static long LastCursorSampleTicks;
     private static string StartupStage = "bootstrap";
     private static BinaryWriter Output;
     private static StreamWriter ErrorOutput;
@@ -850,6 +853,7 @@ internal static class PalmTTYRemoteAppHost
                     streaming = false;
                     PublishCaptureReason("window-not-found");
                     PublishMediaState("waiting-for-window");
+                    PublishCursorHidden();
                 }
                 else
                 {
@@ -860,9 +864,11 @@ internal static class PalmTTYRemoteAppHost
                     {
                         PublishCaptureReason("window-not-found");
                         PublishMediaState("waiting-for-window");
+                        PublishCursorHidden();
                         Thread.Sleep(delay);
                         continue;
                     }
+                    PublishCursorForOwnedWindow(hwnd, rect);
                     if (!streaming && captureFailures == 0)
                     {
                         PublishMediaState("waiting-for-frame");
@@ -886,6 +892,7 @@ internal static class PalmTTYRemoteAppHost
             }
             catch
             {
+                PublishCursorHidden();
                 PublishCaptureReason("capture-exception");
                 captureFailures += 1;
                 if (captureFailures >= Math.Max(8, config.FrameRate * 2))
@@ -895,6 +902,48 @@ internal static class PalmTTYRemoteAppHost
                 }
             }
             Thread.Sleep(delay);
+        }
+    }
+
+    // Only normalized coordinates inside the verified application window leave
+    // the host. Desktop positions, unrelated windows and cursor imagery never do.
+    private static void PublishCursorForOwnedWindow(IntPtr hwnd, RECT rect)
+    {
+        POINT point;
+        if (!IsOwnedWindow(hwnd) || !GetCursorPos(out point) ||
+            point.X < rect.Left || point.X >= rect.Right ||
+            point.Y < rect.Top || point.Y >= rect.Bottom)
+        {
+            PublishCursorHidden();
+            return;
+        }
+        int x = (int)Math.Round((point.X - rect.Left) * 1000000.0 / Math.Max(1, rect.Width - 1));
+        int y = (int)Math.Round((point.Y - rect.Top) * 1000000.0 / Math.Max(1, rect.Height - 1));
+        PublishCursor(Math.Max(0, Math.Min(1000000, x)),
+            Math.Max(0, Math.Min(1000000, y)));
+    }
+
+    private static void PublishCursorHidden()
+    {
+        PublishCursor(-1, -1);
+    }
+
+    private static void PublishCursor(int x, int y)
+    {
+        lock (StateLock)
+        {
+            long now = DateTime.UtcNow.Ticks;
+            // Refresh unchanged positions once a second so a new peer receives
+            // a stable snapshot without increasing media/IPC traffic every frame.
+            if (x == LastCursorX && y == LastCursorY &&
+                now - LastCursorSampleTicks < TimeSpan.TicksPerSecond) return;
+            LastCursorX = x;
+            LastCursorY = y;
+            LastCursorSampleTicks = now;
+            if (ErrorOutput != null)
+                ErrorOutput.WriteLine("PALMTTY_APP_HOST_CURSOR " +
+                    x.ToString(System.Globalization.CultureInfo.InvariantCulture) + " " +
+                    y.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
     }
 

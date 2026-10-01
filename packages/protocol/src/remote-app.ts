@@ -287,6 +287,21 @@ export const RemoteAppControlMessageSchema = z.discriminatedUnion("type", [
 ]);
 export type RemoteAppControlMessage = z.infer<typeof RemoteAppControlMessageSchema>;
 
+// Server -> browser only. Coordinates are relative to the verified owned
+// application window and deliberately reveal no desktop/global position.
+export const RemoteAppCursorMessageSchema = z.discriminatedUnion("visible", [
+  z.object({ type: z.literal("cursor"), visible: z.literal(true),
+    x: UnitCoordinateSchema, y: UnitCoordinateSchema }).strict(),
+  z.object({ type: z.literal("cursor"), visible: z.literal(false) }).strict()
+]);
+export type RemoteAppCursorMessage = z.infer<typeof RemoteAppCursorMessageSchema>;
+
+export function parseRemoteAppCursorMessage(raw: string): RemoteAppCursorMessage {
+  if (encoder.encode(raw).byteLength > 256) throw new Error("Cursor message too large");
+  return RemoteAppCursorMessageSchema.parse(JSON.parse(raw));
+}
+
+
 export function parseRemoteAppControlMessage(value: string): RemoteAppControlMessage {
   if (encoder.encode(value).byteLength > REMOTE_APP_DATA_MAX_BYTES) {
     throw new Error("Remote App control message exceeds 32 KiB");
