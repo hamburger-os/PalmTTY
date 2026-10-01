@@ -29,6 +29,7 @@ import {
   type RemoteAppWorkerSpawner
 } from "./remote-app-worker-spawner.js";
 import { resolveRemoteAppLaunch } from "./remote-app-launch.js";
+import { assertRemoteAppWebRtcAvailable } from "./remote-app-webrtc.js";
 import type { WorkspaceStore } from "./workspace-store.js";
 
 type ManagedRemoteApp = {
@@ -77,6 +78,7 @@ export class RemoteAppSessionManager {
   private pendingCreates = 0;
   private initialized = false;
   private closing = false;
+  private webRtcIssue: string | undefined;
 
   constructor(
     private readonly config: PalmTTYConfig,
@@ -91,7 +93,7 @@ export class RemoteAppSessionManager {
     const platformSupported = process.platform === "win32" && process.arch === "x64";
     const iceServers = this.config.remoteApps.webrtc.iceServers;
     return {
-      supported: enabled && platformSupported,
+      supported: enabled && platformSupported && !this.webRtcIssue,
       platform: process.platform,
       transport: "webrtc",
       capture: "window",
@@ -104,7 +106,9 @@ export class RemoteAppSessionManager {
         ? { reason: "Remote Apps are disabled by PalmTTY configuration" }
         : !platformSupported
           ? { reason: "Remote Apps currently require Windows x64" }
-          : {})
+          : this.webRtcIssue
+            ? { reason: this.webRtcIssue }
+            : {})
     };
   }
 
@@ -135,6 +139,14 @@ export class RemoteAppSessionManager {
         }
       }
     }));
+    if (this.config.remoteApps.enabled && process.platform === "win32" && process.arch === "x64") {
+      try {
+        await assertRemoteAppWebRtcAvailable();
+        this.webRtcIssue = undefined;
+      } catch (error) {
+        this.webRtcIssue = error instanceof Error ? error.message : String(error);
+      }
+    }
     this.initialized = true;
   }
 
@@ -190,6 +202,7 @@ export class RemoteAppSessionManager {
         launch.environment,
         excludedEnvKeys
       );
+      await assertRemoteAppWebRtcAvailable();
       const helperPath = await resolveRemoteAppHost();
       const id = sessionId();
       const endpoint = endpointId();
