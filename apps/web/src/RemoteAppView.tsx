@@ -137,6 +137,7 @@ export function RemoteAppView({
   const { t } = useI18n();
   const surfaceRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const currentTrackRef = useRef<MediaStreamTrack | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RTCDataChannel | null>(null);
   const [mode, setMode] = useState<InteractionMode>("view");
@@ -249,7 +250,7 @@ export function RemoteAppView({
     let stopped = false;
     let callbackId: number | undefined;
     const frame = () => {
-      if (stopped) return;
+      if (stopped || currentTrackRef.current?.readyState !== "live") return;
       videoRenderedRef.current = true;
       lastFrameAt.current = Date.now();
       setVideoRendered(true);
@@ -265,10 +266,14 @@ export function RemoteAppView({
     }
     const timer = window.setInterval(() => {
       if (stopped) return;
-      if (!videoRenderedRef.current &&
+      if (!videoRenderedRef.current && currentTrackRef.current?.readyState === "live" &&
+          video.srcObject !== null &&
           video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-          video.videoWidth > 0 && video.videoHeight > 0 &&
-          typeof video.requestVideoFrameCallback !== "function") frame();
+          video.videoWidth > 0 && video.videoHeight > 0) {
+        // iOS may paint a WebRTC frame before (or without) invoking rVFC.
+        if (callbackId !== undefined) video.cancelVideoFrameCallback?.(callbackId);
+        frame();
+      }
       if (connectedAt.current !== null && !videoRenderedRef.current &&
           Date.now() - connectedAt.current > 8000) setVideoTimedOut(true);
       if (!activeRef.current || document.hidden) {
@@ -307,6 +312,7 @@ export function RemoteAppView({
       clearConnectionTimer();
       channelRef.current = null;
       connectedAt.current = null;
+      currentTrackRef.current = null;
       if (connection) {
         try { connection.close(); } catch { /* ignore */ }
         connection = undefined;
@@ -349,8 +355,10 @@ export function RemoteAppView({
       };
 
       peer.ontrack = (event) => {
+        if (connection !== peer || controller.signal.aborted) return;
         const video = videoRef.current;
         if (!video) return;
+        currentTrackRef.current = event.track;
         const stream = event.streams[0] ?? new MediaStream([event.track]);
         video.srcObject = stream;
         void video.play().then(() => setPlayRejected(false), () => setPlayRejected(true));
