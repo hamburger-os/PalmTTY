@@ -143,8 +143,8 @@ internal static class PalmTTYRemoteAppHost
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT
     {
-        public int X { get; set; }
-        public int Y { get; set; }
+        public int X;
+        public int Y;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -402,7 +402,6 @@ internal static class PalmTTYRemoteAppHost
     private static IntPtr JobHandle = IntPtr.Zero;
     private static IntPtr TargetWindow = IntPtr.Zero;
     private static RECT TargetRect;
-    private static uint RootPid;
     private static volatile bool Stopping;
     private static BinaryWriter Output;
     private static StreamWriter ErrorOutput;
@@ -436,7 +435,6 @@ internal static class PalmTTYRemoteAppHost
             job = CreateConfiguredJob();
             JobHandle = job;
             process = StartApplicationSuspended(config);
-            RootPid = process.dwProcessId;
             if (!AssignProcessToJobObject(job, process.hProcess))
             {
                 ThrowLastError("AssignProcessToJobObject");
