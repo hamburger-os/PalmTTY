@@ -108,6 +108,42 @@ function boundedEven(value: number, minimum: number, maximum: number): number {
   return bounded % 2 === 0 ? bounded : bounded - 1;
 }
 
+function browserIceServers(
+  capabilities: RemoteAppCapabilities | null
+): RTCIceServer[] {
+  return (capabilities?.iceServers ?? []).map((server) => ({
+    urls: server.urls,
+    ...(server.username !== undefined ? { username: server.username } : {}),
+    ...(server.credential !== undefined ? { credential: server.credential } : {})
+  }));
+}
+
+function interactionModeLabelKey(
+  mode: InteractionMode
+):
+  | "remoteApp.mode.view"
+  | "remoteApp.mode.direct"
+  | "remoteApp.mode.touchpad" {
+  switch (mode) {
+    case "view": return "remoteApp.mode.view";
+    case "direct": return "remoteApp.mode.direct";
+    case "touchpad": return "remoteApp.mode.touchpad";
+  }
+}
+
+function interactionModeHintKey(
+  mode: InteractionMode
+):
+  | "remoteApp.hint.view"
+  | "remoteApp.hint.direct"
+  | "remoteApp.hint.touchpad" {
+  switch (mode) {
+    case "view": return "remoteApp.hint.view";
+    case "direct": return "remoteApp.hint.direct";
+    case "touchpad": return "remoteApp.hint.touchpad";
+  }
+}
+
 export function RemoteAppView({
   session,
   capabilities,
@@ -239,7 +275,7 @@ export function RemoteAppView({
       firstAttempt = false;
 
       const peer = new RTCPeerConnection({
-        iceServers: capabilities?.iceServers ?? []
+        iceServers: browserIceServers(capabilities)
       });
       connection = peer;
       peer.addTransceiver("video", { direction: "recvonly" });
@@ -532,7 +568,7 @@ export function RemoteAppView({
               className={mode === item ? "selected compact" : "ghost compact"}
               onClick={() => setMode(item)}
             >
-              {t("remoteApp.mode." + item)}
+              {t(interactionModeLabelKey(item))}
             </button>
           ))}
         </div>
@@ -567,7 +603,7 @@ export function RemoteAppView({
           </div>
         ) : (
           <div className="remote-app-mode-hint">
-            {t("remoteApp.hint." + mode)}
+            {t(interactionModeHintKey(mode))}
           </div>
         )}
       </div>
