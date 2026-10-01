@@ -189,11 +189,11 @@ async function readHostFile(
 }
 
 function wslPrefix(workspace: WorkspaceDefinition): string[] {
-  if (workspace.runtime.kind !== "wsl") {
+  if (workspace.terminal.runtime.kind !== "wsl") {
     throw new Error("Workspace is not a WSL runtime");
   }
-  return workspace.runtime.distribution
-    ? ["--distribution", workspace.runtime.distribution]
+  return workspace.terminal.runtime.distribution
+    ? ["--distribution", workspace.terminal.runtime.distribution]
     : [];
 }
 
@@ -371,7 +371,7 @@ export async function listWorkspaceFiles(
   excludedEnvironmentKeys: string[] = []
 ): Promise<WorkspaceFileListResponse> {
   const relativePath = normalizeWorkspaceRelativePath(requestedPath);
-  return workspace.runtime.kind === "wsl"
+  return workspace.terminal.runtime.kind === "wsl"
     ? listWslFiles(workspace, relativePath, excludedEnvironmentKeys)
     : listHostFiles(workspace, relativePath);
 }
@@ -383,7 +383,7 @@ export async function readWorkspaceFile(
 ): Promise<WorkspaceFileReadResponse> {
   const relativePath = normalizeWorkspaceRelativePath(requestedPath);
   if (!relativePath) throw new Error("File path is required");
-  return workspace.runtime.kind === "wsl"
+  return workspace.terminal.runtime.kind === "wsl"
     ? readWslFile(workspace, relativePath, excludedEnvironmentKeys)
     : readHostFile(workspace, relativePath);
 }
@@ -473,7 +473,7 @@ export async function readWorkspaceFileContent(
 ): Promise<WorkspaceFileContentReadResult> {
   const relativePath = normalizeWorkspaceRelativePath(requestedPath);
   if (!relativePath) throw new Error("File path is required");
-  return workspace.runtime.kind === "wsl"
+  return workspace.terminal.runtime.kind === "wsl"
     ? readWslFileContent(workspace, relativePath, excludedEnvironmentKeys)
     : readHostFileContent(workspace, relativePath);
 }
@@ -567,7 +567,7 @@ export async function readWorkspaceImage(
 ): Promise<WorkspaceImageReadResult> {
   const relativePath = normalizeWorkspaceRelativePath(requestedPath);
   if (!relativePath) throw new Error("File path is required");
-  return workspace.runtime.kind === "wsl"
+  return workspace.terminal.runtime.kind === "wsl"
     ? readWslImage(workspace, relativePath, excludedEnvironmentKeys)
     : readHostImage(workspace, relativePath);
 }
