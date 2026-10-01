@@ -3,8 +3,10 @@ import { chmod, mkdir, readFile, readdir, rename, stat, unlink, writeFile } from
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
+import { REMOTE_APP_WORKER_PROTOCOL_VERSION } from "./remote-app-worker-protocol.js";
 
-export const REMOTE_APP_RUNTIME_GENERATION = "app-runtime-v1" as const;
+export const REMOTE_APP_RUNTIME_GENERATION =
+  `app-runtime-v${REMOTE_APP_WORKER_PROTOCOL_VERSION}` as const;
 
 export const RemoteAppWorkerRecordSchema = z.object({
   version: z.literal(1),
