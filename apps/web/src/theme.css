@@ -340,7 +340,7 @@ button:disabled {
   background:
     var(--specular-panel),
     var(--theme-modal-veil),
-    var(--clear-panel);
+    var(--flat-modal);
   border: 1px solid var(--border-strong);
   border-top-color: var(--border-highlight);
   box-shadow: var(--modal-shadow);

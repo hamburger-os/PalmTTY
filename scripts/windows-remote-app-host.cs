@@ -1007,6 +1007,13 @@ internal static class PalmTTYRemoteAppHost
 
     private static bool CaptureWindow(IntPtr hwnd, RECT rect, int maxWidth, int maxHeight)
     {
+        // Ownership is revalidated immediately before capture, not merely
+        // during an earlier EnumWindows callback (HWND may be recycled).
+        if (!IsOwnedWindow(hwnd))
+        {
+            PublishCaptureReason("window-not-found");
+            return false;
+        }
         int sourceWidth = rect.Width;
         int sourceHeight = rect.Height;
         if (
@@ -1028,6 +1035,11 @@ internal static class PalmTTYRemoteAppHost
             // never read the desktop/window DC or include occluding windows.
             if (!ok || !HasVisiblePixels(source))
             {
+                if (!IsOwnedWindow(hwnd))
+                {
+                    PublishCaptureReason("window-not-found");
+                    return false;
+                }
                 using (Graphics clear = Graphics.FromImage(source))
                     clear.Clear(Color.Transparent);
                 ok = PrintOwnedWindow(hwnd, source, 0);

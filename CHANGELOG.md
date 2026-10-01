@@ -48,7 +48,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Fixed
 - Retry standard PrintWindow on the same verified window when full-content capture fails or yields blank pixels, and report bounded native capture failure reasons. Stop reporting successful video merely because PrintWindow or WebRTC signaling succeeded; show the actual browser playback state and provide a manual-play action when autoplay is blocked.
-- Use a semantic opaque video background to prevent the ambient gradient showing through an empty Remote App viewport.
+- Use an almost opaque theme-aware modal backing to keep the mobile App picker legible over the Workbench; use a semantic opaque video background to prevent the ambient gradient showing through an empty Remote App viewport.
 - Expand Windows Remote App discovery beyond PATH to known install roots, App Paths and capped Start Menu shortcut targets, and add searchable mobile results. Detect missing/incompatible native `@roamhq/wrtc` before AppWorker launch and validate the packaged WebRTC addon during Windows installed-runtime smoke.
 
 - Harden mobile terminal input for iOS/CJK IMEs: defer and deduplicate keyCode-229 punctuation (including literal `/`), recover confirmed keydown-only Ctrl+letter/Ctrl+Space/Escape physical-key cases without stealing real composition, honor DECCKM application-cursor sequences in the virtual keybar, preserve bracketed-paste semantics for long text, add literal symbol fallbacks, and allow browser-local A−/A+ terminal density adjustment without reconnecting the Session.

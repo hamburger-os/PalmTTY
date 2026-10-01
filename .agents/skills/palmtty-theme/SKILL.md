@@ -55,7 +55,7 @@ All themes share the same clear/specular glass tokens. Theme identity comes from
 Surface tiers:
 
 - `.glass-shell`: small application shells, top bars and login cards. Quality mode may use bounded backdrop sampling.
-- `.glass-modal`: modal dialogs that must visually isolate form/readability content from the ambient field. It uses a stronger theme veil and shadow, never large-area backdrop blur.
+- `.glass-modal`: modal dialogs that must visually isolate form/readability content from the ambient field. It uses a stronger theme veil, an almost opaque semantic `--flat-modal` base under the specular material, and shadow; never large-area backdrop blur or transparent overlay of underlying text.
 - `.glass-panel`: structural controls such as terminal header, key bar and composer shell. No large-area backdrop blur.
 - `.terminal-surface`: the single terminal viewport owner. Its opaque background must come from the same active xterm theme background value; do not place `.glass-content` behind xterm.
 - `.remote-app-surface`: the separately owned video viewport uses the opaque semantic `--remote-video-background` token when no remote frame is available. It must not leak ambient gradients or inherit the Terminal palette.
