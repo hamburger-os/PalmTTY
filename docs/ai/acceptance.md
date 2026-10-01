@@ -54,7 +54,7 @@ Security, session and reconnect changes should include or update tests for:
 - workspace environment editing accepts bounded `NAME=value` input, rejects duplicate/reserved/unbalanced-quote input, normalizes balanced outer quotes, and persists only through workspace CRUD
 - Host directory picker navigation returns absolute selectable paths without exposing files
 - Session workbench tab changes (Terminal/Git/Files/Artifacts) keep the terminal/xterm/WebSocket mounted, do not reset `lastSeq`, and do not emit hidden-pane geometry changes; returning to Terminal performs a safe refit. Artifact path insertion must write text only, never synthesize Enter or execute a command
-- terminal stack policy rejects ranged/drifted `@xterm/*` dependencies and the known browser `@xterm/xterm 6.0.0` touch-scroll regression; frozen-lock installation must resolve the exact browser/Worker set from `terminal-stack.json`; theme/static checks require a decorative `terminal-frame` around a padding-free `terminal-mount`, xterm opened directly into that mount, screen-local `touch-action: none`, mobile/coarse-pointer editable controls at 16px or larger, SessionWorkbench-only VisualViewport ownership that stays active at non-1 scale, opt-in viewport diagnostics, and no PalmTTY touch listener or `terminal.scrollLines` gesture shim; the mobile input contract additionally requires the isolated keyCode-229 transaction to deduplicate textarea/xterm delivery and cancel on genuine composition, keydown-only physical Ctrl+letter/Ctrl+Space/Escape recovery, a shared terminal-key encoder with first-class Enter/Ctrl+J/Shift+Tab/Ctrl+D and literal `/` fallback, accessible Ctrl/Alt state, application-cursor-mode-aware arrows, expandable symbol/navigation keys, explicit bracketed-paste-preserving paste versus paste+Enter actions, browser-local font-size bounds/refit, and unit coverage for IME deltas/control recovery plus normal/application/modified key sequences
+- terminal stack policy rejects ranged/drifted `@xterm/*` dependencies and the known browser `@xterm/xterm 6.0.0` touch-scroll regression; frozen-lock installation must resolve the exact browser/Worker set from `terminal-stack.json`; theme/static checks require a decorative `terminal-frame` around a padding-free `terminal-mount`, xterm opened directly into that mount, screen-local `touch-action: none`, mobile/coarse-pointer editable controls at 16px or larger, WorkspaceWorkbench-only VisualViewport ownership that stays active at non-1 scale, opt-in viewport diagnostics, and no PalmTTY touch listener or `terminal.scrollLines` gesture shim; the mobile input contract additionally requires the isolated keyCode-229 transaction to deduplicate textarea/xterm delivery and cancel on genuine composition, keydown-only physical Ctrl+letter/Ctrl+Space/Escape recovery, a shared terminal-key encoder with first-class Enter/Ctrl+J/Shift+Tab/Ctrl+D and literal `/` fallback, accessible Ctrl/Alt state, application-cursor-mode-aware arrows, expandable symbol/navigation keys, explicit bracketed-paste-preserving paste versus paste+Enter actions, browser-local font-size bounds/refit, and unit coverage for IME deltas/control recovery plus normal/application/modified key sequences
 - workspace file list/read/export APIs require authentication + exact Origin, use canonical relative paths, reject traversal/symlink escape, cap listings at 512 entries, cap text preview at 512 KiB, and report binary/truncated previews explicitly; complete-file export must be a separate read-only path capped at 8 MiB, reuse the same Host/WSL containment plus stable length-checked reads, return private no-store/no-sniff bytes, and prove that a truncated preview still exports the exact complete file; the Web copy/share/download path must not silently substitute preview bytes for complete content; the image-preview endpoint must reuse the same Host/WSL containment, accept only server-validated PNG/JPEG/WebP/GIF bytes, enforce dimension/pixel bounds, return no-sniff image responses, and stay bounded
 - Session artifact APIs require authentication + exact Origin, reject inactive upload targets, validate bytes rather than trusting filename/Content-Type, enforce per-file/count/aggregate/dimension/pixel bounds, keep random private storage outside the Workspace, expose a runtime-appropriate Host/WSL local path from immutable Session launch-runtime metadata, use stable bounded file-handle reads, survive Agent restart only while the Session recovery record is live, and clean up on clear/restart/retention expiry/startup orphan reconciliation
 - workspace Git APIs require authentication + exact Origin, handle non-repositories without failing the Agent, use porcelain-v2 structured status, make containing-repository scope explicit, bound status/diff/branch/history/commit-detail/commit-diff output, reject path traversal, disable external diff/textconv/fsmonitor execution for reads, and do not inherit the reserved `PALMTTY_*` control namespace or any separately configured PalmTTY auth-token environment key; history tests must prove first-page HEAD snapshot freezing, opaque bounded cursor continuation after the branch advances, optional file-scoped `--follow` history, nested-Workspace path translation, commit changed-file inspection and textual per-commit file diff, including deterministic first-parent changed-file/diff semantics for merge commits; History is read-only and must remain usable without the Web write-trust acknowledgement; typed writes must reject stale or incomplete/truncated status, serialize concurrent writes by resolved repository even when multiple Workspaces share it, preserve both old/new paths for rename-aware single-file staging, use explicit repository-wide stage-all/unstage-all operations, destructive restore must verify the loaded diff snapshot and stay unavailable for rename/untracked/conflict entries, hooks/interactive prompts stay disabled, repository filter execution requires explicit Web acknowledgement, and remote operations stay non-interactive
@@ -137,29 +137,42 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 
 Automated/static acceptance for any Remote App change:
 
-- protocol tests cover profile bounds/unique IDs, App Session state classification, signaling bounds and typed control-message bounds;
-- Remote App recovery storage is versioned separately from Terminal Worker state and round-trips record + secret cleanup;
-- App Session creation accepts only persisted workspaceId + profileId and rejects WSL/non-Host profiles, unknown profiles and unsupported platforms;
+- protocol tests prove App profile id/name/executable/argv bounds, unique IDs, App Session/media-state classification, signaling bounds, ICE server bounds and typed pointer/key/text/display-hint control bounds;
+- Workspace protocol tests prove Terminal launch settings live under `workspace.terminal`; removed top-level runtime/startupCommand shapes are rejected rather than compatibility-migrated;
+- Remote App recovery storage generation stays independent from Terminal Worker state and aligned with the Remote App Worker protocol version;
+- App Session creation accepts only persisted workspaceId + profileId. It rejects unknown profiles/unsupported platforms and never accepts browser executable/argv/environment/PID/HWND;
+- a Workspace using WSL for its Terminal profile may still retain/launch Windows Remote App profiles; Git/Files continue to interpret the nested Terminal runtime;
+- Remote App discovery endpoints require authentication + exact Origin, are rate-limited, and expose only bounded known-app results or directories + `.exe` entries; they are not file-content/command APIs;
+- Workspace mutation and App Session creation both revalidate executable resolution;
 - Workspace deletion is blocked by active Terminal **or** active Remote App Sessions;
 - AppWorker bootstrap removes PalmTTY control/auth environment keys, requires authenticated adoption, retains recovery authority across Agent reconnect and never treats persisted PID as kill authority;
-- Windows packaging compiles a GUI-subsystem Remote App helper into the installed runtime and package smoke verifies a native PE executable is present;
-- Linux/Ubuntu build/test paths do not try to initialize the Windows capture/WebRTC native runtime merely because the control-plane schemas exist;
-- Web build keeps Remote App video/activity mounted while switching to shared Git/Files panes;
-- View mode sends no pointer controls; Touch/Trackpad use the bounded typed control schema; text input is bounded Unicode and special keys stay allowlisted;
-- no terminal protocol/schema is expanded with Remote App video/input messages.
+- Windows packaging compiles the GUI-subsystem Remote App helper and installed-runtime smoke verifies a native helper is present;
+- Linux/Ubuntu build/test paths do not initialize Windows capture/WebRTC native runtime merely because schemas/control-plane routes exist;
+- browser WebRTC configuration maps only bounded authenticated `remoteApps.webrtc.iceServers`; empty ICE config is valid, TURN presence is reported without implying PalmTTY operates a relay;
+- browser display hints are derived from live App-surface geometry/DPR, clamped to protocol bounds, and native code clamps again; FPS/width/height must not reappear in persisted Remote App profiles;
+- App media diagnostics distinguish waiting-for-window, waiting-for-frame, streaming and capture-unavailable, while Web separately reports repeated WebRTC connection failure;
+- Web keeps active Terminal/App surfaces mounted while switching Git/Files and supports direct switching among live Activities for the same Workspace;
+- View mode sends no pointer controls; Touch/Trackpad use bounded typed control messages; text stays bounded Unicode; special keys stay allowlisted;
+- no terminal protocol/schema is expanded with Remote App video/input messages and there is no full-desktop capture fallback.
 
 Real Windows + phone acceptance before claiming a specific desktop application is supported:
 
-- configure a Host Workspace Remote App profile and confirm save-time plus launch-time executable validation;
-- launch the profile and confirm the browser request contains only workspaceId + profileId, while no executable/PID/HWND is browser-selected;
-- verify the helper captures only a window whose process is a member of the PalmTTY-owned Job Object and does not fall back to the desktop when the target cannot be captured;
-- test View / Touch / Trackpad, two-finger scroll, Ctrl/Alt/Shift/common keys, Chinese IME/voice text and device rotation;
-- background/foreground or switch phone network and confirm WebRTC reconnect does not create a second application process;
+- create/edit a Workspace and confirm the root page stays short: name/cwd/environment plus separate Terminal/Remote Apps navigation;
+- choose a Remote App from detected applications or the bounded `.exe` browser, save it, and confirm the normal path does not require typing an executable path; manual path remains Advanced;
+- test a WSL Terminal Workspace with a Windows Remote App profile and confirm Terminal/Git/Files remain WSL-scoped while the App launches as current-user Windows;
+- launch the saved profile and confirm the create request contains only workspaceId + profileId;
+- resize/rotate the phone and confirm capture adapts automatically without a manual FPS/resolution setting and without spawning a second app;
+- verify the helper captures only a window whose process is in the PalmTTY-owned Job and never falls back to desktop when capture fails;
+- force/observe a no-window or incompatible-capture case and confirm the Web surface shows a meaningful state rather than only a black frame;
+- test View / Touch / Trackpad, two-finger scroll, Ctrl/Alt/Shift/common keys, Chinese IME/voice text and rotation;
+- verify direct LAN/VPN media with empty ICE config where routable; for reverse-proxy/public testing, configure operator-owned STUN/TURN and confirm repeated media failure produces the relay/network diagnostic rather than creating a broader capture path;
+- background/foreground or switch phone network and confirm reconnect does not create a second application process;
 - restart only the Agent and confirm the adopted AppWorker/application remain alive and are rediscovered;
-- terminate the App Session and confirm the PalmTTY Job Object closes all member processes;
-- kill the AppWorker/control path during a disposable test and confirm the native helper terminates its Job Object instead of leaving an orphan application;
+- switch from the App to another live Terminal/App Activity in the same Workspace and back without returning home;
+- terminate the App Session and confirm the PalmTTY Job closes all member processes;
+- kill the AppWorker/control path during a disposable test and confirm the helper closes its Job instead of leaving an orphan application;
 - confirm an elevated/UAC application cannot be controlled from normal-user PalmTTY and do **not** bypass UIPI;
-- test intended apps such as Codex Desktop/VS Code individually. If PrintWindow returns blank/protected/GPU-incompatible frames, record the app as unvalidated/unsupported instead of enabling whole-desktop capture.
+- test intended apps such as Codex Desktop/VS Code individually. If PrintWindow returns blank/protected/GPU-incompatible frames, record that app as unvalidated/unsupported instead of enabling desktop capture.
 
 ## Manual Windows validation before a release
 

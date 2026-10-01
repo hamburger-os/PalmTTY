@@ -155,10 +155,12 @@ function e2eWorkspace() {
     id: "e2e",
     name: "E2E",
     cwd: process.cwd(),
-    runtime: {
-      kind: "host" as const,
-      shell: process.execPath,
-      args: []
+    terminal: {
+      runtime: {
+        kind: "host" as const,
+        shell: process.execPath,
+        args: []
+      }
     },
     remoteApps: []
   };

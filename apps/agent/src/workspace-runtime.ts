@@ -35,11 +35,11 @@ export type SessionLaunchRuntime = z.infer<typeof SessionLaunchRuntimeSchema>;
 export function sessionLaunchRuntime(
   workspace: WorkspaceDefinition
 ): SessionLaunchRuntime {
-  if (workspace.runtime.kind === "host") return { kind: "host" };
+  if (workspace.terminal.runtime.kind === "host") return { kind: "host" };
   return SessionLaunchRuntimeSchema.parse({
     kind: "wsl",
-    ...(workspace.runtime.distribution
-      ? { distribution: workspace.runtime.distribution }
+    ...(workspace.terminal.runtime.distribution
+      ? { distribution: workspace.terminal.runtime.distribution }
       : {})
   });
 }
@@ -202,21 +202,21 @@ function defaultHostShell(
 }
 
 function wslPrefix(workspace: WorkspaceDefinition): string[] {
-  if (workspace.runtime.kind !== "wsl") {
+  if (workspace.terminal.runtime.kind !== "wsl") {
     throw new Error("Workspace is not a WSL runtime");
   }
-  return workspace.runtime.distribution
-    ? ["--distribution", workspace.runtime.distribution]
+  return workspace.terminal.runtime.distribution
+    ? ["--distribution", workspace.terminal.runtime.distribution]
     : [];
 }
 
 export function buildWslLaunchArgs(workspace: WorkspaceDefinition): string[] {
-  if (workspace.runtime.kind !== "wsl") {
+  if (workspace.terminal.runtime.kind !== "wsl") {
     throw new Error("Workspace is not a WSL runtime");
   }
   const args = [...wslPrefix(workspace), "--cd", workspace.cwd];
-  if (workspace.runtime.shell) {
-    args.push("--exec", workspace.runtime.shell, ...workspace.runtime.args);
+  if (workspace.terminal.runtime.shell) {
+    args.push("--exec", workspace.terminal.runtime.shell, ...workspace.terminal.runtime.args);
   }
   return args;
 }
@@ -273,7 +273,7 @@ async function runProcessProbe(
 async function resolveHostWorkspace(
   workspace: WorkspaceDefinition
 ): Promise<RuntimeWorkspace> {
-  if (workspace.runtime.kind !== "host") throw new Error("Expected host runtime");
+  if (workspace.terminal.runtime.kind !== "host") throw new Error("Expected host runtime");
 
   const cwdState = await workspaceDirectoryState(workspace.cwd);
   if (cwdState === "unavailable") {
@@ -293,7 +293,7 @@ async function resolveHostWorkspace(
     hostEnvironment,
     workspace.environment ?? {}
   );
-  const requestedExecutable = workspace.runtime.shell ?? defaultHostShell(environment);
+  const requestedExecutable = workspace.terminal.runtime.shell ?? defaultHostShell(environment);
   let executable: string;
   try {
     executable = await resolveExecutable(requestedExecutable, {
@@ -309,8 +309,8 @@ async function resolveHostWorkspace(
     id: workspace.id,
     cwd,
     executable,
-    args: workspace.runtime.args,
-    ...(workspace.startupCommand ? { command: workspace.startupCommand } : {}),
+    args: workspace.terminal.runtime.args,
+    ...(workspace.terminal.startupCommand ? { command: workspace.terminal.startupCommand } : {}),
     env: environment
   });
 }
@@ -318,7 +318,7 @@ async function resolveHostWorkspace(
 async function resolveWslWorkspace(
   workspace: WorkspaceDefinition
 ): Promise<RuntimeWorkspace> {
-  if (workspace.runtime.kind !== "wsl") throw new Error("Expected WSL runtime");
+  if (workspace.terminal.runtime.kind !== "wsl") throw new Error("Expected WSL runtime");
   if (process.platform !== "win32") {
     throw new Error("WSL workspaces are supported only by a Windows PalmTTY Agent");
   }
@@ -343,11 +343,11 @@ async function resolveWslWorkspace(
     "--exec",
     "/bin/sh",
     "-lc",
-    workspace.runtime.shell
+    workspace.terminal.runtime.shell
       ? 'command -v "$1" >/dev/null 2>&1'
       : "exit 0",
     "palmtty-probe",
-    ...(workspace.runtime.shell ? [workspace.runtime.shell] : [])
+    ...(workspace.terminal.runtime.shell ? [workspace.terminal.runtime.shell] : [])
   ];
 
   try {
@@ -371,7 +371,7 @@ async function resolveWslWorkspace(
     cwd: process.cwd(),
     executable,
     args: buildWslLaunchArgs(workspace),
-    ...(workspace.startupCommand ? { command: workspace.startupCommand } : {}),
+    ...(workspace.terminal.startupCommand ? { command: workspace.terminal.startupCommand } : {}),
     env: environment
   });
 }
@@ -379,7 +379,7 @@ async function resolveWslWorkspace(
 export async function resolveRuntimeWorkspace(
   workspace: WorkspaceDefinition
 ): Promise<RuntimeWorkspace> {
-  return workspace.runtime.kind === "wsl"
+  return workspace.terminal.runtime.kind === "wsl"
     ? resolveWslWorkspace(workspace)
     : resolveHostWorkspace(workspace);
 }

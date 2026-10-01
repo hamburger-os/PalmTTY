@@ -15,8 +15,11 @@ import type {
   GitRemoteRequest,
   GitRemoteResponse,
   GitStatusResponse,
+  BrowseRemoteAppExecutableRequest,
   RemoteAppAnswerResponse,
   RemoteAppCapabilities,
+  RemoteAppCatalogResponse,
+  RemoteAppExecutableListing,
   RuntimeCapabilities,
   SessionArtifact,
   SessionArtifactListResponse,
@@ -443,6 +446,32 @@ export async function deleteSession(id: string) {
   ));
 }
 
+
+export async function detectRemoteApps() {
+  return responseJson<RemoteAppCatalogResponse>(await fetch(
+    "/api/v1/remote-apps/catalog",
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    }
+  ));
+}
+
+export async function browseRemoteAppExecutables(
+  input: BrowseRemoteAppExecutableRequest = {}
+) {
+  return responseJson<RemoteAppExecutableListing>(await fetch(
+    "/api/v1/remote-apps/executables/browse",
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input)
+    }
+  ));
+}
 
 export async function remoteAppCapabilities() {
   return responseJson<RemoteAppCapabilities>(

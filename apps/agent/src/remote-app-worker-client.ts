@@ -2,7 +2,8 @@ import { randomBytes } from "node:crypto";
 import net from "node:net";
 import {
   AppSessionPublicSchema,
-  type AppSessionPublic
+  type AppSessionPublic,
+  type RemoteAppIceServer
 } from "@palmtty/protocol";
 import {
   FramedJsonSocket,
@@ -108,11 +109,16 @@ export class RemoteAppWorkerClient {
     await this.request({ type: "adopt" });
   }
 
-  async negotiate(clientId: string, offerSdp: string): Promise<string> {
+  async negotiate(
+    clientId: string,
+    offerSdp: string,
+    iceServers: RemoteAppIceServer[]
+  ): Promise<string> {
     const result = await this.request({
       type: "negotiate",
       clientId,
-      offerSdp
+      offerSdp,
+      iceServers
     });
     if (!result || typeof result !== "object" || !("answerSdp" in result)) {
       throw new Error("Remote App Worker returned a malformed WebRTC answer");

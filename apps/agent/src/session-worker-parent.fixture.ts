@@ -15,10 +15,12 @@ function workspaceForProcessWorker(): WorkspaceDefinition {
         id: "process",
         name: "Process worker",
         cwd: process.cwd(),
-        runtime: {
-          kind: "host",
-          shell: requiredWindowsShellPath(),
-          args: ["-NoLogo", "-NoProfile"]
+        terminal: {
+          runtime: {
+            kind: "host",
+            shell: requiredWindowsShellPath(),
+            args: ["-NoLogo", "-NoProfile"]
+          }
         },
         remoteApps: []
       }
@@ -26,10 +28,12 @@ function workspaceForProcessWorker(): WorkspaceDefinition {
         id: "process",
         name: "Process worker",
         cwd: process.cwd(),
-        runtime: {
-          kind: "host",
-          shell: "/bin/sh",
-          args: ["-i"]
+        terminal: {
+          runtime: {
+            kind: "host",
+            shell: "/bin/sh",
+            args: ["-i"]
+          }
         },
         remoteApps: []
       };

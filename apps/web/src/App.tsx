@@ -162,6 +162,52 @@ export function App() {
     );
   }
 
+  const activityOptionsFor = (
+    workspaceId: string,
+    currentValue: string
+  ) => [
+    ...sessions
+      .filter((session) =>
+        session.workspaceId === workspaceId &&
+        (
+          isActiveSessionState(session.state) ||
+          "terminal:" + session.id === currentValue
+        )
+      )
+      .map((session) => ({
+        value: "terminal:" + session.id,
+        label: t("workbench.terminal") + " · " + session.id.slice(0, 6)
+      })),
+    ...appSessions
+      .filter((session) =>
+        session.workspaceId === workspaceId &&
+        (
+          isActiveAppSessionState(session.state) ||
+          "app:" + session.id === currentValue
+        )
+      )
+      .map((session) => ({
+        value: "app:" + session.id,
+        label: session.profileName
+      }))
+  ];
+
+  const switchActivity = (value: string) => {
+    if (value.startsWith("terminal:")) {
+      const next = sessions.find((session) => "terminal:" + session.id === value);
+      if (!next) return;
+      setActiveAppSession(null);
+      setActiveSession(next);
+      return;
+    }
+    if (value.startsWith("app:")) {
+      const next = appSessions.find((session) => "app:" + session.id === value);
+      if (!next) return;
+      setActiveSession(null);
+      setActiveAppSession(next);
+    }
+  };
+
   if (activeSession) {
     const activeWorkspace = workspaces.find(
       (workspace) => workspace.id === activeSession.workspaceId
@@ -177,6 +223,12 @@ export function App() {
             setActiveSession(result.session);
           }
         }}
+        activityOptions={activityOptionsFor(
+          activeSession.workspaceId,
+          "terminal:" + activeSession.id
+        )}
+        appCapabilities={appCapabilities}
+        onSwitchActivity={switchActivity}
         onBack={() => {
           setActiveSession(null);
           void refreshCatalog();
@@ -193,6 +245,12 @@ export function App() {
       <WorkspaceWorkbench
         {...(activeWorkspace ? { workspace: activeWorkspace } : {})}
         activity={{ kind: "remoteApp", session: activeAppSession }}
+        activityOptions={activityOptionsFor(
+          activeAppSession.workspaceId,
+          "app:" + activeAppSession.id
+        )}
+        appCapabilities={appCapabilities}
+        onSwitchActivity={switchActivity}
         onBack={() => {
           setActiveAppSession(null);
           void refreshCatalog();
@@ -336,6 +394,19 @@ export function App() {
     }
   };
 
+  const activities = [
+    ...sessions.map((session) => ({
+      kind: "terminal" as const,
+      createdAt: session.createdAt,
+      session
+    })),
+    ...appSessions.map((session) => ({
+      kind: "remoteApp" as const,
+      createdAt: session.createdAt,
+      session
+    }))
+  ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+
   return (
     <main className="app-shell">
       <header className="topbar glass-shell">
@@ -408,9 +479,9 @@ export function App() {
                     defaultShell: t("workspaces.defaultShell")
                   })}
                 </small>
-                {workspace.startupCommand && (
+                {workspace.terminal.startupCommand && (
                   <small className="startup-command">
-                    $ {workspace.startupCommand}
+                    $ {workspace.terminal.startupCommand}
                   </small>
                 )}
                 <button
@@ -485,7 +556,10 @@ export function App() {
 
       <section>
         <div className="section-heading">
-          <h2>{t("sessions.title")}</h2>
+          <div className="section-title">
+            <h2>{t("activities.title")}</h2>
+            <span>{activities.length}</span>
+          </div>
           <button
             className="ghost compact"
             onClick={() => void refreshCatalog()}
@@ -494,79 +568,66 @@ export function App() {
           </button>
         </div>
         <div className="session-list">
-          {sessions.length === 0 && (
-            <div className="empty session-empty glass-content">{t("sessions.empty")}</div>
-          )}
-          {sessions.map((session) => {
-            const active = isActiveSessionState(session.state);
-            const busy = sessionBusyId === session.id;
-            return (
-              <div className="session-row glass-card" key={session.id}>
-                <button
-                  className="session-main"
-                  onClick={() => setActiveSession(session)}
-                >
-                  <span className={`status-dot ${session.state}`} />
-                  <span>
-                    <strong>
-                      {workspaces.find(
-                        (workspace) => workspace.id === session.workspaceId
-                      )?.name ?? session.workspaceId}
-                    </strong>
-                    <small>{sessionDetail(session)}</small>
-                  </span>
-                </button>
-                {active ? (
-                  <button
-                    type="button"
-                    className="session-action danger-outline compact"
-                    disabled={sessionBusyId !== null || session.state === "stopping"}
-                    onClick={() => setSessionAction({ kind: "terminate", session })}
-                  >
-                    {busy || session.state === "stopping"
-                      ? t("sessions.terminating")
-                      : t("sessions.terminate")}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="session-action danger-outline compact"
-                    disabled={sessionBusyId !== null}
-                    onClick={() => setSessionAction({ kind: "clear", session })}
-                  >
-                    {busy ? t("sessions.clearing") : t("sessions.clear")}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section>
-        <div className="section-heading">
-          <h2>{t("remoteApps.sessionsTitle")}</h2>
-          <button
-            className="ghost compact"
-            onClick={() => void refreshCatalog()}
-          >
-            {t("sessions.refresh")}
-          </button>
-        </div>
-        <div className="session-list">
-          {appSessions.length === 0 && (
+          {activities.length === 0 && (
             <div className="empty session-empty glass-content">
-              {t("remoteApps.sessionsEmpty")}
+              {t("activities.empty")}
             </div>
           )}
-          {appSessions.map((session) => {
+          {activities.map((activity) => {
+            if (activity.kind === "terminal") {
+              const session = activity.session;
+              const active = isActiveSessionState(session.state);
+              const busy = sessionBusyId === session.id;
+              const workspaceName = workspaces.find(
+                (workspace) => workspace.id === session.workspaceId
+              )?.name ?? session.workspaceId;
+              return (
+                <div className="session-row glass-card" key={"terminal:" + session.id}>
+                  <button
+                    className="session-main"
+                    onClick={() => setActiveSession(session)}
+                  >
+                    <span className={"status-dot " + session.state} />
+                    <span>
+                      <strong>{workspaceName}</strong>
+                      <small>
+                        {t("activities.terminal")} · {sessionDetail(session)}
+                      </small>
+                    </span>
+                  </button>
+                  {active ? (
+                    <button
+                      type="button"
+                      className="session-action danger-outline compact"
+                      disabled={sessionBusyId !== null || session.state === "stopping"}
+                      onClick={() => setSessionAction({ kind: "terminate", session })}
+                    >
+                      {busy || session.state === "stopping"
+                        ? t("sessions.terminating")
+                        : t("sessions.terminate")}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="session-action danger-outline compact"
+                      disabled={sessionBusyId !== null}
+                      onClick={() => setSessionAction({ kind: "clear", session })}
+                    >
+                      {busy ? t("sessions.clearing") : t("sessions.clear")}
+                    </button>
+                  )}
+                </div>
+              );
+            }
+
+            const session = activity.session;
             const active = isActiveAppSessionState(session.state);
             const busy = appSessionBusyId === session.id;
             const workspaceName = workspaces.find(
               (workspace) => workspace.id === session.workspaceId
             )?.name ?? session.workspaceId;
             return (
-              <div className="session-row glass-card" key={session.id}>
+              <div className="session-row glass-card" key={"app:" + session.id}>
                 <button
                   className="session-main"
                   disabled={!active}
@@ -574,10 +635,12 @@ export function App() {
                     if (active) setActiveAppSession(session);
                   }}
                 >
-                  <span className={`status-dot ${session.state}`} />
+                  <span className={"status-dot " + session.state} />
                   <span>
                     <strong>{workspaceName} · {session.profileName}</strong>
-                    <small>{appSessionDetail(session)}</small>
+                    <small>
+                      {t("activities.remoteApp")} · {appSessionDetail(session)}
+                    </small>
                   </span>
                 </button>
                 {active ? (

@@ -28,10 +28,7 @@ import {
   ProcessRemoteAppWorkerSpawner,
   type RemoteAppWorkerSpawner
 } from "./remote-app-worker-spawner.js";
-import {
-  resolveExecutable,
-  resolveRuntimeWorkspace
-} from "./workspace-runtime.js";
+import { resolveRemoteAppLaunch } from "./remote-app-launch.js";
 import type { WorkspaceStore } from "./workspace-store.js";
 
 type ManagedRemoteApp = {
@@ -92,12 +89,17 @@ export class RemoteAppSessionManager {
   capabilities(): RemoteAppCapabilities {
     const enabled = this.config.remoteApps.enabled;
     const platformSupported = process.platform === "win32" && process.arch === "x64";
+    const iceServers = this.config.remoteApps.webrtc.iceServers;
     return {
       supported: enabled && platformSupported,
       platform: process.platform,
       transport: "webrtc",
       capture: "window",
       input: "restricted",
+      iceServers,
+      relayConfigured: iceServers.some((server) =>
+        server.urls.some((url) => /^turns?:/i.test(url))
+      ),
       ...(!enabled
         ? { reason: "Remote Apps are disabled by PalmTTY configuration" }
         : !platformSupported
@@ -174,25 +176,18 @@ export class RemoteAppSessionManager {
 
     const workspace = this.options.workspaceStore.get(workspaceId);
     if (!workspace) throw new Error("Unknown workspace");
-    if (workspace.runtime.kind !== "host") {
-      throw new Error("Remote Apps require a Host workspace");
-    }
     const profile = workspace.remoteApps.find((candidate) => candidate.id === profileId);
     if (!profile) throw new Error("Unknown Remote App profile");
 
     this.pendingCreates += 1;
     try {
-      const runtimeWorkspace = await resolveRuntimeWorkspace(workspace);
-      const executable = await resolveExecutable(profile.executable, {
-        cwd: runtimeWorkspace.cwd,
-        env: runtimeWorkspace.env
-      });
+      const launch = await resolveRemoteAppLaunch(workspace, profile);
       const excludedEnvKeys = controlEnvironmentKeys(this.config.auth.tokenEnv, {
         ...process.env,
-        ...runtimeWorkspace.env
+        ...launch.environment
       });
       const environment = withoutEnvironmentKeys(
-        runtimeWorkspace.env,
+        launch.environment,
         excludedEnvKeys
       );
       const helperPath = await resolveRemoteAppHost();
@@ -212,15 +207,12 @@ export class RemoteAppSessionManager {
         helperPath,
         exitedRetentionMinutes: this.config.remoteApps.exitedRetentionMinutes,
         profile: {
-          id: profile.id,
-          name: profile.name,
-          executable,
-          args: profile.args,
-          cwd: runtimeWorkspace.cwd,
-          environment,
-          frameRate: profile.frameRate,
-          maxWidth: profile.maxWidth,
-          maxHeight: profile.maxHeight
+          id: launch.id,
+          name: launch.name,
+          executable: launch.executable,
+          args: launch.args,
+          cwd: launch.cwd,
+          environment
         }
       };
 
@@ -266,7 +258,11 @@ export class RemoteAppSessionManager {
       throw new Error("Remote App Session is not running");
     }
     const clientId = randomBytes(12).toString("base64url");
-    const answerSdp = await managed.worker.negotiate(clientId, offerSdp);
+    const answerSdp = await managed.worker.negotiate(
+      clientId,
+      offerSdp,
+      this.config.remoteApps.webrtc.iceServers
+    );
     return { clientId, answerSdp };
   }
 

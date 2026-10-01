@@ -20,7 +20,10 @@ import {
   MAX_INPUT_BYTES,
   WorkspaceDefinitionSchema,
   WorkspaceEnvironmentSchema,
+  BrowseRemoteAppExecutableRequestSchema,
+  RemoteAppCapabilitiesSchema,
   RemoteAppControlMessageSchema,
+  RemoteAppExecutableListingSchema,
   isActiveAppSessionState,
   isTerminalAppSessionState,
   isActiveSessionState,
@@ -42,25 +45,24 @@ describe("protocol", () => {
       id: "host-apps",
       name: "Host apps",
       cwd: "C:\\workspace",
-      runtime: { kind: "host" },
+      terminal: { runtime: { kind: "host" } },
       remoteApps: [{
         id: "codex-desktop",
         name: "Codex Desktop",
         executable: "codex.exe"
       }]
     });
-    expect(workspace.remoteApps[0]).toMatchObject({
+    expect(workspace.remoteApps[0]).toEqual({
       id: "codex-desktop",
-      args: [],
-      frameRate: 12,
-      maxWidth: 1280,
-      maxHeight: 800
+      name: "Codex Desktop",
+      executable: "codex.exe",
+      args: []
     });
     expect(() => WorkspaceDefinitionSchema.parse({
       id: "duplicates",
       name: "Duplicates",
       cwd: "C:\\workspace",
-      runtime: { kind: "host" },
+      terminal: { runtime: { kind: "host" } },
       remoteApps: [
         { id: "app", name: "One", executable: "one.exe" },
         { id: "app", name: "Two", executable: "two.exe" }
@@ -71,7 +73,7 @@ describe("protocol", () => {
       id: "oversized-app-argv",
       name: "Oversized app argv",
       cwd: "C:\\workspace",
-      runtime: { kind: "host" },
+      terminal: { runtime: { kind: "host" } },
       remoteApps: [{
         id: "app",
         name: "App",
@@ -99,6 +101,46 @@ describe("protocol", () => {
       x: 2,
       y: 0
     })).toThrow();
+    expect(RemoteAppControlMessageSchema.parse({
+      type: "display",
+      width: 844,
+      height: 390
+    })).toEqual({
+      type: "display",
+      width: 844,
+      height: 390
+    });
+    expect(() => RemoteAppControlMessageSchema.parse({
+      type: "display",
+      width: 4000,
+      height: 390
+    })).toThrow();
+    expect(RemoteAppCapabilitiesSchema.parse({
+      supported: true,
+      platform: "win32",
+      transport: "webrtc",
+      capture: "window",
+      input: "restricted",
+      iceServers: [{
+        urls: ["turns:relay.example.test:5349"],
+        username: "user",
+        credential: "credential"
+      }],
+      relayConfigured: true
+    }).relayConfigured).toBe(true);
+    expect(BrowseRemoteAppExecutableRequestSchema.parse({})).toEqual({});
+    expect(RemoteAppExecutableListingSchema.parse({
+      currentPath: "C:\\Tools",
+      parentPath: "C:\\",
+      locations: [],
+      directories: [],
+      executables: [{
+        name: "Tool",
+        executable: "C:\\Tools\\Tool.exe",
+        source: "path"
+      }],
+      truncated: false
+    }).executables).toHaveLength(1);
     expect(isActiveAppSessionState("running")).toBe(true);
     expect(isTerminalAppSessionState("exited")).toBe(true);
   });
@@ -108,19 +150,21 @@ describe("protocol", () => {
       id: "host-1",
       name: "Host",
       cwd: "/workspace",
-      runtime: { kind: "host" }
-    }).runtime).toEqual({ kind: "host", args: [] });
+      terminal: { runtime: { kind: "host" } }
+    }).terminal.runtime).toEqual({ kind: "host", args: [] });
 
     expect(CreateWorkspaceSchema.parse({
       name: "Ubuntu",
       cwd: "/home/dev/project",
-      runtime: {
-        kind: "wsl",
-        distribution: "Ubuntu",
-        shell: "/bin/bash",
-        args: ["-l"]
+      terminal: {
+        runtime: {
+          kind: "wsl",
+          distribution: "Ubuntu",
+          shell: "/bin/bash",
+          args: ["-l"]
+        }
       }
-    }).runtime.kind).toBe("wsl");
+    }).terminal.runtime.kind).toBe("wsl");
   });
 
   it("parses bounded workspace environment and terminal profiles", () => {
@@ -268,7 +312,7 @@ describe("protocol", () => {
     expect(() => CreateWorkspaceSchema.parse({
       name: "Ubuntu",
       cwd: "/home/dev/project",
-      runtime: { kind: "wsl", args: ["-l"] }
+      terminal: { runtime: { kind: "wsl", args: ["-l"] } }
     })).toThrow();
   });
 

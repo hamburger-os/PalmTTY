@@ -10,14 +10,16 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
-- Add Windows x64 Remote Apps alpha as a terminal-independent Activity: persisted Host Workspace profiles launch through a detached authenticated AppWorker and a PalmTTY-owned native Windows app host, stream one owned application window over WebRTC, and accept only bounded typed mobile pointer/key/text control. Full-desktop capture, browser-selected PID/HWND, elevation/UAC bypass, clipboard, audio, camera, microphone and file-drag channels are intentionally absent.
-- Replace the terminal-specific SessionWorkbench shell with an activity-aware WorkspaceWorkbench so Terminal and Remote App activities can share Git/Files without being unmounted; Terminal Artifacts remain Session-scoped.
-- Add mobile Remote App View / direct-touch / trackpad modes, two-finger scrolling, special keys and Unicode text/IME/dictation input.
+- Add Windows x64 Remote Apps alpha as a terminal-independent Activity: persisted Workspace App profiles launch through a detached authenticated AppWorker and a PalmTTY-owned native Windows app host, stream one owned application window over WebRTC, and accept only bounded typed mobile pointer/key/text/display control. Full-desktop capture, browser-selected PID/HWND, elevation/UAC bypass, clipboard, audio, camera, microphone and file-drag channels are intentionally absent.
+- Replace the terminal-specific SessionWorkbench shell with an activity-aware WorkspaceWorkbench so live Terminal and Remote App activities can be switched in place and share Git/Files without being unmounted; Terminal Artifacts remain Session-scoped.
+- Add mobile Remote App View / direct-touch / trackpad modes, two-finger scrolling, special keys, Unicode text/IME/dictation input, automatic viewport/DPR capture sizing and explicit capture/network diagnostics.
 
 ### Changed
 
-- Bound first-generation Remote App capture to 5–15 fps and 320×240–1600×1000 (1280×800 @ 12 fps default), with an additional 4096×4096 / 12 MP source-window allocation ceiling to keep the raw native capture pipe explicitly resource-bounded.
+- Separate Workspace basics, nested Terminal launch settings and Remote App profiles. Remote App profiles now persist only app identity/executable/argv; capture size is automatically adapted from the live phone surface inside a 320×240–1600×1000 envelope, with a 1280×800 @ 12 fps runtime default and 4096×4096 / 12 MP source-window allocation ceiling.
 - Windows packages now include a precompiled GUI-subsystem Remote App host; source mode compiles the same helper into the private per-user App runtime on first use.
+- Add bounded detected-app / Windows `.exe` browsing and optional operator-supplied STUN/TURN ICE configuration. ICE is applied per authenticated negotiation so a durable AppWorker can use updated Agent network configuration after an Agent restart; PalmTTY does not operate a cloud relay.
+- Move the breaking layered Workspace catalog to persistence generation v2 (`workspaces-v2.json`). PalmTTY intentionally does not migrate/read the v1 catalog; the old file is left untouched for manual reference while Workspaces are recreated through the new UI.
 
 ## [0.2.0]
 

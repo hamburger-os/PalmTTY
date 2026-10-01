@@ -9,9 +9,10 @@ import {
 import { z } from "zod";
 
 const MAX_WORKSPACES = 256;
+export const WORKSPACE_STORE_VERSION = 2 as const;
 
 const WorkspaceFileSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(WORKSPACE_STORE_VERSION),
   workspaces: z.array(WorkspaceDefinitionSchema).max(MAX_WORKSPACES)
 }).strict();
 
@@ -43,7 +44,7 @@ export function defaultWorkspaceStorePath(): string {
     return path.join(
       process.env.APPDATA ?? os.homedir(),
       "PalmTTY",
-      "workspaces.json"
+      `workspaces-v${WORKSPACE_STORE_VERSION}.json`
     );
   }
   if (process.platform === "darwin") {
@@ -52,13 +53,13 @@ export function defaultWorkspaceStorePath(): string {
       "Library",
       "Application Support",
       "PalmTTY",
-      "workspaces.json"
+      `workspaces-v${WORKSPACE_STORE_VERSION}.json`
     );
   }
   return path.join(
     process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share"),
     "palmtty",
-    "workspaces.json"
+    `workspaces-v${WORKSPACE_STORE_VERSION}.json`
   );
 }
 
@@ -151,7 +152,7 @@ export class FileWorkspaceStore implements WorkspaceStore {
 
   private async persist(workspaces: WorkspaceDefinition[]): Promise<void> {
     const document = JSON.stringify(
-      WorkspaceFileSchema.parse({ version: 1, workspaces }),
+      WorkspaceFileSchema.parse({ version: WORKSPACE_STORE_VERSION, workspaces }),
       null,
       2
     ) + "\n";

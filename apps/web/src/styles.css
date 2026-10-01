@@ -1897,12 +1897,8 @@ button.directory-choose {
   white-space: nowrap;
 }
 
-.remote-app-profiles {
-  gap: var(--space-3);
-}
-
-.remote-app-profile-heading,
-.remote-app-profile-row,
+.workspace-dialog-title-row,
+.settings-section-heading,
 .remote-app-text-actions,
 .remote-app-toolbar,
 .remote-app-modes,
@@ -1912,58 +1908,193 @@ button.directory-choose {
   gap: var(--space-2);
 }
 
-.remote-app-profile-heading,
-.remote-app-profile-row,
-.remote-app-toolbar {
-  justify-content: space-between;
-}
-
-.remote-app-profile-heading > div {
+.workspace-dialog-title-row {
   min-width: 0;
-  display: grid;
-  gap: 4px;
 }
 
-.remote-app-profile-heading small {
-  color: var(--text-muted);
-  line-height: 1.4;
+.workspace-dialog-title-row h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.remote-app-profile-list {
+.workspace-settings-card,
+.settings-page,
+.remote-app-picker,
+.remote-app-picker-section {
   display: grid;
   gap: var(--space-3);
 }
 
-.remote-app-profile-card {
+.workspace-settings-card {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+.settings-section-heading {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.settings-section-heading > div,
+.settings-list-row > span,
+.settings-list-main > span,
+.selected-executable > span {
+  min-width: 0;
   display: grid;
+  gap: 3px;
+}
+
+.settings-section-heading small,
+.settings-list-row small,
+.settings-list-main small,
+.selected-executable small,
+.settings-note,
+.settings-muted {
+  color: var(--text-muted);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.settings-command {
+  font-family: var(--font-mono);
+}
+
+.settings-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.settings-list {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.settings-list-row {
+  min-width: 0;
+  min-height: var(--touch-target);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 9px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  text-align: left;
+}
+
+.settings-list-row:last-child {
+  border-bottom: 0;
+}
+
+button.settings-list-row:hover:not(:disabled),
+.settings-list-main:hover:not(:disabled) {
+  transform: none;
+  background: var(--control-hover);
+}
+
+.remote-app-list-row {
+  padding: 0;
+}
+
+.settings-list-main {
+  min-width: 0;
+  flex: 1;
+  min-height: var(--touch-target);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 9px 10px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  text-align: left;
+}
+
+.remote-app-list-row > .danger-outline {
+  margin-right: 7px;
+  flex: 0 0 auto;
+}
+
+.settings-empty {
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.workspace-add-app,
+.workspace-select-app {
+  width: 100%;
+  min-height: var(--touch-target);
+}
+
+.selected-executable {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3);
   border-radius: var(--radius-md);
 }
 
-.remote-app-profile-row > label {
-  min-width: 0;
-  flex: 1;
-}
-
-.remote-app-profile-advanced {
+.remote-app-manual-path {
   padding: var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
 
-.remote-app-profile-advanced > summary {
-  cursor: pointer;
+.remote-app-manual-path > summary {
+  min-height: var(--touch-target-compact);
+  display: flex;
+  align-items: center;
   color: var(--text-secondary);
   font-size: var(--text-sm);
   font-weight: 650;
+  cursor: pointer;
 }
 
-.remote-app-profile-grid {
+.remote-app-picker-section {
+  min-width: 0;
+}
+
+.executable-browser {
+  min-width: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
-  margin-top: var(--space-3);
+  padding: var(--space-2);
+}
+
+.executable-browser-list {
+  max-height: min(42dvh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.executable-row > span:last-child {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.workbench-activity-switcher {
+  width: auto;
+  max-width: min(32vw, 220px);
+  min-height: var(--touch-target-compact);
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 16px;
 }
 
 .workbench-activity-name {
@@ -1995,11 +2126,13 @@ button.directory-choose {
 
 .remote-app-toolbar {
   min-height: var(--touch-target);
+  justify-content: space-between;
   padding: 5px 7px;
 }
 
 .remote-app-modes {
   min-width: 0;
+  flex: 1;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
@@ -2058,6 +2191,33 @@ button.directory-choose {
   background: var(--terminal-background);
 }
 
+.remote-app-quality {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.remote-app-status-overlay {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: min(520px, calc(100% - 28px));
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  transform: translate(-50%, -50%);
+  border-radius: var(--radius-md);
+  text-align: center;
+  pointer-events: none;
+}
+
+.remote-app-status-overlay span {
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
 .remote-app-mode-hint {
   position: absolute;
   left: 50%;
@@ -2114,22 +2274,35 @@ button.directory-choose {
 }
 
 @media (max-width: 620px) {
-  .remote-app-profile-row {
+  .settings-section-heading {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .remote-app-profile-grid {
-    grid-template-columns: 1fr;
+  .settings-section-heading > button {
+    width: 100%;
+  }
+
+  .selected-executable {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .remote-app-toolbar {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .remote-app-modes {
+    flex-basis: 100%;
   }
 
   .remote-app-toolbar > button {
-    width: 100%;
+    margin-left: auto;
+  }
+
+  .workbench-activity-switcher {
+    max-width: 42vw;
   }
 
   .remote-app-mode-hint {

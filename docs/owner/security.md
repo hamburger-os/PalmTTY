@@ -63,9 +63,9 @@ PalmTTY 不按持久化 PID 直接 kill 进程。PID 会复用，stale record �
 - Git API 明确以“包含 Workspace cwd 的完整仓库”为作用域，并返回 workspace 在仓库内的相对路径，避免 Files 根目录边界与 Git 仓库边界被误认为相同。读取面使用 porcelain v2 status、有界 diff/branches，以及基于固定 HEAD snapshot 的 opaque cursor 分页 history；可选文件路径通过规范化 repository-relative path + `--follow -- <path>` 查询，commit metadata/changed-file list 与单文件 commit diff 也分别有输出上限。Git 命令使用结构化 argv、输出/超时上限和 `--` pathspec 分隔，diff 禁止 external diff/textconv，status 禁用 fsmonitor，history/commit metadata 强制关闭 `log.showSignature`，避免只读历史查询触发签名验证外部程序。对于 working-tree diff，Agent 会先用 `git check-attr -z filter` 读取该路径实际生效的 filter driver，再通过命令级配置把该 driver 的 clean/process 清空并把 required 设为 false，避免“只是查看 diff”触发仓库配置的内容过滤程序。异常/不可安全建模的 filter 名称直接拒绝 diff，而不是退回执行。
 - Git 写入只接受固定 typed operation：stage/unstage、restore、commit、branch create/switch、stash push/pop 和非交互 fetch/pull/push，不存在 `/git/run` 或浏览器自定义 argv。同一“已解析 Git 仓库”的 mutation/remote 操作在 Agent 内串行执行，即使两个 Workspace 指向同一仓库也共用一条写队列；每个请求必须带当前 status state token，因此排队期间被前一个写操作改变状态的请求会以 `409 git_state_changed` 失败。若 status 因输出上限、条目上限或解析异常被标记为 truncated，则该快照不能作为写 authority，所有 mutation/remote 都 fail closed，直到状态重新落入安全范围。restore 还必须带所查看 diff 的 snapshot。Web 默认禁用写操作并要求一次明确的可信仓库确认。写/remote 命令禁用 Git hooks、编辑器和交互式 credential prompt，并剔除 Git config/exec/SSH/askpass 覆盖环境；remote 仅允许 http/https/ssh/git 协议，拒绝 ext/file/未知 helper 协议。正常 Git filters 与可信宿主/仓库 Git 配置仍可能在 stage/switch/stash/pull 等语义中执行，因此确认模型不能被描述成沙箱。
 - Session 图片上传只写入当前用户 runtime 下独立的私有 attachment store，不接受浏览器提供的目标路径、不写 Workspace/Git 工作树；存储名随机化，Unix 目录/文件使用 0700/0600。服务端不信任扩展名或浏览器 Content-Type，而是检查文件签名/图片尺寸，并限制单文件 8 MiB、每 Session 32 个、合计 64 MiB、边长 8192、总像素 32 MiPixels。附件内容不进入默认日志。附件随 Session retirement/重启/清除/retention 到期清理，Agent 启动还会依据 live Worker records 清理 orphan attachment 目录。WSL 路径映射使用结构化 argv 和有界子进程，不把路径插入 shell 字符串。
-- Web workspace 可以配置 cwd、runtime、Shell、Shell args、有界 environment 与启动命令。Environment 是当前用户应用数据中的持久化配置，可能敏感但不是 secret vault；默认日志不得记录其值。`PALMTTY_*` 整个命名空间以及单独配置的认证 token 环境变量属于保留项，Workspace mutation 会拒绝持久化它们；Worker bootstrap 和 PTY 仍继续剔除作为纵深防御。
+- Web Workspace authority 明确分层：顶层持久化 cwd + bounded environment；`workspace.terminal` 持久化 runtime/Shell/args/startupCommand；`workspace.remoteApps` 只持久化 App id/name/executable/argv。Environment 是当前用户应用数据中的本地配置，可能敏感但不是 secret vault；默认日志不得记录其值。`PALMTTY_*` 命名空间与单独认证 token 变量属于保留项，Workspace mutation 拒绝持久化，Worker/AppWorker bootstrap 继续剔除作为纵深防御。
 - Session 创建与重启都只使用已持久化的 workspace authority，不允许用一次 Session 请求临时注入 cwd/shell/env。
-- Workspace 新建/更新会验证运行目标，Session 创建/重启前再次验证；Host Shell 解析为绝对 executable，Windows 新终端先刷新 Machine/User 环境再应用 Workspace environment；WSL 通过结构化 argv 调用 `wsl.exe`，并仅通过 `WSLENV` 名称列表转发 workspace variables，不做用户命令字符串拼接。
+- Workspace 新建/更新会验证 Terminal launch target 与可验证的 Remote App executable；Terminal Session 创建/重启前重新验证 `workspace.terminal`，Remote App Session 创建前重新读取 saved profile 并以 Windows host environment 再解析 executable。WSL 只属于 Terminal/Git/Files runtime，不授予或阻止 Windows Remote App launch authority。
 - 终端 Profile 发现与目录浏览一样要求认证 + 精确 Origin，并具有独立限流、输出与超时边界；Host 侧只返回已知 Shell Profile，Windows WSL 侧通过 `wsl.exe --list --quiet` 枚举已注册发行版，不进入发行版执行探测脚本，也不提供任意命令执行。
 - Agent/Worker 默认不提权；
 - PTY 继承普通用户权限；
@@ -89,19 +89,25 @@ systemd unit 使用 `KillMode=process` 是为了保持既有“Agent lifetime !=
 
 ## Remote Apps 安全边界
 
-Remote Apps 的风险等级与 Shell 一样按“当前 OS 用户可执行能力”处理，但它不是浏览器任意桌面控制权限。
+Remote Apps 的风险等级按“当前 OS 用户可执行能力”处理，但它不是浏览器任意桌面控制权限。
 
-- App 创建只接受持久 Workspace 中已保存的 Profile ID，不接受临时 executable/argv/env/PID/HWND；
-- AppWorker 与 Terminal Worker 使用不同的 secret、protocol generation 和 runtime 目录；
-- Windows helper 只捕获/控制自己启动的根进程树拥有的可见顶层窗口；每次输入前重新校验 ownership；
-- 捕获失败不会降级成 monitor/desktop capture；
-- helper 使用普通用户 token，PalmTTY 不提升完整性级别，也不绕过 SendInput/UIPI 对 elevated App 的限制；
-- Meta/Win 与 Alt+Tab 等系统切换键不在当前输入能力内；
-- WebRTC SDP、DataChannel 消息、帧尺寸/字节、Profile 数量和 App Session 数量都必须有硬上限；
-- video/data media peer 在 AppWorker 中处理，Agent 只做认证后的 signaling；当前不配置 TURN/cloud relay；
-- clipboard、audio、camera、microphone、drag/drop 等额外敏感通道当前不存在，未来新增必须单独设计 authority、数据保留和日志策略；
-- AppWorker/控制管道丢失时，native helper 必须终止其 Job Object，不能留下失去 PalmTTY recovery authority 的孤儿应用进程树；
-- 默认日志不得记录视频帧、Unicode 文本输入、DataChannel payload、AppWorker secret 或 Workspace environment。
+- App Session create 只接受 persisted workspaceId + profileId；不接受临时 executable/argv/env/PID/HWND/capture target；
+- Remote App profile 只持久化 id/name/executable/argv；FPS/width/height 属于运行时 presentation policy，不能成为持久 authority；
+- Remote App discovery 要求认证 + 精确 Origin + 限流；known-app detection 只检查少量已知应用，executable browser 只暴露目录与 `.exe`，不能读取任意文件内容或执行命令；
+- WSL Terminal Workspace 可以保存/运行 Windows Remote Apps，但 Remote App 不继承 WSL runtime/environment command semantics；
+- AppWorker 与 Terminal Worker 使用不同 secret、protocol generation 与 runtime 目录；
+- Windows helper 只捕获/控制 PalmTTY-owned Job 中成员进程拥有的可见顶层窗口；每次 OS 输入前重新验证 ownership；
+- capture failure 不得降级为 monitor/desktop capture；
+- helper 使用普通用户 token，PalmTTY 不提升完整性级别，也不绕过 UIPI/UAC；
+- Meta/Win、Alt+Tab 等系统切换能力仍受限；
+- WebRTC SDP、DataChannel、display hint、frame bytes/dimensions、Profile/App Session 数量都有硬上限；
+- display hint 只影响缩放尺寸，必须在 protocol + native 两层 clamp，不能携带 HWND 或改变 capture authority；
+- `remoteApps.webrtc.iceServers` 只允许 bounded STUN/TURN URL + optional credentials；capability endpoint 必须认证后才返回 ICE config。TURN 只改变网络可达性，不改变 capture/input authority；
+- PalmTTY 不运营 cloud relay。未来若增加 first-party relay，必须单独设计凭据、隐私、流量、滥用防护与审计；
+- video/data peer 在 AppWorker 处理，Agent 只做 authenticated signaling；
+- clipboard/audio/camera/microphone/drag-drop 等额外敏感通道当前不存在，未来新增必须逐通道设计 authority、数据保留与日志；
+- AppWorker/helper control 丢失时，native helper 必须关闭其 Job，不能留下无人管理的 PalmTTY-owned 进程树；
+- 默认日志不得记录视频帧、Unicode text、DataChannel payload、TURN credential、AppWorker secret 或 Workspace environment。
 
 ## 仍需加强
 

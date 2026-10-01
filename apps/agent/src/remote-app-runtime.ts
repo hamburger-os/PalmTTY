@@ -2,8 +2,13 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createRequire } from "node:module";
 import {
   AppSessionPublicSchema,
+  REMOTE_APP_CAPTURE_DEFAULT_FPS,
+  REMOTE_APP_CAPTURE_DEFAULT_HEIGHT,
+  REMOTE_APP_CAPTURE_DEFAULT_WIDTH,
   parseRemoteAppControlMessage,
-  type AppSessionPublic
+  type AppSessionMediaState,
+  type AppSessionPublic,
+  type RemoteAppIceServer
 } from "@palmtty/protocol";
 import type {
   RemoteAppWorkerBootstrap
@@ -22,7 +27,16 @@ const FRAME_HEADER_BYTES = 16;
 const MAX_FRAME_BYTES = 8 * 1024 * 1024;
 const MAX_HELPER_STDERR_BYTES = 16 * 1024;
 const HELPER_READY_PREFIX = "PALMTTY_APP_HOST_READY ";
-const ICE_GATHER_TIMEOUT_MS = 5_000;
+const HELPER_STATE_PREFIX = "PALMTTY_APP_HOST_STATE ";
+const ICE_GATHER_TIMEOUT_MS = 8_000;
+
+const MEDIA_STATES = new Set<AppSessionMediaState>([
+  "launching",
+  "waiting-for-window",
+  "waiting-for-frame",
+  "streaming",
+  "capture-unavailable"
+]);
 
 function loadWebRtc(): any {
   const require = createRequire(import.meta.url);
@@ -31,6 +45,7 @@ function loadWebRtc(): any {
 
 export class RemoteAppRuntime {
   private state: RuntimeState = "starting";
+  private mediaState: AppSessionMediaState = "launching";
   private helper: ChildProcessWithoutNullStreams | undefined;
   private appPid: number | undefined;
   private exitCode: number | undefined;
@@ -73,6 +88,14 @@ export class RemoteAppRuntime {
         if (line.startsWith(HELPER_READY_PREFIX)) {
           const pid = Number(line.slice(HELPER_READY_PREFIX.length).trim());
           if (Number.isSafeInteger(pid) && pid > 0) this.appPid = pid;
+          continue;
+        }
+        if (line.startsWith(HELPER_STATE_PREFIX)) {
+          const next = line.slice(HELPER_STATE_PREFIX.length).trim() as AppSessionMediaState;
+          if (MEDIA_STATES.has(next) && next !== this.mediaState) {
+            this.mediaState = next;
+            this.publishStatus();
+          }
         }
       }
     });
@@ -90,9 +113,9 @@ export class RemoteAppRuntime {
       executable: this.bootstrap.profile.executable,
       cwd: this.bootstrap.profile.cwd,
       args: this.bootstrap.profile.args,
-      frameRate: this.bootstrap.profile.frameRate,
-      maxWidth: this.bootstrap.profile.maxWidth,
-      maxHeight: this.bootstrap.profile.maxHeight
+      frameRate: REMOTE_APP_CAPTURE_DEFAULT_FPS,
+      maxWidth: REMOTE_APP_CAPTURE_DEFAULT_WIDTH,
+      maxHeight: REMOTE_APP_CAPTURE_DEFAULT_HEIGHT
     };
 
     child.stdin.write(`${JSON.stringify(bootstrap)}\n`, "utf8");
@@ -161,6 +184,7 @@ export class RemoteAppRuntime {
       profileId: this.bootstrap.profile.id,
       profileName: this.bootstrap.profile.name,
       state: this.state,
+      mediaState: this.mediaState,
       createdAt: this.bootstrap.createdAt,
       connections,
       ...(this.appPid ? { pid: this.appPid } : {}),
@@ -168,11 +192,15 @@ export class RemoteAppRuntime {
     });
   }
 
-  async negotiate(clientId: string, offerSdp: string): Promise<string> {
+  async negotiate(
+    clientId: string,
+    offerSdp: string,
+    iceServers: RemoteAppIceServer[]
+  ): Promise<string> {
     if (this.state !== "running") throw new Error("Remote App is not running");
     this.closePeer();
 
-    const connection = new this.wrtc.RTCPeerConnection({ iceServers: [] });
+    const connection = new this.wrtc.RTCPeerConnection({ iceServers });
     this.peer = { clientId, connection };
 
     connection.addTrack(this.videoTrack);
@@ -259,12 +287,9 @@ export class RemoteAppRuntime {
     try {
       const message = parseRemoteAppControlMessage(source);
       const encoded = JSON.stringify(message);
-      if (!helper.stdin.write(`${encoded}\n`, "utf8")) {
-        // Backpressure is bounded by Node's writable high-water mark. Input is
-        // deliberately dropped instead of building an unbounded control queue.
-      }
+      helper.stdin.write(`${encoded}\n`, "utf8");
     } catch {
-      // Invalid or oversized DataChannel input is ignored.
+      // Invalid, oversized, or backpressured control input is dropped.
     }
   }
 
@@ -318,6 +343,10 @@ export class RemoteAppRuntime {
           { width, height, data: i420 }
         );
         this.videoSource.onFrame({ width, height, data: i420 });
+        if (this.mediaState !== "streaming") {
+          this.mediaState = "streaming";
+          this.publishStatus();
+        }
       } catch {
         // A malformed/native conversion failure drops only the current frame.
       }

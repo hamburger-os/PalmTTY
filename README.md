@@ -32,16 +32,16 @@ PalmTTY is **alpha**. **0.2.0** is the current release baseline; this source lin
 | Linux host runtime | Implemented and exercised on Ubuntu CI |
 | WSL runtime | Implemented with runtime validation; real-owner-host validation still required |
 | macOS host runtime | Architecture implemented; no repository macOS CI yet |
-| Web workspace management | Persistent create/edit/delete with unified terminal profiles (Host shells + WSL distributions), bounded environment variables and multiline startup input |
+| Web workspace management | Persistent layered Workspace settings: name/cwd/environment + nested Terminal profile/startup + saved Remote App profiles; Host shells + WSL distributions remain unified in Terminal settings |
 | UI languages | English and Simplified Chinese |
 | Visual themes | Spectrum / Obsidian / Frosted with Quality / Performance rendering modes |
 | Browser or network disconnect | PTY survives while the Agent stays alive |
 | Reconnect | Sequence replay + server-side terminal snapshot fallback |
 | Session lifecycle | Explicit terminate / restart-as-replacement / retained clear; no ambiguous close/kill control |
-| Workspace workbench | Activity-aware Terminal / Remote App surface plus shared Git / Files; switching tools keeps the active terminal/WebRTC surface mounted; Artifacts remain Terminal Session-scoped |
-| Windows Remote Apps | **Unreleased alpha:** persisted Host profiles → detached AppWorker → single owned app window → WebRTC video + bounded typed input; no full desktop/UAC/clipboard/audio; real-app device validation still required |
+| Workspace workbench | Activity-aware Terminal / Remote App surface plus shared Git / Files; direct switching among live Activities for the same Workspace; switching tools keeps active xterm/WebRTC mounted; Artifacts remain Terminal Session-scoped |
+| Windows Remote Apps | **Unreleased alpha:** detected/.exe-selected saved profiles → detached AppWorker → single owned app window → WebRTC video + bounded typed input; auto capture size; optional operator STUN/TURN; no full desktop/UAC/clipboard/audio; real-app validation still required |
 | Mobile terminal | xterm.js PWA, touch special-key bar, on-demand long-text input |
-| Mobile Remote App | View / direct-touch / trackpad modes, two-finger scroll, special keys and bounded Unicode text/IME input |
+| Mobile Remote App | View / direct-touch / trackpad modes, two-finger scroll, special keys and bounded Unicode text/IME input; auto viewport/DPR capture sizing plus explicit capture/network diagnostics |
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
 | Network exposure | Explicit `local` / `lan` / `reverseProxy` / direct `https` profiles; HTTPS/private entry is recommended |
 | Agent restart persistence | Implemented: independent Session Worker + authenticated local rediscovery |
@@ -57,7 +57,7 @@ PalmTTY is intentionally narrower than a browser IDE:
 - **Survive mobile reality.** WebSocket reconnect, bounded replay, snapshot recovery and application heartbeat are built around Wi-Fi/cellular switching and backgrounded tabs.
 - **Keep remote authority explicit.** Workspace changes are persistent authenticated mutations, not ad-hoc Session parameters. A Workspace may contain bounded environment variables, but Session creation/restart cannot inject temporary cwd/shell/env overrides.
 - **Stay AI-vendor-neutral.** Codex, Claude Code, OpenCode and other terminal tools are workloads, not protocol dependencies.
-- **Remain self-hosted.** No cloud relay is required by the core architecture.
+- **Remain self-hosted.** No PalmTTY cloud relay is required or operated. Direct LAN/VPN WebRTC can stay relay-free; operators may configure their own STUN/TURN when NAT traversal requires it.
 
 ## Architecture / 架构
 
@@ -147,7 +147,7 @@ pnpm check
 pnpm start
 ```
 
-Open `http://127.0.0.1:17688`, sign in with the access token, then create a workspace from the Web UI. Workspaces are stored separately from `palmtty.local.yaml`. Choose a **Terminal environment** directly: Host shells such as PowerShell 7 and registered WSL distributions such as `Ubuntu-22.04` appear in one selector. Use **Custom** only when explicit runtime/executable/argv control is required. Workspace environment entries use `NAME=value` lines and are applied before the Shell starts; balanced outer quotes are normalized, so copied forms such as `HTTP_PROXY="http://127.0.0.1:10808"` save the same value as the unquoted URL. The startup field accepts multiple lines sent after startup.
+Open `http://127.0.0.1:17688`, sign in with the access token, then create a workspace from the Web UI. Workspaces are stored separately from `palmtty.local.yaml`. The editor root keeps Workspace name/cwd/environment compact; open **Terminal** for runtime/startup settings and **Remote Apps** for saved desktop applications. In Terminal settings, choose a **Terminal environment** directly: Host shells such as PowerShell 7 and registered WSL distributions such as `Ubuntu-22.04` appear in one selector. Use **Custom** only when explicit runtime/executable/argv control is required. Workspace environment entries use `NAME=value` lines and are applied before the Shell starts; balanced outer quotes are normalized, so copied forms such as `HTTP_PROXY="http://127.0.0.1:10808"` save the same value as the unquoted URL. The Terminal startup field accepts multiple lines sent after startup. On Windows x64, Remote Apps can be added by choosing a detected application or browsing host directories for an `.exe`; manual executable entry is an Advanced fallback. Remote App profiles do not expose FPS/resolution fields—the phone surface requests a bounded capture size automatically.
 
 `pnpm run preflight` validates the authentication environment, security exposure rules and configured Agent TCP listen endpoint before the Agent starts. Workspace directories and shells are validated when a workspace is created/updated and again when a Session starts or is explicitly restarted. Windows Store/MSIX PowerShell is supported through the current user's App Execution Alias, and resolved host shells are normalized to absolute launch paths before Worker creation. Each new/restarted Windows Host terminal rebuilds its environment from current Machine/User values before Workspace overrides are applied, so a CLI added to the user's PATH after the PalmTTY Agent started can be picked up by **Restart terminal** without restarting the Agent.
 
@@ -189,6 +189,8 @@ PalmTTY uses an explicit exposure profile instead of independent low-level secur
 - `lan` — listens on IPv4 `0.0.0.0`, requires authentication, rejects non-private client source addresses, discovers exact private/overlay IPv4 Origins automatically, and intentionally uses unencrypted HTTP. Keep the host firewall scoped to trusted Private networks.
 - `reverseProxy` — HTTP upstream plus explicit HTTPS browser Origins; Secure cookies are derived automatically. Use this for Tailscale Serve, Caddy, QNAP, Nginx, and similar ingress.
 - `https` — Agent terminates TLS directly using configured certificate/key files and explicit HTTPS Origins.
+
+Remote App signaling follows the same authenticated Origin boundary, but WebRTC media has its own ICE path. Directly routable LAN/VPN deployments may keep `remoteApps.webrtc.iceServers` empty; reverse-proxy/public deployments can configure operator-owned STUN/TURN when required. PalmTTY does not operate a hosted TURN relay.
 
 For normal remote use, prefer a private HTTPS entry point or authenticated HTTPS reverse proxy. Keep an HTTP reverse-proxy upstream private/firewalled.
 

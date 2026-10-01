@@ -82,13 +82,18 @@ export const WorkspaceEnvironmentSchema = z.record(
 });
 export type WorkspaceEnvironment = z.infer<typeof WorkspaceEnvironmentSchema>;
 
+export const TerminalLaunchProfileSchema = z.object({
+  runtime: WorkspaceRuntimeSchema,
+  startupCommand: z.string().max(8192).optional()
+}).strict();
+export type TerminalLaunchProfile = z.infer<typeof TerminalLaunchProfileSchema>;
+
 export const WorkspaceDefinitionSchema = z.object({
   id: WorkspaceIdSchema,
   name: z.string().trim().min(1).max(100),
   cwd: z.string().trim().min(1).max(4096),
-  runtime: WorkspaceRuntimeSchema,
   environment: WorkspaceEnvironmentSchema.optional(),
-  startupCommand: z.string().max(8192).optional(),
+  terminal: TerminalLaunchProfileSchema,
   remoteApps: RemoteAppProfilesSchema.default([])
 }).strict();
 export type WorkspaceDefinition = z.infer<typeof WorkspaceDefinitionSchema>;

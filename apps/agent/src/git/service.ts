@@ -74,11 +74,11 @@ function repositoryWriteKey(
   workspace: WorkspaceDefinition,
   root: string
 ): string {
-  const normalizedRoot = workspace.runtime.kind === "host" && process.platform === "win32"
+  const normalizedRoot = workspace.terminal.runtime.kind === "host" && process.platform === "win32"
     ? root.toLowerCase()
     : root;
-  if (workspace.runtime.kind === "wsl") {
-    return `wsl:${workspace.runtime.distribution ?? ""}:${normalizedRoot}`;
+  if (workspace.terminal.runtime.kind === "wsl") {
+    return `wsl:${workspace.terminal.runtime.distribution ?? ""}:${normalizedRoot}`;
   }
   return `host:${normalizedRoot}`;
 }

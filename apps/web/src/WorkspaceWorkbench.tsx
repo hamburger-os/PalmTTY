@@ -1,11 +1,13 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState
 } from "react";
 import type {
   AppSessionPublic,
+  RemoteAppCapabilities,
   WorkspacePublic
 } from "@palmtty/protocol";
 import { ArtifactsPane } from "./ArtifactsPane.js";
@@ -42,13 +44,24 @@ type WorkbenchPane =
   | "files"
   | "artifacts";
 
+export type WorkbenchActivityOption = {
+  value: string;
+  label: string;
+};
+
 export function WorkspaceWorkbench({
   workspace,
   activity,
+  activityOptions,
+  appCapabilities,
+  onSwitchActivity,
   onBack
 }: {
   workspace?: WorkspacePublic;
   activity: WorkbenchActivity;
+  activityOptions: WorkbenchActivityOption[];
+  appCapabilities: RemoteAppCapabilities | null;
+  onSwitchActivity(value: string): void;
   onBack(): void;
 }) {
   const { t } = useI18n();
@@ -68,6 +81,13 @@ export function WorkspaceWorkbench({
   const [terminalInsert, setTerminalInsert] = useState<TerminalInsertRequest>();
   const terminalInsertSequence = useRef(0);
   const workbenchRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    setPane(activity.kind === "terminal" ? "terminal" : "remoteApp");
+  }, [
+    activity.kind,
+    activity.kind === "terminal" ? activity.sessionId : activity.session.id
+  ]);
 
   const terminalConnectionChanged = useCallback((next: ConnectionState) => {
     setTerminalConnection(next);
@@ -169,7 +189,25 @@ export function WorkspaceWorkbench({
           <strong className="workbench-name">
             {workspace?.name ?? t("workbench.session")}
           </strong>
-          {activity.kind === "remoteApp" && (
+          {activityOptions.length > 1 && (
+            <select
+              className="glass-input glass-select workbench-activity-switcher"
+              aria-label={t("workbench.activitySwitcher")}
+              value={
+                activity.kind === "terminal"
+                  ? "terminal:" + activity.sessionId
+                  : "app:" + activity.session.id
+              }
+              onChange={(event) => onSwitchActivity(event.target.value)}
+            >
+              {activityOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          )}
+          {activityOptions.length <= 1 && activity.kind === "remoteApp" && (
             <span className="workbench-activity-name">
               {activity.session.profileName}
             </span>
@@ -239,7 +277,8 @@ export function WorkspaceWorkbench({
         {activity.kind === "remoteApp" && (
           <div className={`workbench-pane${pane === "remoteApp" ? " is-active" : ""}`}>
             <RemoteAppView
-              sessionId={activity.session.id}
+              session={activity.session}
+              capabilities={appCapabilities}
               active={pane === "remoteApp"}
               onConnectionChange={appConnectionChanged}
             />

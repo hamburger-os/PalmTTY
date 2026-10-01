@@ -7,7 +7,14 @@ import {
   type WheelEvent
 } from "react";
 import {
+  REMOTE_APP_CAPTURE_MAX_HEIGHT,
+  REMOTE_APP_CAPTURE_MAX_WIDTH,
+  REMOTE_APP_CAPTURE_MIN_HEIGHT,
+  REMOTE_APP_CAPTURE_MIN_WIDTH,
   encodeRemoteAppControlMessage,
+  type AppSessionMediaState,
+  type AppSessionPublic,
+  type RemoteAppCapabilities,
   type RemoteAppControlMessage
 } from "@palmtty/protocol";
 import {
@@ -24,7 +31,6 @@ export type RemoteAppConnectionState =
   | "closed";
 
 type InteractionMode = "view" | "direct" | "touchpad";
-
 type Point = { x: number; y: number };
 
 function waitForIceGathering(
@@ -33,7 +39,7 @@ function waitForIceGathering(
 ): Promise<void> {
   if (connection.iceGatheringState === "complete") return Promise.resolve();
   return new Promise((resolve) => {
-    const timeout = window.setTimeout(finish, 5000);
+    const timeout = window.setTimeout(finish, 8000);
     const onState = () => {
       if (connection.iceGatheringState === "complete") finish();
     };
@@ -97,12 +103,55 @@ function normalizedVideoPoint(
   return { x, y };
 }
 
+function boundedEven(value: number, minimum: number, maximum: number): number {
+  const bounded = Math.max(minimum, Math.min(maximum, Math.round(value)));
+  return bounded % 2 === 0 ? bounded : bounded - 1;
+}
+
+function browserIceServers(
+  capabilities: RemoteAppCapabilities | null
+): RTCIceServer[] {
+  return (capabilities?.iceServers ?? []).map((server) => ({
+    urls: server.urls,
+    ...(server.username !== undefined ? { username: server.username } : {}),
+    ...(server.credential !== undefined ? { credential: server.credential } : {})
+  }));
+}
+
+function interactionModeLabelKey(
+  mode: InteractionMode
+):
+  | "remoteApp.mode.view"
+  | "remoteApp.mode.direct"
+  | "remoteApp.mode.touchpad" {
+  switch (mode) {
+    case "view": return "remoteApp.mode.view";
+    case "direct": return "remoteApp.mode.direct";
+    case "touchpad": return "remoteApp.mode.touchpad";
+  }
+}
+
+function interactionModeHintKey(
+  mode: InteractionMode
+):
+  | "remoteApp.hint.view"
+  | "remoteApp.hint.direct"
+  | "remoteApp.hint.touchpad" {
+  switch (mode) {
+    case "view": return "remoteApp.hint.view";
+    case "direct": return "remoteApp.hint.direct";
+    case "touchpad": return "remoteApp.hint.touchpad";
+  }
+}
+
 export function RemoteAppView({
-  sessionId,
+  session,
+  capabilities,
   active,
   onConnectionChange
 }: {
-  sessionId: string;
+  session: AppSessionPublic;
+  capabilities: RemoteAppCapabilities | null;
   active: boolean;
   onConnectionChange(state: RemoteAppConnectionState): void;
 }) {
@@ -116,6 +165,10 @@ export function RemoteAppView({
   const [shift, setShift] = useState(false);
   const [textOpen, setTextOpen] = useState(false);
   const [text, setText] = useState("");
+  const [mediaState, setMediaState] = useState<AppSessionMediaState>(
+    session.mediaState
+  );
+  const [networkIssue, setNetworkIssue] = useState(false);
   const activePointers = useRef(new Map<number, Point>());
   const pointerMoved = useRef(false);
   const connectionChangeRef = useRef(onConnectionChange);
@@ -123,6 +176,10 @@ export function RemoteAppView({
   useEffect(() => {
     connectionChangeRef.current = onConnectionChange;
   }, [onConnectionChange]);
+
+  useEffect(() => {
+    setMediaState(session.mediaState);
+  }, [session.mediaState, session.id]);
 
   const send = useCallback((message: RemoteAppControlMessage): boolean => {
     const channel = channelRef.current;
@@ -135,21 +192,80 @@ export function RemoteAppView({
     }
   }, []);
 
+  const sendDisplayHint = useCallback(() => {
+    const surface = surfaceRef.current;
+    if (!surface) return;
+    const bounds = surface.getBoundingClientRect();
+    if (bounds.width < 1 || bounds.height < 1) return;
+    const pixelRatio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    send({
+      type: "display",
+      width: boundedEven(
+        bounds.width * pixelRatio,
+        REMOTE_APP_CAPTURE_MIN_WIDTH,
+        REMOTE_APP_CAPTURE_MAX_WIDTH
+      ),
+      height: boundedEven(
+        bounds.height * pixelRatio,
+        REMOTE_APP_CAPTURE_MIN_HEIGHT,
+        REMOTE_APP_CAPTURE_MAX_HEIGHT
+      )
+    });
+  }, [send]);
+
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface) return;
+    let timer: number | undefined;
+    const observer = new ResizeObserver(() => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      timer = window.setTimeout(sendDisplayHint, 160);
+    });
+    observer.observe(surface);
+    sendDisplayHint();
+    return () => {
+      observer.disconnect();
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [sendDisplayHint]);
+
   useEffect(() => {
     const controller = new AbortController();
     let connection: RTCPeerConnection | undefined;
     let connectionId: string | undefined;
     let retryTimer: number | undefined;
     let stateTimer: number | undefined;
+    let connectionTimer: number | undefined;
     let firstAttempt = true;
     let ended = false;
+    let failedAttempts = 0;
+
+    const clearConnectionTimer = () => {
+      if (connectionTimer !== undefined) {
+        window.clearTimeout(connectionTimer);
+        connectionTimer = undefined;
+      }
+    };
 
     const cleanupPeer = () => {
+      clearConnectionTimer();
       channelRef.current = null;
       if (connection) {
         try { connection.close(); } catch { /* ignore */ }
         connection = undefined;
       }
+    };
+
+    const scheduleReconnect = () => {
+      if (controller.signal.aborted || ended || retryTimer !== undefined) return;
+      cleanupPeer();
+      failedAttempts += 1;
+      if (failedAttempts >= 2) setNetworkIssue(true);
+      connectionChangeRef.current("reconnecting");
+      retryTimer = window.setTimeout(() => {
+        retryTimer = undefined;
+        void connect();
+      }, Math.min(5000, 750 * failedAttempts));
     };
 
     const connect = async () => {
@@ -158,11 +274,16 @@ export function RemoteAppView({
       connectionChangeRef.current(firstAttempt ? "connecting" : "reconnecting");
       firstAttempt = false;
 
-      const peer = new RTCPeerConnection({ iceServers: [] });
+      const peer = new RTCPeerConnection({
+        iceServers: browserIceServers(capabilities)
+      });
       connection = peer;
       peer.addTransceiver("video", { direction: "recvonly" });
       const channel = peer.createDataChannel("control", { ordered: true });
       channelRef.current = channel;
+      channel.onopen = () => {
+        sendDisplayHint();
+      };
 
       peer.ontrack = (event) => {
         const video = videoRef.current;
@@ -174,7 +295,11 @@ export function RemoteAppView({
       peer.onconnectionstatechange = () => {
         if (connection !== peer || controller.signal.aborted) return;
         if (peer.connectionState === "connected") {
+          clearConnectionTimer();
+          failedAttempts = 0;
+          setNetworkIssue(false);
           connectionChangeRef.current("connected");
+          sendDisplayHint();
           return;
         }
         if (
@@ -194,21 +319,34 @@ export function RemoteAppView({
         const sdp = peer.localDescription?.sdp;
         if (!sdp) throw new Error("Remote App offer did not contain SDP");
 
-        const answer = await negotiateRemoteApp(sessionId, sdp);
+        const answer = await negotiateRemoteApp(session.id, sdp);
         connectionId = answer.connectionId;
         await peer.setRemoteDescription({ type: "answer", sdp: answer.sdp });
+        connectionTimer = window.setTimeout(() => {
+          if (
+            connection === peer &&
+            peer.connectionState !== "connected" &&
+            !controller.signal.aborted
+          ) {
+            scheduleReconnect();
+          }
+        }, 10_000);
       } catch {
         if (!controller.signal.aborted && connection === peer && !ended) {
           try {
-            const current = await getAppSession(sessionId);
-            if (current.session.state === "exited" || current.session.state === "failed") {
+            const current = await getAppSession(session.id);
+            setMediaState(current.session.mediaState);
+            if (
+              current.session.state === "exited" ||
+              current.session.state === "failed"
+            ) {
               ended = true;
               cleanupPeer();
               connectionChangeRef.current("closed");
               return;
             }
           } catch {
-            // The Agent may be restarting. Preserve reconnect semantics.
+            // Agent restart is a reconnect condition, not proof of App loss.
           }
           scheduleReconnect();
         }
@@ -218,33 +356,27 @@ export function RemoteAppView({
     const pollSessionState = async () => {
       if (controller.signal.aborted || ended) return;
       try {
-        const current = await getAppSession(sessionId);
-        if (current.session.state === "exited" || current.session.state === "failed") {
+        const current = await getAppSession(session.id);
+        setMediaState(current.session.mediaState);
+        if (
+          current.session.state === "exited" ||
+          current.session.state === "failed"
+        ) {
           ended = true;
           cleanupPeer();
           connectionChangeRef.current("closed");
           return;
         }
       } catch {
-        // Session-state polling is advisory; media reconnect remains authoritative.
+        // Advisory while media reconnect remains authoritative.
       }
       if (!controller.signal.aborted && !ended) {
-        stateTimer = window.setTimeout(() => void pollSessionState(), 3000);
+        stateTimer = window.setTimeout(() => void pollSessionState(), 2000);
       }
-    };
-
-    const scheduleReconnect = () => {
-      if (controller.signal.aborted || ended || retryTimer !== undefined) return;
-      cleanupPeer();
-      connectionChangeRef.current("reconnecting");
-      retryTimer = window.setTimeout(() => {
-        retryTimer = undefined;
-        void connect();
-      }, 1000);
     };
 
     void connect();
-    stateTimer = window.setTimeout(() => void pollSessionState(), 3000);
+    stateTimer = window.setTimeout(() => void pollSessionState(), 1500);
 
     return () => {
       controller.abort();
@@ -252,18 +384,19 @@ export function RemoteAppView({
       if (stateTimer !== undefined) window.clearTimeout(stateTimer);
       cleanupPeer();
       if (connectionId) {
-        void detachRemoteApp(sessionId, connectionId).catch(() => undefined);
+        void detachRemoteApp(session.id, connectionId).catch(() => undefined);
       }
       connectionChangeRef.current("closed");
       const video = videoRef.current;
       if (video) video.srcObject = null;
     };
-  }, [sessionId]);
+  }, [capabilities?.iceServers, sendDisplayHint, session.id]);
 
   useEffect(() => {
     if (!active) return;
     surfaceRef.current?.focus({ preventScroll: true });
-  }, [active]);
+    sendDisplayHint();
+  }, [active, sendDisplayHint]);
 
   const sendKey = (key: string) => {
     const common = {
@@ -410,6 +543,20 @@ export function RemoteAppView({
     });
   };
 
+  const diagnostic = networkIssue
+    ? (
+        capabilities?.relayConfigured
+          ? t("remoteApp.networkUnavailable")
+          : t("remoteApp.networkNoRelay")
+      )
+    : mediaState === "capture-unavailable"
+      ? t("remoteApp.captureUnavailable")
+      : mediaState === "waiting-for-window"
+        ? t("remoteApp.waitingForWindow")
+        : mediaState === "waiting-for-frame"
+          ? t("remoteApp.waitingForFrame")
+          : null;
+
   return (
     <section className="remote-app-view">
       <div className="remote-app-toolbar">
@@ -421,10 +568,11 @@ export function RemoteAppView({
               className={mode === item ? "selected compact" : "ghost compact"}
               onClick={() => setMode(item)}
             >
-              {t(`remoteApp.mode.${item}`)}
+              {t(interactionModeLabelKey(item))}
             </button>
           ))}
         </div>
+        <span className="remote-app-quality">{t("remoteApp.qualityAuto")}</span>
         <button
           type="button"
           className="ghost compact"
@@ -436,7 +584,7 @@ export function RemoteAppView({
 
       <div
         ref={surfaceRef}
-        className={`remote-app-surface mode-${mode}`}
+        className={"remote-app-surface mode-" + mode}
         tabIndex={0}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -448,9 +596,16 @@ export function RemoteAppView({
         }}
       >
         <video ref={videoRef} autoPlay playsInline muted />
-        <div className="remote-app-mode-hint">
-          {t(`remoteApp.hint.${mode}`)}
-        </div>
+        {diagnostic ? (
+          <div className="remote-app-status-overlay glass-content">
+            <strong>{t("remoteApp.statusTitle")}</strong>
+            <span>{diagnostic}</span>
+          </div>
+        ) : (
+          <div className="remote-app-mode-hint">
+            {t(interactionModeHintKey(mode))}
+          </div>
+        )}
       </div>
 
       {textOpen && (

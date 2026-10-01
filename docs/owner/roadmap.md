@@ -23,7 +23,7 @@
 - 手机端 Session Workbench（终端 / Git / 文件 / 附件）、xterm/PWA、触摸特殊键栏与按需长文本输入，中文/英文界面切换，并提供明确的终端替换重启动作；Session 附件支持手机/浏览器上传 PNG/JPEG/WebP/GIF、预览、删除和把本地路径安全插入终端，Files 同时可直接预览 Workspace 中的受支持图片；
 - Git Source Control 工作台与 Workspace 根目录只读文件浏览/预览/完整文件导出已经作为独立、有界、认证的 Agent API 落地，不复用终端协议；Files 提供 512 KiB 预览与独立 8 MiB 完整文件复制/分享/下载，Git 提供“更改 / 历史”、snapshot-stable cursor 分页、文件级 history、commit changed-files/file-diff，以及受控 stage/unstage/restore/commit/branch/stash/fetch/pull/push；
 - PalmTTY 自有的三主题视觉系统（炫彩流光/黑曜石/白霜）、效果/性能两档、reduced-motion 处理与主题审查 skills；
-- Web 端持久化 Workspace CRUD，Host / WSL runtime adapter；正常 UI 使用统一终端 Profile（Host Shell + WSL 发行版），高级 runtime 细节只在 Custom 路径展开；工作区支持有界环境变量与多行启动输入，Session 创建/重启仍只消费持久化 workspace authority；
+- Web 端持久化 Workspace CRUD 已升级为 v2 generation（`workspaces-v2.json`）：Workspace 基础、嵌套 Terminal launch profile、Remote App profiles 分层；不读取/迁移 v1，旧文件保留供人工参考；Terminal 仍使用统一 Profile（Host Shell + WSL 发行版），高级 runtime 细节只在 Custom 路径展开；
 - Ubuntu CI 已覆盖 Linux host runtime；Windows CI 保持 PowerShell 7/ConPTY 路径；macOS adapter 已按同一 Host 模型实现但尚无仓库 CI；
 - 当前用户自启动管理已实现：Windows Task Scheduler 登录任务与 Linux `systemd --user`，支持 install/status/restart/uninstall；可选 env-file 避免把 token 值写入 task/unit argv，Linux 会拒绝 group/world 可读的 env-file；
 - Windows/Ubuntu 双平台 CI；
@@ -33,7 +33,7 @@
 - root `package.json` 作为唯一 Release/runtime 版本源，私有 workspace package 不再重复维护 version；
 - 手动触发的 guarded Release Action：锁定 `main` SHA，针对同一 SHA 重跑 Windows/Ubuntu CI、Security/License、CodeQL，确认主干未前进后创建 annotated tag 与 GitHub Release，最终发布前失败会回滚本次 Tag/Release；真实设备/部署检查保留为推荐证据，不设置无信息增益的人工勾选门禁；
 - 四层文档体系、docs-sync Agent Skill 与 Apache-2.0。
-- Windows x64 Remote Apps alpha：持久 Host Profile、独立 AppWorker/app-runtime-v1、单个 owned-window capture、WebRTC video + typed DataChannel input、View/直触/触控板手机交互，以及 Windows 安装包预编译 native helper；不提供整桌面、UAC/elevated、clipboard/audio 等宽权限能力。
+- Windows x64 Remote Apps alpha：Workspace/Terminal/Remote App authority 已分层；App Profile 只保存 id/name/executable/argv；独立 AppWorker/app-runtime-v2 持有单个 owned-window capture 与 WebRTC video + typed DataChannel；手机端提供 View/直触/触控板、自动 viewport/DPR 画面适配与 capture/network diagnostics；支持有界应用检测/.exe 浏览及 operator-owned STUN/TURN，Windows 安装包预编译 native helper；不提供整桌面、UAC/elevated、clipboard/audio 等宽权限能力。
 
 ## 当前持久化边界
 
@@ -85,7 +85,7 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 自动化已经覆盖浏览器重连、Worker IPC、Agent 重启恢复、真实 detached 进程和 Windows ConPTY。下一阶段继续做真实使用验证：
 
 - Codex CLI 长时间交互；
-- Remote Apps 在真实 Windows x64 + iPhone/Android 上验证 Codex Desktop、VS Code 等目标应用的 PrintWindow 兼容性、触控/IME、网络切换、Agent restart rediscovery 与 AppWorker-loss Job cleanup；未验证应用不得宣称支持；
+- Remote Apps 在真实 Windows x64 + iPhone/Android 上验证 Codex Desktop、VS Code 等目标应用的 PrintWindow 兼容性、自动横竖屏/画质适配、触控/IME、Activity 切换、网络切换、Agent restart rediscovery 与 AppWorker-loss Job cleanup；公网/反代场景额外验证 operator-owned TURN；未验证应用不得宣称支持；
 - iPhone/Android 中文 IME 与语音输入；
 - Ctrl+C 等交互式中断；
 - 手机 Wi-Fi/蜂窝切换、锁屏和恢复；
@@ -112,7 +112,7 @@ Git 已完成从只读 status/diff 到受控 Source Control 工作台，并补�
 - 根据真实使用反馈评估更高级 Git 操作（force push、interactive rebase/cherry-pick、reflog、submodule/LFS）；除非有明确需求与独立安全设计，不暴露任意 Git argv；
 - 根据真实使用反馈评估受控文件编辑，前置解决并发修改、编码与原子写入；
 - 根据真实 Codex/Antigravity/Claude Code 等 CLI 的多模态交互反馈，评估厂商专用 adapter 是否有必要；当前先保持“受控本地附件 + 路径插入”的中立边界，不把任何一个 Agent 的图片消息协议写入核心；
-- Remote Apps 后续只在真实需求成立时评估 Windows Graphics Capture backend、macOS ScreenCaptureKit、Linux Portal/PipeWire、TURN 或 clipboard/audio 等独立 capability；不以完整 Remote Desktop 为目标；
+- Remote Apps 后续只在真实需求成立时评估 Windows Graphics Capture backend、macOS ScreenCaptureKit、Linux Portal/PipeWire、first-party relay 或 clipboard/audio 等独立 capability；当前仅支持 operator-supplied STUN/TURN，不以完整 Remote Desktop 为目标；
 - 本地服务入口；
 - WSL 实机长期验证与发行版边界测试；
 - 增加 macOS CI / 实机验证后再提升其支持等级。
