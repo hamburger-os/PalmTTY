@@ -139,3 +139,9 @@ Remote Apps 当前是与终端独立的第二条 Activity 数据面。Workspace 
 Windows helper cursor telemetry stays inside the verified Job-owned application HWND. AppWorker forwards bounded typed coordinates and foreground/UIPI input-state feedback only to its single authenticated WebRTC peer; Web overlays the cursor using the same contain/cover geometry as clicks. A one-row mobile Tools header and an always-visible terminal key dock keep xterm/WebSocket mounted; the pinned More button directly toggles extra keys, without separate full or hidden modes.
 
 原生 Helper 仅提供 Job-owned 受控窗口内的归一化光标坐标，通过现有已认证的单一 WebRTC Peer 回传；手机光标与点击使用同一 contain/cover 映射。手机导航收成单行工具菜单，CLI 键栏取消完整/隐藏状态，将高频长文本固定在键盘之后，通过始终可见的“更多”直接展开或收起其他按键，绝不重建 xterm/WebSocket。
+
+### Shared mobile inputs / 手机输入一致性
+
+Terminal and Remote App docks render the same shared Keyboard → Long Text primary actions before their mode-specific shortcuts. The Terminal keyboard focuses xterm’s own input; Remote App Keyboard synchronously focuses a dedicated mobile-safe textarea in the originating iPhone tap, sends committed Unicode on its existing authenticated bounded WebRTC control channel and routes only allowlisted navigation keys via typed key messages. Long Text remains an explicitly submitted composer, with unsent live input preserved when switching. No shared PTY or additional input authority is created.
+
+Terminal 和 Remote App 共用「键盘 → 长文本」两项主按钮，其他功能键后置。Terminal 继续由 xterm 接管软键盘；Remote App 在用户点击当下聚焦独立输入框，输入法完成组合后使用现有 WebRTC 有界文字通道即时发送，特殊键仍走白名单。长文本由用户明确发送，切换时保留即时输入中未发送的草稿，不增加 PTY 通道或桌面控制权限。
