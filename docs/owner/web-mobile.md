@@ -87,3 +87,16 @@
 ## 你审查时重点看
 
 手机体验优化不能绕开终端协议新增隐式高权限 API。Git/文件能力已经通过独立、有界 Workspace API 落地：Files 保持只读，Git 只开放 typed 写操作。继续增加更高级 Git 或文件写能力时仍必须单独审查权限、仓库 hooks/filters、并发写、symlink/路径逃逸与敏感环境变量继承。
+
+## Remote App 手机交互
+
+Workbench 已从“SessionWorkbench”收敛为“WorkspaceWorkbench”：Terminal 与 Remote App 是互斥的 Activity；Git/Files 是共享 Workspace Tool；Artifacts 仍只属于 Terminal Session。切换 Git/Files 不卸载当前 Activity，因此 xterm/WebSocket 或 Remote App WebRTC 都不会因为查看源码而被重建。
+
+Remote App Surface 使用三种显式触摸语义：
+
+- 查看：不发送 pointer，浏览器保留 pinch zoom/页面手势；
+- 直触：屏幕坐标映射到目标应用窗口；
+- 触控板：单指相对移动、轻点点击、双指滚动。
+
+手机 IME/语音/长文本使用独立 Unicode text control；常用 Ctrl/Alt/Shift、方向、Enter、Tab、Esc、Backspace/Delete 使用 allowlisted typed key。Remote App 不复用 xterm textarea，也不把桌面输入逻辑混入 TerminalView。
+

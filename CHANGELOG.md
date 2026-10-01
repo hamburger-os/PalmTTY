@@ -8,6 +8,17 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 <!-- Add changes here after the latest release. Publishing requires this section to be empty. -->
 
+### Added
+
+- Add Windows x64 Remote Apps alpha as a terminal-independent Activity: persisted Host Workspace profiles launch through a detached authenticated AppWorker and a PalmTTY-owned native Windows app host, stream one owned application window over WebRTC, and accept only bounded typed mobile pointer/key/text control. Full-desktop capture, browser-selected PID/HWND, elevation/UAC bypass, clipboard, audio, camera, microphone and file-drag channels are intentionally absent.
+- Replace the terminal-specific SessionWorkbench shell with an activity-aware WorkspaceWorkbench so Terminal and Remote App activities can share Git/Files without being unmounted; Terminal Artifacts remain Session-scoped.
+- Add mobile Remote App View / direct-touch / trackpad modes, two-finger scrolling, special keys and Unicode text/IME/dictation input.
+
+### Changed
+
+- Bound first-generation Remote App capture to 5–15 fps and 320×240–1600×1000 (1280×800 @ 12 fps default), with an additional 4096×4096 / 12 MP source-window allocation ceiling to keep the raw native capture pipe explicitly resource-bounded.
+- Windows packages now include a precompiled GUI-subsystem Remote App host; source mode compiles the same helper into the private per-user App runtime on first use.
+
 ## [0.2.0]
 
 ### Added

@@ -90,6 +90,14 @@ async function main() {
     );
     const cli = path.join(root, "tools", "installed-cli.mjs");
     const agent = path.join(root, "app", "dist", "index.js");
+    if (process.platform === "win32") {
+      const helper = await readFile(
+        path.join(root, "bin", "palmtty-remote-app-host.exe")
+      );
+      if (helper.length < 2 || helper[0] !== 0x4d || helper[1] !== 0x5a) {
+        throw new Error("Packaged Windows runtime is missing a valid Remote App host");
+      }
+    }
     if (process.platform !== "win32") {
       await chmod(node, 0o755);
       await chmod(path.join(root, "bin", "palmtty"), 0o755);

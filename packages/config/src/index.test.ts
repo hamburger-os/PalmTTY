@@ -38,6 +38,9 @@ describe("configuration", () => {
     expect(config.auth.maxLoginSessions).toBe(32);
     expect(config.sessions.maxSessions).toBe(8);
     expect(config.sessions.exitedRetentionMinutes).toBe(30);
+    expect(config.remoteApps.enabled).toBe(true);
+    expect(config.remoteApps.maxSessions).toBe(4);
+    expect(config.remoteApps.exitedRetentionMinutes).toBe(30);
   });
 
   it("derives LAN listeners and exact private origins", () => {

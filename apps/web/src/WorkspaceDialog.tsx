@@ -7,6 +7,7 @@ import {
 } from "react";
 import type {
   CreateWorkspaceInput,
+  RemoteAppProfile,
   RuntimeCapabilities,
   TerminalProfile,
   WorkspacePublic,
@@ -146,6 +147,9 @@ export function WorkspaceDialog({
   const [environmentError, setEnvironmentError] = useState<string | null>(null);
   const [startupCommand, setStartupCommand] = useState(
     workspace?.startupCommand ?? ""
+  );
+  const [remoteApps, setRemoteApps] = useState<RemoteAppProfile[]>(
+    workspace?.remoteApps ?? []
   );
   const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -335,7 +339,8 @@ export function WorkspaceDialog({
       ),
       ...(startupCommand.trim()
         ? { startupCommand: startupCommand.trim() }
-        : {})
+        : {}),
+      remoteApps: kind === "host" ? remoteApps : []
     };
     await onSave(input);
   };
@@ -623,6 +628,202 @@ export function WorkspaceDialog({
               </div>
             </div>
 
+            {kind === "host" && (
+              <div className="workspace-field remote-app-profiles">
+                <div className="remote-app-profile-heading">
+                  <div>
+                    <strong>{t("workspace.remoteApps")}</strong>
+                    <small>{t("workspace.remoteAppsHelp")}</small>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost compact"
+                    disabled={remoteApps.length >= 16}
+                    onClick={() => {
+                      const id = `app-${Date.now().toString(36)}-${remoteApps.length}`;
+                      setRemoteApps((current) => [
+                        ...current,
+                        {
+                          id,
+                          name: "",
+                          executable: "",
+                          args: [],
+                          frameRate: 12,
+                          maxWidth: 1280,
+                          maxHeight: 800
+                        }
+                      ]);
+                    }}
+                  >
+                    + {t("workspace.remoteAppAdd")}
+                  </button>
+                </div>
+
+                {remoteApps.length === 0 ? (
+                  <small>{t("workspace.remoteAppsEmpty")}</small>
+                ) : (
+                  <div className="remote-app-profile-list">
+                    {remoteApps.map((profile, index) => (
+                      <div className="remote-app-profile-card glass-content" key={profile.id}>
+                        <div className="remote-app-profile-row">
+                          <label>
+                            <span>{t("workspace.remoteAppName")}</span>
+                            <input
+                              className="glass-input"
+                              value={profile.name}
+                              maxLength={100}
+                              required
+                              onChange={(event) => setRemoteApps((current) =>
+                                current.map((candidate, candidateIndex) =>
+                                  candidateIndex === index
+                                    ? { ...candidate, name: event.target.value }
+                                    : candidate
+                                )
+                              )}
+                              placeholder={t("workspace.remoteAppNamePlaceholder")}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="danger-outline compact"
+                            onClick={() => setRemoteApps((current) =>
+                              current.filter((_, candidateIndex) => candidateIndex !== index)
+                            )}
+                          >
+                            {t("workspace.remoteAppRemove")}
+                          </button>
+                        </div>
+
+                        <label>
+                          <span>{t("workspace.remoteAppExecutable")}</span>
+                          <input
+                            className="glass-input"
+                            value={profile.executable}
+                            maxLength={4096}
+                            required
+                            onChange={(event) => setRemoteApps((current) =>
+                              current.map((candidate, candidateIndex) =>
+                                candidateIndex === index
+                                  ? { ...candidate, executable: event.target.value }
+                                  : candidate
+                              )
+                            )}
+                            placeholder={t("workspace.remoteAppExecutablePlaceholder")}
+                          />
+                          <small>{t("workspace.remoteAppExecutableHelp")}</small>
+                        </label>
+
+                        <label>
+                          <span>{t("workspace.remoteAppArgs")}</span>
+                          <textarea
+                            className="glass-input"
+                            value={profile.args.join("\n")}
+                            rows={2}
+                            maxLength={8192}
+                            onChange={(event) => {
+                              const args = event.target.value
+                                .split(/\r?\n/)
+                                .map((value) => value.trim())
+                                .filter(Boolean)
+                                .slice(0, 32);
+                              setRemoteApps((current) =>
+                                current.map((candidate, candidateIndex) =>
+                                  candidateIndex === index
+                                    ? { ...candidate, args }
+                                    : candidate
+                                )
+                              );
+                            }}
+                            placeholder={t("workspace.remoteAppArgsPlaceholder")}
+                          />
+                          <small>{t("workspace.remoteAppArgsHelp")}</small>
+                        </label>
+
+                        <details className="remote-app-profile-advanced">
+                          <summary>{t("workspace.remoteAppAdvanced")}</summary>
+                          <div className="remote-app-profile-grid">
+                            <label>
+                              <span>{t("workspace.remoteAppFps")}</span>
+                              <input
+                                className="glass-input"
+                                type="number"
+                                min={5}
+                                max={15}
+                                value={profile.frameRate}
+                                onChange={(event) => setRemoteApps((current) =>
+                                  current.map((candidate, candidateIndex) =>
+                                    candidateIndex === index
+                                      ? {
+                                          ...candidate,
+                                          frameRate: Math.max(
+                                            5,
+                                            Math.min(15, Number(event.target.value) || 12)
+                                          )
+                                        }
+                                      : candidate
+                                  )
+                                )}
+                              />
+                            </label>
+                            <label>
+                              <span>{t("workspace.remoteAppMaxWidth")}</span>
+                              <input
+                                className="glass-input"
+                                type="number"
+                                min={320}
+                                max={1600}
+                                value={profile.maxWidth}
+                                onChange={(event) => setRemoteApps((current) =>
+                                  current.map((candidate, candidateIndex) =>
+                                    candidateIndex === index
+                                      ? {
+                                          ...candidate,
+                                          maxWidth: Math.max(
+                                            320,
+                                            Math.min(1600, Number(event.target.value) || 1280)
+                                          )
+                                        }
+                                      : candidate
+                                  )
+                                )}
+                              />
+                            </label>
+                            <label>
+                              <span>{t("workspace.remoteAppMaxHeight")}</span>
+                              <input
+                                className="glass-input"
+                                type="number"
+                                min={240}
+                                max={1000}
+                                value={profile.maxHeight}
+                                onChange={(event) => setRemoteApps((current) =>
+                                  current.map((candidate, candidateIndex) =>
+                                    candidateIndex === index
+                                      ? {
+                                          ...candidate,
+                                          maxHeight: Math.max(
+                                            240,
+                                            Math.min(1000, Number(event.target.value) || 800)
+                                          )
+                                        }
+                                      : candidate
+                                  )
+                                )}
+                              />
+                            </label>
+                          </div>
+                        </details>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {kind === "wsl" && workspace?.remoteApps.length ? (
+              <div className="info-banner">{t("workspace.remoteAppsHostOnly")}</div>
+            ) : null}
+
             {error && <div className="error-banner">{error}</div>}
           </div>
 
@@ -650,7 +851,14 @@ export function WorkspaceDialog({
               <button
                 className="prism-primary"
                 type="submit"
-                disabled={busy || !name.trim() || !cwd.trim()}
+                disabled={
+                  busy ||
+                  !name.trim() ||
+                  !cwd.trim() ||
+                  (kind === "host" && remoteApps.some(
+                    (profile) => !profile.name.trim() || !profile.executable.trim()
+                  ))
+                }
               >
                 {busy ? t("workspace.saving") : t("workspace.save")}
               </button>

@@ -22,7 +22,8 @@ async function workspace(): Promise<WorkspaceDefinition> {
     id: "files-test",
     name: "Files test",
     cwd: root,
-    runtime: { kind: "host", args: [] }
+    runtime: { kind: "host", args: [] },
+    remoteApps: []
   };
 }
 

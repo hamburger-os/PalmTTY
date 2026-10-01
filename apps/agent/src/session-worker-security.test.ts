@@ -68,7 +68,8 @@ function workspace(): WorkspaceDefinition {
       kind: "host",
       shell: process.execPath,
       args: []
-    }
+    },
+    remoteApps: []
   };
 }
 

@@ -1,10 +1,22 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import type { WorkspacePublic } from "@palmtty/protocol";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState
+} from "react";
+import type {
+  AppSessionPublic,
+  WorkspacePublic
+} from "@palmtty/protocol";
 import { ArtifactsPane } from "./ArtifactsPane.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { FilesPane } from "./FilesPane.js";
 import { GitPane } from "./GitPane.js";
 import { useI18n } from "./i18n.js";
+import {
+  RemoteAppView,
+  type RemoteAppConnectionState
+} from "./RemoteAppView.js";
 import {
   TerminalView,
   type ConnectionState,
@@ -12,22 +24,42 @@ import {
 } from "./TerminalView.js";
 import { workbenchVisualViewportFrame } from "./visual-viewport.js";
 
-type WorkbenchPane = "terminal" | "git" | "files" | "artifacts";
+export type WorkbenchActivity =
+  | {
+      kind: "terminal";
+      sessionId: string;
+      onRestart(): Promise<void>;
+    }
+  | {
+      kind: "remoteApp";
+      session: AppSessionPublic;
+    };
 
-export function SessionWorkbench({
-  sessionId,
+type WorkbenchPane =
+  | "terminal"
+  | "remoteApp"
+  | "git"
+  | "files"
+  | "artifacts";
+
+export function WorkspaceWorkbench({
   workspace,
-  onBack,
-  onRestart
+  activity,
+  onBack
 }: {
-  sessionId: string;
   workspace?: WorkspacePublic;
+  activity: WorkbenchActivity;
   onBack(): void;
-  onRestart(): Promise<void>;
 }) {
   const { t } = useI18n();
-  const [pane, setPane] = useState<WorkbenchPane>("terminal");
-  const [connection, setConnection] = useState<ConnectionState>("connecting");
+  const initialPane: WorkbenchPane = activity.kind === "terminal"
+    ? "terminal"
+    : "remoteApp";
+  const [pane, setPane] = useState<WorkbenchPane>(initialPane);
+  const [terminalConnection, setTerminalConnection] =
+    useState<ConnectionState>("connecting");
+  const [appConnection, setAppConnection] =
+    useState<RemoteAppConnectionState>("connecting");
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [restartError, setRestartError] = useState<string | null>(null);
@@ -35,11 +67,14 @@ export function SessionWorkbench({
   const [gitHistoryPath, setGitHistoryPath] = useState<string>();
   const [terminalInsert, setTerminalInsert] = useState<TerminalInsertRequest>();
   const terminalInsertSequence = useRef(0);
-
-  const handleConnectionChange = useCallback((next: ConnectionState) => {
-    setConnection(next);
-  }, []);
   const workbenchRef = useRef<HTMLElement>(null);
+
+  const terminalConnectionChanged = useCallback((next: ConnectionState) => {
+    setTerminalConnection(next);
+  }, []);
+  const appConnectionChanged = useCallback((next: RemoteAppConnectionState) => {
+    setAppConnection(next);
+  }, []);
 
   useLayoutEffect(() => {
     const element = workbenchRef.current;
@@ -67,7 +102,6 @@ export function SessionWorkbench({
         clearVisualViewportFrame();
         return;
       }
-
       element.style.setProperty("--workbench-visual-top", `${frame.top}px`);
       element.style.setProperty("--workbench-visual-left", `${frame.left}px`);
       element.style.setProperty("--workbench-visual-width", `${frame.width}px`);
@@ -94,11 +128,11 @@ export function SessionWorkbench({
     };
   }, []);
 
-  const selectPane = (next: WorkbenchPane) => {
-    if ((next === "git" || next === "files") && !workspace) return;
-    if (next === "git") setGitHistoryPath(undefined);
-    setPane(next);
-  };
+  const tabs: WorkbenchPane[] = [
+    activity.kind === "terminal" ? "terminal" : "remoteApp",
+    ...(workspace ? (["git", "files"] as const) : []),
+    ...(activity.kind === "terminal" ? (["artifacts"] as const) : [])
+  ];
 
   const showFileHistory = (path: string) => {
     if (!workspace) return;
@@ -107,6 +141,7 @@ export function SessionWorkbench({
   };
 
   const insertArtifactPath = (artifactPath: string) => {
+    if (activity.kind !== "terminal") return;
     terminalInsertSequence.current += 1;
     setTerminalInsert({
       id: terminalInsertSequence.current,
@@ -114,6 +149,10 @@ export function SessionWorkbench({
     });
     setPane("terminal");
   };
+
+  const status = activity.kind === "terminal"
+    ? terminalConnection
+    : appConnection;
 
   return (
     <main ref={workbenchRef} className="workbench-page">
@@ -125,23 +164,34 @@ export function SessionWorkbench({
             onClick={onBack}
             disabled={restarting}
           >
-            ← {t("terminal.back")}
+            ← {t("workbench.back")}
           </button>
           <strong className="workbench-name">
             {workspace?.name ?? t("workbench.session")}
           </strong>
+          {activity.kind === "remoteApp" && (
+            <span className="workbench-activity-name">
+              {activity.session.profileName}
+            </span>
+          )}
         </div>
 
-        <nav className="workbench-tabs" role="tablist" aria-label={t("workbench.views")}>
-          {(["terminal", "git", "files", "artifacts"] as const).map((item) => (
+        <nav
+          className="workbench-tabs"
+          role="tablist"
+          aria-label={t("workbench.views")}
+        >
+          {tabs.map((item) => (
             <button
               type="button"
               role="tab"
               key={item}
               className={pane === item ? "selected" : ""}
               aria-selected={pane === item}
-              disabled={(item === "git" || item === "files") && !workspace}
-              onClick={() => selectPane(item)}
+              onClick={() => {
+                if (item === "git") setGitHistoryPath(undefined);
+                setPane(item);
+              }}
             >
               {t(`workbench.${item}`)}
             </button>
@@ -154,31 +204,47 @@ export function SessionWorkbench({
               {restartError}
             </span>
           )}
-          <button
-            type="button"
-            className="ghost compact"
-            title={t("terminal.restart")}
-            aria-label={t("terminal.restart")}
-            disabled={restarting || connection === "stopping"}
-            onClick={() => setRestartConfirmOpen(true)}
-          >
-            {restarting ? "…" : "↻"}
-          </button>
-          <span className={`connection ${connection}`}>
-            {t(`terminal.connection.${connection}`)}
+          {activity.kind === "terminal" && (
+            <button
+              type="button"
+              className="ghost compact"
+              title={t("terminal.restart")}
+              aria-label={t("terminal.restart")}
+              disabled={restarting || terminalConnection === "stopping"}
+              onClick={() => setRestartConfirmOpen(true)}
+            >
+              {restarting ? "…" : "↻"}
+            </button>
+          )}
+          <span className={`connection ${status}`}>
+            {activity.kind === "terminal"
+              ? t(`terminal.connection.${terminalConnection}`)
+              : t(`remoteApp.connection.${appConnection}`)}
           </span>
         </div>
       </header>
 
       <div className="workbench-content">
-        <div className={`workbench-pane${pane === "terminal" ? " is-active" : ""}`}>
-          <TerminalView
-            sessionId={sessionId}
-            active={pane === "terminal"}
-            insertRequest={terminalInsert}
-            onConnectionChange={handleConnectionChange}
-          />
-        </div>
+        {activity.kind === "terminal" && (
+          <div className={`workbench-pane${pane === "terminal" ? " is-active" : ""}`}>
+            <TerminalView
+              sessionId={activity.sessionId}
+              active={pane === "terminal"}
+              insertRequest={terminalInsert}
+              onConnectionChange={terminalConnectionChanged}
+            />
+          </div>
+        )}
+
+        {activity.kind === "remoteApp" && (
+          <div className={`workbench-pane${pane === "remoteApp" ? " is-active" : ""}`}>
+            <RemoteAppView
+              sessionId={activity.session.id}
+              active={pane === "remoteApp"}
+              onConnectionChange={appConnectionChanged}
+            />
+          </div>
+        )}
 
         {workspace && pane === "git" && (
           <div className="workbench-pane is-active">
@@ -200,19 +266,19 @@ export function SessionWorkbench({
           </div>
         )}
 
-        {pane === "artifacts" && (
+        {activity.kind === "terminal" && pane === "artifacts" && (
           <div className="workbench-pane is-active">
             <ArtifactsPane
-              sessionId={sessionId}
-              canUpload={connection === "connected"}
-              canInsert={connection === "connected"}
+              sessionId={activity.sessionId}
+              canUpload={terminalConnection === "connected"}
+              canInsert={terminalConnection === "connected"}
               onInsertPath={insertArtifactPath}
             />
           </div>
         )}
       </div>
 
-      {restartConfirmOpen && (
+      {activity.kind === "terminal" && restartConfirmOpen && (
         <ConfirmDialog
           title={t("terminal.restartTitle")}
           message={t("terminal.restartConfirm")}
@@ -221,9 +287,9 @@ export function SessionWorkbench({
           onCancel={() => setRestartConfirmOpen(false)}
           onConfirm={() => {
             setRestartConfirmOpen(false);
-            setRestartError(null);
             setRestarting(true);
-            void onRestart()
+            setRestartError(null);
+            void activity.onRestart()
               .catch(() => setRestartError(t("errors.session_restart_failed")))
               .finally(() => setRestarting(false));
           }}

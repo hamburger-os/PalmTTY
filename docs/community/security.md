@@ -110,3 +110,10 @@ PalmTTY 自启动始终属于当前用户：Windows Task Scheduler 使用交互�
 ### 推荐部署
 
 优先使用私有 HTTPS 入口，例如 Tailscale Serve；或使用 Caddy/QNAP 等可信 HTTPS 反向代理。PalmTTY 上游端口保持私有。
+
+### Remote Apps / 远程 App
+
+Windows Remote Apps deliberately expose less authority than a general remote desktop. A Session launches only a persisted Host Workspace profile; the native host captures and controls only a visible top-level window owned by that launched process tree. It does not fall back to full-desktop capture, accept browser-selected HWND/PID, elevate, or bypass UIPI. Control messages are typed/bounded and current channels exclude clipboard, audio, camera, microphone and file drag/drop.
+
+Windows Remote Apps 有意保持比完整远程桌面更窄的权限：只启动持久 Host Workspace Profile，只捕获/控制该进程树拥有的可见顶层窗口，不允许浏览器提交 HWND/PID，不提供整桌面 fallback，不提权也不绕过 UIPI。控制消息全部 typed + bounded；当前没有剪贴板、音频、摄像头、麦克风或文件拖放通道。
+

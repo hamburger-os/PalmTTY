@@ -133,6 +133,34 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 - a live terminal while changing appearance, confirming there is no xterm/WebSocket recreation or recovery reset;
 - static theme contract checks confirming locale/presentation state is not a terminal transport-lifecycle dependency.
 
+## Remote App acceptance
+
+Automated/static acceptance for any Remote App change:
+
+- protocol tests cover profile bounds/unique IDs, App Session state classification, signaling bounds and typed control-message bounds;
+- Remote App recovery storage is versioned separately from Terminal Worker state and round-trips record + secret cleanup;
+- App Session creation accepts only persisted workspaceId + profileId and rejects WSL/non-Host profiles, unknown profiles and unsupported platforms;
+- Workspace deletion is blocked by active Terminal **or** active Remote App Sessions;
+- AppWorker bootstrap removes PalmTTY control/auth environment keys, requires authenticated adoption, retains recovery authority across Agent reconnect and never treats persisted PID as kill authority;
+- Windows packaging compiles a GUI-subsystem Remote App helper into the installed runtime and package smoke verifies a native PE executable is present;
+- Linux/Ubuntu build/test paths do not try to initialize the Windows capture/WebRTC native runtime merely because the control-plane schemas exist;
+- Web build keeps Remote App video/activity mounted while switching to shared Git/Files panes;
+- View mode sends no pointer controls; Touch/Trackpad use the bounded typed control schema; text input is bounded Unicode and special keys stay allowlisted;
+- no terminal protocol/schema is expanded with Remote App video/input messages.
+
+Real Windows + phone acceptance before claiming a specific desktop application is supported:
+
+- configure a Host Workspace Remote App profile and confirm save-time plus launch-time executable validation;
+- launch the profile and confirm the browser request contains only workspaceId + profileId, while no executable/PID/HWND is browser-selected;
+- verify the helper captures only a window whose process is a member of the PalmTTY-owned Job Object and does not fall back to the desktop when the target cannot be captured;
+- test View / Touch / Trackpad, two-finger scroll, Ctrl/Alt/Shift/common keys, Chinese IME/voice text and device rotation;
+- background/foreground or switch phone network and confirm WebRTC reconnect does not create a second application process;
+- restart only the Agent and confirm the adopted AppWorker/application remain alive and are rediscovered;
+- terminate the App Session and confirm the PalmTTY Job Object closes all member processes;
+- kill the AppWorker/control path during a disposable test and confirm the native helper terminates its Job Object instead of leaving an orphan application;
+- confirm an elevated/UAC application cannot be controlled from normal-user PalmTTY and do **not** bypass UIPI;
+- test intended apps such as Codex Desktop/VS Code individually. If PrintWindow returns blank/protected/GPU-incompatible frames, record the app as unvalidated/unsupported instead of enabling whole-desktop capture.
+
 ## Manual Windows validation before a release
 
 - run `pnpm run preflight` with the intended config/token and confirm the Agent TCP endpoint is bindable;

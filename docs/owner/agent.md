@@ -81,6 +81,16 @@ Agent 启动前的 runtime preflight 只处理认证环境、外部暴露规则�
 
 `PALMTTY_*` 整个控制环境命名空间以及单独配置的认证 token 环境变量，在 Worker bootstrap 前从规范化 Workspace 环境剔除，并从 Worker 进程环境删除；用户 PTY 只接收清理后的 Workspace 环境。
 
+## Remote App 控制面
+
+Remote Apps 使用与终端完全独立的 App Session 数据面。Agent 负责持久 Workspace Profile authority、App Session registry、认证/Origin、生命周期 HTTP API 与 WebRTC offer/answer signaling；视频和输入不经过 terminal WebSocket。
+
+每个 App Session 由独立 detached AppWorker 持有，使用 app-runtime-v1 recovery generation 和自己的 secret/adoption/heartbeat。Agent 重启后会像 Terminal Worker 一样重新扫描并认证 AppWorker，但两类 Worker 不共享 lifecycle protocol 或 canonical state。
+
+App Session 创建请求只有 workspaceId + profileId。真正的 executable、argv、cwd、环境和 capture limits 必须从持久 Workspace Profile 解析；Host runtime/executable 会在启动前再次验证，并剔除 PALMTTY_* 与认证 token 环境。浏览器不能通过 Remote App API 临时指定 executable、PID、HWND 或 env。
+
+Windows AppWorker 启动独立 GUI helper。helper 以 suspended 状态创建 App，先加入 KILL_ON_JOB_CLOSE Job Object 再 resume，只发现该根进程及其后代拥有的可见顶层窗口。当前画面使用窗口级 PrintWindow，输入使用 ownership 复核后的受限 SendInput；不提供 desktop fallback、elevation/UIPI bypass、clipboard/audio 等隐式能力。详细边界见 [remote-apps.md](remote-apps.md)。
+
 ## Session 生命周期 API
 
 Session 创建仍是 `POST /api/v1/sessions`。生命周期修改不再复用一个含义模糊的 DELETE：
@@ -110,3 +120,12 @@ Session 创建仍是 `POST /api/v1/sessions`。生命周期修改不再复用一
 - 是否按记录的 PID 直接杀进程；
 - Workspace CRUD 是否仍是显式持久化修改面，而不是把 cwd/shell/env 重新塞进 Session 创建请求；
 - IPC 与浏览器 backpressure 是否仍有硬上限。
+
+## Remote Apps 控制面
+
+Remote Apps 不属于 Terminal Worker。Agent 额外维护 `RemoteAppSessionManager`，只负责持久 Workspace Profile authority、AppWorker registry/rediscovery、生命周期 API 与 WebRTC signaling。AppWorker 使用独立 `app-runtime-v1`、独立 per-session secret 与 adoption，不读取 Terminal `runtime-v5` recovery state。
+
+浏览器创建 App Session 只能提交持久化 `workspaceId + profileId`。Agent 会重新读取 Workspace、确认 Host runtime、重新解析 executable 与当前宿主环境，并剔除 PalmTTY 控制/认证环境后才 bootstrap AppWorker。浏览器不能临时提供 executable、argv、PID、HWND 或环境覆盖。
+
+Agent restart 只关闭 AppWorker IPC client；已 adoption 的 AppWorker/应用继续。新 Agent 从 Remote App recovery record + secret 重新认证。AppWorker 丢失时 Windows helper 的控制 pipe EOF 会终止其 Job Object，避免留下无人管理的 PalmTTY-owned 应用。
+

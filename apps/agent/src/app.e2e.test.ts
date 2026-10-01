@@ -159,7 +159,8 @@ function e2eWorkspace() {
       kind: "host" as const,
       shell: process.execPath,
       args: []
-    }
+    },
+    remoteApps: []
   };
 }
 
