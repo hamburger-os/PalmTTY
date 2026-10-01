@@ -760,6 +760,12 @@ export function RemoteAppView({
 
   const toggleKeyboard = () => {
     if (keyboardOpen) {
+      // Safari can dismiss the system keyboard while our input tray stays
+      // mounted. A second tap restores focus instead of needlessly closing it.
+      if (controlReady && document.activeElement !== liveKeyboardRef.current) {
+        liveKeyboardRef.current?.focus({ preventScroll: true });
+        return;
+      }
       closeKeyboard();
       return;
     }
@@ -787,6 +793,15 @@ export function RemoteAppView({
     });
     longTextRef.current?.focus({ preventScroll: true });
   };
+
+  useEffect(() => {
+    if (active) return;
+    // Activity panes stay mounted while Git/Files tools are open; do not let
+    // an off-screen Safari textarea retain the phone's software keyboard.
+    liveKeyboardRef.current?.blur();
+    longTextRef.current?.blur();
+    if (keyboardOpen) closeKeyboard();
+  }, [active, keyboardOpen]);
 
   const sendKey = (key: string) => {
     const common = {
