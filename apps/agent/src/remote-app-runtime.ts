@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createRequire } from "node:module";
 import { RemoteAppFrameDecoder } from "./remote-app-frame-decoder.js";
 import { parseNativeCursorSample } from "./remote-app-cursor.js";
+import { RemoteAppControlForwarder } from "./remote-app-control-forwarder.js";
 import {
   AppSessionPublicSchema,
   REMOTE_APP_CAPTURE_DEFAULT_FPS,
@@ -55,6 +56,7 @@ export class RemoteAppRuntime {
   private state: RuntimeState = "starting";
   private mediaState: AppSessionMediaState = "launching";
   private helper: ChildProcessWithoutNullStreams | undefined;
+  private nativeControl: RemoteAppControlForwarder | undefined;
   private appPid: number | undefined;
   private exitCode: number | undefined;
   private readonly frameDecoder = new RemoteAppFrameDecoder();
@@ -93,6 +95,7 @@ export class RemoteAppRuntime {
       env: this.bootstrap.profile.environment
     });
     this.helper = child;
+    this.nativeControl = new RemoteAppControlForwarder(child.stdin);
 
     let stderr = "";
     let hostStartupError: string | undefined;
@@ -162,6 +165,8 @@ export class RemoteAppRuntime {
     });
     child.stdout.on("data", (chunk: Buffer) => this.consumeFrames(chunk));
     child.on("close", (code) => {
+      this.nativeControl?.close();
+      this.nativeControl = undefined;
       if (this.disposed) return;
       this.exitCode = typeof code === "number" ? code : undefined;
       this.state = this.state === "stopping" || code === 0 ? "exited" : "failed";
@@ -349,6 +354,8 @@ export class RemoteAppRuntime {
 
     const helper = this.helper;
     this.helper = undefined;
+    this.nativeControl?.close();
+    this.nativeControl = undefined;
     if (killApp && helper && helper.exitCode === null && helper.signalCode === null) {
       try { helper.kill(); } catch { /* ignore */ }
     }
@@ -368,18 +375,14 @@ export class RemoteAppRuntime {
 
   private forwardControl(source: string): void {
     const helper = this.helper;
-    if (
-      !helper ||
-      helper.stdin.destroyed ||
-      helper.stdin.writableNeedDrain ||
-      this.state !== "running"
-    ) return;
+    if (!helper || helper.stdin.destroyed || this.state !== "running") return;
     try {
       const message = parseRemoteAppControlMessage(source);
-      const encoded = JSON.stringify(message);
-      helper.stdin.write(`${encoded}\n`, "utf8");
+      // One bounded ordered queue owns helper stdin: a write(false) has
+      // accepted bytes, and all subsequent input waits for drain.
+      this.nativeControl?.enqueue(`${JSON.stringify(message)}\n`);
     } catch {
-      // Invalid, oversized, or backpressured control input is dropped.
+      // Malformed, unauthenticated, or oversized controls never reach native.
     }
   }
 
