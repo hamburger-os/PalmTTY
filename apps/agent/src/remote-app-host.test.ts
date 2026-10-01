@@ -5,7 +5,7 @@ describe("source Windows Remote App helper cache", () => {
   it("uses a deterministic content and compiler-options fingerprint", () => {
     const first = Buffer.from("class Host { static void Main() {} }");
     const name = sourceRemoteAppHostFilename(first);
-    expect(name).toMatch(/^palmtty-remote-app-host-[a-f0-9]{16}\\.exe$/);
+    expect(name).toMatch(/^palmtty-remote-app-host-[a-f0-9]{16}\.exe$/);
     expect(sourceRemoteAppHostFilename(Buffer.from(first))).toBe(name);
   });
 
