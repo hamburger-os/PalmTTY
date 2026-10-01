@@ -222,7 +222,7 @@ export class RemoteAppSessionManager {
         profile: {
           id: launch.id,
           name: launch.name,
-          executable: launch.executable,
+          launch: launch.launch,
           args: launch.args,
           cwd: launch.cwd,
           environment
