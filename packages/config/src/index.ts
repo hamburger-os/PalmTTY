@@ -72,7 +72,16 @@ const SessionConfigSchema = z.object({
 }).strict();
 
 const RemoteAppIceServerConfigSchema = z.object({
-  urls: z.array(z.string().min(1).max(2048)).min(1).max(8),
+  urls: z.array(
+    z.string()
+      .trim()
+      .min(1)
+      .max(2048)
+      .regex(
+        /^(stun|turn|turns):[^\s\u0000-\u001F\u007F]+$/i,
+        "Remote App ICE URLs must use stun:, turn:, or turns: without whitespace/control characters"
+      )
+  ).min(1).max(8),
   username: z.string().max(512).optional(),
   credential: z.string().max(1024).optional()
 }).strict().superRefine((server, ctx) => {
