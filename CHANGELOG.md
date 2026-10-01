@@ -42,6 +42,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - **Upgrade note:** moving from `0.1.0` to `0.2.0` requires replacing those legacy exposure fields with one explicit `local`, `lan`, `reverseProxy`, or `https` profile. PalmTTY intentionally provides no compatibility migration; review the current examples before restarting the Agent.
 
 ### Fixed
+- Expand Windows Remote App discovery beyond PATH to known install roots, App Paths and capped Start Menu shortcut targets, and add searchable mobile results. Detect missing/incompatible native `@roamhq/wrtc` before AppWorker launch and validate the packaged WebRTC addon during Windows installed-runtime smoke.
 
 - Harden mobile terminal input for iOS/CJK IMEs: defer and deduplicate keyCode-229 punctuation (including literal `/`), recover confirmed keydown-only Ctrl+letter/Ctrl+Space/Escape physical-key cases without stealing real composition, honor DECCKM application-cursor sequences in the virtual keybar, preserve bracketed-paste semantics for long text, add literal symbol fallbacks, and allow browser-local A−/A+ terminal density adjustment without reconnecting the Session.
 - Prevent iPhone Safari focus/zoom state from breaking PalmTTY layout: mobile/coarse-pointer editable controls now stay at 16px or larger, SessionWorkbench continues following the current VisualViewport even when `scale !== 1`, and an opt-in `?viewportDebug=1` overlay exposes geometry/focus diagnostics without logging terminal content.
