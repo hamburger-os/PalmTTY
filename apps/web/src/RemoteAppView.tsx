@@ -787,6 +787,13 @@ export function RemoteAppView({
   };
 
   const queueKeyboardDelete = (key: "Backspace" | "Delete") => {
+    if (key === "Backspace" && keyboardOverflowRef.current) {
+      // Congested text has not reached the desktop: edit that draft first.
+      const points = Array.from(keyboardOverflowRef.current);
+      points.pop();
+      keyboardOverflowRef.current = points.join("");
+      return;
+    }
     keyboardQueueRef.current.enqueueDelete(key);
     scheduleKeyboardFlush();
   };
