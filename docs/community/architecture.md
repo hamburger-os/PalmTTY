@@ -133,3 +133,9 @@ WebRTC may use operator-configured STUN/TURN through `remoteApps.webrtc.iceServe
 
 Remote Apps 当前是与终端独立的第二条 Activity 数据面。Workspace 基础配置、Terminal launch profile 与 Remote App profile 分层持久化；App profile 不再保存 FPS/宽高。普通流程通过有界“检测 App / 浏览 .exe”选择应用，手机 Surface 自动发送有界画面尺寸提示。Terminal 可以使用 WSL，而 Remote App 仍作为 Windows 当前用户应用独立启动。公网/反代环境可配置 STUN/TURN，但 PalmTTY 不提供云中继；所有 capture/input authority 仍只属于 PalmTTY 自己启动的单个应用窗口。
 
+
+### Mobile cursor and terminal dock / 手机鼠标与终端工具栏
+
+Windows helper cursor telemetry stays inside the verified Job-owned application HWND. AppWorker forwards bounded typed coordinates and foreground/UIPI input-state feedback only to its single authenticated WebRTC peer; Web overlays the cursor using the same contain/cover geometry as clicks. A one-row mobile Tools header and compact/full/hidden terminal dock keep xterm/WebSocket mounted while providing a pinned expand/restore action.
+
+原生 Helper 仅提供 Job-owned 受控窗口内的归一化光标坐标，通过现有已认证的单一 WebRTC Peer 回传；手机光标与点击使用同一 contain/cover 映射。手机导航收成单行工具菜单，CLI 键栏支持精简/完整/隐藏三态并固定展开/恢复操作，绝不重建 xterm/WebSocket。

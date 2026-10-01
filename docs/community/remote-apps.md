@@ -27,7 +27,7 @@ The App surface exposes three explicit pointer modes:
 
 - **View**: sends no pointer input. Browser gestures stay local.
 - **Touch**: maps touches into the captured application window.
-- **Trackpad**: one finger moves the remote pointer, tap clicks, and two fingers scroll.
+- **Trackpad**: the visible, verified Windows pointer follows one-finger movement; tap clicks, long press drags, two-finger tap right-clicks, and two-finger movement scrolls.
 
 The special-key strip provides Ctrl/Alt/Shift and common navigation keys. The text panel sends bounded Unicode text for mobile IME, paste and dictation.
 
@@ -39,7 +39,7 @@ The Workbench can switch among live Activities for the same Workspace without re
 
 Remote Apps prioritize unobstructed video. On phones the Workbench header fits one line and Git/Files live behind Tools. Pointer modes, the persistent immersive toggle/exit and the options menu now sit in a compact strip **below** the video, immediately above the special-key dock; media diagnostics open from that menu instead of covering application menus. Immersive mode hides the header and removes its grid row, while keeping the exit button reachable below the video. The dock remains inside the current VisualViewport above mobile browser chrome, with navigation keys expanded on demand.
 
-View mode preserves browser pinch. Direct Touch and Trackpad modes claim only gestures beginning inside the active remote surface, using a bounded gesture state machine for single-finger move/tap and two-finger centroid scroll. A cancelled or partially lifted gesture never generates a phantom click. Video defaults to complete-window contain; optional cover fills the available area but crops edges with matching remote touch mapping.
+View mode preserves browser pinch. Direct Touch and Trackpad modes claim only gestures beginning inside the active remote surface, using a bounded gesture state machine for single-finger move/tap and two-finger centroid scroll. A cancelled or partially lifted gesture never generates a phantom click. The helper sends only normalized coordinates inside the verified owned window (hidden outside), and AppWorker forwards typed cursor and native input-state events through the existing single-peer WebRTC DataChannel; streaming video does not imply remote input is available. Video defaults to complete-window contain; optional cover fills the available area but crops edges with matching remote touch mapping.
 
 The optional **Resize PC window for phone** switch attempts to resize only the session-owned verified HWND within protocol limits, and attempts to restore its original dimensions when disabled or the helper stops. Some desktop apps enforce a minimum width and cannot become native mobile UIs. Display hints remain presentation state, not an executable/PID/HWND selection channel. Native WebRTC is initialized only after the Windows app reaches READY; on an MSIX launch failure the browser receives the bounded native startup stage, error type and HRESULT instead of a misleading addon teardown code. Fully dark successful captures remain ambiguous: after retrying the same authorized window, PalmTTY forwards the frame with a blank-window diagnostic rather than treating every black theme as failed.
 
@@ -99,7 +99,7 @@ App 画面提供三种显式模式：
 
 - **查看**：不发送指针输入，浏览器手势留在本地；
 - **直触**：触摸坐标映射到远端应用窗口；
-- **触控板**：单指移动光标、轻点点击、双指滚动。
+- **触控板**：显示 Windows 确认的受控窗口光标；单指移动、轻点左键、长按拖动、双指轻点右键、双指移动滚动。
 
 特殊键栏提供 Ctrl/Alt/Shift 和常用导航键；文本面板使用有界 Unicode 文本通道，适合手机 IME、粘贴和语音输入。
 
@@ -111,7 +111,7 @@ App 画面提供三种显式模式：
 
 远程 App 以不受遮挡的视频画面为核心：手机工作区顶栏压缩为一行，Git/文件位于可展开的“工具”。操作模式切换、沉浸进入/退出及选项菜单统一移到视频下方、快捷键栏上方；媒体诊断按需从选项中展开，不再常驻遮挡应用菜单。沉浸模式同时移除顶栏及其 Grid 行，底部退出按钮始终可见；整组控制栏位于 Safari 当前可视区域内，方向键和删除键按需展开。
 
-查看模式保留浏览器捏合；直触与触控板模式只接管从远程画面内开始的触摸。独立手势状态机区分单指移动/点击、双指中心滚动以及取消/部分抬起，避免误触。默认完整等比显示，裁切铺满作为显式可选操作，并同步修正触控映射。
+查看模式保留浏览器捏合；直触与触控板模式只接管从远程画面内开始的触摸。独立手势状态机区分单指移动/点击、双指中心滚动以及取消/部分抬起，避免误触。原生 Host 仅报告已验证受控窗口内的归一化光标（窗口外隐藏）；AppWorker 经现有已认证的单一 WebRTC DataChannel 转发有类型的光标和原生输入状态。视频已连接不等于远程输入就绪。默认完整等比显示，裁切铺满作为显式可选操作，并同步修正触控映射。
 
 “适应手机（调整电脑窗口）”是单独的用户开关，只尝试有界调整当前 App Session 验证过的 HWND，关闭或退出时尝试恢复原尺寸。部分桌面软件限制最小宽度，不能承诺自动生成原生手机布局。MSIX 启动失败显示受限长度的阶段、异常类型和 HRESULT；Windows 应用 READY 之前不加载原生 WebRTC。纯黑帧不能独立证明捕获失败，完成同一合法窗口重试后仍会发送并提示歧义。
 
