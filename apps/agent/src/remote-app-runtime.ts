@@ -75,10 +75,9 @@ export class RemoteAppRuntime {
     if (process.platform !== "win32") {
       throw new Error("Remote Apps are currently supported only on Windows");
     }
-    this.wrtc = loadWebRtc();
-    this.videoSource = new this.wrtc.nonstandard.RTCVideoSource();
-    this.videoTrack = this.videoSource.createTrack();
-
+    // Starting native WebRTC before the Windows host becomes READY lets an
+    // ordinary MSIX activation failure enter buggy native addon teardown.
+    // Keep launch errors in JavaScript until an owned application exists.
     const child = spawn(this.bootstrap.helperPath, [], {
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
@@ -193,6 +192,9 @@ export class RemoteAppRuntime {
       });
     });
 
+    this.wrtc = loadWebRtc();
+    this.videoSource = new this.wrtc.nonstandard.RTCVideoSource();
+    this.videoTrack = this.videoSource.createTrack();
     this.state = "running";
     this.publishStatus();
   }
