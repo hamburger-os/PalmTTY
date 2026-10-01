@@ -408,10 +408,12 @@ describe("HTTP security boundary", () => {
       payload: {
         name: "Renamed",
         cwd: process.cwd(),
-        runtime: {
-          kind: "host",
-          shell: process.execPath,
-          args: []
+        terminal: {
+          runtime: {
+            kind: "host",
+            shell: process.execPath,
+            args: []
+          }
         }
       }
     });
