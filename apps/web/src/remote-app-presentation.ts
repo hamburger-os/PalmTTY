@@ -28,6 +28,24 @@ export type Geometry = { left: number; top: number; width: number; height: numbe
 export type DisplayBounds = { width: number; height: number };
 export type UnitPoint = { x: number; y: number };
 
+// Keep the entire window by default. If a user explicitly resizes the owned
+// Windows app for their phone, trim only minor DWM/non-client/codec rounding
+// gaps. A constrained or non-resizable window must never lose a large area
+// merely to satisfy an unconditional object-fit: cover.
+export const MAX_ADAPTED_VIDEO_CROP_FRACTION = 0.04;
+
+export function remoteAdaptedVideoFit(
+  adapted: boolean, surface: DisplayBounds, video: DisplayBounds
+): VideoFit {
+  if (!adapted || ![surface.width, surface.height, video.width, video.height]
+    .every((value) => Number.isFinite(value) && value > 0)) return "contain";
+  const widthScale = surface.width / video.width;
+  const heightScale = surface.height / video.height;
+  const cropFraction = 1 - Math.min(widthScale, heightScale) /
+    Math.max(widthScale, heightScale);
+  return cropFraction <= MAX_ADAPTED_VIDEO_CROP_FRACTION ? "cover" : "contain";
+}
+
 function evenClamped(value: number, minimum: number, maximum: number): number {
   const clamped = Math.max(minimum, Math.min(maximum, Math.round(value)));
   return clamped % 2 === 0 ? clamped : clamped - 1;

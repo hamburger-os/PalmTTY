@@ -1,9 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta } from "./remote-app-presentation.js";
+import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta, remoteAdaptedVideoFit, MAX_ADAPTED_VIDEO_CROP_FRACTION } from "./remote-app-presentation.js";
 
 const limits = { minWidth: 320, minHeight: 240, maxWidth: 1600, maxHeight: 1000 };
 
 describe("Remote App video presentation", () => {
+  it("fills only small letterbox gaps after explicit phone resizing", () => {
+    const phone = { width: 390, height: 800 };
+    expect(remoteAdaptedVideoFit(false, phone, { width: 388, height: 800 }))
+      .toBe("contain");
+    expect(remoteAdaptedVideoFit(true, phone, { width: 388, height: 800 }))
+      .toBe("cover");
+    expect(remoteAdaptedVideoFit(true, phone, { width: 390, height: 800 }))
+      .toBe("cover");
+    expect(remoteAdaptedVideoFit(true, phone, { width: 1280, height: 720 }))
+      .toBe("contain");
+    expect(remoteAdaptedVideoFit(true, phone, { width: 0, height: 720 }))
+      .toBe("contain");
+    const narrow = { width: 390 * (1 - MAX_ADAPTED_VIDEO_CROP_FRACTION - 0.01), height: 800 };
+    expect(remoteAdaptedVideoFit(true, phone, narrow)).toBe("contain");
+  });
+
+  it("keeps direct-touch and cursor projections inverse after automatic small-gap fill", () => {
+    const phone = { left: 0, top: 0, width: 390, height: 800 };
+    const video = { width: 380, height: 800 };
+    const fit = remoteAdaptedVideoFit(true, phone, video);
+    expect(fit).toBe("cover");
+    for (const point of [{ x: 0.1, y: 0.2 }, { x: 0.5, y: 0.5 }, { x: 0.9, y: 0.8 }]) {
+      const projected = remoteVideoCursorPosition(phone, video, point, fit);
+      expect(projected).toBeDefined();
+      const mapped = remoteVideoPoint(phone, video, projected!.x, projected!.y, fit, false);
+      expect(mapped?.x).toBeCloseTo(point.x);
+      expect(mapped?.y).toBeCloseTo(point.y);
+    }
+  });
+
   it("moves the trackpad cursor in displayed video coordinates, even when cropped", () => {
     const surface = { width: 360, height: 700 };
     const video = { width: 1280, height: 720 };
