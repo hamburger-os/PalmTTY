@@ -26,6 +26,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
+import { RemoteCursorPreview, REMOTE_CURSOR_RECONCILE_DELAY_MS } from "./remote-app-cursor-preview.js";
 import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta, type VideoFit } from "./remote-app-presentation.js";
 
 export type RemoteAppConnectionState =
@@ -155,10 +156,19 @@ export function RemoteAppView({
   const [text, setText] = useState("");
   const [controlReady, setControlReady] = useState(false);
   const [inputBlocked, setInputBlocked] = useState(false);
-  const [cursor, setCursor] = useState<Point | null>(null);
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
   const [surfaceSize, setSurfaceSize] = useState({ width: 0, height: 0 });
   const dragRef = useRef<{ pointerId: number; timer: number | undefined; held: boolean } | null>(null);
+  const cursorOverlayRef = useRef<SVGSVGElement>(null);
+  const cursorPreviewRef = useRef(new RemoteCursorPreview());
+  const cursorPaintFrameRef = useRef<number | null>(null);
+  const cursorSettleTimerRef = useRef<number | null>(null);
+  const pendingRelativeRef = useRef<Point>({ x: 0, y: 0 });
+  const relativeMoveFrameRef = useRef<number | null>(null);
+  const modeRef = useRef(mode);
+  const fitRef = useRef(fit);
+  modeRef.current = mode;
+  fitRef.current = fit;
   const [mediaState, setMediaState] = useState<AppSessionMediaState>(
     session.mediaState
   );
@@ -178,6 +188,55 @@ export function RemoteAppView({
   const connectedAt = useRef<number | null>(null);
   const activePointers = useRef(new Map<number, Point>());
   const connectionChangeRef = useRef(onConnectionChange);
+
+  const paintCursor = useCallback(() => {
+    cursorPaintFrameRef.current = null;
+    const node = cursorOverlayRef.current;
+    if (!node) return;
+    const surface = surfaceRef.current;
+    const video = videoRef.current;
+    const bounds = surface?.getBoundingClientRect();
+    const cursor = cursorPreviewRef.current.position;
+    const projected = cursor && bounds && remoteVideoCursorPosition(
+      { left: 0, top: 0, width: bounds.width, height: bounds.height },
+      { width: video?.videoWidth ?? 0, height: video?.videoHeight ?? 0 },
+      cursor, fitRef.current
+    );
+    if (!projected || !activeRef.current || modeRef.current !== "touchpad" ||
+        channelRef.current?.readyState !== "open" || !videoRenderedRef.current) {
+      node.style.display = "none";
+      return;
+    }
+    node.style.transform = `translate3d(${projected.x - 0.5}px, ${projected.y - 0.5}px, 0)`;
+    node.style.display = "block";
+  }, []);
+
+  const scheduleCursorPaint = useCallback(() => {
+    if (cursorPaintFrameRef.current !== null) return;
+    cursorPaintFrameRef.current = window.requestAnimationFrame(paintCursor);
+  }, [paintCursor]);
+
+  const cancelRelativeMotion = useCallback(() => {
+    if (relativeMoveFrameRef.current !== null) {
+      window.cancelAnimationFrame(relativeMoveFrameRef.current);
+      relativeMoveFrameRef.current = null;
+    }
+    pendingRelativeRef.current = { x: 0, y: 0 };
+  }, []);
+
+  useEffect(() => {
+    scheduleCursorPaint();
+  }, [mode, fit, active, controlReady, videoRendered,
+      surfaceSize, videoSize, scheduleCursorPaint]);
+
+  useEffect(() => () => {
+    cancelRelativeMotion();
+    if (cursorPaintFrameRef.current !== null)
+      window.cancelAnimationFrame(cursorPaintFrameRef.current);
+    if (cursorSettleTimerRef.current !== null)
+      window.clearTimeout(cursorSettleTimerRef.current);
+    cursorPreviewRef.current.reset();
+  }, [cancelRelativeMotion]);
 
   useEffect(() => {
     connectionChangeRef.current = onConnectionChange;
@@ -234,6 +293,53 @@ export function RemoteAppView({
       return false;
     }
   }, []);
+
+  // Coalesce high-frequency finger deltas to at most one WebRTC message
+  // per animation frame. Down/up remain ordered after an explicit flush.
+  const flushRelativeMotion = useCallback(() => {
+    if (relativeMoveFrameRef.current !== null) {
+      window.cancelAnimationFrame(relativeMoveFrameRef.current);
+      relativeMoveFrameRef.current = null;
+    }
+    const motion = pendingRelativeRef.current;
+    pendingRelativeRef.current = { x: 0, y: 0 };
+    if (motion.x === 0 && motion.y === 0) return;
+    const channel = channelRef.current;
+    if (channel?.readyState !== "open" || channel.bufferedAmount > 8192 ||
+        !send({
+          type: "pointerRelative",
+          dx: Math.max(-1, Math.min(1, motion.x)),
+          dy: Math.max(-1, Math.min(1, motion.y)),
+          action: "move", button: 0
+        })) {
+      // Never keep pretending a dropped motion was accepted by Windows.
+      cursorPreviewRef.current.reset();
+      scheduleCursorPaint();
+    }
+  }, [send, scheduleCursorPaint]);
+
+  const queueRelativeMotion = useCallback((motion: Point): boolean => {
+    const channel = channelRef.current;
+    if (channel?.readyState !== "open" || channel.bufferedAmount > 8192) return false;
+    pendingRelativeRef.current.x += motion.x;
+    pendingRelativeRef.current.y += motion.y;
+    if (relativeMoveFrameRef.current === null) {
+      relativeMoveFrameRef.current = window.requestAnimationFrame(flushRelativeMotion);
+    }
+    return true;
+  }, [flushRelativeMotion]);
+
+  const settleCursorPreview = () => {
+    cursorPreviewRef.current.end(performance.now());
+    if (cursorSettleTimerRef.current !== null) {
+      window.clearTimeout(cursorSettleTimerRef.current);
+    }
+    cursorSettleTimerRef.current = window.setTimeout(() => {
+      cursorSettleTimerRef.current = null;
+      cursorPreviewRef.current.reconcile(performance.now());
+      scheduleCursorPaint();
+    }, REMOTE_CURSOR_RECONCILE_DELAY_MS);
+  };
 
   const sendDisplayHint = useCallback(() => {
     const surface = surfaceRef.current;
@@ -350,7 +456,9 @@ export function RemoteAppView({
       channelRef.current = null;
       setControlReady(false);
       setInputBlocked(false);
-      setCursor(null);
+      cursorPreviewRef.current.reset();
+      cancelRelativeMotion();
+      scheduleCursorPaint();
       connectedAt.current = null;
       currentTrackRef.current = null;
       if (connection) {
@@ -400,7 +508,9 @@ export function RemoteAppView({
         if (connection === peer && !controller.signal.aborted) {
           setControlReady(false);
           setInputBlocked(false);
-          setCursor(null);
+          cursorPreviewRef.current.reset();
+          cancelRelativeMotion();
+          scheduleCursorPaint();
         }
       };
       channel.onmessage = (event) => {
@@ -409,7 +519,11 @@ export function RemoteAppView({
         try {
           const sample = parseRemoteAppTelemetryMessage(event.data);
           if (sample.type === "cursor") {
-            setCursor(sample.visible ? { x: sample.x, y: sample.y } : null);
+            cursorPreviewRef.current.observe(
+              sample.visible ? { x: sample.x, y: sample.y } : null,
+              performance.now()
+            );
+            scheduleCursorPaint();
           } else {
             setInputBlocked(sample.state === "blocked");
           }
@@ -526,7 +640,8 @@ export function RemoteAppView({
       const video = videoRef.current;
       if (video) video.srcObject = null;
     };
-  }, [attemptPlayback, capabilities?.iceServers, sendDisplayHint, session.id]);
+  }, [attemptPlayback, capabilities?.iceServers, cancelRelativeMotion,
+      scheduleCursorPaint, sendDisplayHint, session.id]);
 
   useEffect(() => {
     if (!active) return;
@@ -549,6 +664,7 @@ export function RemoteAppView({
   }, [active, mode]);
 
   useEffect(() => () => {
+    flushRelativeMotion();
     if (mode === "direct") {
       for (const point of activePointers.current.values()) {
         send({ type: "pointer", action: "up", x: point.x, y: point.y, button: 0 });
@@ -561,7 +677,9 @@ export function RemoteAppView({
     }
     dragRef.current = null;
     touchpad.current.cancel();
-  }, [mode, send]);
+    cursorPreviewRef.current.reset();
+    scheduleCursorPaint();
+  }, [active, mode, flushRelativeMotion, scheduleCursorPaint, send]);
 
   const sendKey = (key: string) => {
     const common = {
@@ -597,10 +715,15 @@ export function RemoteAppView({
     }
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
+    if (!touchpad.current.active) cursorPreviewRef.current.begin();
     touchpad.current.down(
       event.pointerId,
       normalizedPoint(event.currentTarget, event.clientX, event.clientY)
     );
+    if (cursorSettleTimerRef.current !== null) {
+      window.clearTimeout(cursorSettleTimerRef.current);
+      cursorSettleTimerRef.current = null;
+    }
     cancelDragTimer();
     if (dragRef.current?.held && dragRef.current.pointerId !== event.pointerId) {
       send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
@@ -654,10 +777,10 @@ export function RemoteAppView({
       const relative = remoteTouchpadDelta(
         { x: motion.dx, y: motion.dy }, surfaceSize, videoSize, fit
       );
-      send({
-        type: "pointerRelative", dx: relative.x, dy: relative.y,
-        action: "move", button: 0
-      });
+      if (queueRelativeMotion(relative)) {
+        cursorPreviewRef.current.predict(relative);
+        scheduleCursorPaint();
+      }
     }
   };
 
@@ -677,6 +800,7 @@ export function RemoteAppView({
         button: Math.max(0, Math.min(2, event.button)) });
       return;
     }
+    flushRelativeMotion();
     cancelDragTimer();
     if (dragRef.current?.pointerId === event.pointerId) {
       const held = dragRef.current.held;
@@ -684,10 +808,12 @@ export function RemoteAppView({
       if (held) {
         touchpad.current.cancel();
         send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
+        settleCursorPreview();
         return;
       }
     }
     const tap = touchpad.current.up(event.pointerId);
+    if (!touchpad.current.active) settleCursorPreview();
     if (tap) {
       const button = tap === "right" ? 2 : 0;
       send({ type: "pointerRelative", dx: 0, dy: 0, action: "down", button });
@@ -704,12 +830,14 @@ export function RemoteAppView({
           x: previous.x, y: previous.y, button: 0 });
       }
     } else {
+      flushRelativeMotion();
       cancelDragTimer();
       if (dragRef.current?.held) {
         send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
       }
       dragRef.current = null;
       touchpad.current.cancel();
+      settleCursorPreview();
     }
   };
 
@@ -727,10 +855,6 @@ export function RemoteAppView({
     const video = videoRef.current;
     if (video) attemptPlayback(video, () => videoRef.current === video);
   };
-
-  const projectedCursor = cursor && remoteVideoCursorPosition(
-    { left: 0, top: 0, ...surfaceSize }, videoSize, cursor, fit
-  );
 
   const diagnostic = networkIssue
     ? (capabilities?.relayConfigured
@@ -785,9 +909,9 @@ export function RemoteAppView({
       >
         <video ref={videoRef} className={"fit-" + fit}
           autoPlay playsInline muted />
-        {active && mode === "touchpad" && controlReady && videoRendered && projectedCursor && (
-          <svg aria-hidden="true" className="remote-app-cursor" viewBox="0 0 17 24"
-            style={{ left: projectedCursor.x, top: projectedCursor.y }}>
+        {active && mode === "touchpad" && (
+          <svg ref={cursorOverlayRef} aria-hidden="true" className="remote-app-cursor"
+            viewBox="0 0 17 24">
             <path d="M1.5 1.5 V19 L5.5 15.2 L8.5 22 L12 20.6 L9 14 H15.5 Z" />
           </svg>
         )}
@@ -886,10 +1010,6 @@ export function RemoteAppView({
                 onClick={() => { setAdaptWindow((previous) => !previous); setOptionsOpen(false); }}>
                 {t("remoteApp.adaptWindow")}
               </button>
-              <button type="button" className="ghost compact"
-                onClick={() => { setTextOpen((current) => !current); setOptionsOpen(false); }}>
-                {t("remoteApp.text")}
-              </button>
               <span className="remote-app-quality">{t("remoteApp.qualityAuto")}</span>
               <details className="remote-app-diagnostics">
                 <summary>{t("remoteApp.diagnostics")}</summary>
@@ -923,6 +1043,11 @@ export function RemoteAppView({
         )}
         <div className="remote-app-keybar-shell glass-panel">
           <div className="remote-app-keybar" aria-label={t("remoteApp.keys")}>
+            <button type="button" className={textOpen ? "selected compact" : "compact"}
+              aria-pressed={textOpen}
+              onClick={() => { setTextOpen((current) => !current); setOptionsOpen(false); }}>
+              {t("remoteApp.text")}
+            </button>
             <button type="button" aria-pressed={ctrl}
               className={ctrl ? "selected compact" : "compact"}
               onClick={() => setCtrl((value) => !value)}>Ctrl</button>

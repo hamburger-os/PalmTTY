@@ -22,6 +22,8 @@ export class RemoteTouchpadGesture {
     return this.pointers.has(pointerId);
   }
 
+  get active(): boolean { return this.pointers.size > 0; }
+
   down(pointerId: number, point: GesturePoint, now = Date.now()): void {
     if (this.pointers.has(pointerId)) return;
     if (this.pointers.size === 0) {

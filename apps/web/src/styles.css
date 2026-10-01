@@ -2187,16 +2187,19 @@ body.remote-app-active { overflow: hidden; }
 .remote-app-cursor {
   position: absolute;
   z-index: 3;
-  width: 17px;
-  height: 24px;
+  width: 5.667px;
+  height: 8px;
   overflow: visible;
   pointer-events: none;
-  transform: translate(-1px, -1px);
+  top: 0;
+  left: 0;
+  transform: translate3d(-0.5px, -0.5px, 0);
+  display: none;
   fill: var(--remote-cursor-fill);
   stroke: var(--remote-cursor-outline);
   stroke-width: 1.6;
   stroke-linejoin: round;
-  filter: drop-shadow(0 1px 1px var(--remote-cursor-outline));
+  filter: drop-shadow(0 0 0.5px var(--remote-cursor-outline));
 }
 
 .remote-app-toolbar {
