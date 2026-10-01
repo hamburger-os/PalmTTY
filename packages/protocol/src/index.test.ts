@@ -150,19 +150,21 @@ describe("protocol", () => {
       id: "host-1",
       name: "Host",
       cwd: "/workspace",
-      runtime: { kind: "host" }
-    }).runtime).toEqual({ kind: "host", args: [] });
+      terminal: { runtime: { kind: "host" } }
+    }).terminal.runtime).toEqual({ kind: "host", args: [] });
 
     expect(CreateWorkspaceSchema.parse({
       name: "Ubuntu",
       cwd: "/home/dev/project",
-      runtime: {
-        kind: "wsl",
-        distribution: "Ubuntu",
-        shell: "/bin/bash",
-        args: ["-l"]
+      terminal: {
+        runtime: {
+          kind: "wsl",
+          distribution: "Ubuntu",
+          shell: "/bin/bash",
+          args: ["-l"]
+        }
       }
-    }).runtime.kind).toBe("wsl");
+    }).terminal.runtime.kind).toBe("wsl");
   });
 
   it("parses bounded workspace environment and terminal profiles", () => {
@@ -310,7 +312,7 @@ describe("protocol", () => {
     expect(() => CreateWorkspaceSchema.parse({
       name: "Ubuntu",
       cwd: "/home/dev/project",
-      runtime: { kind: "wsl", args: ["-l"] }
+      terminal: { runtime: { kind: "wsl", args: ["-l"] } }
     })).toThrow();
   });
 
