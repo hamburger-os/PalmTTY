@@ -11,6 +11,11 @@ pnpm scripts:check
 pnpm terminal:check
 ~~~
 
+## Dependency update and Windows test hygiene
+
+- Dependency PRs must include a lockfile synchronized with their manifests and must rerun frozen-lockfile Windows/Ubuntu CI, Windows/Linux installed distribution smoke, Security Audit and CodeQL after merging current main. Do not infer compatibility from stale green checks. Keep @types/node on major 22 while the runtime/release workflows target Node 22.
+- The Windows autostart lifecycle smoke must prove the detached Worker survives the native host and finishes before temp cleanup. Installed-runtime smoke must await Agent stdio close before removing its copy; Windows-only EBUSY/EPERM/ENOTEMPTY after bounded cleanup retries is reported as deferred cleanup, never misclassified as a failed application smoke.
+
 ## Tests
 
 ~~~text

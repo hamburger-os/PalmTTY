@@ -8,7 +8,7 @@ Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus 
 
 - pnpm/TypeScript monorepo
 - Agent/Web/protocol/config packages
-- committed pnpm lockfile with frozen-lockfile CI installs
+- committed pnpm lockfile with frozen-lockfile CI installs; the repository targets Node.js 22 for CI and release, and Dependabot excludes @types/node 23+ until the runtime baseline is intentionally upgraded. Dependency majors are validated individually on up-to-date main, including Windows/Linux installed distribution smoke. Windows native lifecycle smoke waits for surviving Worker/Agent close and bounds transient temp-directory deletion retries.
 - Windows + Ubuntu CI passing
 - root-script syntax checks plus Node built-in tests for private-LAN address/origin discovery
 - Windows ConPTY smoke coverage that prefers PowerShell 7 locally, falls back to Windows PowerShell for generic host checks, and is forced to PowerShell 7 in repository Windows CI
