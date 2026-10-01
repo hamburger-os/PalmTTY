@@ -20,7 +20,7 @@ export type ResolvedRemoteAppLaunch = {
 };
 
 async function hostWorkspaceCwd(workspace: WorkspaceDefinition): Promise<string> {
-  if (workspace.runtime.kind !== "host") return os.homedir();
+  if (workspace.terminal.runtime.kind !== "host") return os.homedir();
   const resolved = await realpath(workspace.cwd);
   if (!(await stat(resolved)).isDirectory()) {
     throw new Error("Workspace " + workspace.id + " is not a directory: " + workspace.cwd);
@@ -38,7 +38,7 @@ export async function resolveRemoteAppLaunch(
 
   const hostEnvironment = await readHostEnvironment();
   const cwd = await hostWorkspaceCwd(workspace);
-  const environment = workspace.runtime.kind === "host"
+  const environment = workspace.terminal.runtime.kind === "host"
     ? applyEnvironmentOverrides(hostEnvironment, workspace.environment ?? {})
     : hostEnvironment;
   const executable = await resolveExecutable(profile.executable, {
