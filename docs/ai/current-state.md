@@ -220,7 +220,7 @@ Do not claim persistence beyond what is tested: browser disconnect and Agent res
 
 - Native verified-owned-window cursor sampling runs on its own best-effort ~30Hz thread and rechecks ownership/visibility/bounds; unlike capture-loop sampling, PrintWindow/encoding stalls do not pause cursor feedback. A foreground-owned input fast path avoids repeated expensive window activation while retaining the same Job/UIPI checks.
 - Web batches finger-relative motion into at most one ordered DataChannel message per requestAnimationFrame; pending movement is flushed before button releases and cancelled on peer teardown. Display-only optimistic normalized prediction moves the theme SVG by an imperative RAF transform and reconciles latest typed native telemetry after touch release, removing a React rerender per cursor packet. Native hidden state remains immediate. Real network delays are not bypassed.
-- Remote App bottom key dock puts the bounded Text entry first; remove the redundant text entry from the display and diagnostics options menu. Cursor display is exactly one third of the preceding 17×24 CSS px arrow, now 5.667×8 CSS px.
+- Remote App and Terminal share Keyboard and Long Text as the first two mobile dock actions. Remote App Keyboard synchronously focuses a separate 16px live textarea in the originating Safari tap; committed IME Unicode is sent immediately through the existing bounded WebRTC text control while permitted navigation uses typed keys. Long Text remains a deliberate-send composer; unsent live drafts transfer there on closing. Neither input action is duplicated in display/diagnostic options. Cursor display is exactly one third of the preceding 17×24 CSS px arrow, now 5.667×8 CSS px.
 
 ### Phone adaptation edge fill
 

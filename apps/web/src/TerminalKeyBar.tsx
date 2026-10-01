@@ -1,4 +1,5 @@
 import { useI18n } from "./i18n.js";
+import { MobilePrimaryInputActions } from "./MobilePrimaryInputActions.js";
 import {
   encodeControlShortcut,
   type TerminalKey
@@ -88,11 +89,8 @@ export function TerminalKeyBar({
     <div className="keybar glass-panel" aria-label={t("terminal.specialKeys")}>
       <div className="keybar-main">
         <div className="keybar-row" aria-label={t("terminal.specialKeys")}>
-          <button type="button" disabled={!connected}
-            title={t("terminal.keyboard")} aria-label={t("terminal.keyboard")}
-            onClick={onFocusKeyboard}>⌨</button>
-          <button type="button" disabled={!connected}
-            onClick={onLongInput}>{t("terminal.longInput")}</button>
+          <MobilePrimaryInputActions keyboardDisabled={!connected} textDisabled={!connected}
+            onKeyboard={onFocusKeyboard} onLongText={onLongInput} />
           {keyButton("Esc", "escape", t("terminal.keyEscape"))}
           {keyButton("Tab", "tab", t("terminal.keyTab"))}
           {keyButton("Enter", "enter", t("terminal.keyEnter"))}

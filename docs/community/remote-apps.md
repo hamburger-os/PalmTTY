@@ -29,7 +29,7 @@ The App surface exposes three explicit pointer modes:
 - **Touch**: maps touches into the captured application window.
 - **Trackpad**: the visible, verified Windows pointer follows one-finger movement; tap clicks, long press drags, two-finger tap right-clicks, and two-finger movement scrolls.
 
-The bottom special-key strip puts **Text first**, followed by Ctrl/Alt/Shift and common navigation keys. Text opens a bounded Unicode panel for mobile IME, paste and dictation; the Options menu is reserved for display, size and diagnostics.
+The bottom dock shares the Terminal dock’s first two actions: **Keyboard**, **Long Text**, followed by Ctrl/Alt/Shift and navigation. Keyboard synchronously focuses a separate 16px mobile-safe live input; committed Unicode uses the existing bounded text channel and allowlisted navigation/editing keys use typed key controls. Long Text remains explicitly sent and supports paste, IME and dictation. Display options contain neither input action.
 
 Presentation is automatic. The browser sends a bounded display-size hint when the App surface changes size or orientation; the Windows helper scales capture within PalmTTY hard limits. The toolbar reports **Quality · Auto** rather than exposing FPS/width/height controls.
 
@@ -101,7 +101,7 @@ App 画面提供三种显式模式：
 - **直触**：触摸坐标映射到远端应用窗口；
 - **触控板**：显示 Windows 确认的受控窗口光标；单指移动、轻点左键、长按拖动、双指轻点右键、双指移动滚动。
 
-最下面特殊键栏将 **文本放在第一位**，其后是 Ctrl/Alt/Shift 和常用导航键。文本按钮直接打开有界 Unicode 输入面板，支持手机 IME、粘贴及语音输入；上方选项菜单只保留显示、窗口适配和诊断。
+Remote App 底部与 CLI 一致：**键盘、长文本** 固定为前两项，其后是 Ctrl/Alt/Shift 和导航键。「键盘」直接聚焦独立的 16px 手机安全即时输入框，中文输入法组合完成后才沿现有有界 Unicode 通道发送；特殊键沿原有白名单通道发送。「长文本」保留明确发送的粘贴、IME 和语音输入面板。选项菜单不包含输入入口。
 
 画面策略自动适配。手机 Surface 尺寸或横竖屏变化时，浏览器发送有界 display hint，Windows helper 在 PalmTTY 硬上限内缩放捕获；UI 只显示“**画质 · 自动**”，不再让用户手工配置 FPS/宽高。
 

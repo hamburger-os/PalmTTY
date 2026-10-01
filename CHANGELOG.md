@@ -6,6 +6,10 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+### Shared Remote App keyboard and Long Text (unreleased)
+
+- Make the first two Remote App and CLI dock buttons identical: Keyboard → Long Text. On iPhone, Remote App Keyboard synchronously focuses an immediate Unicode input with composition-aware delivery and allowlisted navigation; Long Text retains explicit send and receives failed live-input drafts. Share button UI and add IME/structure/theme regression checks.
+
 ### Remote App phone adaptation (unreleased)
 
 - Remove the separate Fill screen option. Compensate bounded invisible DWM resize margins when adapting the owned Windows app, automatically eliminate residual ≤4% video letterbox gaps without stretching, and keep unresizable apps fully visible with correctly aligned touch/cursor input.
@@ -14,7 +18,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Mobile cursor and CLI dock (unreleased)
 
-- Add bounded owned-window cursor and native input-status telemetry over the existing authenticated WebRTC peer; render a tiny 5.667×8 high-contrast mobile Trackpad cursor with long-press drag and two-finger right tap, unify Remote App key docks under the shared glass theme, move Text to the first bottom special-key slot, and decouple native cursor sampling from video frame capture with RAF-coalesced input and local cursor prediction.
+- Add bounded owned-window cursor and native input-status telemetry over the existing authenticated WebRTC peer; render a tiny 5.667×8 high-contrast mobile Trackpad cursor with long-press drag and two-finger right tap, unify Remote App key docks under the shared glass theme, share Keyboard and Long Text as the first two Terminal and Remote App keys, and decouple native cursor sampling from video frame capture with RAF-coalesced input and local cursor prediction.
 - Simplify the always-visible mobile terminal key dock: Keyboard and Long Text first, one pinned direct More/Collapse button for secondary keys, no redundant full/hidden modes, and a single-row on-demand Tools header.
 
 ### Added
