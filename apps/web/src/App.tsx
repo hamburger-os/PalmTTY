@@ -162,6 +162,40 @@ export function App() {
     );
   }
 
+  const activityOptionsFor = (workspaceId: string) => [
+    ...sessions
+      .filter((session) => session.workspaceId === workspaceId)
+      .map((session) => ({
+        value: "terminal:" + session.id,
+        label: t("workbench.terminal") + " · " + session.id.slice(0, 6)
+      })),
+    ...appSessions
+      .filter((session) =>
+        session.workspaceId === workspaceId &&
+        isActiveAppSessionState(session.state)
+      )
+      .map((session) => ({
+        value: "app:" + session.id,
+        label: session.profileName
+      }))
+  ];
+
+  const switchActivity = (value: string) => {
+    if (value.startsWith("terminal:")) {
+      const next = sessions.find((session) => "terminal:" + session.id === value);
+      if (!next) return;
+      setActiveAppSession(null);
+      setActiveSession(next);
+      return;
+    }
+    if (value.startsWith("app:")) {
+      const next = appSessions.find((session) => "app:" + session.id === value);
+      if (!next) return;
+      setActiveSession(null);
+      setActiveAppSession(next);
+    }
+  };
+
   if (activeSession) {
     const activeWorkspace = workspaces.find(
       (workspace) => workspace.id === activeSession.workspaceId
@@ -177,6 +211,9 @@ export function App() {
             setActiveSession(result.session);
           }
         }}
+        activityOptions={activityOptionsFor(activeSession.workspaceId)}
+        appCapabilities={appCapabilities}
+        onSwitchActivity={switchActivity}
         onBack={() => {
           setActiveSession(null);
           void refreshCatalog();
@@ -193,6 +230,9 @@ export function App() {
       <WorkspaceWorkbench
         {...(activeWorkspace ? { workspace: activeWorkspace } : {})}
         activity={{ kind: "remoteApp", session: activeAppSession }}
+        activityOptions={activityOptionsFor(activeAppSession.workspaceId)}
+        appCapabilities={appCapabilities}
+        onSwitchActivity={switchActivity}
         onBack={() => {
           setActiveAppSession(null);
           void refreshCatalog();
