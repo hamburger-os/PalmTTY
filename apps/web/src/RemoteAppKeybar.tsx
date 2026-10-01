@@ -26,7 +26,7 @@ export function RemoteAppKeybar({
   return (
     <div className="remote-app-keybar-shell glass-panel">
       <div className="remote-app-keybar" aria-label={t("remoteApp.keys")}>
-        <MobilePrimaryInputActions keyboardDisabled={!active || !controlReady}
+        <MobilePrimaryInputActions keyboardDisabled={!active || (!controlReady && !keyboardOpen)}
           textDisabled={!active} keyboardActive={keyboardOpen} textActive={textOpen}
           onKeyboard={onKeyboard} onLongText={onLongText} />
         <button type="button" aria-pressed={ctrl}

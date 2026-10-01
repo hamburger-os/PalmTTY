@@ -6,6 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent
 } from "react";
+import { flushSync } from "react-dom";
 import {
   REMOTE_APP_CAPTURE_MAX_HEIGHT,
   REMOTE_APP_CAPTURE_MAX_WIDTH,
@@ -26,6 +27,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteAppKeybar } from "./RemoteAppKeybar.js";
+import { remoteAppLiveKeyboardKey } from "./remote-app-live-keyboard.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
 import { RemoteCursorPreview, REMOTE_CURSOR_RECONCILE_DELAY_MS } from "./remote-app-cursor-preview.js";
 import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta, remoteAdaptedVideoFit, type VideoFit } from "./remote-app-presentation.js";
@@ -139,6 +141,11 @@ export function RemoteAppView({
 }) {
   const { t } = useI18n();
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const liveKeyboardRef = useRef<HTMLTextAreaElement>(null);
+  const longTextRef = useRef<HTMLTextAreaElement>(null);
+  const keyboardComposingRef = useRef(false);
+  const keyboardFlushFrameRef = useRef<number | null>(null);
+  const keyboardDraftRef = useRef("");
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentTrackRef = useRef<MediaStreamTrack | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -152,6 +159,8 @@ export function RemoteAppView({
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
   const [shift, setShift] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [keyboardDraft, setKeyboardDraft] = useState("");
   const [textOpen, setTextOpen] = useState(false);
   const [text, setText] = useState("");
   const [controlReady, setControlReady] = useState(false);
@@ -238,6 +247,8 @@ export function RemoteAppView({
       surfaceSize, videoSize, scheduleCursorPaint]);
 
   useEffect(() => () => {
+    if (keyboardFlushFrameRef.current !== null)
+      window.cancelAnimationFrame(keyboardFlushFrameRef.current);
     cancelRelativeMotion();
     if (cursorPaintFrameRef.current !== null)
       window.cancelAnimationFrame(cursorPaintFrameRef.current);
@@ -668,9 +679,9 @@ export function RemoteAppView({
 
   useEffect(() => {
     if (!active) return;
-    surfaceRef.current?.focus({ preventScroll: true });
+    if (!keyboardOpen && !textOpen) surfaceRef.current?.focus({ preventScroll: true });
     sendDisplayHint();
-  }, [active, adaptWindow, sendDisplayHint]);
+  }, [active, adaptWindow, keyboardOpen, textOpen, sendDisplayHint]);
 
   useEffect(() => {
     if (!active || mode === "view") return;
@@ -720,6 +731,61 @@ export function RemoteAppView({
     cursorPreviewRef.current.reset();
     scheduleCursorPaint();
   }, [active, mode, flushRelativeMotion, scheduleCursorPaint, send]);
+
+  const commitLiveKeyboardText = (value: string): boolean => {
+    if (!value) return true;
+    if (!send({ type: "text", text: value })) return false;
+    keyboardDraftRef.current = "";
+    setKeyboardDraft("");
+    return true;
+  };
+
+  const closeKeyboard = () => {
+    if (keyboardFlushFrameRef.current !== null) {
+      window.cancelAnimationFrame(keyboardFlushFrameRef.current);
+      keyboardFlushFrameRef.current = null;
+    }
+    keyboardComposingRef.current = false;
+    liveKeyboardRef.current?.blur();
+    // Preserve unsent input in the explicit composer instead of losing it.
+    if (keyboardDraftRef.current) {
+      const draft = keyboardDraftRef.current;
+      setText((current) => current ? current + "\n" + draft : draft);
+      keyboardDraftRef.current = "";
+      setKeyboardDraft("");
+    }
+    setKeyboardOpen(false);
+  };
+
+  const toggleKeyboard = () => {
+    if (keyboardOpen) {
+      closeKeyboard();
+      return;
+    }
+    if (!active || !controlReady) return;
+    flushSync(() => {
+      setKeyboardOpen(true);
+      setTextOpen(false);
+      setOptionsOpen(false);
+    });
+    // Must happen in the actual tap callback for iOS Safari's soft keyboard.
+    liveKeyboardRef.current?.focus({ preventScroll: true });
+  };
+
+  const toggleLongText = () => {
+    const shouldOpen = !textOpen;
+    if (keyboardOpen) closeKeyboard();
+    if (!shouldOpen) {
+      setTextOpen(false);
+      return;
+    }
+    flushSync(() => {
+      setKeyboardOpen(false);
+      setTextOpen(true);
+      setOptionsOpen(false);
+    });
+    longTextRef.current?.focus({ preventScroll: true });
+  };
 
   const sendKey = (key: string) => {
     const common = {
@@ -973,9 +1039,55 @@ export function RemoteAppView({
         )}
       </div>
 
+      {keyboardOpen && (
+        <div className="remote-app-live-keyboard glass-panel" role="group"
+          aria-label={t("remoteApp.keyboard")}>
+          <textarea ref={liveKeyboardRef} className="glass-input"
+            value={keyboardDraft} rows={1} maxLength={16 * 1024}
+            placeholder={t("remoteApp.keyboardPlaceholder")}
+            aria-label={t("remoteApp.keyboardPlaceholder")}
+            autoComplete="off" autoCapitalize="off" autoCorrect="off"
+            spellCheck={false}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              keyboardDraftRef.current = value;
+              setKeyboardDraft(value);
+              if (!keyboardComposingRef.current && !event.nativeEvent.isComposing)
+                commitLiveKeyboardText(value);
+            }}
+            onCompositionStart={() => { keyboardComposingRef.current = true; }}
+            onCompositionEnd={() => {
+              keyboardComposingRef.current = false;
+              if (keyboardFlushFrameRef.current !== null)
+                window.cancelAnimationFrame(keyboardFlushFrameRef.current);
+              // Read the post-composition value: some Safari versions deliver
+              // the final input event before, others just after compositionend.
+              keyboardFlushFrameRef.current = window.requestAnimationFrame(() => {
+                keyboardFlushFrameRef.current = null;
+                const pending = liveKeyboardRef.current?.value ?? keyboardDraftRef.current;
+                if (pending) commitLiveKeyboardText(pending);
+              });
+            }}
+            onKeyDown={(event) => {
+              if (keyboardComposingRef.current || event.nativeEvent.isComposing ||
+                  event.keyCode === 229) return;
+              const key = remoteAppLiveKeyboardKey(event.key);
+              if (!key) return;
+              if (key === "Backspace" && keyboardDraftRef.current) return;
+              event.preventDefault();
+              if (keyboardDraftRef.current &&
+                  !commitLiveKeyboardText(keyboardDraftRef.current)) return;
+              sendKey(key);
+            }}
+          />
+          <button type="button" className="ghost compact"
+            aria-label={t("remoteApp.closeKeyboard")}
+            onClick={closeKeyboard}>×</button>
+        </div>
+      )}
       {textOpen && (
         <div className="remote-app-text-panel glass-panel">
-          <textarea
+          <textarea ref={longTextRef}
             className="glass-input"
             value={text}
             onChange={(event) => setText(event.target.value)}
