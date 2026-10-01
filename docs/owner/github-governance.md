@@ -143,3 +143,8 @@ Release 现在把“可安装软件”而不是源码 tag 作为最终交付物�
 运行基线仍是 Node.js 22（CI、安装包、release 三方一致），`@types/node` 主版本不得领先于受支持的运行环境；Dependabot 仅继续提交 Node 22 类型补丁。TypeScript、Vite、Vitest 等主版本升级需要在最新 `main` 上逐个验证 Windows/Ubuntu CI、安装包真实 smoke、安全审计及 CodeQL，不能将过时 PR 的绿灯当作最新验证。
 
 Windows 原生进程和病毒扫描程序可能在子进程退出后短暂占用临时目录。生命周期测试应等待脱离 Job 的子 Worker 结束，安装包 smoke 应等待 Agent 的 `close`（而不只是 `exit`），删除临时目录采用有限重试；有限重试之后只对 Windows 明确的临时锁错误发出告警，不以环境清理竞争否决已经验证的产品行为。
+
+
+## 2026-10 npm 依赖整合审查
+
+在保持 Node 22 运行时与对应类型定义的前提下，将经单独验证的 TypeScript 7、Vitest 5、Vite 8 及 tsx/@fastify/static/ws 补丁统一合入一份 pnpm 锁文件，并在组合提交上重新执行 Windows/Ubuntu CI、Windows/Linux 安装包 smoke、安全审计与 CodeQL。旧 Dependabot PR 在此组合 PR 合并后关闭并自动清理远程分支。遇到新的主版本升级，先确认 Node 最低运行基线、原生依赖和发行包兼容，再更新自动化升级策略。
