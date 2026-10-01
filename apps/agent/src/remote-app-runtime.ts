@@ -8,7 +8,8 @@ import {
   REMOTE_APP_CAPTURE_DEFAULT_HEIGHT,
   REMOTE_APP_CAPTURE_DEFAULT_WIDTH,
   parseRemoteAppControlMessage,
-  RemoteAppCursorMessageSchema,
+  RemoteAppTelemetryMessageSchema,
+  type RemoteAppTelemetryMessage,
   type RemoteAppCursorMessage,
   type AppSessionMediaState,
   type AppSessionPublic,
@@ -34,6 +35,7 @@ const HELPER_STATE_PREFIX = "PALMTTY_APP_HOST_STATE ";
 const HELPER_REASON_PREFIX = "PALMTTY_APP_HOST_CAPTURE_REASON ";
 const HELPER_ERROR_PREFIX = "PALMTTY_APP_HOST_ERROR ";
 const HELPER_CURSOR_PREFIX = "PALMTTY_APP_HOST_CURSOR ";
+const HELPER_INPUT_PREFIX = "PALMTTY_APP_HOST_INPUT_STATE ";
 const ICE_GATHER_TIMEOUT_MS = 8_000;
 
 const MEDIA_STATES = new Set<AppSessionMediaState>([
@@ -70,6 +72,7 @@ export class RemoteAppRuntime {
   private readonly exitListeners = new Set<ExitListener>();
   private peer: Peer | undefined;
   private cursor: RemoteAppCursorMessage = { type: "cursor", visible: false };
+  private nativeInputState: "ready" | "blocked" | undefined;
   private wrtc: any;
   private videoSource: any;
   private videoTrack: any;
@@ -102,11 +105,19 @@ export class RemoteAppRuntime {
       const lines = stderr.split(/\r?\n/);
       stderr = lines.pop() ?? "";
       for (const line of lines) {
+        if (line.startsWith(HELPER_INPUT_PREFIX)) {
+          const state = line.slice(HELPER_INPUT_PREFIX.length);
+          if (state === "ready" || state === "blocked") {
+            this.nativeInputState = state;
+            this.sendTelemetry({ type: "inputState", state });
+          }
+          continue;
+        }
         if (line.startsWith(HELPER_CURSOR_PREFIX)) {
           const sample = parseNativeCursorSample(line.slice(HELPER_CURSOR_PREFIX.length));
           if (sample) {
             this.cursor = sample;
-            this.sendCursor();
+            this.sendTelemetry(sample);
           }
           continue;
         }
@@ -276,7 +287,10 @@ export class RemoteAppRuntime {
       }
       if (this.peer?.connection === connection) this.peer.channel = channel;
       channel.onopen = () => {
-        if (this.peer?.connection === connection) this.sendCursor();
+        if (this.peer?.connection === connection) {
+          this.sendTelemetry(this.cursor);
+          if (this.nativeInputState) this.sendTelemetry({ type: "inputState", state: this.nativeInputState });
+        }
       };
       channel.onmessage = (message: any) => {
         if (typeof message.data !== "string" || message.data.length > 32 * 1024) return;
@@ -344,10 +358,10 @@ export class RemoteAppRuntime {
     this.exitListeners.clear();
   }
 
-  private sendCursor(): void {
+  private sendTelemetry(message: RemoteAppTelemetryMessage): void {
     const channel = this.peer?.channel;
     if (channel?.readyState !== "open" || channel.bufferedAmount > 4096) return;
-    try { channel.send(JSON.stringify(RemoteAppCursorMessageSchema.parse(this.cursor))); }
+    try { channel.send(JSON.stringify(RemoteAppTelemetryMessageSchema.parse(message))); }
     catch { /* Closed peer or out-of-budget diagnostics are never authoritative. */ }
   }
 

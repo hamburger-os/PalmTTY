@@ -463,6 +463,7 @@ internal static class PalmTTYRemoteAppHost
     private static volatile int CaptureMaxHeight = 800;
     private static string LastMediaState = "";
     private static string LastCaptureReason = "";
+    private static string LastInputState = "";
     private static int LastCursorX = -2;
     private static int LastCursorY = -2;
     private static long LastCursorSampleTicks;
@@ -947,6 +948,17 @@ internal static class PalmTTYRemoteAppHost
         }
     }
 
+    private static void PublishInputState(string state)
+    {
+        lock (StateLock)
+        {
+            if (LastInputState == state) return;
+            LastInputState = state;
+            if (ErrorOutput != null)
+                ErrorOutput.WriteLine("PALMTTY_APP_HOST_INPUT_STATE " + state);
+        }
+    }
+
     private static void PublishMediaState(string state)
     {
         lock (StateLock)
@@ -1335,49 +1347,85 @@ internal static class PalmTTYRemoteAppHost
             hwnd = TargetWindow;
             rect = TargetRect;
         }
-        if (hwnd == IntPtr.Zero || !IsOwnedWindow(hwnd)) return;
+        if (hwnd == IntPtr.Zero || !IsOwnedWindow(hwnd))
+        {
+            PublishInputState("blocked");
+            return;
+        }
 
         if (message.Type == "pointer")
         {
-            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect)) return;
+            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect))
+            {
+                PublishInputState("blocked");
+                return;
+            }
             int x = rect.Left + (int)Math.Round(Clamp01(message.X) * Math.Max(1, rect.Width - 1));
             int y = rect.Top + (int)Math.Round(Clamp01(message.Y) * Math.Max(1, rect.Height - 1));
             MoveAbsolute(x, y);
-            if (GetForegroundWindow() != hwnd) return;
+            if (GetForegroundWindow() != hwnd)
+            {
+                PublishInputState("blocked");
+                return;
+            }
             ApplyPointerAction(message.Action, message.Button);
             return;
         }
 
         if (message.Type == "pointerRelative")
         {
-            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect)) return;
+            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect))
+            {
+                PublishInputState("blocked");
+                return;
+            }
             POINT point;
-            if (!GetCursorPos(out point)) return;
+            if (!GetCursorPos(out point))
+            {
+                PublishInputState("blocked");
+                return;
+            }
             int x = Math.Max(rect.Left, Math.Min(rect.Right - 1, point.X + (int)Math.Round(message.Dx * rect.Width)));
             int y = Math.Max(rect.Top, Math.Min(rect.Bottom - 1, point.Y + (int)Math.Round(message.Dy * rect.Height)));
             MoveAbsolute(x, y);
-            if (GetForegroundWindow() != hwnd) return;
+            if (GetForegroundWindow() != hwnd)
+            {
+                PublishInputState("blocked");
+                return;
+            }
             ApplyPointerAction(message.Action, message.Button);
             return;
         }
 
         if (message.Type == "wheel")
         {
-            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd) return;
+            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd)
+            {
+                PublishInputState("blocked");
+                return;
+            }
             SendWheel(message.DeltaX, message.DeltaY);
             return;
         }
 
         if (message.Type == "text")
         {
-            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd) return;
+            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd)
+            {
+                PublishInputState("blocked");
+                return;
+            }
             SendUnicodeText(message.Text);
             return;
         }
 
         if (message.Type == "key")
         {
-            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd) return;
+            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd)
+            {
+                PublishInputState("blocked");
+                return;
+            }
             SendRestrictedKey(message);
         }
     }
@@ -1616,6 +1664,7 @@ internal static class PalmTTYRemoteAppHost
     {
         if (inputs == null || inputs.Length == 0 || inputs.Length > 32768) return;
         uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
+        PublishInputState(sent == inputs.Length ? "ready" : "blocked");
         if (sent != inputs.Length)
         {
             int error = Marshal.GetLastWin32Error();

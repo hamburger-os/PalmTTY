@@ -12,7 +12,7 @@ import {
   REMOTE_APP_CAPTURE_MIN_HEIGHT,
   REMOTE_APP_CAPTURE_MIN_WIDTH,
   encodeRemoteAppControlMessage,
-  parseRemoteAppCursorMessage,
+  parseRemoteAppTelemetryMessage,
   type AppSessionMediaState,
   type RemoteAppMediaDiagnostics,
   type AppSessionPublic,
@@ -154,6 +154,7 @@ export function RemoteAppView({
   const [textOpen, setTextOpen] = useState(false);
   const [text, setText] = useState("");
   const [controlReady, setControlReady] = useState(false);
+  const [inputBlocked, setInputBlocked] = useState(false);
   const [cursor, setCursor] = useState<Point | null>(null);
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
   const [surfaceSize, setSurfaceSize] = useState({ width: 0, height: 0 });
@@ -348,6 +349,7 @@ export function RemoteAppView({
       clearConnectionTimer();
       channelRef.current = null;
       setControlReady(false);
+      setInputBlocked(false);
       setCursor(null);
       connectedAt.current = null;
       currentTrackRef.current = null;
@@ -397,6 +399,7 @@ export function RemoteAppView({
       channel.onclose = () => {
         if (connection === peer && !controller.signal.aborted) {
           setControlReady(false);
+          setInputBlocked(false);
           setCursor(null);
         }
       };
@@ -404,8 +407,12 @@ export function RemoteAppView({
         if (connection !== peer || controller.signal.aborted ||
             typeof event.data !== "string") return;
         try {
-          const sample = parseRemoteAppCursorMessage(event.data);
-          setCursor(sample.visible ? { x: sample.x, y: sample.y } : null);
+          const sample = parseRemoteAppTelemetryMessage(event.data);
+          if (sample.type === "cursor") {
+            setCursor(sample.visible ? { x: sample.x, y: sample.y } : null);
+          } else {
+            setInputBlocked(sample.state === "blocked");
+          }
         } catch { /* No untyped messages may mutate cursor state. */ }
       };
 
@@ -822,8 +829,10 @@ export function RemoteAppView({
       )}
 
       <div className="remote-app-dock">
-        {mode !== "view" && !controlReady && active && (
-          <div className="remote-app-media-warning" role="status">{t("remoteApp.controlNotReady")}</div>
+        {mode !== "view" && active && (!controlReady || inputBlocked) && (
+          <div className="remote-app-media-warning" role="status">
+            {t(!controlReady ? "remoteApp.controlNotReady" : "remoteApp.inputBlocked")}
+          </div>
         )}
         {warningNotice && (
           <div className="remote-app-media-warning" role="status">
