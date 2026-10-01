@@ -130,7 +130,7 @@ describe("HTTP security boundary", () => {
       payload: {
         name: "Blocked",
         cwd: process.cwd(),
-        runtime: { kind: "host", shell: process.execPath, args: [] }
+        terminal: { runtime: { kind: "host", shell: process.execPath, args: [] } }
       }
     });
     expect(unauthenticated.statusCode).toBe(401);
@@ -143,7 +143,7 @@ describe("HTTP security boundary", () => {
       payload: {
         name: "Blocked",
         cwd: process.cwd(),
-        runtime: { kind: "host", shell: process.execPath, args: [] }
+        terminal: { runtime: { kind: "host", shell: process.execPath, args: [] } }
       }
     });
     expect(wrongOrigin.statusCode).toBe(403);
@@ -214,10 +214,12 @@ describe("HTTP security boundary", () => {
         payload: {
           name: "Reserved",
           cwd: process.cwd(),
-          runtime: {
-            kind: "host",
-            shell: process.execPath,
-            args: []
+          terminal: {
+            runtime: {
+              kind: "host",
+              shell: process.execPath,
+              args: []
+            }
           },
           environment: {
             [reserved]: "must-not-be-persisted"
@@ -339,10 +341,12 @@ describe("HTTP security boundary", () => {
       payload: {
         name: "Local",
         cwd: process.cwd(),
-        runtime: {
-          kind: "host",
-          shell: process.execPath,
-          args: []
+        terminal: {
+          runtime: {
+            kind: "host",
+            shell: process.execPath,
+            args: []
+          }
         },
         environment: {
           HTTPS_PROXY: "http://127.0.0.1:10808"
