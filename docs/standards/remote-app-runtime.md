@@ -23,4 +23,5 @@ Project interpretation:
 - Remote App presentation size is live client presentation state, not persisted App Profile authority; browser display hints are bounded by protocol/native hard limits;
 - direct LAN/VPN WebRTC may use host candidates; deployments that require NAT traversal may configure STUN/TURN through bounded host configuration;
 - configured ICE servers are signaling configuration, not a PalmTTY-operated relay service; adding a PalmTTY-hosted relay would require a separate privacy/security/deployment design;
-- executable discovery is a bounded control-plane surface: known-app detection plus directory/.exe enumeration only, never a general browser file-read or command API.
+- executable discovery is a bounded control-plane surface: known PATH/install-root candidates plus capped Windows App Paths registry and Start Menu shortcut target inspection, followed by directory/.exe enumeration only; never a general browser file-read, unbounded filesystem scan or command API.
+- native WebRTC readiness must be checked in a disposable process; installed Windows runtime smoke must load the packaged addon rather than relying only on compiled TypeScript or PE presence.
