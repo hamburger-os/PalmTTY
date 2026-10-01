@@ -4,6 +4,8 @@ import { installedRoot } from "./runtime-layout.js";
 
 const CHECK_TIMEOUT_MS = 8000;
 const MAX_DIAGNOSTIC_BYTES = 2048;
+// RemoteAppCapabilitiesSchema limits the visible failure reason to 512 chars.
+// Preserve the remediation hint even when native module errors carry stacks.
 const VERIFY_WEBRTC_SCRIPT = [
   "const wrtc = require(process.argv[1]);",
   "if (typeof wrtc.RTCPeerConnection !== 'function' ||",
@@ -61,7 +63,7 @@ export async function assertRemoteAppWebRtcAvailable(): Promise<void> {
         } else {
           finish(new Error(
             "Remote App WebRTC native runtime cannot load" +
-            (stderr.trim() ? ": " + stderr.trim().slice(0, 500) : ".") +
+            (stderr.trim() ? ": " + stderr.trim().slice(0, 220) : ".") +
             " " + repairInstruction()
           ));
         }
