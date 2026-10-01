@@ -214,4 +214,10 @@ Do not claim persistence beyond what is tested: browser disconnect and Agent res
 ### Mobile control polish
 
 - Terminal keybar now exposes Keyboard and Long Text first, followed by Esc/Tab/Enter/slash/Ctrl, and uses one fixed More/Collapse action to reveal the optional advanced row. The compact/full/hidden state machine is removed; xterm/WebSocket lifecycle is unaffected.
-- Remote App primary and expanded key docks use shared `.glass-panel` surfaces and standard theme control tokens instead of `--flat-content`. The verified-window remote cursor is refined to 17×24 CSS px with a 1.6 px outline and lighter shadow; its hotspot and contain/cover mapping remain unchanged.
+- Remote App primary and expanded key docks use shared `.glass-panel` surfaces and standard theme control tokens instead of `--flat-content`. The verified-window remote cursor is now approximately 5.667×8 CSS px (one third of the previous 17×24), retains its theme-owned SVG outline and a subdued shadow; its hotspot and contain/cover mapping remain unchanged.
+
+### Low-latency Remote App cursor and text docking
+
+- Native verified-owned-window cursor sampling runs on its own best-effort ~30Hz thread and rechecks ownership/visibility/bounds; unlike capture-loop sampling, PrintWindow/encoding stalls do not pause cursor feedback. A foreground-owned input fast path avoids repeated expensive window activation while retaining the same Job/UIPI checks.
+- Web batches finger-relative motion into at most one ordered DataChannel message per requestAnimationFrame; pending movement is flushed before button releases and cancelled on peer teardown. Display-only optimistic normalized prediction moves the theme SVG by an imperative RAF transform and reconciles latest typed native telemetry after touch release, removing a React rerender per cursor packet. Native hidden state remains immediate. Real network delays are not bypassed.
+- Remote App bottom key dock puts the bounded Text entry first; remove the redundant text entry from the display and diagnostics options menu. Cursor display is exactly one third of the preceding 17×24 CSS px arrow, now 5.667×8 CSS px.

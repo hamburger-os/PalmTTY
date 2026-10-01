@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.14.0"
+  version: "1.15.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -200,4 +200,8 @@ Hard-coded visual color values belong only in the theme layer or explicit xterm 
 
 ### Remote App dock and cursor visual scale
 
-Use `.glass-panel` for both the primary and extended Remote App key docks, never override their material with `--flat-content`; keep nested buttons theme-tokenized. The verified-window pointer overlay should remain a restrained high-contrast arrow (17×24 CSS px) with a fine theme-owned outline and compact shadow; retain the exact hotspot and contain/cover geometry to avoid obscuring application controls.
+Use `.glass-panel` for both the primary and extended Remote App key docks, never override their material with `--flat-content`; keep nested buttons theme-tokenized. The verified-window pointer overlay should remain a very small high-contrast arrow (5.667×8 CSS px, one third of its previous size) with a fine theme-owned outline and compact shadow; retain the exact hotspot and contain/cover geometry to avoid obscuring application controls.
+
+### Lightweight Remote App pointer rendering
+
+The bottommost Remote App special-key dock places Text first. The top Options menu should only contain display/cropping, explicit current-window resizing, quality and diagnostics; do not duplicate the text entry there. Mouse positions must use a small pointer-events-none SVG with the existing theme fill/outline and exact contain/cover projection; update its transform imperatively in a scheduled animation frame rather than rerendering the large video/workbench React subtree on each cursor report. Optimistic pointer display is permitted only for locally sent, bounded mouse movement and must reconcile with verified native coordinates. Native off-window/peer reset must hide it without continuing stale prediction. Never tie pointer telemetry sampling to PrintWindow frame rate or expand owned-window authority.
