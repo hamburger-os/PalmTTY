@@ -1399,7 +1399,10 @@ internal static class PalmTTYRemoteAppHost
 
         if (message.Type == "pointer")
         {
-            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect))
+            // Most drag/move events already target the foreground window.
+            // Avoid repeatedly restoring it and attaching input threads.
+            if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
+                !TryGetWindowBounds(hwnd, out rect))
             {
                 PublishInputState("blocked");
                 return;
@@ -1418,7 +1421,10 @@ internal static class PalmTTYRemoteAppHost
 
         if (message.Type == "pointerRelative")
         {
-            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect))
+            // Most drag/move events already target the foreground window.
+            // Avoid repeatedly restoring it and attaching input threads.
+            if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
+                !TryGetWindowBounds(hwnd, out rect))
             {
                 PublishInputState("blocked");
                 return;
