@@ -17,6 +17,7 @@ export function RemoteAppExecutablePicker({
 }) {
   const { t, error: translateError } = useI18n();
   const [catalog, setCatalog] = useState<RemoteAppCatalogEntry[]>([]);
+  const [search, setSearch] = useState("");
   const [listing, setListing] = useState<RemoteAppExecutableListing | null>(null);
   const [catalogBusy, setCatalogBusy] = useState(true);
   const [browseBusy, setBrowseBusy] = useState(false);
@@ -81,22 +82,39 @@ export function RemoteAppExecutablePicker({
           </div>
         )}
         {catalog.length > 0 && (
-          <div className="settings-list">
-            {catalog.map((entry) => (
-              <button
-                type="button"
-                className="settings-list-row"
-                key={entry.executable}
-                onClick={() => onChoose(entry)}
-              >
-                <span>
-                  <strong>{entry.name}</strong>
-                  <small>{entry.executable}</small>
-                </span>
-                <span aria-hidden="true">›</span>
-              </button>
-            ))}
-          </div>
+          <>
+            <input
+              className="glass-input"
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t("workspace.remoteAppSearch")}
+              aria-label={t("workspace.remoteAppSearch")}
+            />
+            <div className="settings-list executable-browser-list">
+              {catalog.filter((entry) =>
+                (entry.name + " " + entry.executable).toLowerCase()
+                  .includes(search.trim().toLowerCase())
+              ).map((entry) => (
+                <button
+                  type="button"
+                  className="settings-list-row"
+                  key={entry.executable}
+                  onClick={() => onChoose(entry)}
+                >
+                  <span>
+                    <strong>{entry.name}</strong>
+                    <small>{entry.executable}</small>
+                  </span>
+                  <span aria-hidden="true">›</span>
+                </button>
+              ))}
+              {search.trim() && !catalog.some((entry) =>
+                (entry.name + " " + entry.executable).toLowerCase()
+                  .includes(search.trim().toLowerCase())
+              ) && <div className="settings-empty">{t("workspace.remoteAppNoMatch")}</div>}
+            </div>
+          </>
         )}
       </section>
 

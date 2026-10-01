@@ -15,7 +15,7 @@ Workspace editing is intentionally split into separate surfaces:
 
 A Remote App profile now contains only an ID, display name, executable and optional argv. Capture FPS and pixel dimensions are not user settings. PalmTTY adapts the bounded capture size from the live Remote App surface on the phone.
 
-The normal flow is **Add application → choose a detected app or browse for an .exe → optionally add argv → save**. Discovery is bounded: PalmTTY checks a small known set of developer apps and its executable browser exposes only directories and `.exe` files. A manual executable path remains an Advanced fallback.
+The normal flow is **Add application → choose a detected app or browse for an .exe → optionally add argv → save**. Discovery is bounded: PalmTTY checks known PATH entries, common Windows installation directories, App Paths registry entries and a capped set of Start Menu shortcuts. The detected catalog is searchable and limited to 64 applications; the separate executable browser exposes only directories and `.exe` files. A manual executable path remains an Advanced fallback.
 
 An App Session is created only by persisted `workspaceId + profileId`. The browser cannot provide an arbitrary executable, PID, HWND, environment override or capture target when starting a session.
 

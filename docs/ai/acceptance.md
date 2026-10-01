@@ -142,7 +142,7 @@ Automated/static acceptance for any Remote App change:
 - Remote App recovery storage generation stays independent from Terminal Worker state and aligned with the Remote App Worker protocol version;
 - App Session creation accepts only persisted workspaceId + profileId. It rejects unknown profiles/unsupported platforms and never accepts browser executable/argv/environment/PID/HWND;
 - a Workspace using WSL for its Terminal profile may still retain/launch Windows Remote App profiles; Git/Files continue to interpret the nested Terminal runtime;
-- Remote App discovery endpoints require authentication + exact Origin, are rate-limited, and expose only bounded known-app results or directories + `.exe` entries; they are not file-content/command APIs;
+- Remote App discovery endpoints require authentication + exact Origin and rate limiting. Detection covers known PATH targets, bounded common Windows installation locations, App Paths registry entries and a capped Start Menu shortcut list, deduplicates by executable and caps its catalog at 64 entries; browsing exposes only directories + `.exe`, not file contents or command execution;
 - Workspace mutation and App Session creation both revalidate executable resolution;
 - Workspace deletion is blocked by active Terminal **or** active Remote App Sessions;
 - AppWorker bootstrap removes PalmTTY control/auth environment keys, requires authenticated adoption, retains recovery authority across Agent reconnect and never treats persisted PID as kill authority;

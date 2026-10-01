@@ -88,7 +88,7 @@ Remote App 是 Windows 宿主 Activity。即使 Workspace 的 Terminal profile �
 
 PalmTTY 提供两个有界选择面：
 
-1. **Detected applications**：仅探测少量已知开发应用；
+1. **Detected applications**：检查已知 PATH/常见用户与系统安装目录，再有界读取 Windows App Paths 注册项和开始菜单快捷方式中的本地 `.exe` 目标；按 executable 去重，最多 64 项，手机端可搜索；
 2. **Executable browser**：只列目录和 `.exe` 文件，不返回文件内容，也不执行被浏览的程序。
 
 手工 executable 路径保留在“高级”作为兜底。保存 Workspace 与真正启动 App Session 时都会重新解析 executable。

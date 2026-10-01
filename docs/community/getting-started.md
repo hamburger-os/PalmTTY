@@ -57,6 +57,16 @@ Open the configured Agent URL, sign in, and create the first workspace in the We
 - Workspace environment uses one `NAME=value` entry per line and is applied before the shell starts. Balanced outer single/double quotes are accepted and removed, so both `HTTP_PROXY=http://127.0.0.1:10808` and `HTTP_PROXY="http://127.0.0.1:10808"` persist the same URL; unmatched outer quotes are rejected. On Windows, each new/restarted terminal also refreshes the current Machine/User environment and PATH, so CLIs installed after the PalmTTY Agent started can be discovered by a new PTY. WSL workspace variables are forwarded through `WSLENV`.
 - Shell arguments remain explicit argv values. Startup command is optional multiline Terminal input stored under `workspace.terminal`. Workspace environment is persistent local configuration, not a secret vault.
 
+### Windows source dependency check
+
+When running PalmTTY from a source checkout after pulling Remote App changes,
+run `pnpm install --frozen-lockfile` again before `pnpm build` and restart the
+Agent. Remote Apps require the platform-specific native `@roamhq/wrtc`
+dependency in addition to the compiled Web UI. PalmTTY checks that the
+WebRTC native module actually loads before creating an App Session; a missing
+module produces an actionable message instead of crashing the detached worker.
+Windows distribution smoke separately loads the packaged native module.
+
 ### Windows Remote Apps
 
 On Windows x64, open **Remote Apps** in the Workspace editor and choose **Add application**. The normal path is:

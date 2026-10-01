@@ -9,16 +9,9 @@ import {
   type RemoteAppExecutableLocation
 } from "@palmtty/protocol";
 import { readHostEnvironment } from "./host-environment.js";
-import { resolveExecutable } from "./workspace-runtime.js";
+import { discoverRemoteApps } from "./remote-app-discovery.js";
 
 const MAX_ENTRIES = 256;
-
-const KNOWN_APPS = [
-  { name: "Codex Desktop", programs: ["codex.exe", "Codex.exe"] },
-  { name: "Visual Studio Code", programs: ["Code.exe"] },
-  { name: "ChatGPT", programs: ["ChatGPT.exe"] },
-  { name: "Antigravity", programs: ["Antigravity IDE.exe", "antigravity.exe"] }
-] as const;
 
 function requireWindows(): void {
   if (process.platform !== "win32") {
@@ -69,31 +62,7 @@ export async function detectRemoteAppCatalog(): Promise<{
 }> {
   requireWindows();
   const environment = await readHostEnvironment();
-  const apps: RemoteAppCatalogEntry[] = [];
-  const seen = new Set<string>();
-
-  for (const candidate of KNOWN_APPS) {
-    for (const program of candidate.programs) {
-      try {
-        const executable = await resolveExecutable(program, {
-          cwd: os.homedir(),
-          env: environment
-        });
-        const key = executable.toLowerCase();
-        if (seen.has(key)) break;
-        seen.add(key);
-        apps.push({
-          name: candidate.name,
-          executable,
-          source: "detected"
-        });
-        break;
-      } catch {
-        // A missing known application is expected and omitted.
-      }
-    }
-  }
-
+  const apps = await discoverRemoteApps(environment);
   return RemoteAppCatalogResponseSchema.parse({ apps });
 }
 
