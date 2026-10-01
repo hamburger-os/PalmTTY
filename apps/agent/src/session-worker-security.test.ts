@@ -64,10 +64,12 @@ function workspace(): WorkspaceDefinition {
     id: "security",
     name: "Security",
     cwd: process.cwd(),
-    runtime: {
-      kind: "host",
-      shell: process.execPath,
-      args: []
+    terminal: {
+      runtime: {
+        kind: "host",
+        shell: process.execPath,
+        args: []
+      }
     },
     remoteApps: []
   };
