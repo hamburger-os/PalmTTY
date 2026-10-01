@@ -79,6 +79,7 @@ async function main() {
   const temp = await mkdtemp(path.join(os.tmpdir(), "palmtty-installed-smoke-"));
   const root = path.join(temp, "PalmTTY");
   let child;
+  let childClosed;
   let stderr = "";
   try {
     // Execute from a detached temporary directory so no source-repository
@@ -182,6 +183,7 @@ sessions:
         windowsHide: true
       }
     );
+    childClosed = new Promise((resolve) => child.once("close", resolve));
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => {
       if (stderr.length < 8192) stderr += chunk;
@@ -214,17 +216,24 @@ sessions:
     }
     throw error;
   } finally {
-    if (child && child.exitCode === null) {
-      child.kill();
-      await new Promise((resolve) => {
-        const timer = setTimeout(resolve, 3000);
-        child.once("exit", () => {
-          clearTimeout(timer);
-          resolve();
-        });
-      });
+    if (child) {
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+      // "exit" precedes closure of Node/Win32 stdio file handles; wait for
+      // "close" before attempting to remove a packaged runtime directory.
+      await Promise.race([
+        childClosed,
+        new Promise((resolve) => setTimeout(resolve, 5000))
+      ]);
     }
-    await rm(temp, { recursive: true, force: true });
+    try {
+      await rm(temp, {
+        recursive: true, force: true, maxRetries: 60, retryDelay: 250
+      });
+    } catch (error) {
+      if (process.platform !== "win32" ||
+          !["EBUSY", "EPERM", "ENOTEMPTY"].includes(error?.code)) throw error;
+      console.warn(`[PalmTTY] Windows deferred smoke temp cleanup: ${error.code}`);
+    }
   }
 }
 

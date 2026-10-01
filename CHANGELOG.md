@@ -55,6 +55,9 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Fixed
 
+- Make Windows CI and installed-runtime cleanup resilient to asynchronous detached Worker shutdown and transient Win32/antivirus file locks, without hiding actual lifecycle/test failures. Keep Dependabot Node typings on the supported Node 22 runtime major.
+
+
 - Isolate mobile Remote App touchpad gestures from browser page scrolling, eliminate phantom taps on pointer cancellation, and keep controls reachable inside VisualViewport.
 - Do not misdiagnose genuine all-black desktop content as a failed capture: retry the same authorized window then forward an ambiguous dark frame with diagnostics.
 - Retry standard PrintWindow on the same verified window when full-content capture fails or yields blank pixels, and report bounded native capture failure reasons. Stop reporting successful video merely because PrintWindow or WebRTC signaling succeeded; show the actual browser playback state and provide a manual-play action when autoplay is blocked.
