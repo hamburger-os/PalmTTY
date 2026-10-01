@@ -189,7 +189,7 @@ export function WorkspaceWorkbench({
       className={"workbench-page" +
         (activity.kind === "remoteApp" && pane === "remoteApp"
           ? " is-remote-app" + (appImmersive ? " remote-app-immersive" : "")
-          : "")}>
+          : activity.kind === "terminal" ? " is-terminal" : "")}>
       <header className="workbench-header glass-panel">
         <div className="workbench-leading">
           <button
@@ -253,8 +253,8 @@ export function WorkspaceWorkbench({
         </nav>
 
         <div className="workbench-actions">
-          {activity.kind === "remoteApp" && (
-            <button type="button" className="ghost compact mobile-app-tools"
+          {(activity.kind === "remoteApp" || activity.kind === "terminal") && (
+            <button type="button" className="ghost compact mobile-workbench-tools"
               aria-label={t("workbench.tools")}
               aria-expanded={mobileToolsOpen}
               onClick={() => setMobileToolsOpen((open) => !open)}>
