@@ -27,7 +27,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteAppKeybar } from "./RemoteAppKeybar.js";
-import { remoteAppLiveKeyboardKey, shouldCommitRemoteLiveText } from "./remote-app-live-keyboard.js";
+import { LIVE_KEYBOARD_SENTINEL, RemoteLiveInputQueue, remoteAppLiveKeyboardKey, shouldCommitRemoteLiveText } from "./remote-app-live-keyboard.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
 import { RemoteCursorPreview, REMOTE_CURSOR_RECONCILE_DELAY_MS } from "./remote-app-cursor-preview.js";
 import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta, remoteAdaptedVideoFit, type VideoFit } from "./remote-app-presentation.js";
@@ -145,7 +145,11 @@ export function RemoteAppView({
   const longTextRef = useRef<HTMLTextAreaElement>(null);
   const keyboardComposingRef = useRef(false);
   const keyboardFlushFrameRef = useRef<number | null>(null);
-  const keyboardDraftRef = useRef("");
+  const keyboardInputFrameRef = useRef<number | null>(null);
+  const keyboardRetryRef = useRef<number | null>(null);
+  const keyboardQueueRef = useRef(new RemoteLiveInputQueue());
+  const keyboardOverflowRef = useRef("");
+  const lastCompositionRef = useRef<{ text: string; at: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentTrackRef = useRef<MediaStreamTrack | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -160,7 +164,6 @@ export function RemoteAppView({
   const [alt, setAlt] = useState(false);
   const [shift, setShift] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const [keyboardDraft, setKeyboardDraft] = useState("");
   const [textOpen, setTextOpen] = useState(false);
   const [text, setText] = useState("");
   const [controlReady, setControlReady] = useState(false);
@@ -249,6 +252,11 @@ export function RemoteAppView({
   useEffect(() => () => {
     if (keyboardFlushFrameRef.current !== null)
       window.cancelAnimationFrame(keyboardFlushFrameRef.current);
+    if (keyboardInputFrameRef.current !== null)
+      window.cancelAnimationFrame(keyboardInputFrameRef.current);
+    if (keyboardRetryRef.current !== null)
+      window.clearTimeout(keyboardRetryRef.current);
+    keyboardQueueRef.current.clear();
     cancelRelativeMotion();
     if (cursorPaintFrameRef.current !== null)
       window.cancelAnimationFrame(cursorPaintFrameRef.current);
@@ -312,6 +320,31 @@ export function RemoteAppView({
       return false;
     }
   }, []);
+
+  const flushKeyboardQueue = useCallback(() => {
+    keyboardInputFrameRef.current = null;
+    const ok = keyboardQueueRef.current.flush((message) => {
+      const channel = channelRef.current;
+      if (!channel || channel.readyState !== "open" ||
+          channel.bufferedAmount > 32 * 1024) return false;
+      return send(message);
+    });
+    if (!ok && channelRef.current?.readyState === "open" &&
+        keyboardRetryRef.current === null) {
+      // Retain unsent words instead of dropping them under DataChannel load.
+      keyboardRetryRef.current = window.setTimeout(() => {
+        keyboardRetryRef.current = null;
+        if (keyboardInputFrameRef.current === null)
+          keyboardInputFrameRef.current = window.requestAnimationFrame(flushKeyboardQueue);
+      }, 40);
+    }
+    return ok;
+  }, [send]);
+
+  const scheduleKeyboardFlush = useCallback(() => {
+    if (keyboardInputFrameRef.current === null)
+      keyboardInputFrameRef.current = window.requestAnimationFrame(flushKeyboardQueue);
+  }, [flushKeyboardQueue]);
 
   // Coalesce high-frequency finger deltas to at most one WebRTC message
   // per animation frame. Down/up remain ordered after an explicit flush.
@@ -533,6 +566,7 @@ export function RemoteAppView({
       channel.onopen = () => {
         if (connection !== peer || controller.signal.aborted) return;
         setControlReady(true);
+        scheduleKeyboardFlush();
         sendDisplayHint();
       };
       channel.onclose = () => {
@@ -675,7 +709,8 @@ export function RemoteAppView({
       if (video) video.srcObject = null;
     };
   }, [attemptPlayback, capabilities?.iceServers, cancelRelativeMotion,
-      flushRelativeMotion, scheduleCursorPaint, send, sendDisplayHint, session.id]);
+      flushRelativeMotion, scheduleCursorPaint, scheduleKeyboardFlush,
+      send, sendDisplayHint, session.id]);
 
   useEffect(() => {
     if (!active) return;
@@ -732,12 +767,50 @@ export function RemoteAppView({
     scheduleCursorPaint();
   }, [active, mode, flushRelativeMotion, scheduleCursorPaint, send]);
 
-  const commitLiveKeyboardText = (value: string): boolean => {
-    if (!value) return true;
-    if (!send({ type: "text", text: value })) return false;
-    keyboardDraftRef.current = "";
-    setKeyboardDraft("");
-    return true;
+  const resetKeyboardAnchor = () => {
+    const field = liveKeyboardRef.current;
+    if (!field || keyboardComposingRef.current) return;
+    field.value = LIVE_KEYBOARD_SENTINEL;
+    field.setSelectionRange(field.value.length, field.value.length);
+  };
+
+  const queueKeyboardText = (value: string, fromComposition = false) => {
+    if (!value) return;
+    if (fromComposition) lastCompositionRef.current = { text: value, at: performance.now() };
+    if (!keyboardQueueRef.current.enqueueText(value)) {
+      // Large paste or exhausted input budget: retain it for explicit sending.
+      keyboardOverflowRef.current += value;
+      setInputBlocked(true);
+      return;
+    }
+    scheduleKeyboardFlush();
+  };
+
+  const queueKeyboardDelete = (key: "Backspace" | "Delete") => {
+    keyboardQueueRef.current.enqueueDelete(key);
+    scheduleKeyboardFlush();
+  };
+
+  const readKeyboardInput = (inputType = "", fromComposition = false) => {
+    if (keyboardComposingRef.current || keyboardFlushFrameRef.current !== null) return;
+    const field = liveKeyboardRef.current;
+    if (!field) return;
+    if (inputType.startsWith("delete")) {
+      queueKeyboardDelete(inputType.includes("Forward") ? "Delete" : "Backspace");
+    } else if (inputType === "insertLineBreak" || inputType === "insertParagraph") {
+      flushKeyboardQueue();
+      sendKey("Enter");
+    } else {
+      const value = field.value.replace(LIVE_KEYBOARD_SENTINEL, "");
+      const previous = lastCompositionRef.current;
+      const duplicate = previous && value === previous.text &&
+        performance.now() - previous.at < 160 &&
+        inputType === "insertFromComposition";
+      if (value && !duplicate) queueKeyboardText(value, fromComposition);
+      if (!fromComposition && inputType !== "insertFromComposition")
+        lastCompositionRef.current = null;
+    }
+    resetKeyboardAnchor();
   };
 
   const closeKeyboard = () => {
@@ -745,14 +818,25 @@ export function RemoteAppView({
       window.cancelAnimationFrame(keyboardFlushFrameRef.current);
       keyboardFlushFrameRef.current = null;
     }
+    if (keyboardInputFrameRef.current !== null) {
+      window.cancelAnimationFrame(keyboardInputFrameRef.current);
+      keyboardInputFrameRef.current = null;
+    }
+    if (keyboardRetryRef.current !== null) {
+      window.clearTimeout(keyboardRetryRef.current);
+      keyboardRetryRef.current = null;
+    }
+    if (!keyboardComposingRef.current) flushKeyboardQueue();
+    const composingDraft = keyboardComposingRef.current
+      ? liveKeyboardRef.current?.value.replace(LIVE_KEYBOARD_SENTINEL, "") ?? ""
+      : "";
     keyboardComposingRef.current = false;
     liveKeyboardRef.current?.blur();
-    // Preserve unsent input in the explicit composer instead of losing it.
-    if (keyboardDraftRef.current) {
-      const draft = keyboardDraftRef.current;
-      setText((current) => current ? current + "\n" + draft : draft);
-      keyboardDraftRef.current = "";
-      setKeyboardDraft("");
+    const unsent = keyboardQueueRef.current.takeUnsentText() +
+      keyboardOverflowRef.current + composingDraft;
+    keyboardOverflowRef.current = "";
+    if (unsent) {
+      setText((current) => current ? current + "\n" + unsent : unsent);
       setTextOpen(true);
     }
     setKeyboardOpen(false);
@@ -776,7 +860,9 @@ export function RemoteAppView({
       setMoreKeysOpen(false);
       setOptionsOpen(false);
     });
-    // Must happen in the actual tap callback for iOS Safari's soft keyboard.
+    // Keep the 1px bridge in the visible viewport: Safari requires a
+    // real user gesture and a focusable element to open the iOS keyboard.
+    resetKeyboardAnchor();
     liveKeyboardRef.current?.focus({ preventScroll: true });
   };
 
