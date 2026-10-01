@@ -301,6 +301,7 @@ export function WorkspaceWorkbench({
         {activity.kind === "remoteApp" && (
           <div className={`workbench-pane${pane === "remoteApp" ? " is-active" : ""}`}>
             <RemoteAppView
+              key={activity.session.id}
               session={activity.session}
               capabilities={appCapabilities}
               active={pane === "remoteApp"}

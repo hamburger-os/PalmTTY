@@ -25,7 +25,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
-import { remoteDisplaySize, remoteVideoPoint, type VideoFit } from "./remote-app-presentation.js";
+import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, type VideoFit } from "./remote-app-presentation.js";
 
 export type RemoteAppConnectionState =
   | "connecting"
@@ -137,6 +137,8 @@ export function RemoteAppView({
   const { t } = useI18n();
   const surfaceRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const currentTrackRef = useRef<MediaStreamTrack | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RTCDataChannel | null>(null);
   const [mode, setMode] = useState<InteractionMode>("view");
   const [fit, setFit] = useState<"contain" | "cover">("contain");
@@ -145,7 +147,6 @@ export function RemoteAppView({
   adaptWindowRef.current = adaptWindow;
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [moreKeysOpen, setMoreKeysOpen] = useState(false);
-  const [showModeHint, setShowModeHint] = useState(true);
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
   const [shift, setShift] = useState(false);
@@ -156,11 +157,15 @@ export function RemoteAppView({
   );
   const [networkIssue, setNetworkIssue] = useState(false);
   const [videoRendered, setVideoRendered] = useState(false);
+  const [everRendered, setEverRendered] = useState(false);
   const [videoTimedOut, setVideoTimedOut] = useState(false);
   const [videoFrozen, setVideoFrozen] = useState(false);
   const [playRejected, setPlayRejected] = useState(false);
   const [mediaDiagnostics, setMediaDiagnostics] = useState<RemoteAppMediaDiagnostics | null>(session.mediaDiagnostics ?? null);
   const videoRenderedRef = useRef(false);
+  const frameCallbackSeenRef = useRef(false);
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const lastFrameAt = useRef(0);
   const touchpad = useRef(new RemoteTouchpadGesture());
   const connectedAt = useRef<number | null>(null);
@@ -175,6 +180,35 @@ export function RemoteAppView({
     setMediaState(session.mediaState);
     setMediaDiagnostics(session.mediaDiagnostics ?? null);
   }, [session.mediaState, session.mediaDiagnostics, session.id]);
+
+  useEffect(() => {
+    setEverRendered(false);
+  }, [session.id]);
+
+  const attemptPlayback = useCallback((
+    video: HTMLVideoElement, isCurrent: () => boolean
+  ) => {
+    void video.play().then(
+      () => { if (isCurrent()) setPlayRejected(false); },
+      () => { if (isCurrent()) setPlayRejected(true); }
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!optionsOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!toolbarRef.current?.contains(event.target as Node)) setOptionsOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOptionsOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [optionsOpen]);
 
   const send = useCallback((message: RemoteAppControlMessage): boolean => {
     const channel = channelRef.current;
@@ -226,30 +260,44 @@ export function RemoteAppView({
     let stopped = false;
     let callbackId: number | undefined;
     const frame = () => {
-      if (stopped) return;
+      if (stopped || currentTrackRef.current?.readyState !== "live") return;
       videoRenderedRef.current = true;
       lastFrameAt.current = Date.now();
       setVideoRendered(true);
+      setEverRendered(true);
       setVideoTimedOut(false);
       setVideoFrozen(false);
       if (typeof video.requestVideoFrameCallback === "function") {
-        callbackId = video.requestVideoFrameCallback(frame);
+        callbackId = video.requestVideoFrameCallback(() => {
+          frameCallbackSeenRef.current = true;
+          frame();
+        });
       }
     };
     if (typeof video.requestVideoFrameCallback === "function") {
-      callbackId = video.requestVideoFrameCallback(frame);
+      callbackId = video.requestVideoFrameCallback(() => {
+        frameCallbackSeenRef.current = true;
+        frame();
+      });
     }
     const timer = window.setInterval(() => {
       if (stopped) return;
-      if (!videoRenderedRef.current &&
-          video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-          video.videoWidth > 0 && video.videoHeight > 0 &&
-          typeof video.requestVideoFrameCallback !== "function") frame();
+      if (!videoRenderedRef.current && hasPresentableVideoFrame(
+        currentTrackRef.current?.readyState === "live",
+        video.srcObject !== null, video.readyState, video.videoWidth, video.videoHeight
+      )) {
+        // iOS may paint a WebRTC frame before (or without) invoking rVFC.
+        if (callbackId !== undefined) video.cancelVideoFrameCallback?.(callbackId);
+        frame();
+      }
       if (connectedAt.current !== null && !videoRenderedRef.current &&
           Date.now() - connectedAt.current > 8000) setVideoTimedOut(true);
-      if (videoRenderedRef.current && lastFrameAt.current > 0 &&
-          typeof video.requestVideoFrameCallback === "function" &&
-          Date.now() - lastFrameAt.current > 8000) setVideoFrozen(true);
+      if (!activeRef.current || document.hidden) {
+        // Backgrounded videos may stop callbacks without losing their stream.
+        if (videoRenderedRef.current) lastFrameAt.current = Date.now();
+      } else if (videoRenderedRef.current && hasStalledVideoFrames(
+        frameCallbackSeenRef.current, lastFrameAt.current, Date.now()
+      )) setVideoFrozen(true);
     }, 1000);
     return () => {
       stopped = true;
@@ -280,6 +328,7 @@ export function RemoteAppView({
       clearConnectionTimer();
       channelRef.current = null;
       connectedAt.current = null;
+      currentTrackRef.current = null;
       if (connection) {
         try { connection.close(); } catch { /* ignore */ }
         connection = undefined;
@@ -302,6 +351,7 @@ export function RemoteAppView({
       if (controller.signal.aborted || ended) return;
       cleanupPeer();
       videoRenderedRef.current = false;
+      frameCallbackSeenRef.current = false;
       lastFrameAt.current = 0;
       setVideoRendered(false);
       setVideoTimedOut(false);
@@ -322,11 +372,13 @@ export function RemoteAppView({
       };
 
       peer.ontrack = (event) => {
+        if (connection !== peer || controller.signal.aborted) return;
         const video = videoRef.current;
         if (!video) return;
+        currentTrackRef.current = event.track;
         const stream = event.streams[0] ?? new MediaStream([event.track]);
         video.srcObject = stream;
-        void video.play().then(() => setPlayRejected(false), () => setPlayRejected(true));
+        attemptPlayback(video, () => connection === peer && !controller.signal.aborted);
       };
       peer.onconnectionstatechange = () => {
         if (connection !== peer || controller.signal.aborted) return;
@@ -429,19 +481,13 @@ export function RemoteAppView({
       const video = videoRef.current;
       if (video) video.srcObject = null;
     };
-  }, [capabilities?.iceServers, sendDisplayHint, session.id]);
+  }, [attemptPlayback, capabilities?.iceServers, sendDisplayHint, session.id]);
 
   useEffect(() => {
     if (!active) return;
     surfaceRef.current?.focus({ preventScroll: true });
     sendDisplayHint();
   }, [active, adaptWindow, sendDisplayHint]);
-
-  useEffect(() => {
-    setShowModeHint(true);
-    const timer = window.setTimeout(() => setShowModeHint(false), 3600);
-    return () => window.clearTimeout(timer);
-  }, [mode]);
 
   useEffect(() => {
     if (!active || mode === "view") return;
@@ -588,6 +634,11 @@ export function RemoteAppView({
     });
   };
 
+  const retryPlayback = () => {
+    const video = videoRef.current;
+    if (video) attemptPlayback(video, () => videoRef.current === video);
+  };
+
   const diagnostic = networkIssue
     ? (capabilities?.relayConfigured
       ? t("remoteApp.networkUnavailable")
@@ -596,19 +647,33 @@ export function RemoteAppView({
       ? t("remoteApp.playBlocked")
       : videoFrozen
         ? t("remoteApp.videoFrozen")
-      : videoTimedOut
-        ? mediaDiagnostics && mediaDiagnostics.sourceFrames === 0
-          ? t("remoteApp.noSourceFrames")
-          : mediaDiagnostics && mediaDiagnostics.submittedFrames === 0
-            ? t("remoteApp.noConvertedFrames")
-            : t("remoteApp.noDecodedFrames")
-        : mediaState === "capture-unavailable"
-          ? t("remoteApp.captureUnavailable")
-          : mediaState === "waiting-for-window"
-            ? t("remoteApp.waitingForWindow")
-            : mediaState === "waiting-for-frame"
-              ? t("remoteApp.waitingForFrame")
-              : null;
+        : videoTimedOut
+          ? mediaDiagnostics && mediaDiagnostics.sourceFrames === 0
+            ? t("remoteApp.noSourceFrames")
+            : mediaDiagnostics && mediaDiagnostics.submittedFrames === 0
+              ? t("remoteApp.noConvertedFrames")
+              : t("remoteApp.noDecodedFrames")
+          : mediaState === "capture-unavailable"
+            ? t("remoteApp.captureUnavailable")
+            : mediaState === "waiting-for-window"
+              ? t("remoteApp.waitingForWindow")
+              : mediaState === "waiting-for-frame"
+                ? t("remoteApp.waitingForFrame")
+                : null;
+
+  const hasPlaybackIssue = networkIssue || playRejected || videoFrozen ||
+    videoTimedOut || mediaState === "capture-unavailable";
+  const visualState = remoteAppVisualState(everRendered, videoRendered, hasPlaybackIssue);
+  // Worker polling can still report "waiting" after the browser has decoded a frame.
+  const blockingNotice = visualState === "waiting"
+    ? diagnostic ?? t("remoteApp.videoWaiting")
+    : null;
+  const warningNotice = visualState === "interrupted"
+    ? (networkIssue || playRejected || videoFrozen || videoTimedOut ||
+        mediaState === "capture-unavailable"
+      ? diagnostic
+      : t("remoteApp.connection.reconnecting"))
+    : null;
 
   return (
     <section className="remote-app-view">
@@ -627,97 +692,15 @@ export function RemoteAppView({
       >
         <video ref={videoRef} className={"fit-" + fit}
           autoPlay playsInline muted />
-        <div className="remote-app-toolbar"
-          onPointerDown={(event) => event.stopPropagation()}
-          onPointerMove={(event) => event.stopPropagation()}
-          onPointerUp={(event) => event.stopPropagation()}
-          onPointerCancel={(event) => event.stopPropagation()}
-          onWheel={(event) => event.stopPropagation()}>
-          <div className="remote-app-modes" role="group"
-            aria-label={t("remoteApp.mode")}>
-            {(["view", "touchpad", "direct"] as const).map((item) => (
-              <button key={item} type="button"
-                className={mode === item ? "selected compact" : "ghost compact"}
-                aria-pressed={mode === item}
-                onClick={() => setMode(item)}>
-                {t(interactionModeLabelKey(item))}
-              </button>
-            ))}
-          </div>
-          <button type="button" className="ghost compact remote-app-options-trigger"
-            aria-label={t("remoteApp.options")}
-            aria-expanded={optionsOpen}
-            onClick={() => setOptionsOpen((previous) => !previous)}>⋯</button>
-          {optionsOpen && (
-            <div className="remote-app-options">
-              <button type="button" className="ghost compact"
-                onClick={() => setFit((current) => current === "contain" ? "cover" : "contain")}>
-                {fit === "contain" ? t("remoteApp.fillScreen") : t("remoteApp.showAll")}
-              </button>
-              <button type="button" className={adaptWindow ? "selected compact" : "ghost compact"}
-                aria-pressed={adaptWindow}
-                onClick={() => setAdaptWindow((previous) => !previous)}>
-                {t("remoteApp.adaptWindow")}
-              </button>
-              <button type="button" className="ghost compact"
-                aria-pressed={immersive}
-                onClick={() => onImmersiveChange(!immersive)}>
-                {immersive ? t("remoteApp.exitImmersive") : t("remoteApp.immersive")}
-              </button>
-              <button type="button" className="ghost compact"
-                onClick={() => { setTextOpen((current) => !current); setOptionsOpen(false); }}>
-                {t("remoteApp.text")}
-              </button>
-              <span className="remote-app-quality">{t("remoteApp.qualityAuto")}</span>
-            </div>
-          )}
-        </div>
-        <details className="remote-app-diagnostics"
-          onPointerDown={(event) => event.stopPropagation()}
-          onPointerMove={(event) => event.stopPropagation()}
-          onPointerUp={(event) => event.stopPropagation()}
-          onPointerCancel={(event) => event.stopPropagation()}
-          onWheel={(event) => event.stopPropagation()}>
-          <summary>{t("remoteApp.diagnostics")}</summary>
-          <span>{t("remoteApp.hostState")}: {mediaState}</span>
-          <span>{t("remoteApp.frames")}: {mediaDiagnostics?.sourceFrames ?? "–"} /
-            {mediaDiagnostics?.submittedFrames ?? "–"}</span>
-          <span>{t("remoteApp.failures")}: {mediaDiagnostics?.conversionFailures ?? "–"}</span>
-          {mediaDiagnostics?.nativeFailure && (
-            <span>{t("remoteApp.captureReason")}: {mediaDiagnostics.nativeFailure}</span>
-          )}
-          <span>{t("remoteApp.videoState")}: {videoRendered ? t("remoteApp.videoReady") :
-            t("remoteApp.videoWaiting")}</span>
-          {videoRendered && videoRef.current && (
-            <span>{videoRef.current.videoWidth} × {videoRef.current.videoHeight}</span>
-          )}
-        </details>
-        {diagnostic ? (
-          <div className="remote-app-status-overlay glass-content"
-            onPointerDown={(event) => event.stopPropagation()}
-            onPointerMove={(event) => event.stopPropagation()}
-            onPointerUp={(event) => event.stopPropagation()}
-            onPointerCancel={(event) => event.stopPropagation()}
-            onWheel={(event) => event.stopPropagation()}>
+        {blockingNotice && (
+          <div className="remote-app-status-overlay glass-content" role="status">
             <strong>{t("remoteApp.statusTitle")}</strong>
-            <span>{diagnostic}</span>
+            <span>{blockingNotice}</span>
             {playRejected && (
               <button type="button" className="ghost"
-                onClick={() => {
-                  const video = videoRef.current;
-                  if (video) void video.play().then(
-                    () => setPlayRejected(false),
-                    () => setPlayRejected(true)
-                  );
-                }}>{t("remoteApp.retryPlay")}</button>
+                onClick={retryPlayback}>{t("remoteApp.retryPlay")}</button>
             )}
           </div>
-        ) : videoRendered && showModeHint ? (
-          <div className="remote-app-mode-hint">
-            {t(interactionModeHintKey(mode))}
-          </div>
-        ) : (
-          <div className="remote-app-waiting">{t("remoteApp.videoWaiting")}</div>
         )}
       </div>
 
@@ -752,6 +735,76 @@ export function RemoteAppView({
       )}
 
       <div className="remote-app-dock">
+        {warningNotice && (
+          <div className="remote-app-media-warning" role="status">
+            <span>{warningNotice}</span>
+            {playRejected && (
+              <button type="button" className="ghost compact"
+                onClick={retryPlayback}>{t("remoteApp.retryPlay")}</button>
+            )}
+          </div>
+        )}
+        <div ref={toolbarRef} className="remote-app-toolbar glass-panel">
+          <div className="remote-app-modes" role="group"
+            aria-label={t("remoteApp.mode")}>
+            {(["view", "touchpad", "direct"] as const).map((item) => (
+              <button key={item} type="button"
+                className={mode === item ? "selected compact" : "ghost compact"}
+                aria-pressed={mode === item}
+                title={t(interactionModeHintKey(item))}
+                onClick={() => setMode(item)}>
+                {t(interactionModeLabelKey(item))}
+              </button>
+            ))}
+          </div>
+          <div className="remote-app-toolbar-actions">
+            <button type="button" className="ghost compact remote-app-immersive-trigger"
+              aria-label={immersive ? t("remoteApp.exitImmersive") : t("remoteApp.immersive")}
+              title={immersive ? t("remoteApp.exitImmersive") : t("remoteApp.immersive")}
+              aria-pressed={immersive}
+              onClick={() => { setOptionsOpen(false); onImmersiveChange(!immersive); }}>
+              {immersive ? t("remoteApp.exitShort") : "⛶"}
+            </button>
+            <button type="button" className="ghost compact remote-app-options-trigger"
+              aria-label={t("remoteApp.options")}
+              aria-expanded={optionsOpen}
+              aria-haspopup="true"
+              onClick={() => setOptionsOpen((previous) => !previous)}>⋯</button>
+          </div>
+          {optionsOpen && (
+            <div className="remote-app-options">
+              <button type="button" className="ghost compact"
+                onClick={() => { setFit((current) => current === "contain" ? "cover" : "contain"); setOptionsOpen(false); }}>
+                {fit === "contain" ? t("remoteApp.fillScreen") : t("remoteApp.showAll")}
+              </button>
+              <button type="button" className={adaptWindow ? "selected compact" : "ghost compact"}
+                aria-pressed={adaptWindow}
+                onClick={() => { setAdaptWindow((previous) => !previous); setOptionsOpen(false); }}>
+                {t("remoteApp.adaptWindow")}
+              </button>
+              <button type="button" className="ghost compact"
+                onClick={() => { setTextOpen((current) => !current); setOptionsOpen(false); }}>
+                {t("remoteApp.text")}
+              </button>
+              <span className="remote-app-quality">{t("remoteApp.qualityAuto")}</span>
+              <details className="remote-app-diagnostics">
+                <summary>{t("remoteApp.diagnostics")}</summary>
+                <span>{t("remoteApp.hostState")}: {mediaState}</span>
+                <span>{t("remoteApp.frames")}: {mediaDiagnostics?.sourceFrames ?? "–"} /
+                  {mediaDiagnostics?.submittedFrames ?? "–"}</span>
+                <span>{t("remoteApp.failures")}: {mediaDiagnostics?.conversionFailures ?? "–"}</span>
+                {mediaDiagnostics?.nativeFailure && (
+                  <span>{t("remoteApp.captureReason")}: {mediaDiagnostics.nativeFailure}</span>
+                )}
+                <span>{t("remoteApp.videoState")}: {videoRendered ? t("remoteApp.videoReady") :
+                  t("remoteApp.videoWaiting")}</span>
+                {everRendered && videoRef.current && (
+                  <span>{videoRef.current.videoWidth} × {videoRef.current.videoHeight}</span>
+                )}
+              </details>
+            </div>
+          )}
+        </div>
         {moreKeysOpen && (
           <div className="remote-app-extra-keys" aria-label={t("remoteApp.extraKeys")}>
             {([

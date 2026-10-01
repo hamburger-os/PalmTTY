@@ -37,7 +37,7 @@ The Workbench can switch among live Activities for the same Workspace without re
 
 ### Portrait-first Remote App presentation
 
-Remote Apps now prioritize the video surface over permanent controls. On phones the Workbench header fits one line; Git/Files live behind a reachable Tools toggle, and an immersive option hides the header without hiding the exit action. Pointer modes float inside the video, while the core key strip stays above mobile browser chrome and navigation keys open on demand.
+Remote Apps prioritize unobstructed video. On phones the Workbench header fits one line and Git/Files live behind Tools. Pointer modes, the persistent immersive toggle/exit and the options menu now sit in a compact strip **below** the video, immediately above the special-key dock; media diagnostics open from that menu instead of covering application menus. Immersive mode hides the header and removes its grid row, while keeping the exit button reachable below the video. The dock remains inside the current VisualViewport above mobile browser chrome, with navigation keys expanded on demand.
 
 View mode preserves browser pinch. Direct Touch and Trackpad modes claim only gestures beginning inside the active remote surface, using a bounded gesture state machine for single-finger move/tap and two-finger centroid scroll. A cancelled or partially lifted gesture never generates a phantom click. Video defaults to complete-window contain; optional cover fills the available area but crops edges with matching remote touch mapping.
 
@@ -49,7 +49,7 @@ In source mode, the native Windows Host is cached by the SHA-256 fingerprint of 
 
 ### Connection and capture diagnostics
 
-PalmTTY distinguishes these states and exposes received/submitted video-frame counts, conversion failures and browser decoded-frame readiness instead of treating an ICE connection as successful video:
+PalmTTY distinguishes these states and exposes received/submitted video-frame counts, conversion failures and browser decoded-frame readiness on demand in the options menu instead of treating an ICE connection as successful video. Initial loading covers only the empty surface; once the browser has decoded a frame, stale worker waiting states cannot recreate the waiting overlay. Subsequent stream interruptions use a non-blocking warning in the dock:
 
 - waiting for the PalmTTY-owned application window;
 - window found, waiting for a capturable frame;
@@ -109,7 +109,7 @@ App 画面提供三种显式模式：
 
 ### 面向手机竖屏的沉浸式交互
 
-远程 App 改为画面优先：手机工作区顶栏压缩为一行，Git/文件位于可展开的“工具”，沉浸模式隐藏顶栏但保留退出入口。操作模式浮于视频内；核心快捷键条始终位于 Safari 工具栏之上，方向键和删除键可以按需展开。
+远程 App 以不受遮挡的视频画面为核心：手机工作区顶栏压缩为一行，Git/文件位于可展开的“工具”。操作模式切换、沉浸进入/退出及选项菜单统一移到视频下方、快捷键栏上方；媒体诊断按需从选项中展开，不再常驻遮挡应用菜单。沉浸模式同时移除顶栏及其 Grid 行，底部退出按钮始终可见；整组控制栏位于 Safari 当前可视区域内，方向键和删除键按需展开。
 
 查看模式保留浏览器捏合；直触与触控板模式只接管从远程画面内开始的触摸。独立手势状态机区分单指移动/点击、双指中心滚动以及取消/部分抬起，避免误触。默认完整等比显示，裁切铺满作为显式可选操作，并同步修正触控映射。
 
@@ -121,7 +121,7 @@ App 画面提供三种显式模式：
 
 ### 连接与捕获诊断
 
-PalmTTY 会分别显示捕获状态、Worker 收到/成功提交视频帧计数、转换失败次数和浏览器是否真正显示首帧，而不是仅凭 WebRTC 已连接就宣称画面正常：
+PalmTTY 会分别管理捕获状态、Worker 收到/成功提交视频帧计数、转换失败次数和浏览器是否真正显示首帧，而不是仅凭 WebRTC 已连接就宣称画面正常。视频首帧出现后立即取消初始等待覆盖层；后续断流/卡帧使用底部非阻塞提示，详细诊断收纳在选项菜单中：
 
 - 等待 PalmTTY 持有的应用窗口；
 - 已找到窗口，等待第一帧；

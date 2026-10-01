@@ -1,4 +1,29 @@
 export type VideoFit = "contain" | "cover";
+export type RemoteAppVisualState = "waiting" | "playing" | "interrupted";
+
+/** A callback-capable Safari build is not necessarily delivering callbacks. */
+export function hasStalledVideoFrames(
+  callbackObserved: boolean, lastFrameAt: number, now: number
+): boolean {
+  return callbackObserved && lastFrameAt > 0 && now - lastFrameAt > 8000;
+}
+
+/** Safari can paint an attached live WebRTC frame before its video-frame callback fires. */
+export function hasPresentableVideoFrame(
+  liveTrack: boolean, sourceAttached: boolean, mediaReadyState: number,
+  videoWidth: number, videoHeight: number
+): boolean {
+  return liveTrack && sourceAttached && mediaReadyState >= 2 &&
+    videoWidth > 0 && videoHeight > 0;
+}
+
+/** Only browser-decoded frames can clear initial loading; hints and worker polling cannot. */
+export function remoteAppVisualState(
+  hasRenderedFrame: boolean, currentTrackRendered: boolean, hasPlaybackIssue: boolean
+): RemoteAppVisualState {
+  if (!hasRenderedFrame) return "waiting";
+  return currentTrackRendered && !hasPlaybackIssue ? "playing" : "interrupted";
+}
 export type Geometry = { left: number; top: number; width: number; height: number };
 export type DisplayBounds = { width: number; height: number };
 export type UnitPoint = { x: number; y: number };

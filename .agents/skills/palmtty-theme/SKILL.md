@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.11.0"
+  version: "1.12.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -67,7 +67,7 @@ A visual region has one surface owner. Do not stack equivalent glass surfaces me
 
 ### Immersive Remote App on phones
 
-The remote app video is the one visual owner of all available workbench content height. Overlay pointer mode controls and diagnostics must use semantic `--flat-modal` rather than opaque hard-coded palettes or permanent additional grid rows. The one-row mobile Workspace header can collapse into a Tools overlay; immersive mode retains an exit button inside the video. The bottom core key dock remains reachable inside VisualViewport above browser chrome, with an explicit expandable second row. Complete aspect-ratio display is default; cropped cover is optional and its pointer mapping must be adjusted without image stretching. Remote App native touch ownership must not steal xterm's independent gesture path.
+The remote app video is the one visual owner of all available workbench content height. The video surface has no persistent pointer-mode or diagnostic overlays: a compact control strip lives below the video and above the special-key dock, using semantic surfaces and the shared touch-target tokens. The one-row mobile Workspace header can collapse into a Tools overlay; immersive mode removes the header's grid row but keeps a labeled exit button in the bottom control strip. Media diagnostics live in the on-demand options menu; before the first decoded frame an initial status may cover the empty surface, and after a frame has rendered any connection/capture warning belongs in the dock, not over the remote application's controls. The entire dock remains reachable inside VisualViewport above browser chrome, with an explicit expandable second key row. Complete aspect-ratio display is default; cropped cover is optional and its pointer mapping must be adjusted without image stretching. Remote App native touch ownership must not steal xterm's independent gesture path.
 
 ## 4. Theme identity
 

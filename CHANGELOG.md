@@ -10,7 +10,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
-- Introduce portrait-first Remote App immersion: in-video mode/options, single-row phone header with on-demand Git/Files, optional full-window or cropped fill, opt-in bounded current-window resize, and a pinned expandable key dock.
+- Introduce portrait-first Remote App immersion: outside-video mode/options/diagnostics, single-row phone header with on-demand Git/Files, optional full-window or cropped fill, opt-in bounded current-window resize, and a pinned expandable key dock.
 - Add independent two-finger centroid gesture tests and detection of video stalls after first-frame success.
 
 - Detect current-user Microsoft Store/MSIX apps by registered AUMID with a typed Win32/packaged launch model; packaged activation verifies a fresh PID, exact package family and mandatory PalmTTY Job ownership before remote control.
@@ -21,6 +21,8 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - Add mobile Remote App View / direct-touch / trackpad modes, two-finger scrolling, special keys, Unicode text/IME/dictation input, automatic viewport/DPR capture sizing and explicit capture/network diagnostics.
 
 ### Changed
+
+- Stabilize phone Remote App layout and media status: scope homepage section spacing, allocate the full content row in immersive mode, dismiss initial waiting UI after the browser's first decoded frame (including Safari media-readiness fallback), and show later stream warnings without blocking application controls.
 
 - Consolidate reviewed toolchain upgrades (TypeScript 7, Vitest 5, Vite 8) and current tsx/@fastify/static/ws patches under one consistent pnpm lockfile while keeping Node.js 22 typings and runtime aligned.
 

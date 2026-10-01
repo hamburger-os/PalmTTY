@@ -89,6 +89,7 @@ const mainSource = await readFile(mainPath, "utf8");
 const indexHtml = await readFile(indexHtmlPath, "utf8");
 const styles = (await readFile(stylesPath, "utf8")).replaceAll("\r\n", "\n");
 const workspaceWorkbench = await readFile(workspaceWorkbenchPath, "utf8");
+const remoteAppView = await readFile(path.join(webSource, "RemoteAppView.tsx"), "utf8");
 const workspaceDialog = await readFile(workspaceDialogPath, "utf8");
 const gitPane = await readFile(gitPanePath, "utf8");
 const filesPane = await readFile(filesPanePath, "utf8");
@@ -246,6 +247,22 @@ if (
   failures.push(
     "apps/web/src/visual-viewport.ts [mobile-viewport-contract] zoom level must not disable visible-viewport framing"
   );
+}
+
+// Remote App video and controls must never inherit a global section margin or collapse in immersive mode.
+if (/^section\s*\{/m.test(styles) || !styles.includes(".app-shell > section {")) {
+  failures.push("apps/web/src/styles.css [remote-app-spacing] unscoped section margin");
+}
+if (!/\.workbench-page\.is-remote-app\.remote-app-immersive\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);/.test(styles)) {
+  failures.push("apps/web/src/styles.css [remote-app-immersive] missing single-row content grid");
+}
+if (!remoteAppView.includes('className="remote-app-dock"') ||
+    !remoteAppView.includes('className="remote-app-toolbar glass-panel"') ||
+    !remoteAppView.includes('visualState === "waiting"') ||
+    !remoteAppView.includes('visualState === "interrupted"') ||
+    remoteAppView.includes('className="remote-app-waiting"') ||
+    !remoteAppView.includes('<details className="remote-app-diagnostics">')) {
+  failures.push("apps/web/src/RemoteAppView.tsx [remote-app-video-first] loading states or dock controls regressed");
 }
 
 if (!visualViewport.includes("return null;")) {
