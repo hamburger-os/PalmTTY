@@ -69,6 +69,8 @@ export function WorkspaceWorkbench({
     ? "terminal"
     : "remoteApp";
   const [pane, setPane] = useState<WorkbenchPane>(initialPane);
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
+  const [appImmersive, setAppImmersive] = useState(false);
   const [terminalConnection, setTerminalConnection] =
     useState<ConnectionState>("connecting");
   const [appConnection, setAppConnection] =
@@ -84,10 +86,18 @@ export function WorkspaceWorkbench({
 
   useEffect(() => {
     setPane(activity.kind === "terminal" ? "terminal" : "remoteApp");
+    setMobileToolsOpen(false);
+    setAppImmersive(false);
   }, [
     activity.kind,
     activity.kind === "terminal" ? activity.sessionId : activity.session.id
   ]);
+
+  useEffect(() => {
+    const remoteActive = activity.kind === "remoteApp" && pane === "remoteApp";
+    if (remoteActive) document.body.classList.add("remote-app-active");
+    return () => document.body.classList.remove("remote-app-active");
+  }, [activity.kind, pane]);
 
   const terminalConnectionChanged = useCallback((next: ConnectionState) => {
     setTerminalConnection(next);
@@ -175,7 +185,11 @@ export function WorkspaceWorkbench({
     : appConnection;
 
   return (
-    <main ref={workbenchRef} className="workbench-page">
+    <main ref={workbenchRef}
+      className={"workbench-page" +
+        (activity.kind === "remoteApp" && pane === "remoteApp"
+          ? " is-remote-app" + (appImmersive ? " remote-app-immersive" : "")
+          : "")}>
       <header className="workbench-header glass-panel">
         <div className="workbench-leading">
           <button
@@ -215,7 +229,7 @@ export function WorkspaceWorkbench({
         </div>
 
         <nav
-          className="workbench-tabs"
+          className={"workbench-tabs" + (mobileToolsOpen ? " mobile-open" : "")}
           role="tablist"
           aria-label={t("workbench.views")}
         >
@@ -229,6 +243,8 @@ export function WorkspaceWorkbench({
               onClick={() => {
                 if (item === "git") setGitHistoryPath(undefined);
                 setPane(item);
+                setMobileToolsOpen(false);
+                if (item !== "remoteApp") setAppImmersive(false);
               }}
             >
               {t(`workbench.${item}`)}
@@ -237,6 +253,14 @@ export function WorkspaceWorkbench({
         </nav>
 
         <div className="workbench-actions">
+          {activity.kind === "remoteApp" && (
+            <button type="button" className="ghost compact mobile-app-tools"
+              aria-label={t("workbench.tools")}
+              aria-expanded={mobileToolsOpen}
+              onClick={() => setMobileToolsOpen((open) => !open)}>
+              {t("workbench.tools")}
+            </button>
+          )}
           {restartError && (
             <span className="workbench-error" title={restartError}>
               {restartError}
@@ -280,6 +304,8 @@ export function WorkspaceWorkbench({
               session={activity.session}
               capabilities={appCapabilities}
               active={pane === "remoteApp"}
+              immersive={appImmersive}
+              onImmersiveChange={setAppImmersive}
               onConnectionChange={appConnectionChanged}
             />
           </div>
