@@ -58,74 +58,74 @@ internal static class PalmTTYRemoteAppHost
     private sealed class AppConfig
     {
         [DataMember(Name = "executable", IsRequired = true)]
-        public string Executable;
+        public string Executable { get; set; }
 
         [DataMember(Name = "cwd", IsRequired = true)]
-        public string Cwd;
+        public string Cwd { get; set; }
 
         [DataMember(Name = "args", IsRequired = true)]
-        public string[] Args;
+        public string[] Args { get; set; }
 
         [DataMember(Name = "frameRate", IsRequired = true)]
-        public int FrameRate;
+        public int FrameRate { get; set; }
 
         [DataMember(Name = "maxWidth", IsRequired = true)]
-        public int MaxWidth;
+        public int MaxWidth { get; set; }
 
         [DataMember(Name = "maxHeight", IsRequired = true)]
-        public int MaxHeight;
+        public int MaxHeight { get; set; }
     }
 
     [DataContract]
     private sealed class ControlMessage
     {
         [DataMember(Name = "type")]
-        public string Type;
+        public string Type { get; set; }
 
         [DataMember(Name = "action")]
-        public string Action;
+        public string Action { get; set; }
 
         [DataMember(Name = "x")]
-        public double X;
+        public double X { get; set; }
 
         [DataMember(Name = "y")]
-        public double Y;
+        public double Y { get; set; }
 
         [DataMember(Name = "dx")]
-        public double Dx;
+        public double Dx { get; set; }
 
         [DataMember(Name = "dy")]
-        public double Dy;
+        public double Dy { get; set; }
 
         [DataMember(Name = "button")]
-        public int Button;
+        public int Button { get; set; }
 
         [DataMember(Name = "deltaX")]
-        public double DeltaX;
+        public double DeltaX { get; set; }
 
         [DataMember(Name = "deltaY")]
-        public double DeltaY;
+        public double DeltaY { get; set; }
 
         [DataMember(Name = "key")]
-        public string Key;
+        public string Key { get; set; }
 
         [DataMember(Name = "code")]
-        public string Code;
+        public string Code { get; set; }
 
         [DataMember(Name = "ctrl")]
-        public bool Ctrl;
+        public bool Ctrl { get; set; }
 
         [DataMember(Name = "alt")]
-        public bool Alt;
+        public bool Alt { get; set; }
 
         [DataMember(Name = "shift")]
-        public bool Shift;
+        public bool Shift { get; set; }
 
         [DataMember(Name = "meta")]
-        public bool Meta;
+        public bool Meta { get; set; }
 
         [DataMember(Name = "text")]
-        public string Text;
+        public string Text { get; set; }
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -143,8 +143,8 @@ internal static class PalmTTYRemoteAppHost
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT
     {
-        public int X;
-        public int Y;
+        public int X { get; set; }
+        public int Y { get; set; }
     }
 
     [StructLayout(LayoutKind.Sequential)]
