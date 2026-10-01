@@ -855,6 +855,14 @@ button.directory-choose {
   overscroll-behavior: none;
 }
 
+.workbench-page.is-remote-app.remote-app-immersive {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.workbench-page.is-remote-app.remote-app-immersive .workbench-header {
+  display: none;
+}
+
 .workbench-page.has-visual-viewport-frame {
   position: fixed;
   top: var(--workbench-visual-top);
@@ -2424,10 +2432,6 @@ body.remote-app-active { overflow: hidden; }
   }
   .workbench-page.is-remote-app .mobile-app-tools { display: inline-flex; }
   .workbench-page.is-remote-app .workbench-actions { gap: 4px; }
-  .workbench-page.is-remote-app.remote-app-immersive {
-    grid-template-rows: minmax(0, 1fr);
-  }
-  .workbench-page.is-remote-app.remote-app-immersive .workbench-header { display: none; }
 }
 
 @media (orientation: landscape) and (max-height: 520px) {

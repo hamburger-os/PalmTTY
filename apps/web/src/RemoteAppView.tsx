@@ -753,7 +753,7 @@ export function RemoteAppView({
               title={immersive ? t("remoteApp.exitImmersive") : t("remoteApp.immersive")}
               aria-pressed={immersive}
               onClick={() => { setOptionsOpen(false); onImmersiveChange(!immersive); }}>
-              {immersive ? "↙" : "⛶"}
+              {immersive ? t("remoteApp.exitShort") : "⛶"}
             </button>
             <button type="button" className="ghost compact remote-app-options-trigger"
               aria-label={t("remoteApp.options")}

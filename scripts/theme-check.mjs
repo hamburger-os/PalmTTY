@@ -253,7 +253,7 @@ if (
 if (/^section\s*\{/m.test(styles) || !styles.includes(".app-shell > section {")) {
   failures.push("apps/web/src/styles.css [remote-app-spacing] unscoped section margin");
 }
-if (!styles.includes(".workbench-page.is-remote-app.remote-app-immersive {\n    grid-template-rows: minmax(0, 1fr);")) {
+if (!/\.workbench-page\.is-remote-app\.remote-app-immersive\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);/.test(styles)) {
   failures.push("apps/web/src/styles.css [remote-app-immersive] missing single-row content grid");
 }
 if (!remoteAppView.includes('className="remote-app-dock"') ||
