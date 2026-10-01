@@ -289,6 +289,7 @@ if (!remoteAppView.includes('className="remote-app-dock"') ||
     !remoteAppView.includes('onCompositionEnd=') ||
     !remoteAppLiveKeyboard.includes('shouldCommitRemoteLiveText(') ||
     !styles.includes('.remote-app-live-keyboard textarea {') ||
+    !styles.includes('bottom: calc(var(--touch-target) + var(--touch-target) + 12px);') ||
     !remoteAppView.includes('className="remote-app-extra-keys glass-panel"') ||
     !remoteAppView.includes('ref={cursorOverlayRef}') ||
     !remoteAppView.includes('queueRelativeMotion(relative)') ||

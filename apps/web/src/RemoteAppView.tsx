@@ -773,6 +773,7 @@ export function RemoteAppView({
     flushSync(() => {
       setKeyboardOpen(true);
       setTextOpen(false);
+      setMoreKeysOpen(false);
       setOptionsOpen(false);
     });
     // Must happen in the actual tap callback for iOS Safari's soft keyboard.
@@ -789,6 +790,7 @@ export function RemoteAppView({
     flushSync(() => {
       setKeyboardOpen(false);
       setTextOpen(true);
+      setMoreKeysOpen(false);
       setOptionsOpen(false);
     });
     longTextRef.current?.focus({ preventScroll: true });
