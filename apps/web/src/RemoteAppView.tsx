@@ -27,7 +27,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteAppKeybar } from "./RemoteAppKeybar.js";
-import { remoteAppLiveKeyboardKey } from "./remote-app-live-keyboard.js";
+import { remoteAppLiveKeyboardKey, shouldCommitRemoteLiveText } from "./remote-app-live-keyboard.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
 import { RemoteCursorPreview, REMOTE_CURSOR_RECONCILE_DELAY_MS } from "./remote-app-cursor-preview.js";
 import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta, remoteAdaptedVideoFit, type VideoFit } from "./remote-app-presentation.js";
@@ -753,6 +753,7 @@ export function RemoteAppView({
       setText((current) => current ? current + "\n" + draft : draft);
       keyboardDraftRef.current = "";
       setKeyboardDraft("");
+      setTextOpen(true);
     }
     setKeyboardOpen(false);
   };
@@ -1052,8 +1053,11 @@ export function RemoteAppView({
               const value = event.currentTarget.value;
               keyboardDraftRef.current = value;
               setKeyboardDraft(value);
-              if (!keyboardComposingRef.current && !event.nativeEvent.isComposing)
-                commitLiveKeyboardText(value);
+              if (shouldCommitRemoteLiveText(
+                keyboardComposingRef.current,
+                (event.nativeEvent as InputEvent).isComposing === true,
+                keyboardFlushFrameRef.current !== null
+              )) commitLiveKeyboardText(value);
             }}
             onCompositionStart={() => { keyboardComposingRef.current = true; }}
             onCompositionEnd={() => {

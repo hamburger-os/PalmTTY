@@ -7,6 +7,13 @@ const liveKeys = new Set([
   "Home", "End", "PageUp", "PageDown"
 ]);
 
+/** Do not submit a half-formed iOS/Chinese composition or its final duplicate. */
+export function shouldCommitRemoteLiveText(
+  composing: boolean, nativeComposing: boolean, finalCompositionPending: boolean
+): boolean {
+  return !composing && !nativeComposing && !finalCompositionPending;
+}
+
 export function remoteAppLiveKeyboardKey(key: string): string | null {
   return liveKeys.has(key) ? key : null;
 }
