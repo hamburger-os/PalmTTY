@@ -679,6 +679,7 @@ internal static class PalmTTYRemoteAppHost
     {
         int delay = Math.Max(66, 1000 / config.FrameRate);
         int captureFailures = 0;
+        bool streaming = false;
         while (!Stopping)
         {
             try
@@ -688,14 +689,19 @@ internal static class PalmTTYRemoteAppHost
                 if (!TryResolveOwnedWindow(out hwnd, out rect))
                 {
                     captureFailures = 0;
+                    streaming = false;
                     PublishMediaState("waiting-for-window");
                 }
                 else
                 {
-                    PublishMediaState("waiting-for-frame");
+                    if (!streaming && captureFailures == 0)
+                    {
+                        PublishMediaState("waiting-for-frame");
+                    }
                     if (CaptureWindow(hwnd, rect, CaptureMaxWidth, CaptureMaxHeight))
                     {
                         captureFailures = 0;
+                        streaming = true;
                         PublishMediaState("streaming");
                     }
                     else
@@ -703,6 +709,7 @@ internal static class PalmTTYRemoteAppHost
                         captureFailures += 1;
                         if (captureFailures >= Math.Max(8, config.FrameRate * 2))
                         {
+                            streaming = false;
                             PublishMediaState("capture-unavailable");
                         }
                     }
@@ -713,6 +720,7 @@ internal static class PalmTTYRemoteAppHost
                 captureFailures += 1;
                 if (captureFailures >= Math.Max(8, config.FrameRate * 2))
                 {
+                    streaming = false;
                     PublishMediaState("capture-unavailable");
                 }
             }
