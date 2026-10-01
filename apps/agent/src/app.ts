@@ -34,9 +34,9 @@ import { SessionArtifactStore } from "./session-artifacts.js";
 import { SessionManager, type SessionManagerOptions } from "./session-manager.js";
 import {
   detectRuntimeCapabilities,
-  resolveExecutable,
   resolveRuntimeWorkspace
 } from "./workspace-runtime.js";
+import { validateRemoteAppProfiles } from "./remote-app-launch.js";
 import {
   FileWorkspaceStore,
   type WorkspaceStore
@@ -146,24 +146,8 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   async function validateWorkspaceLaunchTargets(
     workspace: ReturnType<typeof WorkspaceDefinitionSchema.parse>
   ): Promise<void> {
-    const runtime = await resolveRuntimeWorkspace(workspace);
-    if (workspace.remoteApps.length === 0) return;
-    if (workspace.runtime.kind !== "host") {
-      throw new Error("Remote Apps require a Host workspace");
-    }
-    for (const profile of workspace.remoteApps) {
-      try {
-        await resolveExecutable(profile.executable, {
-          cwd: runtime.cwd,
-          env: runtime.env
-        });
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        throw new Error(
-          `Remote App "${profile.name}" is not launchable: ${detail}`
-        );
-      }
-    }
+    await resolveRuntimeWorkspace(workspace);
+    await validateRemoteAppProfiles(workspace);
   }
 
   async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
