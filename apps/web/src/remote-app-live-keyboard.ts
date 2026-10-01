@@ -72,6 +72,7 @@ export class RemoteLiveInputQueue {
   flush(send: (message: RemoteAppControlMessage) => boolean): boolean {
     while (this.pending.length) {
       const item = this.pending[0];
+      if (!item) break;
       const message: RemoteAppControlMessage = item.kind === "text"
         ? { type: "text", text: item.text }
         : { type: "keyRepeat", key: item.key, count: item.count };
