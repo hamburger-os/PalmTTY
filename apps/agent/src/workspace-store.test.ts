@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -62,12 +62,10 @@ describe("workspace store", () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "palmtty-workspaces-"));
     tempDirs.add(directory);
     const filePath = path.join(directory, "workspaces.json");
-    await import("node:fs/promises").then(({ writeFile }) =>
-      writeFile(filePath, JSON.stringify({
-        version: 1,
-        workspaces: []
-      }))
-    );
+    await writeFile(filePath, JSON.stringify({
+      version: 1,
+      workspaces: []
+    }));
     const store = new FileWorkspaceStore(filePath);
     await expect(store.initialize()).rejects.toThrow();
   });
