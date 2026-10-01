@@ -38,7 +38,7 @@ function hostWorkspace(
     id,
     name: "Node",
     cwd,
-    runtime: { kind: "host", shell, args: ["--version"] },
+    terminal: { runtime: { kind: "host", shell, args: ["--version"] } },
     remoteApps: []
   };
 }
@@ -212,10 +212,12 @@ describe("workspace runtime resolution", () => {
       id: "wsl-only",
       name: "WSL only",
       cwd: "/home/dev/project",
-      runtime: {
-        kind: "wsl",
-        distribution: "Ubuntu",
-        args: []
+      terminal: {
+        runtime: {
+          kind: "wsl",
+          distribution: "Ubuntu",
+          args: []
+        }
       },
       remoteApps: []
     })).rejects.toThrow(
@@ -228,11 +230,13 @@ describe("workspace runtime resolution", () => {
       id: "ubuntu",
       name: "Ubuntu",
       cwd: "/home/dev/project with spaces",
-      runtime: {
-        kind: "wsl",
-        distribution: "Ubuntu-24.04",
-        shell: "/bin/bash",
-        args: ["-l"]
+      terminal: {
+        runtime: {
+          kind: "wsl",
+          distribution: "Ubuntu-24.04",
+          shell: "/bin/bash",
+          args: ["-l"]
+        }
       },
       remoteApps: []
     };
@@ -253,10 +257,12 @@ describe("workspace runtime resolution", () => {
       id: "ubuntu-default",
       name: "Ubuntu",
       cwd: "/home/dev/project",
-      runtime: {
-        kind: "wsl",
-        distribution: "Ubuntu-24.04",
-        args: []
+      terminal: {
+        runtime: {
+          kind: "wsl",
+          distribution: "Ubuntu-24.04",
+          args: []
+        }
       },
       remoteApps: []
     };
