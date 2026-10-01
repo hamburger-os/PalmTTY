@@ -136,3 +136,10 @@ Release 现在把“可安装软件”而不是源码 tag 作为最终交付物�
 5. 不把测试、安全审计或文档同步当成可选项；
 6. Ruleset 或 Repository Settings 的实际状态变化后，同步更新本文档与 `docs/ai/current-state.md`；
 7. 不新增“所有 PR 必须人工 approval”的要求，除非项目所有者以后明确改变治理策略。
+
+
+## 依赖更新和 Windows CI 可靠性（2026-10）
+
+运行基线仍是 Node.js 22（CI、安装包、release 三方一致），`@types/node` 主版本不得领先于受支持的运行环境；Dependabot 仅继续提交 Node 22 类型补丁。TypeScript、Vite、Vitest 等主版本升级需要在最新 `main` 上逐个验证 Windows/Ubuntu CI、安装包真实 smoke、安全审计及 CodeQL，不能将过时 PR 的绿灯当作最新验证。
+
+Windows 原生进程和病毒扫描程序可能在子进程退出后短暂占用临时目录。生命周期测试应等待脱离 Job 的子 Worker 结束，安装包 smoke 应等待 Agent 的 `close`（而不只是 `exit`），删除临时目录采用有限重试；有限重试之后只对 Windows 明确的临时锁错误发出告警，不以环境清理竞争否决已经验证的产品行为。

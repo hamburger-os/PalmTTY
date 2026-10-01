@@ -190,6 +190,10 @@ Windows Host 的启动阶段为 `validate-profile → create-job → activate-ms
 
 浏览器 display hint 继续按同一比例因子缩放宽高；显式 `adaptWindow` 只可尝试调整当前 Job-owned HWND 的尺寸，关闭或 Helper 退出时恢复原尺寸，不得选择其他窗口或桌面。深色 UI 在两种 PrintWindow 模式下均为黑色时标记诊断歧义并继续发送帧；不能把颜色采样当成确定的捕获失败。Windows Graphics Capture 仍未完成独立的真实设备安全验收。
 
+## Windows 原生 Host 更新
+
+已安装版本始终使用与发行包一起构建的 `bin/palmtty-remote-app-host.exe`。源码模式按 Windows Host C# 源码内容及编译参数计算 SHA-256 指纹，编译到当前用户私有 runtime 下带指纹的独立 EXE。源码更新后重新启动 Agent 并打开新的 App Session 会自动重新编译新 Helper，旧的独立 AppWorker 不因源码更新被强行中断。编译使用与指纹相同的临时源码快照，并以原子重命名发布；失败后下次创建 App Session 可重试，不会继续静默复用旧固定名称的 Host。
+
 ## 当前限制
 
 - Remote App runtime 只实现 Windows x64；
