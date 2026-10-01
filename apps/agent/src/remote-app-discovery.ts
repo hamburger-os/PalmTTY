@@ -96,8 +96,8 @@ const WINDOWS_DISCOVERY_SCRIPT = [
   "$shell = New-Object -ComObject WScript.Shell",
   "foreach ($menu in $menus) {",
   "  if (-not (Test-Path -LiteralPath $menu)) { continue }",
-  "  Get-ChildItem -LiteralPath $menu -Filter '*.lnk' -Recurse -File",
-  "    -ErrorAction SilentlyContinue | Select-Object -First 128 | ForEach-Object {",
+  "  Get-ChildItem -LiteralPath $menu -Filter '*.lnk' -Recurse -File -ErrorAction SilentlyContinue |",
+  "    Select-Object -First 128 | ForEach-Object {",
   "      if ($results.Count -ge 64) { return }",
   "      try {",
   "        $link = $shell.CreateShortcut($_.FullName)",
@@ -144,6 +144,7 @@ export function parseInstalledAppDiscovery(value: unknown): RemoteAppCatalogEntr
     if (
       typeof record.name !== "string" ||
       typeof record.executable !== "string" ||
+      record.name.trim().length === 0 ||
       !/^[A-Za-z]:\\/.test(record.executable) ||
       path.win32.extname(record.executable).toLowerCase() !== ".exe" ||
       record.executable.length > 4096
