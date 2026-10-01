@@ -2160,7 +2160,7 @@ button.settings-list-row:hover:not(:disabled),
   outline: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--terminal-background);
+  background: var(--terminal-background, #0c1117);
   overscroll-behavior: contain;
   user-select: none;
   -webkit-user-select: none;
@@ -2188,7 +2188,7 @@ button.settings-list-row:hover:not(:disabled),
   display: block;
   object-fit: contain;
   pointer-events: none;
-  background: var(--terminal-background);
+  background: var(--terminal-background, #0c1117);
 }
 
 .remote-app-quality {
@@ -2210,7 +2210,37 @@ button.settings-list-row:hover:not(:disabled),
   transform: translate(-50%, -50%);
   border-radius: var(--radius-md);
   text-align: center;
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+.remote-app-status-overlay button { pointer-events: auto; }
+
+.remote-app-diagnostics {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: min(280px, calc(100% - 16px));
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--flat-modal);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+.remote-app-diagnostics:not([open]) { width: auto; }
+.remote-app-diagnostics summary { cursor: pointer; }
+.remote-app-diagnostics span { display: block; padding-top: 5px; overflow-wrap: anywhere; }
+.remote-app-waiting {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
 }
 
 .remote-app-status-overlay span {
