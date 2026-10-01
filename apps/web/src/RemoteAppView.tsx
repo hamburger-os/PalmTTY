@@ -747,7 +747,12 @@ export function RemoteAppView({
     }
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    if (!touchpad.current.active) cursorPreviewRef.current.begin();
+    if (touchpad.current.active) {
+      // Finish single-finger motion before a second finger switches to scroll.
+      flushRelativeMotion();
+    } else {
+      cursorPreviewRef.current.begin();
+    }
     touchpad.current.down(
       event.pointerId,
       normalizedPoint(event.currentTarget, event.clientX, event.clientY)
