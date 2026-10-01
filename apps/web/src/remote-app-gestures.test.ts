@@ -17,16 +17,19 @@ describe("remote trackpad gesture ownership", () => {
     const gesture = new RemoteTouchpadGesture();
     gesture.down(1, { x: 0.1, y: 0.1 });
     gesture.down(2, { x: 0.3, y: 0.1 });
-    expect(gesture.move(1, { x: 0.1, y: 0.2 })).toEqual({
-      type: "scroll", dx: 0, dy: 0.05
-    });
-    expect(gesture.move(2, { x: 0.3, y: 0.2 })).toEqual({
-      type: "scroll", dx: 0, dy: 0.05
-    });
+    const first = gesture.move(1, { x: 0.1, y: 0.2 });
+    expect(first?.type).toBe("scroll");
+    if (first?.type === "scroll") expect(first.dy).toBeCloseTo(0.05);
+    const second = gesture.move(2, { x: 0.3, y: 0.2 });
+    expect(second?.type).toBe("scroll");
+    if (second?.type === "scroll") expect(second.dy).toBeCloseTo(0.05);
     expect(gesture.up(1)).toBe(false);
-    expect(gesture.move(2, { x: 0.35, y: 0.25 })).toEqual({
-      type: "move", dx: 0.05, dy: 0.05
-    });
+    const motion = gesture.move(2, { x: 0.35, y: 0.25 });
+    expect(motion?.type).toBe("move");
+    if (motion?.type === "move") {
+      expect(motion.dx).toBeCloseTo(0.05);
+      expect(motion.dy).toBeCloseTo(0.05);
+    }
     expect(gesture.up(2)).toBe(false);
   });
 

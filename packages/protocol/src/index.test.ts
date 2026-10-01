@@ -127,16 +127,25 @@ describe("protocol", () => {
     expect(RemoteAppControlMessageSchema.parse({
       type: "display",
       width: 844,
-      height: 390
+      height: 390,
+      adaptWindow: true
     })).toEqual({
       type: "display",
       width: 844,
-      height: 390
+      height: 390,
+      adaptWindow: true
     });
     expect(() => RemoteAppControlMessageSchema.parse({
       type: "display",
       width: 4000,
-      height: 390
+      height: 390,
+      adaptWindow: false
+    })).toThrow();
+    expect(() => RemoteAppControlMessageSchema.parse({
+      type: "display",
+      width: 844,
+      height: 390,
+      adaptWindow: "true"
     })).toThrow();
     expect(RemoteAppCapabilitiesSchema.parse({
       supported: true,

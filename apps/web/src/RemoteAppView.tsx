@@ -191,7 +191,6 @@ export function RemoteAppView({
   const touchpad = useRef(new RemoteTouchpadGesture());
   const connectedAt = useRef<number | null>(null);
   const activePointers = useRef(new Map<number, Point>());
-  const pointerMoved = useRef(false);
   const connectionChangeRef = useRef(onConnectionChange);
 
   useEffect(() => {
