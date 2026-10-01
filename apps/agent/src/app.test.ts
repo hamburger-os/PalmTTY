@@ -104,6 +104,48 @@ describe("HTTP security boundary", () => {
     await app.close();
   });
 
+  it("keeps authenticated Remote App ICE capabilities out of caches", async () => {
+    process.env.PALMTTY_TEST_TOKEN = TOKEN;
+    const config = parseConfig({
+      server: {
+        port: 7688,
+        exposure: { mode: "local" }
+      },
+      auth: {
+        enabled: true,
+        tokenEnv: "PALMTTY_TEST_TOKEN",
+        sessionTtlMinutes: 60
+      },
+      remoteApps: {
+        webrtc: {
+          iceServers: [{
+            urls: ["turns:relay.example.test:5349"],
+            username: "palmtty",
+            credential: "secret"
+          }]
+        }
+      }
+    });
+    const app = await buildTestApp(config);
+    const cookie = await loginCookie(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/remote-apps/capabilities",
+      headers: { cookie }
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(response.json()).toMatchObject({
+      iceServers: [{
+        urls: ["turns:relay.example.test:5349"],
+        username: "palmtty",
+        credential: "secret"
+      }],
+      relayConfigured: true
+    });
+    await app.close();
+  });
+
   it("creates an HttpOnly SameSite login session for a trusted origin", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
     const app = await buildTestApp();
