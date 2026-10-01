@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.16.0"
+  version: "1.17.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -204,4 +204,4 @@ Use `.glass-panel` for both the primary and extended Remote App key docks, never
 
 ### Lightweight Remote App pointer rendering
 
-The bottommost Remote App special-key dock places Text first. The top Options menu should only contain display/cropping, explicit current-window resizing, quality and diagnostics; do not duplicate the text entry there. Mouse positions must use a small pointer-events-none SVG with the existing theme fill/outline and exact contain/cover projection; update its transform imperatively in a scheduled animation frame rather than rerendering the large video/workbench React subtree on each cursor report. Optimistic pointer display is permitted only for locally sent, bounded mouse movement and must reconcile with verified native coordinates. Native off-window/peer reset must hide it without continuing stale prediction. Never tie pointer telemetry sampling to PrintWindow frame rate or expand owned-window authority.
+Both Terminal and Remote App key docks render the same shared Keyboard then Long Text primary actions first; only afterward come mode-specific shortcut/modifier keys. On iPhone the Remote App Keyboard must synchronously focus a separate 16px live input on the originating tap and must never send partial/duplicated IME commits. Long Text remains a deliberate-send composer with draft recovery. The top Options menu should only contain display/cropping, explicit current-window resizing, quality and diagnostics; do not duplicate the text entry there. Mouse positions must use a small pointer-events-none SVG with the existing theme fill/outline and exact contain/cover projection; update its transform imperatively in a scheduled animation frame rather than rerendering the large video/workbench React subtree on each cursor report. Optimistic pointer display is permitted only for locally sent, bounded mouse movement and must reconcile with verified native coordinates. Native off-window/peer reset must hide it without continuing stale prediction. Never tie pointer telemetry sampling to PrintWindow frame rate or expand owned-window authority.
