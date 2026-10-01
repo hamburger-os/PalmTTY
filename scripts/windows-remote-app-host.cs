@@ -123,6 +123,9 @@ internal static class PalmTTYRemoteAppHost
         [DataMember(Name = "key")]
         public string Key { get; set; }
 
+        [DataMember(Name = "count")]
+        public int Count { get; set; }
+
         [DataMember(Name = "code")]
         public string Code { get; set; }
 
@@ -1475,7 +1478,10 @@ internal static class PalmTTYRemoteAppHost
 
         if (message.Type == "text")
         {
-            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd)
+            // An already-foreground owned app must keep its actual focused
+            // child edit control. Repeated SetFocus(hwnd) breaks text editing.
+            if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
+                GetForegroundWindow() != hwnd)
             {
                 PublishInputState("blocked");
                 return;
@@ -1484,9 +1490,22 @@ internal static class PalmTTYRemoteAppHost
             return;
         }
 
+        if (message.Type == "keyRepeat")
+        {
+            if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
+                GetForegroundWindow() != hwnd)
+            {
+                PublishInputState("blocked");
+                return;
+            }
+            SendRepeatedEditKey(message);
+            return;
+        }
+
         if (message.Type == "key")
         {
-            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd)
+            if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
+                GetForegroundWindow() != hwnd)
             {
                 PublishInputState("blocked");
                 return;
@@ -1607,6 +1626,25 @@ internal static class PalmTTYRemoteAppHost
         {
             inputs.Add(UnicodeInput(character, false));
             inputs.Add(UnicodeInput(character, true));
+        }
+        SendInputs(inputs.ToArray());
+    }
+
+    // All repeat requests are validated in the typed browser protocol and
+    // revalidated at the native trust boundary. One SendInput call preserves
+    // down/up ordering without repeatedly activating or refocusing the HWND.
+    private static void SendRepeatedEditKey(ControlMessage message)
+    {
+        if (message.Count < 1 || message.Count > 32) return;
+        ushort vk;
+        if (String.Equals(message.Key, "Backspace", StringComparison.Ordinal)) vk = 0x08;
+        else if (String.Equals(message.Key, "Delete", StringComparison.Ordinal)) vk = 0x2e;
+        else return;
+        List<INPUT> inputs = new List<INPUT>(message.Count * 2);
+        for (int i = 0; i < message.Count; i++)
+        {
+            inputs.Add(VirtualKeyInput(vk, false));
+            inputs.Add(VirtualKeyInput(vk, true));
         }
         SendInputs(inputs.ToArray());
     }
