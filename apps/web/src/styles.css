@@ -2160,7 +2160,7 @@ button.settings-list-row:hover:not(:disabled),
   outline: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--terminal-background, #0c1117);
+  background: var(--remote-video-background);
   overscroll-behavior: contain;
   user-select: none;
   -webkit-user-select: none;
@@ -2188,7 +2188,7 @@ button.settings-list-row:hover:not(:disabled),
   display: block;
   object-fit: contain;
   pointer-events: none;
-  background: var(--terminal-background, #0c1117);
+  background: var(--remote-video-background);
 }
 
 .remote-app-quality {
