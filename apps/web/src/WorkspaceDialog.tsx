@@ -44,7 +44,7 @@ function runtimeLabel(
   hostLabel: string,
   wslLabel: string
 ): string {
-  return workspace.runtime.kind === "wsl" ? wslLabel : hostLabel;
+  return workspace.terminal.runtime.kind === "wsl" ? wslLabel : hostLabel;
 }
 
 export function workspaceRuntimeSummary(
@@ -56,9 +56,9 @@ export function workspaceRuntimeSummary(
   }
 ): string {
   const runtime = runtimeLabel(workspace, labels.host, labels.wsl);
-  const shell = workspace.runtime.shell ?? labels.defaultShell;
-  if (workspace.runtime.kind === "wsl" && workspace.runtime.distribution) {
-    return workspace.runtime.distribution + " · " + shell;
+  const shell = workspace.terminal.runtime.shell ?? labels.defaultShell;
+  if (workspace.terminal.runtime.kind === "wsl" && workspace.terminal.runtime.distribution) {
+    return workspace.terminal.runtime.distribution + " · " + shell;
   }
   return runtime + " · " + shell;
 }
@@ -138,16 +138,16 @@ export function WorkspaceDialog({
   const [name, setName] = useState(workspace?.name ?? "");
   const [cwd, setCwd] = useState(workspace?.cwd ?? "");
   const [kind, setKind] = useState<"host" | "wsl">(
-    workspace?.runtime.kind ?? "host"
+    workspace?.terminal.runtime.kind ?? "host"
   );
   const [distribution, setDistribution] = useState(
-    workspace?.runtime.kind === "wsl"
-      ? workspace.runtime.distribution ?? ""
+    workspace?.terminal.runtime.kind === "wsl"
+      ? workspace.terminal.runtime.distribution ?? ""
       : ""
   );
-  const [shell, setShell] = useState(workspace?.runtime.shell ?? "");
+  const [shell, setShell] = useState(workspace?.terminal.runtime.shell ?? "");
   const [shellArgs, setShellArgs] = useState(
-    workspace?.runtime.args.join("\n") ?? ""
+    workspace?.terminal.runtime.args.join("\n") ?? ""
   );
   const [profiles, setProfiles] = useState<TerminalProfile[]>([]);
   const [profileChoice, setProfileChoice] = useState("detecting");
@@ -159,7 +159,7 @@ export function WorkspaceDialog({
   );
   const [environmentError, setEnvironmentError] = useState<string | null>(null);
   const [startupCommand, setStartupCommand] = useState(
-    workspace?.startupCommand ?? ""
+    workspace?.terminal.startupCommand ?? ""
   );
   const [remoteApps, setRemoteApps] = useState<RemoteAppProfile[]>(
     workspace?.remoteApps ?? []
@@ -332,10 +332,12 @@ export function WorkspaceDialog({
       name: name.trim(),
       cwd: cwd.trim(),
       environment: Object.keys(environment).length > 0 ? environment : undefined,
-      runtime: runtimeFromState(kind, distribution, shell, parsedShellArgs),
-      ...(startupCommand.trim()
-        ? { startupCommand: startupCommand.trim() }
-        : {}),
+      terminal: {
+        runtime: runtimeFromState(kind, distribution, shell, parsedShellArgs),
+        ...(startupCommand.trim()
+          ? { startupCommand: startupCommand.trim() }
+          : {})
+      },
       remoteApps
     };
     await onSave(input);
