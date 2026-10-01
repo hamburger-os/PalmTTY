@@ -272,6 +272,12 @@ export const RemoteAppControlMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("text"),
     text: z.string().min(1).max(16 * 1024)
   }).strict(),
+  // Coalesce only the two editing keys. Never expose arbitrary key repeat.
+  z.object({
+    type: z.literal("keyRepeat"),
+    key: z.enum(["Backspace", "Delete"]),
+    count: z.number().int().min(1).max(32)
+  }).strict(),
   z.object({
     type: z.literal("display"),
     width: z.number().int()

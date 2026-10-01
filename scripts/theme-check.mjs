@@ -288,8 +288,14 @@ if (!remoteAppView.includes('className="remote-app-dock"') ||
     !remoteAppView.includes('liveKeyboardRef.current?.focus') ||
     !remoteAppView.includes('onCompositionEnd=') ||
     !remoteAppLiveKeyboard.includes('shouldCommitRemoteLiveText(') ||
-    !styles.includes('.remote-app-live-keyboard textarea {') ||
-    !styles.includes('bottom: calc(var(--touch-target) + var(--touch-target) + 12px);') ||
+    !remoteAppLiveKeyboard.includes('class RemoteLiveInputQueue') ||
+    !remoteAppView.includes('onBeforeInput=') ||
+    !remoteAppView.includes('onInput=') ||
+    !remoteAppView.includes('keyboardQueueRef.current.enqueueDelete(') ||
+    !remoteAppView.includes('LIVE_KEYBOARD_SENTINEL') ||
+    !styles.includes('.remote-app-live-bridge {') ||
+    !styles.includes('opacity: 0.01;') ||
+    styles.includes('.remote-app-live-keyboard textarea {') ||
     !remoteAppView.includes('className="remote-app-extra-keys glass-panel"') ||
     !remoteAppView.includes('ref={cursorOverlayRef}') ||
     !remoteAppView.includes('queueRelativeMotion(relative)') ||

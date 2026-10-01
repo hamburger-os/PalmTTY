@@ -27,7 +27,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteAppKeybar } from "./RemoteAppKeybar.js";
-import { remoteAppLiveKeyboardKey, shouldCommitRemoteLiveText } from "./remote-app-live-keyboard.js";
+import { LIVE_KEYBOARD_SENTINEL, RemoteLiveInputQueue, remoteAppLiveKeyboardKey, shouldCommitRemoteLiveText } from "./remote-app-live-keyboard.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
 import { RemoteCursorPreview, REMOTE_CURSOR_RECONCILE_DELAY_MS } from "./remote-app-cursor-preview.js";
 import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta, remoteAdaptedVideoFit, type VideoFit } from "./remote-app-presentation.js";
@@ -145,7 +145,11 @@ export function RemoteAppView({
   const longTextRef = useRef<HTMLTextAreaElement>(null);
   const keyboardComposingRef = useRef(false);
   const keyboardFlushFrameRef = useRef<number | null>(null);
-  const keyboardDraftRef = useRef("");
+  const keyboardInputFrameRef = useRef<number | null>(null);
+  const keyboardRetryRef = useRef<number | null>(null);
+  const keyboardQueueRef = useRef(new RemoteLiveInputQueue());
+  const keyboardOverflowRef = useRef("");
+  const lastCompositionRef = useRef<{ text: string; at: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentTrackRef = useRef<MediaStreamTrack | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -160,7 +164,6 @@ export function RemoteAppView({
   const [alt, setAlt] = useState(false);
   const [shift, setShift] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const [keyboardDraft, setKeyboardDraft] = useState("");
   const [textOpen, setTextOpen] = useState(false);
   const [text, setText] = useState("");
   const [controlReady, setControlReady] = useState(false);
@@ -249,6 +252,11 @@ export function RemoteAppView({
   useEffect(() => () => {
     if (keyboardFlushFrameRef.current !== null)
       window.cancelAnimationFrame(keyboardFlushFrameRef.current);
+    if (keyboardInputFrameRef.current !== null)
+      window.cancelAnimationFrame(keyboardInputFrameRef.current);
+    if (keyboardRetryRef.current !== null)
+      window.clearTimeout(keyboardRetryRef.current);
+    keyboardQueueRef.current.clear();
     cancelRelativeMotion();
     if (cursorPaintFrameRef.current !== null)
       window.cancelAnimationFrame(cursorPaintFrameRef.current);
@@ -312,6 +320,31 @@ export function RemoteAppView({
       return false;
     }
   }, []);
+
+  const flushKeyboardQueue = useCallback(() => {
+    keyboardInputFrameRef.current = null;
+    const ok = keyboardQueueRef.current.flush((message) => {
+      const channel = channelRef.current;
+      if (!channel || channel.readyState !== "open" ||
+          channel.bufferedAmount > 32 * 1024) return false;
+      return send(message);
+    });
+    if (!ok && channelRef.current?.readyState === "open" &&
+        keyboardRetryRef.current === null) {
+      // Retain unsent words instead of dropping them under DataChannel load.
+      keyboardRetryRef.current = window.setTimeout(() => {
+        keyboardRetryRef.current = null;
+        if (keyboardInputFrameRef.current === null)
+          keyboardInputFrameRef.current = window.requestAnimationFrame(flushKeyboardQueue);
+      }, 40);
+    }
+    return ok;
+  }, [send]);
+
+  const scheduleKeyboardFlush = useCallback(() => {
+    if (keyboardInputFrameRef.current === null)
+      keyboardInputFrameRef.current = window.requestAnimationFrame(flushKeyboardQueue);
+  }, [flushKeyboardQueue]);
 
   // Coalesce high-frequency finger deltas to at most one WebRTC message
   // per animation frame. Down/up remain ordered after an explicit flush.
@@ -533,6 +566,7 @@ export function RemoteAppView({
       channel.onopen = () => {
         if (connection !== peer || controller.signal.aborted) return;
         setControlReady(true);
+        scheduleKeyboardFlush();
         sendDisplayHint();
       };
       channel.onclose = () => {
@@ -675,7 +709,8 @@ export function RemoteAppView({
       if (video) video.srcObject = null;
     };
   }, [attemptPlayback, capabilities?.iceServers, cancelRelativeMotion,
-      flushRelativeMotion, scheduleCursorPaint, send, sendDisplayHint, session.id]);
+      flushRelativeMotion, scheduleCursorPaint, scheduleKeyboardFlush,
+      send, sendDisplayHint, session.id]);
 
   useEffect(() => {
     if (!active) return;
@@ -732,27 +767,87 @@ export function RemoteAppView({
     scheduleCursorPaint();
   }, [active, mode, flushRelativeMotion, scheduleCursorPaint, send]);
 
-  const commitLiveKeyboardText = (value: string): boolean => {
-    if (!value) return true;
-    if (!send({ type: "text", text: value })) return false;
-    keyboardDraftRef.current = "";
-    setKeyboardDraft("");
-    return true;
+  const resetKeyboardAnchor = () => {
+    const field = liveKeyboardRef.current;
+    if (!field || keyboardComposingRef.current) return;
+    field.value = LIVE_KEYBOARD_SENTINEL;
+    field.setSelectionRange(field.value.length, field.value.length);
+  };
+
+  const queueKeyboardText = (value: string, fromComposition = false) => {
+    if (!value) return;
+    if (fromComposition) lastCompositionRef.current = { text: value, at: performance.now() };
+    if (keyboardOverflowRef.current || !keyboardQueueRef.current.enqueueText(value)) {
+      // Large paste or exhausted input budget: retain it for explicit sending.
+      keyboardOverflowRef.current += value;
+      setInputBlocked(true);
+      return;
+    }
+    scheduleKeyboardFlush();
+  };
+
+  const queueKeyboardDelete = (key: "Backspace" | "Delete") => {
+    if (key === "Backspace" && keyboardOverflowRef.current) {
+      // Congested text has not reached the desktop: edit that draft first.
+      const points = Array.from(keyboardOverflowRef.current);
+      points.pop();
+      keyboardOverflowRef.current = points.join("");
+      return;
+    }
+    keyboardQueueRef.current.enqueueDelete(key);
+    scheduleKeyboardFlush();
+  };
+
+  const readKeyboardInput = (inputType = "", fromComposition = false) => {
+    if (keyboardComposingRef.current || keyboardFlushFrameRef.current !== null) return;
+    const field = liveKeyboardRef.current;
+    if (!field) return;
+    if (inputType.startsWith("delete") ||
+        (field.value === "" && !fromComposition && !inputType.startsWith("insert"))) {
+      queueKeyboardDelete(inputType.includes("Forward") ? "Delete" : "Backspace");
+    } else if (inputType === "insertLineBreak" || inputType === "insertParagraph") {
+      if (flushKeyboardQueue()) sendKey("Enter");
+      else setInputBlocked(true);
+    } else {
+      const value = field.value.replace(LIVE_KEYBOARD_SENTINEL, "");
+      const previous = lastCompositionRef.current;
+      const duplicate = previous && value === previous.text &&
+        performance.now() - previous.at < 160 &&
+        inputType === "insertFromComposition";
+      if (value && !duplicate) queueKeyboardText(value, fromComposition);
+      if (!fromComposition && inputType !== "insertFromComposition")
+        lastCompositionRef.current = null;
+    }
+    resetKeyboardAnchor();
   };
 
   const closeKeyboard = () => {
     if (keyboardFlushFrameRef.current !== null) {
       window.cancelAnimationFrame(keyboardFlushFrameRef.current);
       keyboardFlushFrameRef.current = null;
+      // Closing immediately after IME compositionend must not drop the
+      // final committed character before its next animation frame.
+      readKeyboardInput("insertFromComposition", true);
     }
+    if (keyboardInputFrameRef.current !== null) {
+      window.cancelAnimationFrame(keyboardInputFrameRef.current);
+      keyboardInputFrameRef.current = null;
+    }
+    if (keyboardRetryRef.current !== null) {
+      window.clearTimeout(keyboardRetryRef.current);
+      keyboardRetryRef.current = null;
+    }
+    if (!keyboardComposingRef.current) flushKeyboardQueue();
+    const composingDraft = keyboardComposingRef.current
+      ? liveKeyboardRef.current?.value.replace(LIVE_KEYBOARD_SENTINEL, "") ?? ""
+      : "";
     keyboardComposingRef.current = false;
     liveKeyboardRef.current?.blur();
-    // Preserve unsent input in the explicit composer instead of losing it.
-    if (keyboardDraftRef.current) {
-      const draft = keyboardDraftRef.current;
-      setText((current) => current ? current + "\n" + draft : draft);
-      keyboardDraftRef.current = "";
-      setKeyboardDraft("");
+    const unsent = keyboardQueueRef.current.takeUnsentText() +
+      keyboardOverflowRef.current + composingDraft;
+    keyboardOverflowRef.current = "";
+    if (unsent) {
+      setText((current) => current ? current + "\n" + unsent : unsent);
       setTextOpen(true);
     }
     setKeyboardOpen(false);
@@ -776,7 +871,9 @@ export function RemoteAppView({
       setMoreKeysOpen(false);
       setOptionsOpen(false);
     });
-    // Must happen in the actual tap callback for iOS Safari's soft keyboard.
+    // Keep the 1px bridge in the visible viewport: Safari requires a
+    // real user gesture and a focusable element to open the iOS keyboard.
+    resetKeyboardAnchor();
     liveKeyboardRef.current?.focus({ preventScroll: true });
   };
 
@@ -1058,52 +1155,65 @@ export function RemoteAppView({
       </div>
 
       {keyboardOpen && (
-        <div className="remote-app-live-keyboard glass-panel" role="group"
-          aria-label={t("remoteApp.keyboard")}>
-          <textarea ref={liveKeyboardRef} className="glass-input"
-            value={keyboardDraft} rows={1} maxLength={16 * 1024}
-            placeholder={t("remoteApp.keyboardPlaceholder")}
-            aria-label={t("remoteApp.keyboardPlaceholder")}
+        <div className="remote-app-live-keyboard">
+          <textarea ref={liveKeyboardRef} className="remote-app-live-bridge"
+            defaultValue={LIVE_KEYBOARD_SENTINEL} rows={1} maxLength={16 * 1024 + 1}
+            aria-label={t("remoteApp.keyboard")}
             autoComplete="off" autoCapitalize="off" autoCorrect="off"
             spellCheck={false}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              keyboardDraftRef.current = value;
-              setKeyboardDraft(value);
-              if (shouldCommitRemoteLiveText(
-                keyboardComposingRef.current,
-                (event.nativeEvent as InputEvent).isComposing === true,
-                keyboardFlushFrameRef.current !== null
-              )) commitLiveKeyboardText(value);
+            onBeforeInput={(event) => {
+              const native = event.nativeEvent as InputEvent;
+              if (keyboardComposingRef.current || native.isComposing ||
+                  keyboardFlushFrameRef.current !== null || !native.cancelable) return;
+              if (native.inputType === "deleteContentBackward" ||
+                  native.inputType === "deleteContentForward") {
+                event.preventDefault();
+                queueKeyboardDelete(native.inputType === "deleteContentForward"
+                  ? "Delete" : "Backspace");
+              } else if (native.inputType === "insertLineBreak" ||
+                  native.inputType === "insertParagraph") {
+                event.preventDefault();
+                if (flushKeyboardQueue()) sendKey("Enter");
+                else setInputBlocked(true);
+              }
             }}
-            onCompositionStart={() => { keyboardComposingRef.current = true; }}
+            onInput={(event) => {
+              const native = event.nativeEvent as InputEvent;
+              if (!shouldCommitRemoteLiveText(keyboardComposingRef.current,
+                native.isComposing === true, keyboardFlushFrameRef.current !== null)) return;
+              // If beforeinput was cancelled, there should be no input event.
+              // A stray Safari event must not double-send a deleted sentinel.
+              if (native.inputType?.startsWith("delete") &&
+                  liveKeyboardRef.current?.value === LIVE_KEYBOARD_SENTINEL) return;
+              readKeyboardInput(native.inputType ?? "");
+            }}
+            onCompositionStart={() => {
+              keyboardComposingRef.current = true;
+              lastCompositionRef.current = null;
+            }}
             onCompositionEnd={() => {
               keyboardComposingRef.current = false;
               if (keyboardFlushFrameRef.current !== null)
                 window.cancelAnimationFrame(keyboardFlushFrameRef.current);
-              // Read the post-composition value: some Safari versions deliver
-              // the final input event before, others just after compositionend.
+              // Safari may emit the final input before or after compositionend.
+              // Read the final DOM value only once after that event settles.
               keyboardFlushFrameRef.current = window.requestAnimationFrame(() => {
                 keyboardFlushFrameRef.current = null;
-                const pending = liveKeyboardRef.current?.value ?? keyboardDraftRef.current;
-                if (pending) commitLiveKeyboardText(pending);
+                readKeyboardInput("insertFromComposition", true);
               });
             }}
             onKeyDown={(event) => {
               if (keyboardComposingRef.current || event.nativeEvent.isComposing ||
                   event.keyCode === 229) return;
               const key = remoteAppLiveKeyboardKey(event.key);
-              if (!key) return;
-              if (key === "Backspace" && keyboardDraftRef.current) return;
+              if (!key || key === "Backspace" || key === "Delete") return;
+              // Delete is handled by beforeinput/input (including long-press);
+              // navigating through keydown must not inject a duplicate input.
               event.preventDefault();
-              if (keyboardDraftRef.current &&
-                  !commitLiveKeyboardText(keyboardDraftRef.current)) return;
-              sendKey(key);
+              if (flushKeyboardQueue()) sendKey(key);
+              else setInputBlocked(true);
             }}
           />
-          <button type="button" className="ghost compact"
-            aria-label={t("remoteApp.closeKeyboard")}
-            onClick={closeKeyboard}>×</button>
         </div>
       )}
       {textOpen && (

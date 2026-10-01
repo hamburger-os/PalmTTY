@@ -29,7 +29,7 @@ The App surface exposes three explicit pointer modes:
 - **Touch**: maps touches into the captured application window.
 - **Trackpad**: the visible, verified Windows pointer follows one-finger movement; tap clicks, long press drags, two-finger tap right-clicks, and two-finger movement scrolls.
 
-The bottom dock shares the Terminal dock’s first two actions: **Keyboard**, **Long Text**, followed by Ctrl/Alt/Shift and navigation. Keyboard synchronously focuses a separate 16px mobile-safe live input; committed Unicode uses the existing bounded text channel and allowlisted navigation/editing keys use typed key controls. Long Text remains explicitly sent and supports paste, IME and dictation. Display options contain neither input action.
+The bottom dock shares the Terminal dock’s first two actions: **Keyboard**, **Long Text**, followed by Ctrl/Alt/Shift and navigation. Keyboard synchronously focuses a 1px nearly invisible but genuine in-viewport Safari input with a 16px computed font, not a second editor over the captured app. Committed Unicode uses an ordered, bounded per-frame text queue; Backspace/Delete are batched (max 32 per native event); supported navigation retains the typed key allowlist. Long Text remains explicitly sent and supports paste, IME and dictation. Display options contain neither input action.
 
 Presentation is automatic. The browser sends a bounded display-size hint when the App surface changes size or orientation; the Windows helper scales capture within PalmTTY hard limits. The toolbar reports **Quality · Auto** rather than exposing FPS/width/height controls.
 
@@ -101,7 +101,7 @@ App 画面提供三种显式模式：
 - **直触**：触摸坐标映射到远端应用窗口；
 - **触控板**：显示 Windows 确认的受控窗口光标；单指移动、轻点左键、长按拖动、双指轻点右键、双指移动滚动。
 
-Remote App 底部与 CLI 一致：**键盘、长文本** 固定为前两项，其后是 Ctrl/Alt/Shift 和导航键。「键盘」直接聚焦独立的 16px 手机安全即时输入框，中文输入法组合完成后才沿现有有界 Unicode 通道发送；特殊键沿原有白名单通道发送。「长文本」保留明确发送的粘贴、IME 和语音输入面板。选项菜单不包含输入入口。
+Remote App 底部与 CLI 一致：**键盘、长文本** 固定为前两项，其后是 Ctrl/Alt/Shift 和导航键。「键盘」在用户点击时聚焦屏幕内 1px 的不可见编辑桥（字号仍为 16px），不会叠加灰色输入框；中文输入法组合完成后才按帧发送有界 Unicode，连续退格/删除每批最多 32 次。特殊导航键沿原有白名单发送。「长文本」保留明确发送的粘贴、IME 和语音输入面板。选项菜单不包含输入入口。
 
 画面策略自动适配。手机 Surface 尺寸或横竖屏变化时，浏览器发送有界 display hint，Windows helper 在 PalmTTY 硬上限内缩放捕获；UI 只显示“**画质 · 自动**”，不再让用户手工配置 FPS/宽高。
 
@@ -150,3 +150,9 @@ PalmTTY 明确不提供整桌面捕获、浏览器选择任意窗口/PID、UAC/e
 The tiny verified-window arrow now occupies about 5.667 × 8 CSS pixels, one third of its former 17 × 24 size. Native Windows cursor sampling runs on an independent ~30 Hz thread instead of waiting for 5–15 fps window-video capture; ownership and visibility are rechecked on every sample. Browser Trackpad movement coalesces relative deltas to at most one WebRTC control message per animation frame and paints a bounded, optimistic local pointer transform without rendering the React tree on every cursor update. When fingers lift, the preview reconciles to the latest authenticated native position; leaving the owned window hides it immediately. This reduces perceived cursor lag, but actual network and Windows input latency still depend on the connection and host workload.
 
 已验证窗口内的 SVG 箭头由 17×24 缩为约 5.667×8 CSS 像素。Windows 光标采样改用独立约 30Hz 线程，不再与 5–15fps 视频截图共用采样时机，每次仍校验窗口归属和可见性。手机触控板将一帧内的位移合并为一条 WebRTC 控制消息，预测光标通过逐帧 DOM transform 绘制而不是每次触发 React 整树渲染；抬起手指后以最新原生位置校准，移出受控窗口立即隐藏。网络与 Windows 真实输入延迟仍受部署环境影响。
+
+### Invisible keyboard and responsive deletion / 隐形键盘和流畅删除
+
+The iPhone still needs a real, in-viewport editable element to open its native keyboard, but it does not need another visible field over the remotely captured application's own input. A nearly invisible 1px editable bridge with 16px computed font and a nonempty sentinel keeps iOS autorepeat working. Confirmed Unicode is serialized into bounded <=2 KiB text messages, and consecutive Backspace/Delete actions into typed batches of at most 32. The Windows host revalidates repeat requests and skips repeated SetFocus/ShowWindow when the verified owned app is already foreground. The explicit Long Text composer preserves text that could not be sent under congestion. This improves input-path latency but does not increase the application's media capture frame rate or guarantee exactly-once delivery after disconnection.
+
+iPhone 唤起软键盘依然需要真实、位于屏幕内的输入元素，但不需要再在远程软件已有输入框上方显示第二个灰色输入框。1px 的隐形桥保留 16px 字号及非空哨兵，支持 iOS 连续删除。已确认文字以最多 2KiB 的消息按序批量发送，连续 Backspace/Delete 每批最多 32 次；Windows 已处于前台的已验证窗口跳过每键重复激活和 SetFocus。拥塞时未发送文字保留给「长文本」。视频自身帧率和中断后的恰好一次交付并未改变。

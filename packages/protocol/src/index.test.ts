@@ -125,6 +125,15 @@ describe("protocol", () => {
       y: 0
     })).toThrow();
     expect(RemoteAppControlMessageSchema.parse({
+      type: "keyRepeat", key: "Backspace", count: 32
+    })).toEqual({ type: "keyRepeat", key: "Backspace", count: 32 });
+    for (const invalid of [
+      { type: "keyRepeat", key: "Tab", count: 3 },
+      { type: "keyRepeat", key: "Backspace", count: 0 },
+      { type: "keyRepeat", key: "Delete", count: 33 },
+      { type: "keyRepeat", key: "Backspace", count: 1, ctrl: true }
+    ]) expect(() => RemoteAppControlMessageSchema.parse(invalid)).toThrow();
+    expect(RemoteAppControlMessageSchema.parse({
       type: "display",
       width: 844,
       height: 390,

@@ -6,6 +6,12 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+### Invisible Remote App keyboard and faster deletion (unreleased)
+
+- Fix helper-stdin backpressure handling: wait for drain using a 64KiB/128-message ordered, disposable queue rather than silently dropping subsequent typed controls.
+
+- Replace the obstructive extra mobile keyboard textarea with an in-viewport, focusable, nearly invisible 1px Safari input bridge. Keep 16px computed font, composition-aware Unicode and separate deliberate Long Text composer. Batch text into ordered <=2KiB packets, combine held Backspace/Delete into native-validated <=32-key batches and skip redundant Windows focus activation for already-foreground owned apps. Preserve unsent drafts during DataChannel congestion. Add queue/protocol/IME/theme regressions; perceived latency still requires real iPhone Safari and Windows validation.
+
 ### Shared Remote App keyboard and Long Text (unreleased)
 
 - Make the first two Remote App and CLI dock buttons identical: Keyboard → Long Text. On iPhone, Remote App Keyboard synchronously focuses an immediate Unicode input with composition-aware delivery and allowlisted navigation; Long Text retains explicit send and receives failed live-input drafts. Share button UI and add IME/structure/theme regression checks.
