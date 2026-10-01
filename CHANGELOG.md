@@ -8,6 +8,11 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 <!-- Add changes here after the latest release. Publishing requires this section to be empty. -->
 
+### Mobile cursor and CLI dock (unreleased)
+
+- Add bounded owned-window cursor and native input-status telemetry over the existing authenticated WebRTC peer; render a high-contrast mobile Trackpad cursor with long-press drag and two-finger right tap.
+- Add compact/full/hidden mobile terminal dock with pinned expansion/restore controls and a single-row on-demand Tools header.
+
 ### Added
 
 - Introduce portrait-first Remote App immersion: outside-video mode/options/diagnostics, single-row phone header with on-demand Git/Files, optional full-window or cropped fill, opt-in bounded current-window resize, and a pinned expandable key dock.

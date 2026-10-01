@@ -696,7 +696,38 @@ button.directory-choose {
   border-radius: var(--radius-md);
   gap: 6px;
   overflow: hidden;
-  padding: 7px 8px;
+  padding: 5px 6px;
+}
+
+.keybar-main {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  gap: 5px;
+}
+
+.keybar-main > .keybar-row { flex: 1 1 auto; }
+
+.keybar-pinned {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  border-left: 1px solid var(--border);
+  padding-left: 5px;
+}
+
+.keybar-pinned button { min-width: var(--touch-target-compact); }
+
+.keybar-hidden {
+  justify-content: center;
+  padding: 2px 6px;
+}
+
+.keybar-hidden .keybar-restore {
+  width: 100%;
+  min-height: var(--touch-target-compact);
+  padding: 2px 8px;
+  font-size: var(--text-sm);
 }
 
 .keybar-row {
@@ -2165,6 +2196,21 @@ body.remote-app-active { overflow: hidden; }
 
 .remote-app-surface video.fit-cover { object-fit: cover; }
 
+.remote-app-cursor {
+  position: absolute;
+  z-index: 3;
+  width: 26px;
+  height: 34px;
+  overflow: visible;
+  pointer-events: none;
+  transform: translate(-2px, -2px);
+  fill: var(--remote-cursor-fill);
+  stroke: var(--remote-cursor-outline);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 2px var(--remote-cursor-outline));
+}
+
 .remote-app-toolbar {
   position: relative;
   z-index: 6;
@@ -2176,7 +2222,6 @@ body.remote-app-active { overflow: hidden; }
   gap: 4px;
   padding: 3px;
   border-radius: var(--radius-md);
-  background: var(--flat-content);
 }
 
 .remote-app-toolbar-actions {
@@ -2385,7 +2430,7 @@ body.remote-app-active { overflow: hidden; }
 
 .remote-app-text-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
 
-.mobile-app-tools { display: none; }
+.mobile-workbench-tools { display: none; }
 
 @media (max-width: 620px) {
   .settings-section-heading { align-items: stretch; flex-direction: column; }
@@ -2398,7 +2443,8 @@ body.remote-app-active { overflow: hidden; }
 }
 
 @media (max-width: 760px) {
-  .workbench-page.is-remote-app {
+  .workbench-page.is-remote-app,
+  .workbench-page.is-terminal {
     gap: 4px;
     padding:
       max(3px, env(safe-area-inset-top))
@@ -2406,7 +2452,8 @@ body.remote-app-active { overflow: hidden; }
       max(3px, env(safe-area-inset-bottom))
       max(4px, env(safe-area-inset-left));
   }
-  .workbench-page.is-remote-app .workbench-header {
+  .workbench-page.is-remote-app .workbench-header,
+  .workbench-page.is-terminal .workbench-header {
     position: relative;
     min-height: var(--touch-target);
     grid-template-columns: minmax(0, 1fr) auto;
@@ -2414,10 +2461,14 @@ body.remote-app-active { overflow: hidden; }
     gap: 4px;
     padding: 3px 6px;
   }
-  .workbench-page.is-remote-app .workbench-name { max-width: 24vw; }
-  .workbench-page.is-remote-app .workbench-activity-switcher { max-width: 27vw; }
-  .workbench-page.is-remote-app .workbench-tabs { display: none; }
-  .workbench-page.is-remote-app .workbench-tabs.mobile-open {
+  .workbench-page.is-remote-app .workbench-name,
+  .workbench-page.is-terminal .workbench-name { max-width: 38vw; }
+  .workbench-page.is-remote-app .workbench-activity-switcher,
+  .workbench-page.is-terminal .workbench-activity-switcher { max-width: 27vw; }
+  .workbench-page.is-remote-app .workbench-tabs,
+  .workbench-page.is-terminal .workbench-tabs { display: none; }
+  .workbench-page.is-remote-app .workbench-tabs.mobile-open,
+  .workbench-page.is-terminal .workbench-tabs.mobile-open {
     position: absolute;
     z-index: 20;
     display: flex;
@@ -2430,8 +2481,10 @@ body.remote-app-active { overflow: hidden; }
     border: 1px solid var(--border-strong);
     box-shadow: var(--shadow);
   }
-  .workbench-page.is-remote-app .mobile-app-tools { display: inline-flex; }
-  .workbench-page.is-remote-app .workbench-actions { gap: 4px; }
+  .workbench-page.is-remote-app .mobile-workbench-tools,
+  .workbench-page.is-terminal .mobile-workbench-tools { display: inline-flex; }
+  .workbench-page.is-remote-app .workbench-actions,
+  .workbench-page.is-terminal .workbench-actions { gap: 4px; }
 }
 
 @media (orientation: landscape) and (max-height: 520px) {

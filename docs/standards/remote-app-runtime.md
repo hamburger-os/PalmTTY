@@ -39,3 +39,7 @@ MSIX activation returns a PID but does not prove ownership. PalmTTY requires a f
 - Touch gesture ownership: https://www.w3.org/TR/pointerevents/#the-touch-action-css-property
 
 PalmTTY's optional per-session adaptWindow display flag can resize only the already verified Job-owned HWND and must restore its original size on disable or helper shutdown; this does not broaden capture authority. Real dark windows are not conclusive PrintWindow failures. WGC requires separate window-only capture, device-loss, and real Windows host qualification; synthetic WebRTC smoke is insufficient.
+
+## Owned cursor and mobile dock boundary
+
+The Windows host samples only the currently verified Job-owned HWND and emits 0–1000000 normalized fixed-point cursor coordinates, or `-1 -1` outside. AppWorker validates native stderr samples and forwards only bounded, typed cursor/foreground-input telemetry on the existing authenticated single-peer WebRTC control DataChannel; backpressured telemetry is discarded. The Web pointer is theme-owned, pointer-events-none and projected through inverse contain/cover geometry, hidden beyond clipped video boundaries. No desktop or arbitrary-window capture, input elevation or new peer is introduced. Compact/full/hidden mobile Terminal docks and the on-demand one-row Tools header are browser presentation state; xterm/WebSocket remain mounted, and the existing mount ResizeObserver/FitAddon owns geometry.

@@ -204,3 +204,9 @@ Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus 
 ## Required honesty rule
 
 Do not claim persistence beyond what is tested: browser disconnect and Agent restart are covered; OS reboot/logoff and Worker-process loss are not. If CI demonstrates a regression, update this file in the same task as the fix.
+
+### Mobile cursor and terminal dock (latest)
+
+- The native helper samples cursor position only inside its current verified Job-owned HWND, emits normalized fixed-point 0–1000000 coordinates or hidden, and never leaks global desktop coordinates. AppWorker strictly parses native stderr records and forwards only typed cursor/native-input state through the existing authenticated single-peer WebRTC control DataChannel with bounded backpressure. Web overlays a theme-tokenized SVG pointer via the inverse contain/cover transform, hiding off-window and cropped positions.
+- Trackpad adds short two-finger right tap and long-press primary drag with cancellation releasing the button. Windows foreground/UIPI input denial is distinct from DataChannel readiness and neither expands authority.
+- Terminal/Remote App use a single-row mobile Tools header; the CLI dock has compact/full/hidden browser-local states with pinned expansion/restore. Neither may recreate xterm, WebSocket or Session Worker canonical state; the existing terminal mount ResizeObserver/FitAddon owns geometry.

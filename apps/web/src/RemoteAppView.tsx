@@ -12,6 +12,7 @@ import {
   REMOTE_APP_CAPTURE_MIN_HEIGHT,
   REMOTE_APP_CAPTURE_MIN_WIDTH,
   encodeRemoteAppControlMessage,
+  parseRemoteAppTelemetryMessage,
   type AppSessionMediaState,
   type RemoteAppMediaDiagnostics,
   type AppSessionPublic,
@@ -25,7 +26,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
-import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, type VideoFit } from "./remote-app-presentation.js";
+import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta, type VideoFit } from "./remote-app-presentation.js";
 
 export type RemoteAppConnectionState =
   | "connecting"
@@ -152,6 +153,12 @@ export function RemoteAppView({
   const [shift, setShift] = useState(false);
   const [textOpen, setTextOpen] = useState(false);
   const [text, setText] = useState("");
+  const [controlReady, setControlReady] = useState(false);
+  const [inputBlocked, setInputBlocked] = useState(false);
+  const [cursor, setCursor] = useState<Point | null>(null);
+  const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
+  const [surfaceSize, setSurfaceSize] = useState({ width: 0, height: 0 });
+  const dragRef = useRef<{ pointerId: number; timer: number | undefined; held: boolean } | null>(null);
   const [mediaState, setMediaState] = useState<AppSessionMediaState>(
     session.mediaState
   );
@@ -184,6 +191,13 @@ export function RemoteAppView({
   useEffect(() => {
     setEverRendered(false);
   }, [session.id]);
+
+  const cancelDragTimer = () => {
+    if (dragRef.current?.timer !== undefined) {
+      window.clearTimeout(dragRef.current.timer);
+      dragRef.current.timer = undefined;
+    }
+  };
 
   const attemptPlayback = useCallback((
     video: HTMLVideoElement, isCurrent: () => boolean
@@ -243,6 +257,9 @@ export function RemoteAppView({
     if (!surface) return;
     let timer: number | undefined;
     const observer = new ResizeObserver(() => {
+      const bounds = surface.getBoundingClientRect();
+      setSurfaceSize((current) => current.width === bounds.width && current.height === bounds.height
+        ? current : { width: bounds.width, height: bounds.height });
       if (timer !== undefined) window.clearTimeout(timer);
       timer = window.setTimeout(sendDisplayHint, 160);
     });
@@ -264,6 +281,10 @@ export function RemoteAppView({
       videoRenderedRef.current = true;
       lastFrameAt.current = Date.now();
       setVideoRendered(true);
+      const nextWidth = video.videoWidth;
+      const nextHeight = video.videoHeight;
+      setVideoSize((current) => current.width === nextWidth && current.height === nextHeight
+        ? current : { width: nextWidth, height: nextHeight });
       setEverRendered(true);
       setVideoTimedOut(false);
       setVideoFrozen(false);
@@ -327,6 +348,9 @@ export function RemoteAppView({
     const cleanupPeer = () => {
       clearConnectionTimer();
       channelRef.current = null;
+      setControlReady(false);
+      setInputBlocked(false);
+      setCursor(null);
       connectedAt.current = null;
       currentTrackRef.current = null;
       if (connection) {
@@ -368,7 +392,28 @@ export function RemoteAppView({
       const channel = peer.createDataChannel("control", { ordered: true });
       channelRef.current = channel;
       channel.onopen = () => {
+        if (connection !== peer || controller.signal.aborted) return;
+        setControlReady(true);
         sendDisplayHint();
+      };
+      channel.onclose = () => {
+        if (connection === peer && !controller.signal.aborted) {
+          setControlReady(false);
+          setInputBlocked(false);
+          setCursor(null);
+        }
+      };
+      channel.onmessage = (event) => {
+        if (connection !== peer || controller.signal.aborted ||
+            typeof event.data !== "string") return;
+        try {
+          const sample = parseRemoteAppTelemetryMessage(event.data);
+          if (sample.type === "cursor") {
+            setCursor(sample.visible ? { x: sample.x, y: sample.y } : null);
+          } else {
+            setInputBlocked(sample.state === "blocked");
+          }
+        } catch { /* No untyped messages may mutate cursor state. */ }
       };
 
       peer.ontrack = (event) => {
@@ -510,6 +555,11 @@ export function RemoteAppView({
       }
     }
     activePointers.current.clear();
+    cancelDragTimer();
+    if (dragRef.current?.held) {
+      send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
+    }
+    dragRef.current = null;
     touchpad.current.cancel();
   }, [mode, send]);
 
@@ -551,6 +601,24 @@ export function RemoteAppView({
       event.pointerId,
       normalizedPoint(event.currentTarget, event.clientX, event.clientY)
     );
+    cancelDragTimer();
+    if (dragRef.current?.held && dragRef.current.pointerId !== event.pointerId) {
+      send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
+      dragRef.current = null;
+    }
+    // Long press without movement holds the primary button for a drag.
+    if (touchpad.current.canLongPress(event.pointerId)) {
+      const pointerId = event.pointerId;
+      const timer = window.setTimeout(() => {
+        if (!touchpad.current.canLongPress(pointerId)) return;
+        if (send({ type: "pointerRelative", dx: 0, dy: 0, action: "down", button: 0 }) &&
+            dragRef.current?.pointerId === pointerId) {
+          dragRef.current.held = true;
+          dragRef.current.timer = undefined;
+        }
+      }, 480);
+      dragRef.current = { pointerId, timer, held: false };
+    }
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -572,6 +640,7 @@ export function RemoteAppView({
       event.pointerId,
       normalizedPoint(event.currentTarget, event.clientX, event.clientY)
     );
+    if (!touchpad.current.canLongPress(event.pointerId)) cancelDragTimer();
     if (!motion) return;
     if (motion.type === "scroll") {
       send({
@@ -582,10 +651,11 @@ export function RemoteAppView({
           motion.dy * event.currentTarget.clientHeight * 3))
       });
     } else {
+      const relative = remoteTouchpadDelta(
+        { x: motion.dx, y: motion.dy }, surfaceSize, videoSize, fit
+      );
       send({
-        type: "pointerRelative",
-        dx: Math.max(-1, Math.min(1, motion.dx * 1.6)),
-        dy: Math.max(-1, Math.min(1, motion.dy * 1.6)),
+        type: "pointerRelative", dx: relative.x, dy: relative.y,
         action: "move", button: 0
       });
     }
@@ -607,9 +677,21 @@ export function RemoteAppView({
         button: Math.max(0, Math.min(2, event.button)) });
       return;
     }
-    if (touchpad.current.up(event.pointerId)) {
-      send({ type: "pointerRelative", dx: 0, dy: 0, action: "down", button: 0 });
-      send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
+    cancelDragTimer();
+    if (dragRef.current?.pointerId === event.pointerId) {
+      const held = dragRef.current.held;
+      dragRef.current = null;
+      if (held) {
+        touchpad.current.cancel();
+        send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
+        return;
+      }
+    }
+    const tap = touchpad.current.up(event.pointerId);
+    if (tap) {
+      const button = tap === "right" ? 2 : 0;
+      send({ type: "pointerRelative", dx: 0, dy: 0, action: "down", button });
+      send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button });
     }
   };
 
@@ -621,7 +703,14 @@ export function RemoteAppView({
         send({ type: "pointer", action: "up",
           x: previous.x, y: previous.y, button: 0 });
       }
-    } else touchpad.current.cancel();
+    } else {
+      cancelDragTimer();
+      if (dragRef.current?.held) {
+        send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
+      }
+      dragRef.current = null;
+      touchpad.current.cancel();
+    }
   };
 
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
@@ -638,6 +727,10 @@ export function RemoteAppView({
     const video = videoRef.current;
     if (video) attemptPlayback(video, () => videoRef.current === video);
   };
+
+  const projectedCursor = cursor && remoteVideoCursorPosition(
+    { left: 0, top: 0, ...surfaceSize }, videoSize, cursor, fit
+  );
 
   const diagnostic = networkIssue
     ? (capabilities?.relayConfigured
@@ -692,6 +785,12 @@ export function RemoteAppView({
       >
         <video ref={videoRef} className={"fit-" + fit}
           autoPlay playsInline muted />
+        {active && mode === "touchpad" && controlReady && videoRendered && projectedCursor && (
+          <svg aria-hidden="true" className="remote-app-cursor" viewBox="0 0 26 34"
+            style={{ left: projectedCursor.x, top: projectedCursor.y }}>
+            <path d="M2 2 L2 27 L8 21 L13 32 L18 29 L13 19 L23 19 Z" />
+          </svg>
+        )}
         {blockingNotice && (
           <div className="remote-app-status-overlay glass-content" role="status">
             <strong>{t("remoteApp.statusTitle")}</strong>
@@ -735,6 +834,11 @@ export function RemoteAppView({
       )}
 
       <div className="remote-app-dock">
+        {mode !== "view" && active && (!controlReady || inputBlocked) && (
+          <div className="remote-app-media-warning" role="status">
+            {t(!controlReady ? "remoteApp.controlNotReady" : "remoteApp.inputBlocked")}
+          </div>
+        )}
         {warningNotice && (
           <div className="remote-app-media-warning" role="status">
             <span>{warningNotice}</span>

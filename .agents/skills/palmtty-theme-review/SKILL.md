@@ -3,7 +3,7 @@ name: palmtty-theme-review
 description: "Audit PalmTTY Web UI for theme SSOT compliance, mobile rendering quality, semantic surface ownership, terminal lifecycle isolation, and visual performance regressions."
 license: Apache-2.0
 metadata:
-  version: "1.11.0"
+  version: "1.12.0"
 ---
 
 # PalmTTY theme and rendering review
@@ -54,11 +54,11 @@ For each relevant combination inspect:
 8. portrait;
 9. short landscape.
 
-Theme or workbench-pane switching while a terminal is live must not recreate xterm or WebSocket state. Presentation-state changes must not be wired into the terminal transport lifecycle.
+Check compact/full/hidden mobile CLI docks, a reachable restore button, pinned expansion controls, and single-row Tools navigation without remounting xterm/WebSocket. Theme or workbench-pane switching while a terminal is live must not recreate xterm or WebSocket state. Presentation-state changes must not be wired into the terminal transport lifecycle.
 
 ## Additional Remote App matrix
 
-Check all three themes, Quality/Performance, portrait/short landscape, keyboard open and reduced motion with a video-first Remote App. Verify compact header, Tools overlay, a video surface free of permanent controls, the outside-video mode/options strip and key dock, immersive one-row layout with an always-reachable dock exit, on-demand diagnostics, and no waiting text after the browser has decoded a frame. On real mobile Safari, verify View pinch remains browser-owned and Trackpad/Direct touch never scroll the page, including two-finger partial lifts/pointercancel; test contain/cover mapping and user-consented Windows window resize/restore. Confirm switching Git/Files does not reset App/Terminal connections. Windows native compile and installed video smoke cannot replace real Codex/7-Zip capture tests.
+Check all three themes, Quality/Performance, portrait/short landscape, keyboard open and reduced motion with a video-first Remote App. Verify compact header, Tools overlay, a video surface free of permanent controls, the outside-video mode/options strip and key dock, immersive one-row layout with an always-reachable dock exit, on-demand diagnostics, and no waiting text after the browser has decoded a frame. On real mobile Safari, verify View pinch remains browser-owned and Trackpad/Direct touch never scroll the page, including two-finger partial lifts/pointercancel; test contain/cover pointer/cursor mapping, clipped/off-window cursor hiding, one-finger tap, long-press drag/cancel release, two-finger right tap/scroll, native input-blocked feedback and user-consented Windows window resize/restore. Confirm switching Git/Files does not reset App/Terminal connections. Windows native compile and installed video smoke cannot replace real Codex/7-Zip capture tests.
 
 ## Review priorities
 

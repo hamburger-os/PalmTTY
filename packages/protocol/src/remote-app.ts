@@ -287,6 +287,33 @@ export const RemoteAppControlMessageSchema = z.discriminatedUnion("type", [
 ]);
 export type RemoteAppControlMessage = z.infer<typeof RemoteAppControlMessageSchema>;
 
+// Server -> browser only. Coordinates are relative to the verified owned
+// application window and deliberately reveal no desktop/global position.
+export const RemoteAppCursorMessageSchema = z.discriminatedUnion("visible", [
+  z.object({ type: z.literal("cursor"), visible: z.literal(true),
+    x: UnitCoordinateSchema, y: UnitCoordinateSchema }).strict(),
+  z.object({ type: z.literal("cursor"), visible: z.literal(false) }).strict()
+]);
+export type RemoteAppCursorMessage = z.infer<typeof RemoteAppCursorMessageSchema>;
+export const RemoteAppInputStateMessageSchema = z.object({
+  type: z.literal("inputState"), state: z.enum(["ready", "blocked"])
+}).strict();
+export const RemoteAppTelemetryMessageSchema = z.union([
+  RemoteAppCursorMessageSchema, RemoteAppInputStateMessageSchema
+]);
+export type RemoteAppTelemetryMessage = z.infer<typeof RemoteAppTelemetryMessageSchema>;
+
+export function parseRemoteAppTelemetryMessage(raw: string): RemoteAppTelemetryMessage {
+  if (encoder.encode(raw).byteLength > 256) throw new Error("Telemetry message too large");
+  return RemoteAppTelemetryMessageSchema.parse(JSON.parse(raw));
+}
+
+export function parseRemoteAppCursorMessage(raw: string): RemoteAppCursorMessage {
+  if (encoder.encode(raw).byteLength > 256) throw new Error("Cursor message too large");
+  return RemoteAppCursorMessageSchema.parse(JSON.parse(raw));
+}
+
+
 export function parseRemoteAppControlMessage(value: string): RemoteAppControlMessage {
   if (encoder.encode(value).byteLength > REMOTE_APP_DATA_MAX_BYTES) {
     throw new Error("Remote App control message exceeds 32 KiB");

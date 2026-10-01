@@ -463,6 +463,10 @@ internal static class PalmTTYRemoteAppHost
     private static volatile int CaptureMaxHeight = 800;
     private static string LastMediaState = "";
     private static string LastCaptureReason = "";
+    private static string LastInputState = "";
+    private static int LastCursorX = -2;
+    private static int LastCursorY = -2;
+    private static long LastCursorSampleTicks;
     private static string StartupStage = "bootstrap";
     private static BinaryWriter Output;
     private static StreamWriter ErrorOutput;
@@ -850,6 +854,7 @@ internal static class PalmTTYRemoteAppHost
                     streaming = false;
                     PublishCaptureReason("window-not-found");
                     PublishMediaState("waiting-for-window");
+                    PublishCursorHidden();
                 }
                 else
                 {
@@ -860,9 +865,11 @@ internal static class PalmTTYRemoteAppHost
                     {
                         PublishCaptureReason("window-not-found");
                         PublishMediaState("waiting-for-window");
+                        PublishCursorHidden();
                         Thread.Sleep(delay);
                         continue;
                     }
+                    PublishCursorForOwnedWindow(hwnd, rect);
                     if (!streaming && captureFailures == 0)
                     {
                         PublishMediaState("waiting-for-frame");
@@ -886,6 +893,7 @@ internal static class PalmTTYRemoteAppHost
             }
             catch
             {
+                PublishCursorHidden();
                 PublishCaptureReason("capture-exception");
                 captureFailures += 1;
                 if (captureFailures >= Math.Max(8, config.FrameRate * 2))
@@ -895,6 +903,59 @@ internal static class PalmTTYRemoteAppHost
                 }
             }
             Thread.Sleep(delay);
+        }
+    }
+
+    // Only normalized coordinates inside the verified application window leave
+    // the host. Desktop positions, unrelated windows and cursor imagery never do.
+    private static void PublishCursorForOwnedWindow(IntPtr hwnd, RECT rect)
+    {
+        POINT point;
+        if (!IsOwnedWindow(hwnd) || !GetCursorPos(out point) ||
+            point.X < rect.Left || point.X >= rect.Right ||
+            point.Y < rect.Top || point.Y >= rect.Bottom)
+        {
+            PublishCursorHidden();
+            return;
+        }
+        int x = (int)Math.Round((point.X - rect.Left) * 1000000.0 / Math.Max(1, rect.Width - 1));
+        int y = (int)Math.Round((point.Y - rect.Top) * 1000000.0 / Math.Max(1, rect.Height - 1));
+        PublishCursor(Math.Max(0, Math.Min(1000000, x)),
+            Math.Max(0, Math.Min(1000000, y)));
+    }
+
+    private static void PublishCursorHidden()
+    {
+        PublishCursor(-1, -1);
+    }
+
+    private static void PublishCursor(int x, int y)
+    {
+        lock (StateLock)
+        {
+            long now = DateTime.UtcNow.Ticks;
+            // Refresh unchanged positions once a second so a new peer receives
+            // a stable snapshot without increasing media/IPC traffic every frame.
+            if (x == LastCursorX && y == LastCursorY &&
+                now - LastCursorSampleTicks < TimeSpan.TicksPerSecond) return;
+            LastCursorX = x;
+            LastCursorY = y;
+            LastCursorSampleTicks = now;
+            if (ErrorOutput != null)
+                ErrorOutput.WriteLine("PALMTTY_APP_HOST_CURSOR " +
+                    x.ToString(System.Globalization.CultureInfo.InvariantCulture) + " " +
+                    y.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+    }
+
+    private static void PublishInputState(string state)
+    {
+        lock (StateLock)
+        {
+            if (LastInputState == state) return;
+            LastInputState = state;
+            if (ErrorOutput != null)
+                ErrorOutput.WriteLine("PALMTTY_APP_HOST_INPUT_STATE " + state);
         }
     }
 
@@ -1286,49 +1347,85 @@ internal static class PalmTTYRemoteAppHost
             hwnd = TargetWindow;
             rect = TargetRect;
         }
-        if (hwnd == IntPtr.Zero || !IsOwnedWindow(hwnd)) return;
+        if (hwnd == IntPtr.Zero || !IsOwnedWindow(hwnd))
+        {
+            PublishInputState("blocked");
+            return;
+        }
 
         if (message.Type == "pointer")
         {
-            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect)) return;
+            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect))
+            {
+                PublishInputState("blocked");
+                return;
+            }
             int x = rect.Left + (int)Math.Round(Clamp01(message.X) * Math.Max(1, rect.Width - 1));
             int y = rect.Top + (int)Math.Round(Clamp01(message.Y) * Math.Max(1, rect.Height - 1));
             MoveAbsolute(x, y);
-            if (GetForegroundWindow() != hwnd) return;
+            if (GetForegroundWindow() != hwnd)
+            {
+                PublishInputState("blocked");
+                return;
+            }
             ApplyPointerAction(message.Action, message.Button);
             return;
         }
 
         if (message.Type == "pointerRelative")
         {
-            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect)) return;
+            if (!ActivateWindow(hwnd) || !TryGetWindowBounds(hwnd, out rect))
+            {
+                PublishInputState("blocked");
+                return;
+            }
             POINT point;
-            if (!GetCursorPos(out point)) return;
+            if (!GetCursorPos(out point))
+            {
+                PublishInputState("blocked");
+                return;
+            }
             int x = Math.Max(rect.Left, Math.Min(rect.Right - 1, point.X + (int)Math.Round(message.Dx * rect.Width)));
             int y = Math.Max(rect.Top, Math.Min(rect.Bottom - 1, point.Y + (int)Math.Round(message.Dy * rect.Height)));
             MoveAbsolute(x, y);
-            if (GetForegroundWindow() != hwnd) return;
+            if (GetForegroundWindow() != hwnd)
+            {
+                PublishInputState("blocked");
+                return;
+            }
             ApplyPointerAction(message.Action, message.Button);
             return;
         }
 
         if (message.Type == "wheel")
         {
-            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd) return;
+            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd)
+            {
+                PublishInputState("blocked");
+                return;
+            }
             SendWheel(message.DeltaX, message.DeltaY);
             return;
         }
 
         if (message.Type == "text")
         {
-            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd) return;
+            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd)
+            {
+                PublishInputState("blocked");
+                return;
+            }
             SendUnicodeText(message.Text);
             return;
         }
 
         if (message.Type == "key")
         {
-            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd) return;
+            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd)
+            {
+                PublishInputState("blocked");
+                return;
+            }
             SendRestrictedKey(message);
         }
     }
@@ -1567,6 +1664,7 @@ internal static class PalmTTYRemoteAppHost
     {
         if (inputs == null || inputs.Length == 0 || inputs.Length > 32768) return;
         uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
+        PublishInputState(sent == inputs.Length ? "ready" : "blocked");
         if (sent != inputs.Length)
         {
             int error = Marshal.GetLastWin32Error();

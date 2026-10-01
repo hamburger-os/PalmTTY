@@ -221,3 +221,9 @@ Windows Host 的启动阶段为 `validate-profile → create-job → activate-ms
 10. Agent restart 是否误杀 AppWorker，AppWorker loss 是否遗留孤儿 App；
 11. presentation/quality 参数是否错误地重新持久化进 App Profile；
 12. clipboard/audio/file channel 是否经过独立 authority/privacy 设计。
+
+## 真实鼠标与输入反馈
+
+原生 Host 仅采样当前 Job-owned HWND 内部的鼠标位置，发送 0–1000000 定点归一化坐标；窗口外发送隐藏状态，不传桌面全局坐标或其他窗口内容。AppWorker 严格解析有界 stderr 记录，只经当前已认证的单一 WebRTC DataChannel 发送有类型的 cursor/inputState 消息，缓冲超限即丢弃，Peer 重建后补发最新状态。手机用相同 contain/cover 几何逆映射绘制主题 SVG 光标，裁切区域外隐藏。
+
+触控板单指移动、轻点左键、长按拖动、双指轻点右键和双指中心滚动。取消、切换模式须释放已经按下的左键且不得补发点击。控制通道未就绪与 Windows 前台/UIPI 输入被拒绝分别提示；不增加任何提权或任意桌面控制路径。「适应手机」继续只调整当前已验证应用窗口。

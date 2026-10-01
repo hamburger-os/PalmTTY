@@ -1,12 +1,16 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createRequire } from "node:module";
 import { RemoteAppFrameDecoder } from "./remote-app-frame-decoder.js";
+import { parseNativeCursorSample } from "./remote-app-cursor.js";
 import {
   AppSessionPublicSchema,
   REMOTE_APP_CAPTURE_DEFAULT_FPS,
   REMOTE_APP_CAPTURE_DEFAULT_HEIGHT,
   REMOTE_APP_CAPTURE_DEFAULT_WIDTH,
   parseRemoteAppControlMessage,
+  RemoteAppTelemetryMessageSchema,
+  type RemoteAppTelemetryMessage,
+  type RemoteAppCursorMessage,
   type AppSessionMediaState,
   type AppSessionPublic,
   type RemoteAppIceServer
@@ -22,6 +26,7 @@ type ExitListener = () => void;
 type Peer = {
   clientId: string;
   connection: any;
+  channel?: any;
 };
 
 const MAX_HELPER_STDERR_BYTES = 16 * 1024;
@@ -29,6 +34,8 @@ const HELPER_READY_PREFIX = "PALMTTY_APP_HOST_READY ";
 const HELPER_STATE_PREFIX = "PALMTTY_APP_HOST_STATE ";
 const HELPER_REASON_PREFIX = "PALMTTY_APP_HOST_CAPTURE_REASON ";
 const HELPER_ERROR_PREFIX = "PALMTTY_APP_HOST_ERROR ";
+const HELPER_CURSOR_PREFIX = "PALMTTY_APP_HOST_CURSOR ";
+const HELPER_INPUT_PREFIX = "PALMTTY_APP_HOST_INPUT_STATE ";
 const ICE_GATHER_TIMEOUT_MS = 8_000;
 
 const MEDIA_STATES = new Set<AppSessionMediaState>([
@@ -64,6 +71,8 @@ export class RemoteAppRuntime {
   private readonly statusListeners = new Set<StatusListener>();
   private readonly exitListeners = new Set<ExitListener>();
   private peer: Peer | undefined;
+  private cursor: RemoteAppCursorMessage = { type: "cursor", visible: false };
+  private nativeInputState: "ready" | "blocked" | undefined;
   private wrtc: any;
   private videoSource: any;
   private videoTrack: any;
@@ -96,6 +105,22 @@ export class RemoteAppRuntime {
       const lines = stderr.split(/\r?\n/);
       stderr = lines.pop() ?? "";
       for (const line of lines) {
+        if (line.startsWith(HELPER_INPUT_PREFIX)) {
+          const state = line.slice(HELPER_INPUT_PREFIX.length);
+          if (state === "ready" || state === "blocked") {
+            this.nativeInputState = state;
+            this.sendTelemetry({ type: "inputState", state });
+          }
+          continue;
+        }
+        if (line.startsWith(HELPER_CURSOR_PREFIX)) {
+          const sample = parseNativeCursorSample(line.slice(HELPER_CURSOR_PREFIX.length));
+          if (sample) {
+            this.cursor = sample;
+            this.sendTelemetry(sample);
+          }
+          continue;
+        }
         if (line.startsWith(HELPER_ERROR_PREFIX)) {
           hostStartupError = line.slice(HELPER_ERROR_PREFIX.length).slice(0, 512);
           continue;
@@ -255,10 +280,19 @@ export class RemoteAppRuntime {
     connection.addTrack(this.videoTrack);
     connection.ondatachannel = (event: any) => {
       const channel = event.channel;
-      if (!channel || channel.label !== "control") {
+      const currentPeer = this.peer;
+      if (!channel || channel.label !== "control" ||
+          !currentPeer || currentPeer.connection !== connection) {
         try { channel?.close(); } catch { /* ignore */ }
         return;
       }
+      currentPeer.channel = channel;
+      channel.onopen = () => {
+        if (this.peer?.connection === connection) {
+          this.sendTelemetry(this.cursor);
+          if (this.nativeInputState) this.sendTelemetry({ type: "inputState", state: this.nativeInputState });
+        }
+      };
       channel.onmessage = (message: any) => {
         if (typeof message.data !== "string" || message.data.length > 32 * 1024) return;
         this.forwardControl(message.data);
@@ -323,6 +357,13 @@ export class RemoteAppRuntime {
     helper?.stderr.destroy();
     this.statusListeners.clear();
     this.exitListeners.clear();
+  }
+
+  private sendTelemetry(message: RemoteAppTelemetryMessage): void {
+    const channel = this.peer?.channel;
+    if (channel?.readyState !== "open" || channel.bufferedAmount > 4096) return;
+    try { channel.send(JSON.stringify(RemoteAppTelemetryMessageSchema.parse(message))); }
+    catch { /* Closed peer or out-of-budget diagnostics are never authoritative. */ }
   }
 
   private forwardControl(source: string): void {

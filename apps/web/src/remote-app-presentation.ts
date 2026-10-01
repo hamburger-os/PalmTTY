@@ -73,3 +73,41 @@ export function remoteVideoPoint(
   y = Math.max(0, Math.min(1, y));
   return { x, y };
 }
+
+/** Map an owned-window normalized cursor into the visible, possibly cropped video. */
+export function remoteVideoCursorPosition(
+  surface: Geometry, video: DisplayBounds, cursor: UnitPoint, fit: VideoFit
+): UnitPoint | undefined {
+  if (surface.width <= 0 || surface.height <= 0 ||
+      video.width <= 0 || video.height <= 0 ||
+      !Number.isFinite(cursor.x) || !Number.isFinite(cursor.y) ||
+      cursor.x < 0 || cursor.x > 1 || cursor.y < 0 || cursor.y > 1) return undefined;
+  const scale = (fit === "cover" ? Math.max : Math.min)(
+    surface.width / video.width, surface.height / video.height
+  );
+  const width = video.width * scale;
+  const height = video.height * scale;
+  const x = (surface.width - width) / 2 + cursor.x * width;
+  const y = (surface.height - height) / 2 + cursor.y * height;
+  if (x < 0 || x > surface.width || y < 0 || y > surface.height) return undefined;
+  return { x, y };
+}
+
+/** Keep finger-to-preview cursor travel stable in contain and cropped cover modes. */
+export function remoteTouchpadDelta(
+  motion: UnitPoint, surface: DisplayBounds, video: DisplayBounds,
+  fit: VideoFit, gain = 1.6
+): UnitPoint {
+  const clamp = (value: number) => Math.max(-1, Math.min(1, value));
+  if (surface.width <= 0 || surface.height <= 0 ||
+      video.width <= 0 || video.height <= 0) {
+    return { x: clamp(motion.x * gain), y: clamp(motion.y * gain) };
+  }
+  const scale = (fit === "cover" ? Math.max : Math.min)(
+    surface.width / video.width, surface.height / video.height
+  );
+  return {
+    x: clamp((motion.x * surface.width / (video.width * scale)) * gain),
+    y: clamp((motion.y * surface.height / (video.height * scale)) * gain)
+  };
+}
