@@ -461,9 +461,9 @@ export function App() {
                     defaultShell: t("workspaces.defaultShell")
                   })}
                 </small>
-                {workspace.startupCommand && (
+                {workspace.terminal.startupCommand && (
                   <small className="startup-command">
-                    $ {workspace.startupCommand}
+                    $ {workspace.terminal.startupCommand}
                   </small>
                 )}
                 <button
