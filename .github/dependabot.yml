@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 8
+    # Runtime and all release gates target Node 22; do not let type definitions
+    # drift to a newer major until the supported runtime is upgraded together.
+    ignore:
+      - dependency-name: "@types/node"
+        versions: [">=23"]
     groups:
       npm-minor-patch:
         patterns:
