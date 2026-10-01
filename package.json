@@ -31,7 +31,7 @@
     "package:deb": "node scripts/package-linux-deb.mjs"
   },
   "devDependencies": {
-    "@types/node": "^22.18.0",
+    "@types/node": "^26.6.3",
     "@types/ws": "^8.18.1",
     "tsx": "^4.20.0",
     "typescript": "^5.9.2",
