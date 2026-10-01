@@ -445,6 +445,7 @@ internal static class PalmTTYRemoteAppHost
     private static volatile int CaptureMaxHeight = 800;
     private static string LastMediaState = "";
     private static string LastCaptureReason = "";
+    private static string StartupStage = "bootstrap";
     private static BinaryWriter Output;
     private static StreamWriter ErrorOutput;
 
@@ -471,17 +472,21 @@ internal static class PalmTTYRemoteAppHost
             {
                 throw new InvalidDataException("Remote App host bootstrap was empty");
             }
+            StartupStage = "validate-profile";
             AppConfig config = ParseJson<AppConfig>(firstLine);
             ValidateConfig(config);
             CaptureMaxWidth = config.MaxWidth;
             CaptureMaxHeight = config.MaxHeight;
 
+            StartupStage = "create-job";
             job = CreateConfiguredJob();
             JobHandle = job;
             bool packaged = String.Equals(config.Kind, "packaged", StringComparison.Ordinal);
+            StartupStage = packaged ? "activate-msix" : "create-win32";
             process = packaged
                 ? StartPackagedApplication(config)
                 : StartApplicationSuspended(config);
+            StartupStage = "assign-job";
             if (!AssignProcessToJobObject(job, process.hProcess))
             {
                 // Windows Store may deny assignment to an existing OS Job.
@@ -489,6 +494,7 @@ internal static class PalmTTYRemoteAppHost
                 if (packaged) TerminateProcess(process.hProcess, 1);
                 ThrowLastError("AssignProcessToJobObject (the packaged app must be newly launched and job-ownable)");
             }
+            StartupStage = "resume-process";
             if (!packaged)
             {
                 if (ResumeThread(process.hThread) == RESUME_FAILED)
@@ -499,6 +505,7 @@ internal static class PalmTTYRemoteAppHost
                 process.hThread = IntPtr.Zero;
             }
 
+            StartupStage = "ready";
             ErrorOutput.WriteLine("PALMTTY_APP_HOST_READY " + process.dwProcessId.ToString());
             PublishMediaState("waiting-for-window");
 
@@ -521,7 +528,19 @@ internal static class PalmTTYRemoteAppHost
         {
             try
             {
-                if (ErrorOutput != null) ErrorOutput.WriteLine("PALMTTY_APP_HOST_ERROR " + error.Message);
+                if (ErrorOutput != null)
+                {
+                    // A structured bounded error must reach the Agent before
+                    // native WebRTC's later process teardown can fault.
+                    string detail = error.Message ?? "";
+                    detail = detail.Replace('\r', ' ').Replace('\n', ' ');
+                    if (detail.Length > 180) detail = detail.Substring(0, 180);
+                    ErrorOutput.WriteLine(
+                        "PALMTTY_APP_HOST_ERROR stage=" + StartupStage +
+                        " type=" + error.GetType().Name +
+                        " hresult=0x" + error.HResult.ToString("X8") +
+                        " detail=" + detail);
+                }
             }
             catch { }
             return 1;
@@ -686,7 +705,8 @@ internal static class PalmTTYRemoteAppHost
         {
             if (!accepted)
             {
-                TerminateProcess(handle, 1);
+                // Activation may return a broker or unrelated process when
+                // package verification fails; do not terminate an unverified PID.
                 CloseHandle(handle);
             }
         }

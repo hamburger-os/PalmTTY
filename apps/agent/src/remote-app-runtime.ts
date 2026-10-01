@@ -28,6 +28,7 @@ const MAX_HELPER_STDERR_BYTES = 16 * 1024;
 const HELPER_READY_PREFIX = "PALMTTY_APP_HOST_READY ";
 const HELPER_STATE_PREFIX = "PALMTTY_APP_HOST_STATE ";
 const HELPER_REASON_PREFIX = "PALMTTY_APP_HOST_CAPTURE_REASON ";
+const HELPER_ERROR_PREFIX = "PALMTTY_APP_HOST_ERROR ";
 const ICE_GATHER_TIMEOUT_MS = 8_000;
 
 const MEDIA_STATES = new Set<AppSessionMediaState>([
@@ -86,6 +87,7 @@ export class RemoteAppRuntime {
     this.helper = child;
 
     let stderr = "";
+    let hostStartupError: string | undefined;
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => {
       stderr += chunk;
@@ -95,6 +97,10 @@ export class RemoteAppRuntime {
       const lines = stderr.split(/\r?\n/);
       stderr = lines.pop() ?? "";
       for (const line of lines) {
+        if (line.startsWith(HELPER_ERROR_PREFIX)) {
+          hostStartupError = line.slice(HELPER_ERROR_PREFIX.length).slice(0, 512);
+          continue;
+        }
         if (line.startsWith(HELPER_READY_PREFIX)) {
           const pid = Number(line.slice(HELPER_READY_PREFIX.length).trim());
           if (Number.isSafeInteger(pid) && pid > 0) this.appPid = pid;
@@ -154,7 +160,8 @@ export class RemoteAppRuntime {
       const deadline = setTimeout(() => {
         reject(new Error(
           "Windows Remote App host did not become ready" +
-          (stderr.trim() ? `: ${stderr.trim()}` : "")
+          (hostStartupError ? `: ${hostStartupError}`
+            : stderr.trim() ? `: ${stderr.trim().slice(0, 512)}` : "")
         ));
       }, 10_000);
       deadline.unref();
@@ -179,7 +186,8 @@ export class RemoteAppRuntime {
         clearTimeout(deadline);
         reject(new Error(
           `Windows Remote App host exited before ready (code=${code ?? "null"})` +
-          (stderr.trim() ? `: ${stderr.trim()}` : "")
+          (hostStartupError ? `: ${hostStartupError}`
+            : stderr.trim() ? `: ${stderr.trim().slice(0, 512)}` : "")
         ));
       });
     });
