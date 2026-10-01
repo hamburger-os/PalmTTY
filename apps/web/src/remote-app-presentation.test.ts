@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { hasPresentableVideoFrame, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint } from "./remote-app-presentation.js";
+import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint } from "./remote-app-presentation.js";
 
 const limits = { minWidth: 320, minHeight: 240, maxWidth: 1600, maxHeight: 1000 };
 
 describe("Remote App video presentation", () => {
+  it("does not report a Safari stall when native video callbacks never fired", () => {
+    expect(hasStalledVideoFrames(false, 1000, 30_000)).toBe(false);
+    expect(hasStalledVideoFrames(true, 1000, 30_000)).toBe(true);
+    expect(hasStalledVideoFrames(true, 1000, 8000)).toBe(false);
+  });
+
   it("recognizes a Safari-presentable frame only from an attached live track", () => {
     expect(hasPresentableVideoFrame(true, true, 2, 640, 480)).toBe(true);
     expect(hasPresentableVideoFrame(true, true, 4, 640, 480)).toBe(true);

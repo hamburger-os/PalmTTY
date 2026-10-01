@@ -1,6 +1,13 @@
 export type VideoFit = "contain" | "cover";
 export type RemoteAppVisualState = "waiting" | "playing" | "interrupted";
 
+/** A callback-capable Safari build is not necessarily delivering callbacks. */
+export function hasStalledVideoFrames(
+  callbackObserved: boolean, lastFrameAt: number, now: number
+): boolean {
+  return callbackObserved && lastFrameAt > 0 && now - lastFrameAt > 8000;
+}
+
 /** Safari can paint an attached live WebRTC frame before its video-frame callback fires. */
 export function hasPresentableVideoFrame(
   liveTrack: boolean, sourceAttached: boolean, mediaReadyState: number,

@@ -25,7 +25,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
-import { hasPresentableVideoFrame, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, type VideoFit } from "./remote-app-presentation.js";
+import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, type VideoFit } from "./remote-app-presentation.js";
 
 export type RemoteAppConnectionState =
   | "connecting"
@@ -163,6 +163,7 @@ export function RemoteAppView({
   const [playRejected, setPlayRejected] = useState(false);
   const [mediaDiagnostics, setMediaDiagnostics] = useState<RemoteAppMediaDiagnostics | null>(session.mediaDiagnostics ?? null);
   const videoRenderedRef = useRef(false);
+  const frameCallbackSeenRef = useRef(false);
   const activeRef = useRef(active);
   activeRef.current = active;
   const lastFrameAt = useRef(0);
@@ -267,11 +268,17 @@ export function RemoteAppView({
       setVideoTimedOut(false);
       setVideoFrozen(false);
       if (typeof video.requestVideoFrameCallback === "function") {
-        callbackId = video.requestVideoFrameCallback(frame);
+        callbackId = video.requestVideoFrameCallback(() => {
+          frameCallbackSeenRef.current = true;
+          frame();
+        });
       }
     };
     if (typeof video.requestVideoFrameCallback === "function") {
-      callbackId = video.requestVideoFrameCallback(frame);
+      callbackId = video.requestVideoFrameCallback(() => {
+        frameCallbackSeenRef.current = true;
+        frame();
+      });
     }
     const timer = window.setInterval(() => {
       if (stopped) return;
@@ -288,9 +295,9 @@ export function RemoteAppView({
       if (!activeRef.current || document.hidden) {
         // Backgrounded videos may stop callbacks without losing their stream.
         if (videoRenderedRef.current) lastFrameAt.current = Date.now();
-      } else if (videoRenderedRef.current && lastFrameAt.current > 0 &&
-          typeof video.requestVideoFrameCallback === "function" &&
-          Date.now() - lastFrameAt.current > 8000) setVideoFrozen(true);
+      } else if (videoRenderedRef.current && hasStalledVideoFrames(
+        frameCallbackSeenRef.current, lastFrameAt.current, Date.now()
+      )) setVideoFrozen(true);
     }, 1000);
     return () => {
       stopped = true;
@@ -344,6 +351,7 @@ export function RemoteAppView({
       if (controller.signal.aborted || ended) return;
       cleanupPeer();
       videoRenderedRef.current = false;
+      frameCallbackSeenRef.current = false;
       lastFrameAt.current = 0;
       setVideoRendered(false);
       setVideoTimedOut(false);
