@@ -14,6 +14,7 @@ export class RemoteTouchpadGesture {
   private centroid: GesturePoint | null = null;
   private usedTwoFingers = false;
   private moved = false;
+  private origin: GesturePoint | null = null;
 
   has(pointerId: number): boolean {
     return this.pointers.has(pointerId);
@@ -24,6 +25,7 @@ export class RemoteTouchpadGesture {
     if (this.pointers.size === 0) {
       this.usedTwoFingers = false;
       this.moved = false;
+      this.origin = point;
     }
     this.pointers.set(pointerId, point);
     if (this.pointers.size > 1) this.usedTwoFingers = true;
@@ -48,7 +50,10 @@ export class RemoteTouchpadGesture {
     this.centroid = next;
     const dx = next.x - previous.x;
     const dy = next.y - previous.y;
-    if (Math.abs(dx) + Math.abs(dy) > 0.006) this.moved = true;
+    // Evaluate the whole gesture, not just each tiny move event: a slow
+    // long drag must not end as an accidental click.
+    if (this.origin && (Math.abs(next.x - this.origin.x) +
+      Math.abs(next.y - this.origin.y)) > 0.012) this.moved = true;
     if (Math.abs(dx) + Math.abs(dy) < 0.00001) return null;
     return { type: "move", dx, dy };
   }
@@ -68,6 +73,7 @@ export class RemoteTouchpadGesture {
     this.centroid = null;
     this.usedTwoFingers = false;
     this.moved = false;
+    this.origin = null;
   }
 
   private currentCentroid(): GesturePoint | null {
