@@ -19,6 +19,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - Separate Workspace basics, nested Terminal launch settings and Remote App profiles. Remote App profiles now persist only app identity/executable/argv; capture size is automatically adapted from the live phone surface inside a 320×240–1600×1000 envelope, with a 1280×800 @ 12 fps runtime default and 4096×4096 / 12 MP source-window allocation ceiling.
 - Windows packages now include a precompiled GUI-subsystem Remote App host; source mode compiles the same helper into the private per-user App runtime on first use.
 - Add bounded detected-app / Windows `.exe` browsing and optional operator-supplied STUN/TURN ICE configuration. ICE is applied per authenticated negotiation so a durable AppWorker can use updated Agent network configuration after an Agent restart; PalmTTY does not operate a cloud relay.
+- Move the breaking layered Workspace catalog to persistence generation v2 (`workspaces-v2.json`). PalmTTY intentionally does not migrate/read the v1 catalog; the old file is left untouched for manual reference while Workspaces are recreated through the new UI.
 
 ## [0.2.0]
 
