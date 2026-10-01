@@ -22,6 +22,8 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Changed
 
+- Recompile the source-mode Windows Remote App Host automatically after native C# or compiler-option changes using a content-addressed private EXE and exact source snapshot; avoid silently reusing stale native helpers after updating the checkout.
+
 - Initialize native WebRTC only after the Windows host verifies a launched app and emits READY. MSIX startup failures retain a bounded stage/type/HRESULT instead of being masked by native teardown; never terminate a PID before package verification.
 
 - Replace the Remote App executable-only profile with a typed Win32/MSIX launch identity and increment the persistence generation to `workspaces-v3.json`; v1/v2 catalogs are left untouched and Workspaces must be recreated. This intentionally breaks the pre-release profile format. The native AppWorker receives bounded single-allocation PTF1 frames rather than repeatedly concatenating large stdout chunks.
@@ -52,6 +54,9 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - **Upgrade note:** moving from `0.1.0` to `0.2.0` requires replacing those legacy exposure fields with one explicit `local`, `lan`, `reverseProxy`, or `https` profile. PalmTTY intentionally provides no compatibility migration; review the current examples before restarting the Agent.
 
 ### Fixed
+
+- Make Windows CI and installed-runtime cleanup resilient to asynchronous detached Worker shutdown and transient Win32/antivirus file locks, without hiding actual lifecycle/test failures. Keep Dependabot Node typings on the supported Node 22 runtime major.
+
 
 - Isolate mobile Remote App touchpad gestures from browser page scrolling, eliminate phantom taps on pointer cancellation, and keep controls reachable inside VisualViewport.
 - Do not misdiagnose genuine all-black desktop content as a failed capture: retry the same authorized window then forward an ambiguous dark frame with diagnostics.

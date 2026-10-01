@@ -11,6 +11,11 @@ pnpm scripts:check
 pnpm terminal:check
 ~~~
 
+## Dependency update and Windows test hygiene
+
+- Dependency PRs must include a lockfile synchronized with their manifests and must rerun frozen-lockfile Windows/Ubuntu CI, Windows/Linux installed distribution smoke, Security Audit and CodeQL after merging current main. Do not infer compatibility from stale green checks. Keep @types/node on major 22 while the runtime/release workflows target Node 22.
+- The Windows autostart lifecycle smoke must prove the detached Worker survives the native host and finishes before temp cleanup. Installed-runtime smoke must await Agent stdio close before removing its copy; Windows-only EBUSY/EPERM/ENOTEMPTY after bounded cleanup retries is reported as deferred cleanup, never misclassified as a failed application smoke.
+
 ## Tests
 
 ~~~text
@@ -153,7 +158,7 @@ Automated/static acceptance for any Remote App change:
 - Workspace mutation and App Session creation both revalidate executable resolution;
 - Workspace deletion is blocked by active Terminal **or** active Remote App Sessions;
 - AppWorker bootstrap removes PalmTTY control/auth environment keys, requires authenticated adoption, retains recovery authority across Agent reconnect and never treats persisted PID as kill authority;
-- Windows packaging compiles the GUI-subsystem Remote App helper and installed-runtime smoke verifies a native helper is present;
+- Windows packaging compiles the GUI-subsystem Remote App helper and installed-runtime smoke verifies a native helper is present; source-mode native Host caching is content-addressed by the C# source and compiler settings, tested for stable reuse with unchanged inputs and a different filename when source changes. Compilation must use a private source snapshot matching the fingerprint, and a failed compilation must be retryable without silently using an old helper. Windows CI must compile the fingerprinted source helper (not just the packaged EXE), run an invalid-profile bootstrap, and assert its bounded startup stage/type/HRESULT output;
 - Linux/Ubuntu build/test paths do not initialize Windows capture/WebRTC native runtime merely because schemas/control-plane routes exist;
 - browser WebRTC configuration maps only bounded authenticated `remoteApps.webrtc.iceServers`; empty ICE config is valid, TURN presence is reported without implying PalmTTY operates a relay;
 - browser display hints are derived from live App-surface geometry/DPR, clamped to protocol bounds, and native code clamps again; FPS/width/height must not reappear in persisted Remote App profiles;
