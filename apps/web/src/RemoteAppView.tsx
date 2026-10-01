@@ -24,6 +24,8 @@ import {
   negotiateRemoteApp
 } from "./api.js";
 import { useI18n } from "./i18n.js";
+import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
+import { remoteDisplaySize, remoteVideoPoint, type VideoFit } from "./remote-app-presentation.js";
 
 export type RemoteAppConnectionState =
   | "connecting"
@@ -71,42 +73,14 @@ function normalizedPoint(
 }
 
 function normalizedVideoPoint(
-  element: HTMLElement,
-  video: HTMLVideoElement | null,
-  clientX: number,
-  clientY: number,
-  clamp: boolean
+  element: HTMLElement, video: HTMLVideoElement | null,
+  clientX: number, clientY: number, fit: VideoFit, clamp: boolean
 ): Point | undefined {
-  const bounds = element.getBoundingClientRect();
-  const videoWidth = video?.videoWidth ?? 0;
-  const videoHeight = video?.videoHeight ?? 0;
-  if (
-    bounds.width <= 0 ||
-    bounds.height <= 0 ||
-    videoWidth <= 0 ||
-    videoHeight <= 0
-  ) return undefined;
-
-  const scale = Math.min(
-    bounds.width / videoWidth,
-    bounds.height / videoHeight
+  return remoteVideoPoint(
+    element.getBoundingClientRect(),
+    { width: video?.videoWidth ?? 0, height: video?.videoHeight ?? 0 },
+    clientX, clientY, fit, clamp
   );
-  const contentWidth = videoWidth * scale;
-  const contentHeight = videoHeight * scale;
-  const left = bounds.left + (bounds.width - contentWidth) / 2;
-  const top = bounds.top + (bounds.height - contentHeight) / 2;
-  let x = (clientX - left) / contentWidth;
-  let y = (clientY - top) / contentHeight;
-
-  if (!clamp && (x < 0 || x > 1 || y < 0 || y > 1)) return undefined;
-  x = Math.max(0, Math.min(1, x));
-  y = Math.max(0, Math.min(1, y));
-  return { x, y };
-}
-
-function boundedEven(value: number, minimum: number, maximum: number): number {
-  const bounded = Math.max(minimum, Math.min(maximum, Math.round(value)));
-  return bounded % 2 === 0 ? bounded : bounded - 1;
 }
 
 function browserIceServers(
@@ -149,11 +123,15 @@ export function RemoteAppView({
   session,
   capabilities,
   active,
+  immersive,
+  onImmersiveChange,
   onConnectionChange
 }: {
   session: AppSessionPublic;
   capabilities: RemoteAppCapabilities | null;
   active: boolean;
+  immersive: boolean;
+  onImmersiveChange(immersive: boolean): void;
   onConnectionChange(state: RemoteAppConnectionState): void;
 }) {
   const { t } = useI18n();
@@ -161,6 +139,13 @@ export function RemoteAppView({
   const videoRef = useRef<HTMLVideoElement>(null);
   const channelRef = useRef<RTCDataChannel | null>(null);
   const [mode, setMode] = useState<InteractionMode>("view");
+  const [fit, setFit] = useState<"contain" | "cover">("contain");
+  const [adaptWindow, setAdaptWindow] = useState(false);
+  const adaptWindowRef = useRef(false);
+  adaptWindowRef.current = adaptWindow;
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [moreKeysOpen, setMoreKeysOpen] = useState(false);
+  const [showModeHint, setShowModeHint] = useState(true);
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
   const [shift, setShift] = useState(false);
@@ -172,12 +157,14 @@ export function RemoteAppView({
   const [networkIssue, setNetworkIssue] = useState(false);
   const [videoRendered, setVideoRendered] = useState(false);
   const [videoTimedOut, setVideoTimedOut] = useState(false);
+  const [videoFrozen, setVideoFrozen] = useState(false);
   const [playRejected, setPlayRejected] = useState(false);
   const [mediaDiagnostics, setMediaDiagnostics] = useState<RemoteAppMediaDiagnostics | null>(session.mediaDiagnostics ?? null);
   const videoRenderedRef = useRef(false);
+  const lastFrameAt = useRef(0);
+  const touchpad = useRef(new RemoteTouchpadGesture());
   const connectedAt = useRef<number | null>(null);
   const activePointers = useRef(new Map<number, Point>());
-  const pointerMoved = useRef(false);
   const connectionChangeRef = useRef(onConnectionChange);
 
   useEffect(() => {
@@ -205,20 +192,16 @@ export function RemoteAppView({
     if (!surface) return;
     const bounds = surface.getBoundingClientRect();
     if (bounds.width < 1 || bounds.height < 1) return;
-    const pixelRatio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    send({
-      type: "display",
-      width: boundedEven(
-        bounds.width * pixelRatio,
-        REMOTE_APP_CAPTURE_MIN_WIDTH,
-        REMOTE_APP_CAPTURE_MAX_WIDTH
-      ),
-      height: boundedEven(
-        bounds.height * pixelRatio,
-        REMOTE_APP_CAPTURE_MIN_HEIGHT,
-        REMOTE_APP_CAPTURE_MAX_HEIGHT
-      )
-    });
+    // Clamp the single scale factor before computing both dimensions;
+    // independent width/height clamps otherwise distort a portrait ratio.
+    const size = remoteDisplaySize(bounds.width, bounds.height,
+      window.devicePixelRatio || 1, {
+        minWidth: REMOTE_APP_CAPTURE_MIN_WIDTH,
+        minHeight: REMOTE_APP_CAPTURE_MIN_HEIGHT,
+        maxWidth: REMOTE_APP_CAPTURE_MAX_WIDTH,
+        maxHeight: REMOTE_APP_CAPTURE_MAX_HEIGHT
+      });
+    if (size) send({ type: "display", ...size, adaptWindow: adaptWindowRef.current });
   }, [send]);
 
   useEffect(() => {
@@ -245,8 +228,10 @@ export function RemoteAppView({
     const frame = () => {
       if (stopped) return;
       videoRenderedRef.current = true;
+      lastFrameAt.current = Date.now();
       setVideoRendered(true);
       setVideoTimedOut(false);
+      setVideoFrozen(false);
       if (typeof video.requestVideoFrameCallback === "function") {
         callbackId = video.requestVideoFrameCallback(frame);
       }
@@ -262,6 +247,9 @@ export function RemoteAppView({
           typeof video.requestVideoFrameCallback !== "function") frame();
       if (connectedAt.current !== null && !videoRenderedRef.current &&
           Date.now() - connectedAt.current > 8000) setVideoTimedOut(true);
+      if (videoRenderedRef.current && lastFrameAt.current > 0 &&
+          typeof video.requestVideoFrameCallback === "function" &&
+          Date.now() - lastFrameAt.current > 8000) setVideoFrozen(true);
     }, 1000);
     return () => {
       stopped = true;
@@ -314,8 +302,10 @@ export function RemoteAppView({
       if (controller.signal.aborted || ended) return;
       cleanupPeer();
       videoRenderedRef.current = false;
+      lastFrameAt.current = 0;
       setVideoRendered(false);
       setVideoTimedOut(false);
+      setVideoFrozen(false);
       setPlayRejected(false);
       connectionChangeRef.current(firstAttempt ? "connecting" : "reconnecting");
       firstAttempt = false;
@@ -445,7 +435,37 @@ export function RemoteAppView({
     if (!active) return;
     surfaceRef.current?.focus({ preventScroll: true });
     sendDisplayHint();
-  }, [active, sendDisplayHint]);
+  }, [active, adaptWindow, sendDisplayHint]);
+
+  useEffect(() => {
+    setShowModeHint(true);
+    const timer = window.setTimeout(() => setShowModeHint(false), 3600);
+    return () => window.clearTimeout(timer);
+  }, [mode]);
+
+  useEffect(() => {
+    if (!active || mode === "view") return;
+    const surface = surfaceRef.current;
+    if (!surface) return;
+    // Mobile Safari may ignore React's synthetic preventDefault for native
+    // scroll gestures. Claim touchmove only inside the active remote surface;
+    // view mode deliberately preserves normal browser pinch/scroll.
+    const preventNativeScroll = (event: TouchEvent) => {
+      if (event.cancelable) event.preventDefault();
+    };
+    surface.addEventListener("touchmove", preventNativeScroll, { passive: false });
+    return () => surface.removeEventListener("touchmove", preventNativeScroll);
+  }, [active, mode]);
+
+  useEffect(() => () => {
+    if (mode === "direct") {
+      for (const point of activePointers.current.values()) {
+        send({ type: "pointer", action: "up", x: point.x, y: point.y, button: 0 });
+      }
+    }
+    activePointers.current.clear();
+    touchpad.current.cancel();
+  }, [mode, send]);
 
   const sendKey = (key: string) => {
     const common = {
@@ -464,126 +484,102 @@ export function RemoteAppView({
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (mode === "view") return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (!active || mode === "view") return;
     if (mode === "direct") {
       const point = normalizedVideoPoint(
-        event.currentTarget,
-        videoRef.current,
-        event.clientX,
-        event.clientY,
-        false
+        event.currentTarget, videoRef.current, event.clientX, event.clientY, fit, false
       );
       if (!point) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
       activePointers.current.set(event.pointerId, point);
       send({
-        type: "pointer",
-        action: "down",
-        x: point.x,
-        y: point.y,
+        type: "pointer", action: "down", x: point.x, y: point.y,
         button: Math.max(0, Math.min(2, event.button))
       });
       return;
     }
-
-    const point = normalizedPoint(
-      event.currentTarget,
-      event.clientX,
-      event.clientY
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    touchpad.current.down(
+      event.pointerId,
+      normalizedPoint(event.currentTarget, event.clientX, event.clientY)
     );
-    activePointers.current.set(event.pointerId, point);
-    pointerMoved.current = false;
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (mode === "view" || !activePointers.current.has(event.pointerId)) return;
-    event.preventDefault();
-    const previous = activePointers.current.get(event.pointerId)!;
-
+    if (!active || mode === "view") return;
     if (mode === "direct") {
+      if (!activePointers.current.has(event.pointerId)) return;
+      event.preventDefault();
       const point = normalizedVideoPoint(
-        event.currentTarget,
-        videoRef.current,
-        event.clientX,
-        event.clientY,
-        true
+        event.currentTarget, videoRef.current, event.clientX, event.clientY, fit, true
       );
       if (!point) return;
       activePointers.current.set(event.pointerId, point);
-      send({
-        type: "pointer",
-        action: "move",
-        x: point.x,
-        y: point.y,
-        button: 0
-      });
+      send({ type: "pointer", action: "move", x: point.x, y: point.y, button: 0 });
       return;
     }
-
-    const point = normalizedPoint(
-      event.currentTarget,
-      event.clientX,
-      event.clientY
+    if (!touchpad.current.has(event.pointerId)) return;
+    event.preventDefault();
+    const motion = touchpad.current.move(
+      event.pointerId,
+      normalizedPoint(event.currentTarget, event.clientX, event.clientY)
     );
-    activePointers.current.set(event.pointerId, point);
-    const pointers = [...activePointers.current.values()];
-    if (pointers.length >= 2) {
+    if (!motion) return;
+    if (motion.type === "scroll") {
       send({
         type: "wheel",
-        deltaX: (point.x - previous.x) * event.currentTarget.clientWidth * 3,
-        deltaY: (point.y - previous.y) * event.currentTarget.clientHeight * 3
+        deltaX: Math.max(-4096, Math.min(4096,
+          motion.dx * event.currentTarget.clientWidth * 3)),
+        deltaY: Math.max(-4096, Math.min(4096,
+          motion.dy * event.currentTarget.clientHeight * 3))
       });
-      pointerMoved.current = true;
-      return;
+    } else {
+      send({
+        type: "pointerRelative",
+        dx: Math.max(-1, Math.min(1, motion.dx * 1.6)),
+        dy: Math.max(-1, Math.min(1, motion.dy * 1.6)),
+        action: "move", button: 0
+      });
     }
-
-    const dx = point.x - previous.x;
-    const dy = point.y - previous.y;
-    if (Math.abs(dx) + Math.abs(dy) > 0.003) pointerMoved.current = true;
-    send({
-      type: "pointerRelative",
-      dx: Math.max(-1, Math.min(1, dx * 1.6)),
-      dy: Math.max(-1, Math.min(1, dy * 1.6)),
-      action: "move",
-      button: 0
-    });
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (mode === "view") return;
     event.preventDefault();
-    const previous = activePointers.current.get(event.pointerId);
-    activePointers.current.delete(event.pointerId);
-    try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* ignore */ }
-
+    try { event.currentTarget.releasePointerCapture(event.pointerId); }
+    catch { /* Browser may already have released the pointer. */ }
     if (mode === "direct") {
+      const previous = activePointers.current.get(event.pointerId);
+      if (!previous) return;
+      activePointers.current.delete(event.pointerId);
       const point = normalizedVideoPoint(
-        event.currentTarget,
-        videoRef.current,
-        event.clientX,
-        event.clientY,
-        true
+        event.currentTarget, videoRef.current, event.clientX, event.clientY, fit, true
       ) ?? previous;
-      if (!point) return;
-      send({
-        type: "pointer",
-        action: "up",
-        x: point.x,
-        y: point.y,
-        button: Math.max(0, Math.min(2, event.button))
-      });
+      send({ type: "pointer", action: "up", x: point.x, y: point.y,
+        button: Math.max(0, Math.min(2, event.button)) });
       return;
     }
-
-    if (!pointerMoved.current && activePointers.current.size === 0) {
+    if (touchpad.current.up(event.pointerId)) {
       send({ type: "pointerRelative", dx: 0, dy: 0, action: "down", button: 0 });
       send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
     }
   };
 
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (mode === "direct") {
+      const previous = activePointers.current.get(event.pointerId);
+      if (previous) {
+        activePointers.current.delete(event.pointerId);
+        send({ type: "pointer", action: "up",
+          x: previous.x, y: previous.y, button: 0 });
+      }
+    } else touchpad.current.cancel();
+  };
+
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
-    if (mode === "view") return;
+    if (!active || mode === "view") return;
     event.preventDefault();
     send({
       type: "wheel",
@@ -598,6 +594,8 @@ export function RemoteAppView({
       : t("remoteApp.networkNoRelay"))
     : playRejected
       ? t("remoteApp.playBlocked")
+      : videoFrozen
+        ? t("remoteApp.videoFrozen")
       : videoTimedOut
         ? mediaDiagnostics && mediaDiagnostics.sourceFrames === 0
           ? t("remoteApp.noSourceFrames")
@@ -614,29 +612,6 @@ export function RemoteAppView({
 
   return (
     <section className="remote-app-view">
-      <div className="remote-app-toolbar">
-        <div className="remote-app-modes" role="group" aria-label={t("remoteApp.mode")}>
-          {(["view", "direct", "touchpad"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              className={mode === item ? "selected compact" : "ghost compact"}
-              onClick={() => setMode(item)}
-            >
-              {t(interactionModeLabelKey(item))}
-            </button>
-          ))}
-        </div>
-        <span className="remote-app-quality">{t("remoteApp.qualityAuto")}</span>
-        <button
-          type="button"
-          className="ghost compact"
-          onClick={() => setTextOpen((value) => !value)}
-        >
-          {t("remoteApp.text")}
-        </button>
-      </div>
-
       <div
         ref={surfaceRef}
         className={"remote-app-surface mode-" + mode}
@@ -644,13 +619,59 @@ export function RemoteAppView({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         onWheel={handleWheel}
         onContextMenu={(event) => {
           if (mode !== "view") event.preventDefault();
         }}
       >
-        <video ref={videoRef} autoPlay playsInline muted />
+        <video ref={videoRef} className={"fit-" + fit}
+          autoPlay playsInline muted />
+        <div className="remote-app-toolbar"
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerMove={(event) => event.stopPropagation()}
+          onPointerUp={(event) => event.stopPropagation()}
+          onPointerCancel={(event) => event.stopPropagation()}
+          onWheel={(event) => event.stopPropagation()}>
+          <div className="remote-app-modes" role="group"
+            aria-label={t("remoteApp.mode")}>
+            {(["view", "touchpad", "direct"] as const).map((item) => (
+              <button key={item} type="button"
+                className={mode === item ? "selected compact" : "ghost compact"}
+                aria-pressed={mode === item}
+                onClick={() => setMode(item)}>
+                {t(interactionModeLabelKey(item))}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="ghost compact remote-app-options-trigger"
+            aria-label={t("remoteApp.options")}
+            aria-expanded={optionsOpen}
+            onClick={() => setOptionsOpen((previous) => !previous)}>⋯</button>
+          {optionsOpen && (
+            <div className="remote-app-options">
+              <button type="button" className="ghost compact"
+                onClick={() => setFit((current) => current === "contain" ? "cover" : "contain")}>
+                {fit === "contain" ? t("remoteApp.fillScreen") : t("remoteApp.showAll")}
+              </button>
+              <button type="button" className={adaptWindow ? "selected compact" : "ghost compact"}
+                aria-pressed={adaptWindow}
+                onClick={() => setAdaptWindow((previous) => !previous)}>
+                {t("remoteApp.adaptWindow")}
+              </button>
+              <button type="button" className="ghost compact"
+                aria-pressed={immersive}
+                onClick={() => onImmersiveChange(!immersive)}>
+                {immersive ? t("remoteApp.exitImmersive") : t("remoteApp.immersive")}
+              </button>
+              <button type="button" className="ghost compact"
+                onClick={() => { setTextOpen((current) => !current); setOptionsOpen(false); }}>
+                {t("remoteApp.text")}
+              </button>
+              <span className="remote-app-quality">{t("remoteApp.qualityAuto")}</span>
+            </div>
+          )}
+        </div>
         <details className="remote-app-diagnostics"
           onPointerDown={(event) => event.stopPropagation()}
           onPointerMove={(event) => event.stopPropagation()}
@@ -667,6 +688,9 @@ export function RemoteAppView({
           )}
           <span>{t("remoteApp.videoState")}: {videoRendered ? t("remoteApp.videoReady") :
             t("remoteApp.videoWaiting")}</span>
+          {videoRendered && videoRef.current && (
+            <span>{videoRef.current.videoWidth} × {videoRef.current.videoHeight}</span>
+          )}
         </details>
         {diagnostic ? (
           <div className="remote-app-status-overlay glass-content"
@@ -688,7 +712,7 @@ export function RemoteAppView({
                 }}>{t("remoteApp.retryPlay")}</button>
             )}
           </div>
-        ) : videoRendered ? (
+        ) : videoRendered && showModeHint ? (
           <div className="remote-app-mode-hint">
             {t(interactionModeHintKey(mode))}
           </div>
@@ -727,42 +751,42 @@ export function RemoteAppView({
         </div>
       )}
 
-      <div className="remote-app-keybar" aria-label={t("remoteApp.keys")}>
-        <button
-          type="button"
-          className={ctrl ? "selected compact" : "ghost compact"}
-          onClick={() => setCtrl((value) => !value)}
-        >Ctrl</button>
-        <button
-          type="button"
-          className={alt ? "selected compact" : "ghost compact"}
-          onClick={() => setAlt((value) => !value)}
-        >Alt</button>
-        <button
-          type="button"
-          className={shift ? "selected compact" : "ghost compact"}
-          onClick={() => setShift((value) => !value)}
-        >Shift</button>
-        {([
-          ["Escape", "Esc"],
-          ["Tab", "Tab"],
-          ["Enter", "Enter"],
-          ["ArrowLeft", "←"],
-          ["ArrowUp", "↑"],
-          ["ArrowDown", "↓"],
-          ["ArrowRight", "→"],
-          ["Backspace", "⌫"],
-          ["Delete", "Del"]
-        ] as const).map(([key, label]) => (
-          <button
-            type="button"
-            className="ghost compact"
-            key={key}
-            onClick={() => sendKey(key)}
-          >
-            {label}
+      <div className="remote-app-dock">
+        {moreKeysOpen && (
+          <div className="remote-app-extra-keys" aria-label={t("remoteApp.extraKeys")}>
+            {([
+              ["ArrowLeft", "←"], ["ArrowUp", "↑"],
+              ["ArrowDown", "↓"], ["ArrowRight", "→"],
+              ["Backspace", "⌫"], ["Delete", "Del"]
+            ] as const).map(([key, label]) => (
+              <button key={key} type="button" className="ghost compact"
+                onClick={() => sendKey(key)}>{label}</button>
+            ))}
+          </div>
+        )}
+        <div className="remote-app-keybar-shell">
+          <div className="remote-app-keybar" aria-label={t("remoteApp.keys")}>
+            <button type="button" aria-pressed={ctrl}
+              className={ctrl ? "selected compact" : "ghost compact"}
+              onClick={() => setCtrl((value) => !value)}>Ctrl</button>
+            <button type="button" aria-pressed={alt}
+              className={alt ? "selected compact" : "ghost compact"}
+              onClick={() => setAlt((value) => !value)}>Alt</button>
+            <button type="button" aria-pressed={shift}
+              className={shift ? "selected compact" : "ghost compact"}
+              onClick={() => setShift((value) => !value)}>Shift</button>
+            {([["Escape", "Esc"], ["Tab", "Tab"], ["Enter", "Enter"]] as const)
+              .map(([key, label]) => (
+                <button key={key} type="button" className="ghost compact"
+                  onClick={() => sendKey(key)}>{label}</button>
+              ))}
+          </div>
+          <button type="button" className="ghost compact remote-app-more-keys"
+            aria-expanded={moreKeysOpen}
+            onClick={() => setMoreKeysOpen((previous) => !previous)}>
+            {moreKeysOpen ? t("remoteApp.fewerKeys") : t("remoteApp.moreKeys")}
           </button>
-        ))}
+        </div>
       </div>
     </section>
   );

@@ -28,6 +28,7 @@ const MAX_HELPER_STDERR_BYTES = 16 * 1024;
 const HELPER_READY_PREFIX = "PALMTTY_APP_HOST_READY ";
 const HELPER_STATE_PREFIX = "PALMTTY_APP_HOST_STATE ";
 const HELPER_REASON_PREFIX = "PALMTTY_APP_HOST_CAPTURE_REASON ";
+const HELPER_ERROR_PREFIX = "PALMTTY_APP_HOST_ERROR ";
 const ICE_GATHER_TIMEOUT_MS = 8_000;
 
 const MEDIA_STATES = new Set<AppSessionMediaState>([
@@ -58,7 +59,7 @@ export class RemoteAppRuntime {
   private lastFrameStatusAt = 0;
   private nativeFailure: "window-not-found" | "window-too-large" |
     "printwindow-failed" | "blank-window" | "capture-exception" |
-    "frame-write-failed" | undefined;
+    "frame-write-failed" | "window-resize-rejected" | undefined;
   private helperMediaState: AppSessionMediaState = "launching";
   private readonly statusListeners = new Set<StatusListener>();
   private readonly exitListeners = new Set<ExitListener>();
@@ -74,10 +75,9 @@ export class RemoteAppRuntime {
     if (process.platform !== "win32") {
       throw new Error("Remote Apps are currently supported only on Windows");
     }
-    this.wrtc = loadWebRtc();
-    this.videoSource = new this.wrtc.nonstandard.RTCVideoSource();
-    this.videoTrack = this.videoSource.createTrack();
-
+    // Starting native WebRTC before the Windows host becomes READY lets an
+    // ordinary MSIX activation failure enter buggy native addon teardown.
+    // Keep launch errors in JavaScript until an owned application exists.
     const child = spawn(this.bootstrap.helperPath, [], {
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
@@ -86,6 +86,7 @@ export class RemoteAppRuntime {
     this.helper = child;
 
     let stderr = "";
+    let hostStartupError: string | undefined;
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => {
       stderr += chunk;
@@ -95,6 +96,10 @@ export class RemoteAppRuntime {
       const lines = stderr.split(/\r?\n/);
       stderr = lines.pop() ?? "";
       for (const line of lines) {
+        if (line.startsWith(HELPER_ERROR_PREFIX)) {
+          hostStartupError = line.slice(HELPER_ERROR_PREFIX.length).slice(0, 512);
+          continue;
+        }
         if (line.startsWith(HELPER_READY_PREFIX)) {
           const pid = Number(line.slice(HELPER_READY_PREFIX.length).trim());
           if (Number.isSafeInteger(pid) && pid > 0) this.appPid = pid;
@@ -104,7 +109,8 @@ export class RemoteAppRuntime {
           const reason = line.slice(HELPER_REASON_PREFIX.length).trim();
           const valid = [
             "window-not-found", "window-too-large", "printwindow-failed",
-            "blank-window", "capture-exception", "frame-write-failed"
+            "blank-window", "capture-exception", "frame-write-failed",
+            "window-resize-rejected"
           ];
           this.nativeFailure = valid.includes(reason)
             ? reason as typeof this.nativeFailure
@@ -154,7 +160,8 @@ export class RemoteAppRuntime {
       const deadline = setTimeout(() => {
         reject(new Error(
           "Windows Remote App host did not become ready" +
-          (stderr.trim() ? `: ${stderr.trim()}` : "")
+          (hostStartupError ? `: ${hostStartupError}`
+            : stderr.trim() ? `: ${stderr.trim().slice(0, 512)}` : "")
         ));
       }, 10_000);
       deadline.unref();
@@ -179,11 +186,15 @@ export class RemoteAppRuntime {
         clearTimeout(deadline);
         reject(new Error(
           `Windows Remote App host exited before ready (code=${code ?? "null"})` +
-          (stderr.trim() ? `: ${stderr.trim()}` : "")
+          (hostStartupError ? `: ${hostStartupError}`
+            : stderr.trim() ? `: ${stderr.trim().slice(0, 512)}` : "")
         ));
       });
     });
 
+    this.wrtc = loadWebRtc();
+    this.videoSource = new this.wrtc.nonstandard.RTCVideoSource();
+    this.videoTrack = this.videoSource.createTrack();
     this.state = "running";
     this.publishStatus();
   }

@@ -35,6 +35,14 @@ Presentation is automatic. The browser sends a bounded display-size hint when th
 
 The Workbench can switch among live Activities for the same Workspace without returning to the home page, while Git/Files remain shared Workspace tools.
 
+### Portrait-first Remote App presentation
+
+Remote Apps now prioritize the video surface over permanent controls. On phones the Workbench header fits one line; Git/Files live behind a reachable Tools toggle, and an immersive option hides the header without hiding the exit action. Pointer modes float inside the video, while the core key strip stays above mobile browser chrome and navigation keys open on demand.
+
+View mode preserves browser pinch. Direct Touch and Trackpad modes claim only gestures beginning inside the active remote surface, using a bounded gesture state machine for single-finger move/tap and two-finger centroid scroll. A cancelled or partially lifted gesture never generates a phantom click. Video defaults to complete-window contain; optional cover fills the available area but crops edges with matching remote touch mapping.
+
+The optional **Resize PC window for phone** switch attempts to resize only the session-owned verified HWND within protocol limits, and attempts to restore its original dimensions when disabled or the helper stops. Some desktop apps enforce a minimum width and cannot become native mobile UIs. Display hints remain presentation state, not an executable/PID/HWND selection channel. Native WebRTC is initialized only after the Windows app reaches READY; on an MSIX launch failure the browser receives the bounded native startup stage, error type and HRESULT instead of a misleading addon teardown code. Fully dark successful captures remain ambiguous: after retrying the same authorized window, PalmTTY forwards the frame with a blank-window diagnostic rather than treating every black theme as failed.
+
 ### Connection and capture diagnostics
 
 PalmTTY distinguishes these states and exposes received/submitted video-frame counts, conversion failures and browser decoded-frame readiness instead of treating an ICE connection as successful video:
@@ -94,6 +102,14 @@ App 画面提供三种显式模式：
 画面策略自动适配。手机 Surface 尺寸或横竖屏变化时，浏览器发送有界 display hint，Windows helper 在 PalmTTY 硬上限内缩放捕获；UI 只显示“**画质 · 自动**”，不再让用户手工配置 FPS/宽高。
 
 同一 Workspace 的多个活动可以直接在 Workbench 中切换，无需返回首页；Git/Files 仍是共享 Workspace Tool。
+
+### 面向手机竖屏的沉浸式交互
+
+远程 App 改为画面优先：手机工作区顶栏压缩为一行，Git/文件位于可展开的“工具”，沉浸模式隐藏顶栏但保留退出入口。操作模式浮于视频内；核心快捷键条始终位于 Safari 工具栏之上，方向键和删除键可以按需展开。
+
+查看模式保留浏览器捏合；直触与触控板模式只接管从远程画面内开始的触摸。独立手势状态机区分单指移动/点击、双指中心滚动以及取消/部分抬起，避免误触。默认完整等比显示，裁切铺满作为显式可选操作，并同步修正触控映射。
+
+“适应手机（调整电脑窗口）”是单独的用户开关，只尝试有界调整当前 App Session 验证过的 HWND，关闭或退出时尝试恢复原尺寸。部分桌面软件限制最小宽度，不能承诺自动生成原生手机布局。MSIX 启动失败显示受限长度的阶段、异常类型和 HRESULT；Windows 应用 READY 之前不加载原生 WebRTC。纯黑帧不能独立证明捕获失败，完成同一合法窗口重试后仍会发送并提示歧义。
 
 ### 连接与捕获诊断
 

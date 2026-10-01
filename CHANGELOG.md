@@ -10,6 +10,9 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
+- Introduce portrait-first Remote App immersion: in-video mode/options, single-row phone header with on-demand Git/Files, optional full-window or cropped fill, opt-in bounded current-window resize, and a pinned expandable key dock.
+- Add independent two-finger centroid gesture tests and detection of video stalls after first-frame success.
+
 - Detect current-user Microsoft Store/MSIX apps by registered AUMID with a typed Win32/packaged launch model; packaged activation verifies a fresh PID, exact package family and mandatory PalmTTY Job ownership before remote control.
 - Add Remote App video-stage diagnostics (native/Worker received and submitted frames, conversion failures, browser decoded-frame watchdog) and a Windows installed native WebRTC round-trip smoke.
 
@@ -18,6 +21,8 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - Add mobile Remote App View / direct-touch / trackpad modes, two-finger scrolling, special keys, Unicode text/IME/dictation input, automatic viewport/DPR capture sizing and explicit capture/network diagnostics.
 
 ### Changed
+
+- Initialize native WebRTC only after the Windows host verifies a launched app and emits READY. MSIX startup failures retain a bounded stage/type/HRESULT instead of being masked by native teardown; never terminate a PID before package verification.
 
 - Replace the Remote App executable-only profile with a typed Win32/MSIX launch identity and increment the persistence generation to `workspaces-v3.json`; v1/v2 catalogs are left untouched and Workspaces must be recreated. This intentionally breaks the pre-release profile format. The native AppWorker receives bounded single-allocation PTF1 frames rather than repeatedly concatenating large stdout chunks.
 
@@ -47,6 +52,9 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - **Upgrade note:** moving from `0.1.0` to `0.2.0` requires replacing those legacy exposure fields with one explicit `local`, `lan`, `reverseProxy`, or `https` profile. PalmTTY intentionally provides no compatibility migration; review the current examples before restarting the Agent.
 
 ### Fixed
+
+- Isolate mobile Remote App touchpad gestures from browser page scrolling, eliminate phantom taps on pointer cancellation, and keep controls reachable inside VisualViewport.
+- Do not misdiagnose genuine all-black desktop content as a failed capture: retry the same authorized window then forward an ambiguous dark frame with diagnostics.
 - Retry standard PrintWindow on the same verified window when full-content capture fails or yields blank pixels, and report bounded native capture failure reasons. Stop reporting successful video merely because PrintWindow or WebRTC signaling succeeded; show the actual browser playback state and provide a manual-play action when autoplay is blocked.
 - Use an almost opaque theme-aware modal backing to keep the mobile App picker legible over the Workbench; use a semantic opaque video background to prevent the ambient gradient showing through an empty Remote App viewport.
 - Expand Windows Remote App discovery beyond PATH to known install roots, App Paths and capped Start Menu shortcut targets, and add searchable mobile results. Detect missing/incompatible native `@roamhq/wrtc` before AppWorker launch and validate the packaged WebRTC addon during Windows installed-runtime smoke.

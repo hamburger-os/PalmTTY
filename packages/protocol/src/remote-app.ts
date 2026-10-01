@@ -139,7 +139,7 @@ export const RemoteAppMediaDiagnosticsSchema = z.object({
   failure: z.enum(["invalid-frame", "frame-conversion"]).optional(),
   nativeFailure: z.enum([
     "window-not-found", "window-too-large", "printwindow-failed",
-    "blank-window", "capture-exception", "frame-write-failed"
+    "blank-window", "capture-exception", "frame-write-failed", "window-resize-rejected"
   ]).optional()
 }).strict();
 export type RemoteAppMediaDiagnostics = z.infer<typeof RemoteAppMediaDiagnosticsSchema>;
@@ -279,7 +279,10 @@ export const RemoteAppControlMessageSchema = z.discriminatedUnion("type", [
       .max(REMOTE_APP_CAPTURE_MAX_WIDTH),
     height: z.number().int()
       .min(REMOTE_APP_CAPTURE_MIN_HEIGHT)
-      .max(REMOTE_APP_CAPTURE_MAX_HEIGHT)
+      .max(REMOTE_APP_CAPTURE_MAX_HEIGHT),
+    // Explicit user choice. Display hints without this flag never resize
+    // the Windows app; control never accepts an arbitrary HWND.
+    adaptWindow: z.boolean()
   }).strict()
 ]);
 export type RemoteAppControlMessage = z.infer<typeof RemoteAppControlMessageSchema>;

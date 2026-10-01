@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.10.0"
+  version: "1.11.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -64,6 +64,10 @@ Surface tiers:
 - `.glass-card`: workspace/session cards derived from the same physics.
 
 A visual region has one surface owner. Do not stack equivalent glass surfaces merely to make an element look "more glassy".
+
+### Immersive Remote App on phones
+
+The remote app video is the one visual owner of all available workbench content height. Overlay pointer mode controls and diagnostics must use semantic `--flat-modal` rather than opaque hard-coded palettes or permanent additional grid rows. The one-row mobile Workspace header can collapse into a Tools overlay; immersive mode retains an exit button inside the video. The bottom core key dock remains reachable inside VisualViewport above browser chrome, with an explicit expandable second row. Complete aspect-ratio display is default; cropped cover is optional and its pointer mapping must be adjusted without image stretching. Remote App native touch ownership must not steal xterm's independent gesture path.
 
 ## 4. Theme identity
 

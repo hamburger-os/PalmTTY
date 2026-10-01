@@ -32,6 +32,9 @@ internal static class PalmTTYRemoteAppHost
     private const int DWMWA_CLOAKED = 14;
     private const uint PW_RENDERFULLCONTENT = 0x00000002;
     private const int SW_RESTORE = 9;
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_NOACTIVATE = 0x0010;
     private static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 =
         new IntPtr(-4);
 
@@ -143,6 +146,9 @@ internal static class PalmTTYRemoteAppHost
 
         [DataMember(Name = "height")]
         public int Height { get; set; }
+
+        [DataMember(Name = "adaptWindow")]
+        public bool AdaptWindow { get; set; }
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -381,6 +387,10 @@ internal static class PalmTTYRemoteAppHost
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+        int x, int y, int cx, int cy, uint uFlags);
+
     [DllImport("dwmapi.dll")]
     private static extern int DwmGetWindowAttribute(
         IntPtr hwnd,
@@ -436,6 +446,14 @@ internal static class PalmTTYRemoteAppHost
 
     private static readonly object TargetLock = new object();
     private static readonly object OutputLock = new object();
+    private static readonly object AdaptLock = new object();
+    private static bool AdaptRequested;
+    private static int AdaptWidth;
+    private static int AdaptHeight;
+    private static IntPtr AdaptedWindow = IntPtr.Zero;
+    private static RECT OriginalWindowRect;
+    private static int LastAppliedWidth;
+    private static int LastAppliedHeight;
     private static readonly object StateLock = new object();
     private static IntPtr JobHandle = IntPtr.Zero;
     private static IntPtr TargetWindow = IntPtr.Zero;
@@ -445,6 +463,7 @@ internal static class PalmTTYRemoteAppHost
     private static volatile int CaptureMaxHeight = 800;
     private static string LastMediaState = "";
     private static string LastCaptureReason = "";
+    private static string StartupStage = "bootstrap";
     private static BinaryWriter Output;
     private static StreamWriter ErrorOutput;
 
@@ -471,17 +490,21 @@ internal static class PalmTTYRemoteAppHost
             {
                 throw new InvalidDataException("Remote App host bootstrap was empty");
             }
+            StartupStage = "validate-profile";
             AppConfig config = ParseJson<AppConfig>(firstLine);
             ValidateConfig(config);
             CaptureMaxWidth = config.MaxWidth;
             CaptureMaxHeight = config.MaxHeight;
 
+            StartupStage = "create-job";
             job = CreateConfiguredJob();
             JobHandle = job;
             bool packaged = String.Equals(config.Kind, "packaged", StringComparison.Ordinal);
+            StartupStage = packaged ? "activate-msix" : "create-win32";
             process = packaged
                 ? StartPackagedApplication(config)
                 : StartApplicationSuspended(config);
+            StartupStage = "assign-job";
             if (!AssignProcessToJobObject(job, process.hProcess))
             {
                 // Windows Store may deny assignment to an existing OS Job.
@@ -489,6 +512,7 @@ internal static class PalmTTYRemoteAppHost
                 if (packaged) TerminateProcess(process.hProcess, 1);
                 ThrowLastError("AssignProcessToJobObject (the packaged app must be newly launched and job-ownable)");
             }
+            StartupStage = "resume-process";
             if (!packaged)
             {
                 if (ResumeThread(process.hThread) == RESUME_FAILED)
@@ -499,6 +523,7 @@ internal static class PalmTTYRemoteAppHost
                 process.hThread = IntPtr.Zero;
             }
 
+            StartupStage = "ready";
             ErrorOutput.WriteLine("PALMTTY_APP_HOST_READY " + process.dwProcessId.ToString());
             PublishMediaState("waiting-for-window");
 
@@ -521,7 +546,19 @@ internal static class PalmTTYRemoteAppHost
         {
             try
             {
-                if (ErrorOutput != null) ErrorOutput.WriteLine("PALMTTY_APP_HOST_ERROR " + error.Message);
+                if (ErrorOutput != null)
+                {
+                    // A structured bounded error must reach the Agent before
+                    // native WebRTC's later process teardown can fault.
+                    string detail = error.Message ?? "";
+                    detail = detail.Replace('\r', ' ').Replace('\n', ' ');
+                    if (detail.Length > 180) detail = detail.Substring(0, 180);
+                    ErrorOutput.WriteLine(
+                        "PALMTTY_APP_HOST_ERROR stage=" + StartupStage +
+                        " type=" + error.GetType().Name +
+                        " hresult=0x" + error.HResult.ToString("X8") +
+                        " detail=" + detail);
+                }
             }
             catch { }
             return 1;
@@ -529,6 +566,7 @@ internal static class PalmTTYRemoteAppHost
         finally
         {
             Stopping = true;
+            RestoreAdaptedWindow();
             if (process.hThread != IntPtr.Zero) CloseHandle(process.hThread);
             if (process.hProcess != IntPtr.Zero) CloseHandle(process.hProcess);
             if (job != IntPtr.Zero) CloseHandle(job);
@@ -686,7 +724,8 @@ internal static class PalmTTYRemoteAppHost
         {
             if (!accepted)
             {
-                TerminateProcess(handle, 1);
+                // Activation may return a broker or unrelated process when
+                // package verification fails; do not terminate an unverified PID.
                 CloseHandle(handle);
             }
         }
@@ -814,13 +853,22 @@ internal static class PalmTTYRemoteAppHost
                 }
                 else
                 {
+                    ApplyRequestedWindowSize(hwnd);
+                    // The window may enforce its own minimum dimensions.
+                    // Input/capture always use the actual post-resize bounds.
+                    if (!TryGetWindowBounds(hwnd, out rect))
+                    {
+                        PublishCaptureReason("window-not-found");
+                        PublishMediaState("waiting-for-window");
+                        Thread.Sleep(delay);
+                        continue;
+                    }
                     if (!streaming && captureFailures == 0)
                     {
                         PublishMediaState("waiting-for-frame");
                     }
                     if (CaptureWindow(hwnd, rect, CaptureMaxWidth, CaptureMaxHeight))
                     {
-                        PublishCaptureReason("none");
                         captureFailures = 0;
                         streaming = true;
                         PublishMediaState("streaming");
@@ -1005,6 +1053,52 @@ internal static class PalmTTYRemoteAppHost
         return bounds.Width >= 1 && bounds.Height >= 1;
     }
 
+    private static void ApplyRequestedWindowSize(IntPtr hwnd)
+    {
+        lock (AdaptLock)
+        {
+            if (!AdaptRequested || !IsOwnedWindow(hwnd)) return;
+            int width = Math.Max(320, Math.Min(1600, AdaptWidth));
+            int height = Math.Max(240, Math.Min(1000, AdaptHeight));
+            if (AdaptedWindow != hwnd)
+            {
+                RestoreAdaptedWindowLocked();
+                RECT original;
+                if (!GetWindowRect(hwnd, out original)) return;
+                OriginalWindowRect = original;
+                AdaptedWindow = hwnd;
+            }
+            if (LastAppliedWidth == width && LastAppliedHeight == height) return;
+            // Only resize the current Job-owned HWND. Never move it, select
+            // another window, resize the desktop or elevate to bypass the OS.
+            if (SetWindowPos(hwnd, IntPtr.Zero, 0, 0, width, height,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE))
+            {
+                LastAppliedWidth = width;
+                LastAppliedHeight = height;
+            }
+            else PublishCaptureReason("window-resize-rejected");
+        }
+    }
+
+    private static void RestoreAdaptedWindow()
+    {
+        lock (AdaptLock) RestoreAdaptedWindowLocked();
+    }
+
+    private static void RestoreAdaptedWindowLocked()
+    {
+        IntPtr hwnd = AdaptedWindow;
+        AdaptedWindow = IntPtr.Zero;
+        LastAppliedWidth = 0;
+        LastAppliedHeight = 0;
+        if (hwnd == IntPtr.Zero || !IsOwnedWindow(hwnd)) return;
+        RECT original = OriginalWindowRect;
+        if (original.Width < 64 || original.Height < 64) return;
+        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, original.Width, original.Height,
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
     private static bool CaptureWindow(IntPtr hwnd, RECT rect, int maxWidth, int maxHeight)
     {
         // Ownership is revalidated immediately before capture, not merely
@@ -1049,11 +1143,10 @@ internal static class PalmTTYRemoteAppHost
                 PublishCaptureReason("printwindow-failed");
                 return false;
             }
-            if (!HasVisiblePixels(source))
-            {
-                PublishCaptureReason("blank-window");
-                return false;
-            }
+            // Uniform near-black desktop themes and splash screens may be
+            // legitimate. Keep forwarding a successful PrintWindow frame, but
+            // report the ambiguity instead of declaring video unavailable.
+            PublishCaptureReason(HasVisiblePixels(source) ? "none" : "blank-window");
 
             double scale = Math.Min(
                 1.0,
@@ -1176,6 +1269,13 @@ internal static class PalmTTYRemoteAppHost
             int height = Math.Max(240, Math.Min(1000, message.Height));
             CaptureMaxWidth = width & ~1;
             CaptureMaxHeight = height & ~1;
+            lock (AdaptLock)
+            {
+                AdaptRequested = message.AdaptWindow;
+                AdaptWidth = CaptureMaxWidth;
+                AdaptHeight = CaptureMaxHeight;
+                if (!AdaptRequested) RestoreAdaptedWindowLocked();
+            }
             return;
         }
 

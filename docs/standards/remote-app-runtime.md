@@ -34,3 +34,8 @@ MSIX and media diagnostic references:
 - HTMLVideoElement.requestVideoFrameCallback: https://developer.mozilla.org/docs/Web/API/HTMLVideoElement/requestVideoFrameCallback
 
 MSIX activation returns a PID but does not prove ownership. PalmTTY requires a fresh process, exact package-family verification and successful Job assignment before granting capture/input. Window-only PrintWindow remains the actual capture backend pending real Windows Graphics Capture integration; synthetic WebRTC round-trip smoke does not prove any particular real application's PrintWindow compatibility.
+
+- SetWindowPos for consented current-HWND sizing: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowpos
+- Touch gesture ownership: https://www.w3.org/TR/pointerevents/#the-touch-action-css-property
+
+PalmTTY's optional per-session adaptWindow display flag can resize only the already verified Job-owned HWND and must restore its original size on disable or helper shutdown; this does not broaden capture authority. Real dark windows are not conclusive PrintWindow failures. WGC requires separate window-only capture, device-loss, and real Windows host qualification; synthetic WebRTC smoke is insufficient.
