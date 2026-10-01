@@ -22,6 +22,8 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Changed
 
+- Consolidate reviewed toolchain upgrades (TypeScript 7, Vitest 5, Vite 8) and current tsx/@fastify/static/ws patches under one consistent pnpm lockfile while keeping Node.js 22 typings and runtime aligned.
+
 - Recompile the source-mode Windows Remote App Host automatically after native C# or compiler-option changes using a content-addressed private EXE and exact source snapshot; avoid silently reusing stale native helpers after updating the checkout.
 
 - Initialize native WebRTC only after the Windows host verifies a launched app and emits READY. MSIX startup failures retain a bounded stage/type/HRESULT instead of being masked by native teardown; never terminate a PID before package verification.
