@@ -29,7 +29,7 @@ Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus 
 ### Agent and security
 
 - Fastify HTTP/WebSocket service
-- versioned per-user persistent workspace store managed through authenticated + exact-Origin CRUD API
+- versioned per-user persistent Workspace store managed through authenticated + exact-Origin CRUD API; the layered schema uses store generation v2 (`workspaces-v2.json`) and intentionally does not read/migrate v1, leaving the old file untouched instead of blocking Agent startup
 - built-in single-user bootstrap-token login
 - random in-memory login session cookie with bounded active-session count
 - explicit `local` / `lan` / `reverseProxy` / direct `https` exposure profiles: bind host, trusted Origins and Secure-cookie behavior are derived from the profile; `lan` additionally rejects non-private client source addresses; legacy low-level exposure switches are rejected
@@ -68,7 +68,7 @@ Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus 
 - capture/media state is explicit: `launching`, `waiting-for-window`, `waiting-for-frame`, `streaming`, `capture-unavailable`. The Web surface separately diagnoses media-path failure, so an unexplained black screen is not the only signal.
 - capture size is automatic. The browser sends a typed bounded display hint derived from current Remote App surface geometry/DPR; protocol/native code clamps it to the 320×240–1600×1000 presentation envelope and the helper retains source/window/frame hard limits. The UI exposes “Quality · Auto”, not FPS/width/height fields.
 - AppWorker accepts one media peer. A later negotiation replaces the prior peer.
-- `remoteApps.webrtc.iceServers` accepts bounded STUN/TURN configuration. The authenticated capability response supplies ICE config to the browser and reports whether a TURN URL is configured. Empty ICE configuration remains valid for directly routable LAN/VPN use; PalmTTY does not operate a cloud relay.
+- `remoteApps.webrtc.iceServers` accepts bounded STUN/TURN configuration. The authenticated capability response supplies ICE config to the browser and reports whether a TURN URL is configured; the Agent also sends its current ICE config with every authenticated AppWorker negotiation so an adopted worker can follow config changes after Agent restart. Empty ICE configuration remains valid for directly routable LAN/VPN use; PalmTTY does not operate a cloud relay.
 - restricted control supports owned-window absolute/relative pointer, wheel, allowlisted keyboard, bounded Unicode text and the non-input display hint. Native input re-validates window ownership and does not bypass UIPI/UAC.
 - no full desktop, arbitrary existing-window capture, elevated control, clipboard, audio, microphone, camera, file drag/drop or arbitrary input-command channel is implemented.
 - `WorkspaceWorkbench` can switch among live Terminal/App Activities for the same Workspace; Git/Files remain Workspace tools and Artifacts remains Terminal Session-scoped.
