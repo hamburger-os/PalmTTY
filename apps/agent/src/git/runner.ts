@@ -69,25 +69,25 @@ function gitHostEnvironment(
 }
 
 function wslPrefix(workspace: WorkspaceDefinition): string[] {
-  if (workspace.runtime.kind !== "wsl") {
+  if (workspace.terminal.runtime.kind !== "wsl") {
     throw new Error("Workspace is not a WSL runtime");
   }
-  return workspace.runtime.distribution
-    ? ["--distribution", workspace.runtime.distribution]
+  return workspace.terminal.runtime.distribution
+    ? ["--distribution", workspace.terminal.runtime.distribution]
     : [];
 }
 
 export function disabledHooksArgs(workspace: WorkspaceDefinition): string[] {
   return [
     "-c",
-    workspace.runtime.kind === "wsl" || process.platform !== "win32"
+    workspace.terminal.runtime.kind === "wsl" || process.platform !== "win32"
       ? "core.hooksPath=/dev/null"
       : "core.hooksPath=NUL"
   ];
 }
 
 export function gitNullDevice(workspace: WorkspaceDefinition): string {
-  if (workspace.runtime.kind === "wsl" || process.platform !== "win32") {
+  if (workspace.terminal.runtime.kind === "wsl" || process.platform !== "win32") {
     return "/dev/null";
   }
   return "NUL";
@@ -111,7 +111,7 @@ export async function runWorkspaceGit(
   const allowTruncated = options.allowTruncated ?? false;
 
   let result: BoundedProcessResult;
-  if (workspace.runtime.kind === "wsl") {
+  if (workspace.terminal.runtime.kind === "wsl") {
     if (process.platform !== "win32") {
       throw new Error("WSL Git integration is available only on Windows");
     }
