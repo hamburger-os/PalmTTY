@@ -280,12 +280,13 @@ export class RemoteAppRuntime {
     connection.addTrack(this.videoTrack);
     connection.ondatachannel = (event: any) => {
       const channel = event.channel;
+      const currentPeer = this.peer;
       if (!channel || channel.label !== "control" ||
-          this.peer?.connection !== connection) {
+          !currentPeer || currentPeer.connection !== connection) {
         try { channel?.close(); } catch { /* ignore */ }
         return;
       }
-      if (this.peer?.connection === connection) this.peer.channel = channel;
+      currentPeer.channel = channel;
       channel.onopen = () => {
         if (this.peer?.connection === connection) {
           this.sendTelemetry(this.cursor);
