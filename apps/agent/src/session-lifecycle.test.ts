@@ -144,10 +144,12 @@ async function buildHarness() {
     id: "lifecycle",
     name: "Lifecycle",
     cwd: process.cwd(),
-    runtime: {
-      kind: "host",
-      shell: process.execPath,
-      args: []
+    terminal: {
+      runtime: {
+        kind: "host",
+        shell: process.execPath,
+        args: []
+      }
     },
     remoteApps: []
   }]);
@@ -328,10 +330,12 @@ describe("session lifecycle API", () => {
       id: "lifecycle",
       name: "Lifecycle",
       cwd: process.cwd(),
-      runtime: {
-        kind: "host",
-        shell: "definitely-not-a-real-palmtty-shell",
-        args: []
+      terminal: {
+        runtime: {
+          kind: "host",
+          shell: "definitely-not-a-real-palmtty-shell",
+          args: []
+        }
       },
       remoteApps: []
     });
