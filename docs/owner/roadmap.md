@@ -23,7 +23,7 @@
 - 手机端 Session Workbench（终端 / Git / 文件 / 附件）、xterm/PWA、触摸特殊键栏与按需长文本输入，中文/英文界面切换，并提供明确的终端替换重启动作；Session 附件支持手机/浏览器上传 PNG/JPEG/WebP/GIF、预览、删除和把本地路径安全插入终端，Files 同时可直接预览 Workspace 中的受支持图片；
 - Git Source Control 工作台与 Workspace 根目录只读文件浏览/预览/完整文件导出已经作为独立、有界、认证的 Agent API 落地，不复用终端协议；Files 提供 512 KiB 预览与独立 8 MiB 完整文件复制/分享/下载，Git 提供“更改 / 历史”、snapshot-stable cursor 分页、文件级 history、commit changed-files/file-diff，以及受控 stage/unstage/restore/commit/branch/stash/fetch/pull/push；
 - PalmTTY 自有的三主题视觉系统（炫彩流光/黑曜石/白霜）、效果/性能两档、reduced-motion 处理与主题审查 skills；
-- Web 端持久化 Workspace CRUD，Host / WSL runtime adapter；正常 UI 使用统一终端 Profile（Host Shell + WSL 发行版），高级 runtime 细节只在 Custom 路径展开；工作区支持有界环境变量与多行启动输入，Session 创建/重启仍只消费持久化 workspace authority；
+- Web 端持久化 Workspace CRUD 已升级为 v2 generation（`workspaces-v2.json`）：Workspace 基础、嵌套 Terminal launch profile、Remote App profiles 分层；不读取/迁移 v1，旧文件保留供人工参考；Terminal 仍使用统一 Profile（Host Shell + WSL 发行版），高级 runtime 细节只在 Custom 路径展开；
 - Ubuntu CI 已覆盖 Linux host runtime；Windows CI 保持 PowerShell 7/ConPTY 路径；macOS adapter 已按同一 Host 模型实现但尚无仓库 CI；
 - 当前用户自启动管理已实现：Windows Task Scheduler 登录任务与 Linux `systemd --user`，支持 install/status/restart/uninstall；可选 env-file 避免把 token 值写入 task/unit argv，Linux 会拒绝 group/world 可读的 env-file；
 - Windows/Ubuntu 双平台 CI；
