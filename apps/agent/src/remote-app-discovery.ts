@@ -109,6 +109,29 @@ const WINDOWS_DISCOVERY_SCRIPT = [
   "[Console]::Out.Write(($results.ToArray() | ConvertTo-Json -Compress -Depth 4))"
 ].join("\n");
 
+// Query only current-user registered MSIX apps. AUMID is an activation
+// identity; never execute binaries from the protected WindowsApps directory.
+const PACKAGED_DISCOVERY_SCRIPT = [
+  "$ErrorActionPreference = 'Stop'",
+  "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)",
+  "$families = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)",
+  "Get-AppxPackage | ForEach-Object { if ($_.PackageFamilyName) { [void]$families.Add($_.PackageFamilyName) } }",
+  "$apps = [System.Collections.Generic.List[object]]::new()",
+  "Get-StartApps | ForEach-Object {",
+  "  if ($apps.Count -ge 256) { return }",
+  "  $name = [string]$_.Name",
+  "  $id = [string]$_.AppID",
+  "  $separator = $id.IndexOf('!')",
+  "  if ($separator -lt 1 -or [string]::IsNullOrWhiteSpace($name)) { return }",
+  "  $family = $id.Substring(0, $separator)",
+  "  if ($families.Contains($family)) {",
+  "    $apps.Add(@{ name = $name.Substring(0, [Math]::Min(100, $name.Length));",
+  "      appUserModelId = $id; packageFamilyName = $family })",
+  "  }",
+  "}",
+  "[Console]::Out.Write(($apps.ToArray() | ConvertTo-Json -Compress -Depth 4))"
+].join("\n");
+
 function envValue(env: Record<string, string>, name: string): string | undefined {
   return Object.entries(env).find(([key]) =>
     key.toLowerCase() === name.toLowerCase()
@@ -160,6 +183,89 @@ export function parseInstalledAppDiscovery(value: unknown): RemoteAppCatalogEntr
     });
   }
   return RemoteAppCatalogResponseSchema.parse({ apps: result }).apps;
+}
+
+export function parsePackagedAppDiscovery(value: unknown): RemoteAppCatalogEntry[] {
+  const entries = Array.isArray(value) ? value : value ? [value] : [];
+  const result: RemoteAppCatalogEntry[] = [];
+  const seen = new Set<string>();
+  for (const value of entries.slice(0, MAX_PACKAGED_RESULTS)) {
+    if (!value || typeof value !== "object") continue;
+    const record = value as Record<string, unknown>;
+    const { name, appUserModelId, packageFamilyName } = record;
+    if (
+      typeof name !== "string" || !name.trim() ||
+      typeof appUserModelId !== "string" ||
+      typeof packageFamilyName !== "string" ||
+      !appUserModelId.toLowerCase().startsWith(packageFamilyName.toLowerCase() + "!")
+    ) continue;
+    const key = appUserModelId.toLowerCase();
+    if (seen.has(key)) continue;
+    const parsed = RemoteAppCatalogResponseSchema.shape.apps.element.safeParse({
+      name: name.trim().slice(0, 100),
+      launch: { kind: "packaged", appUserModelId, packageFamilyName },
+      source: "detected"
+    });
+    if (parsed.success) {
+      seen.add(key);
+      result.push(parsed.data);
+    }
+  }
+  return result.sort((a, b) => Number(/codex/i.test(b.name)) -
+    Number(/codex/i.test(a.name)) || a.name.localeCompare(b.name));
+}
+
+async function queryPackagedApps(env: Record<string, string>): Promise<RemoteAppCatalogEntry[]> {
+  const systemRoot = envValue(env, "SystemRoot") ?? envValue(env, "WINDIR");
+  if (!systemRoot) return [];
+  const powershell = path.win32.join(systemRoot, "System32", "WindowsPowerShell",
+    "v1.0", "powershell.exe");
+  return new Promise((resolve) => {
+    const child = spawn(powershell, [
+      "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand",
+      Buffer.from(PACKAGED_DISCOVERY_SCRIPT, "utf16le").toString("base64")
+    ], { env, stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    let settled = false;
+    const finish = (result: RemoteAppCatalogEntry[]) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    child.stdout.on("data", (chunk: Buffer) => {
+      bytes += chunk.length;
+      if (bytes > MAX_DISCOVERY_OUTPUT_BYTES) {
+        child.kill();
+        finish([]);
+      } else chunks.push(chunk);
+    });
+    child.once("error", () => finish([]));
+    child.once("close", (code) => {
+      if (settled || code !== 0 || bytes === 0) return finish([]);
+      try {
+        finish(parsePackagedAppDiscovery(
+          JSON.parse(Buffer.concat(chunks).toString("utf8").replace(/^\uFEFF/, ""))
+        ));
+      } catch { finish([]); }
+    });
+    const timer = setTimeout(() => { child.kill(); finish([]); }, 12_000);
+    timer.unref();
+  });
+}
+
+export async function findRegisteredPackagedApp(
+  appUserModelId: string,
+  packageFamilyName: string,
+  environment: Record<string, string>
+): Promise<boolean> {
+  const apps = await queryPackagedApps(environment);
+  return apps.some((app) =>
+    app.launch.kind === "packaged" &&
+    app.launch.appUserModelId.toLowerCase() === appUserModelId.toLowerCase() &&
+    app.launch.packageFamilyName.toLowerCase() === packageFamilyName.toLowerCase()
+  );
 }
 
 async function queryInstalledApps(
@@ -230,6 +336,9 @@ export async function discoverRemoteApps(
       results.push(entry);
     }
   };
+
+  // Place Store apps first so alias EXEs and a large Start Menu cannot hide Codex.
+  for (const entry of await queryPackagedApps(environment)) add(entry);
 
   // Resolve well-known apps before the generic catalog, so a large Start
   // Menu cannot crowd out the most useful default selections.
