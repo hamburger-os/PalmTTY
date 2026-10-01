@@ -1,10 +1,15 @@
 import {
+  BrowseRemoteAppExecutableRequestSchema,
   CreateAppSessionSchema,
   RemoteAppOfferRequestSchema
 } from "@palmtty/protocol";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { FixedWindowLimiter } from "./security.js";
+import {
+  browseRemoteAppExecutables,
+  detectRemoteAppCatalog
+} from "./remote-app-catalog.js";
 import type { RemoteAppSessionManager } from "./remote-app-session-manager.js";
 
 const DetachSchema = z.object({
@@ -27,11 +32,56 @@ export function registerRemoteAppRoutes(
   const createLimiter = new FixedWindowLimiter(20, 60_000);
   const mutationLimiter = new FixedWindowLimiter(60, 60_000);
   const signalingLimiter = new FixedWindowLimiter(120, 60_000);
+  const discoveryLimiter = new FixedWindowLimiter(60, 60_000);
 
   app.get(
     "/api/v1/remote-apps/capabilities",
     { preHandler: options.requireAuth },
     async () => options.manager.capabilities()
+  );
+
+  app.post(
+    "/api/v1/remote-apps/catalog",
+    { preHandler: [options.requireOrigin, options.requireAuth] },
+    async (request, reply) => {
+      if (!discoveryLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_remote_app_discovery_requests" });
+      }
+      try {
+        return await detectRemoteAppCatalog();
+      } catch (error) {
+        return reply.code(400).send({
+          error: "remote_app_catalog_unavailable",
+          message: error instanceof Error
+            ? error.message
+            : "Remote App catalog is unavailable"
+        });
+      }
+    }
+  );
+
+  app.post(
+    "/api/v1/remote-apps/executables/browse",
+    { preHandler: [options.requireOrigin, options.requireAuth] },
+    async (request, reply) => {
+      if (!discoveryLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_remote_app_discovery_requests" });
+      }
+      const parsed = BrowseRemoteAppExecutableRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_remote_app_browse_request" });
+      }
+      try {
+        return await browseRemoteAppExecutables(parsed.data.path);
+      } catch (error) {
+        return reply.code(400).send({
+          error: "remote_app_browse_unavailable",
+          message: error instanceof Error
+            ? error.message
+            : "Remote App executable browser is unavailable"
+        });
+      }
+    }
   );
 
   app.get(
