@@ -19,7 +19,7 @@ function workspace(id = "main"): WorkspaceDefinition {
     id,
     name: "Main",
     cwd: process.cwd(),
-    runtime: { kind: "host", args: [] },
+    terminal: { runtime: { kind: "host", args: [] } },
     remoteApps: []
   };
 }
