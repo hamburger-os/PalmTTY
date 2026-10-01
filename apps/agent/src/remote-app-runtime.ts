@@ -59,7 +59,7 @@ export class RemoteAppRuntime {
   private lastFrameStatusAt = 0;
   private nativeFailure: "window-not-found" | "window-too-large" |
     "printwindow-failed" | "blank-window" | "capture-exception" |
-    "frame-write-failed" | undefined;
+    "frame-write-failed" | "window-resize-rejected" | undefined;
   private helperMediaState: AppSessionMediaState = "launching";
   private readonly statusListeners = new Set<StatusListener>();
   private readonly exitListeners = new Set<ExitListener>();
@@ -110,7 +110,8 @@ export class RemoteAppRuntime {
           const reason = line.slice(HELPER_REASON_PREFIX.length).trim();
           const valid = [
             "window-not-found", "window-too-large", "printwindow-failed",
-            "blank-window", "capture-exception", "frame-write-failed"
+            "blank-window", "capture-exception", "frame-write-failed",
+            "window-resize-rejected"
           ];
           this.nativeFailure = valid.includes(reason)
             ? reason as typeof this.nativeFailure
