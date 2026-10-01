@@ -20,7 +20,10 @@ import {
   MAX_INPUT_BYTES,
   WorkspaceDefinitionSchema,
   WorkspaceEnvironmentSchema,
+  BrowseRemoteAppExecutableRequestSchema,
+  RemoteAppCapabilitiesSchema,
   RemoteAppControlMessageSchema,
+  RemoteAppExecutableListingSchema,
   isActiveAppSessionState,
   isTerminalAppSessionState,
   isActiveSessionState,
@@ -49,12 +52,11 @@ describe("protocol", () => {
         executable: "codex.exe"
       }]
     });
-    expect(workspace.remoteApps[0]).toMatchObject({
+    expect(workspace.remoteApps[0]).toEqual({
       id: "codex-desktop",
-      args: [],
-      frameRate: 12,
-      maxWidth: 1280,
-      maxHeight: 800
+      name: "Codex Desktop",
+      executable: "codex.exe",
+      args: []
     });
     expect(() => WorkspaceDefinitionSchema.parse({
       id: "duplicates",
@@ -99,6 +101,46 @@ describe("protocol", () => {
       x: 2,
       y: 0
     })).toThrow();
+    expect(RemoteAppControlMessageSchema.parse({
+      type: "display",
+      width: 844,
+      height: 390
+    })).toEqual({
+      type: "display",
+      width: 844,
+      height: 390
+    });
+    expect(() => RemoteAppControlMessageSchema.parse({
+      type: "display",
+      width: 4000,
+      height: 390
+    })).toThrow();
+    expect(RemoteAppCapabilitiesSchema.parse({
+      supported: true,
+      platform: "win32",
+      transport: "webrtc",
+      capture: "window",
+      input: "restricted",
+      iceServers: [{
+        urls: ["turns:relay.example.test:5349"],
+        username: "user",
+        credential: "credential"
+      }],
+      relayConfigured: true
+    }).relayConfigured).toBe(true);
+    expect(BrowseRemoteAppExecutableRequestSchema.parse({})).toEqual({});
+    expect(RemoteAppExecutableListingSchema.parse({
+      currentPath: "C:\\Tools",
+      parentPath: "C:\\",
+      locations: [],
+      directories: [],
+      executables: [{
+        name: "Tool",
+        executable: "C:\\Tools\\Tool.exe",
+        source: "path"
+      }],
+      truncated: false
+    }).executables).toHaveLength(1);
     expect(isActiveAppSessionState("running")).toBe(true);
     expect(isTerminalAppSessionState("exited")).toBe(true);
   });
