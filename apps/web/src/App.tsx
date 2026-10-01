@@ -162,9 +162,18 @@ export function App() {
     );
   }
 
-  const activityOptionsFor = (workspaceId: string) => [
+  const activityOptionsFor = (
+    workspaceId: string,
+    currentValue: string
+  ) => [
     ...sessions
-      .filter((session) => session.workspaceId === workspaceId)
+      .filter((session) =>
+        session.workspaceId === workspaceId &&
+        (
+          isActiveSessionState(session.state) ||
+          "terminal:" + session.id === currentValue
+        )
+      )
       .map((session) => ({
         value: "terminal:" + session.id,
         label: t("workbench.terminal") + " · " + session.id.slice(0, 6)
@@ -172,7 +181,10 @@ export function App() {
     ...appSessions
       .filter((session) =>
         session.workspaceId === workspaceId &&
-        isActiveAppSessionState(session.state)
+        (
+          isActiveAppSessionState(session.state) ||
+          "app:" + session.id === currentValue
+        )
       )
       .map((session) => ({
         value: "app:" + session.id,
@@ -211,7 +223,10 @@ export function App() {
             setActiveSession(result.session);
           }
         }}
-        activityOptions={activityOptionsFor(activeSession.workspaceId)}
+        activityOptions={activityOptionsFor(
+          activeSession.workspaceId,
+          "terminal:" + activeSession.id
+        )}
         appCapabilities={appCapabilities}
         onSwitchActivity={switchActivity}
         onBack={() => {
@@ -230,7 +245,10 @@ export function App() {
       <WorkspaceWorkbench
         {...(activeWorkspace ? { workspace: activeWorkspace } : {})}
         activity={{ kind: "remoteApp", session: activeAppSession }}
-        activityOptions={activityOptionsFor(activeAppSession.workspaceId)}
+        activityOptions={activityOptionsFor(
+          activeAppSession.workspaceId,
+          "app:" + activeAppSession.id
+        )}
         appCapabilities={appCapabilities}
         onSwitchActivity={switchActivity}
         onBack={() => {
