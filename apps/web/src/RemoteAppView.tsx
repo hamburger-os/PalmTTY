@@ -453,6 +453,18 @@ export function RemoteAppView({
 
     const cleanupPeer = () => {
       clearConnectionTimer();
+      // A disappearing transport must never leave a locally held drag behind.
+      flushRelativeMotion();
+      cancelDragTimer();
+      if (dragRef.current?.held) {
+        send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
+      }
+      dragRef.current = null;
+      touchpad.current.cancel();
+      if (cursorSettleTimerRef.current !== null) {
+        window.clearTimeout(cursorSettleTimerRef.current);
+        cursorSettleTimerRef.current = null;
+      }
       channelRef.current = null;
       setControlReady(false);
       setInputBlocked(false);
@@ -506,6 +518,9 @@ export function RemoteAppView({
       };
       channel.onclose = () => {
         if (connection === peer && !controller.signal.aborted) {
+          cancelDragTimer();
+          dragRef.current = null;
+          touchpad.current.cancel();
           setControlReady(false);
           setInputBlocked(false);
           cursorPreviewRef.current.reset();
@@ -641,7 +656,7 @@ export function RemoteAppView({
       if (video) video.srcObject = null;
     };
   }, [attemptPlayback, capabilities?.iceServers, cancelRelativeMotion,
-      scheduleCursorPaint, sendDisplayHint, session.id]);
+      flushRelativeMotion, scheduleCursorPaint, send, sendDisplayHint, session.id]);
 
   useEffect(() => {
     if (!active) return;
@@ -662,6 +677,23 @@ export function RemoteAppView({
     surface.addEventListener("touchmove", preventNativeScroll, { passive: false });
     return () => surface.removeEventListener("touchmove", preventNativeScroll);
   }, [active, mode]);
+
+  useEffect(() => {
+    const releaseOnBackground = () => {
+      if (!document.hidden) return;
+      flushRelativeMotion();
+      cancelDragTimer();
+      if (dragRef.current?.held) {
+        send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
+      }
+      dragRef.current = null;
+      touchpad.current.cancel();
+      cursorPreviewRef.current.reset();
+      scheduleCursorPaint();
+    };
+    document.addEventListener("visibilitychange", releaseOnBackground);
+    return () => document.removeEventListener("visibilitychange", releaseOnBackground);
+  }, [flushRelativeMotion, scheduleCursorPaint, send]);
 
   useEffect(() => () => {
     flushRelativeMotion();
@@ -726,6 +758,7 @@ export function RemoteAppView({
     }
     cancelDragTimer();
     if (dragRef.current?.held && dragRef.current.pointerId !== event.pointerId) {
+      flushRelativeMotion();
       send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
       dragRef.current = null;
     }
