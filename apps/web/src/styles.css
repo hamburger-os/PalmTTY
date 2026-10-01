@@ -716,19 +716,7 @@ button.directory-choose {
   padding-left: 5px;
 }
 
-.keybar-pinned button { min-width: var(--touch-target-compact); }
-
-.keybar-hidden {
-  justify-content: center;
-  padding: 2px 6px;
-}
-
-.keybar-hidden .keybar-restore {
-  width: 100%;
-  min-height: var(--touch-target-compact);
-  padding: 2px 8px;
-  font-size: var(--text-sm);
-}
+.keybar-pinned button { min-width: 58px; white-space: nowrap; }
 
 .keybar-row {
   display: flex;
@@ -2199,16 +2187,16 @@ body.remote-app-active { overflow: hidden; }
 .remote-app-cursor {
   position: absolute;
   z-index: 3;
-  width: 26px;
-  height: 34px;
+  width: 17px;
+  height: 24px;
   overflow: visible;
   pointer-events: none;
-  transform: translate(-2px, -2px);
+  transform: translate(-1px, -1px);
   fill: var(--remote-cursor-fill);
   stroke: var(--remote-cursor-outline);
-  stroke-width: 2.5;
+  stroke-width: 1.6;
   stroke-linejoin: round;
-  filter: drop-shadow(0 1px 2px var(--remote-cursor-outline));
+  filter: drop-shadow(0 1px 1px var(--remote-cursor-outline));
 }
 
 .remote-app-toolbar {
@@ -2253,6 +2241,7 @@ body.remote-app-active { overflow: hidden; }
 
 .remote-app-modes button.selected,
 .remote-app-keybar button.selected,
+.remote-app-more-keys.selected,
 .remote-app-options button.selected {
   color: var(--text-primary);
   background: var(--control-hover);
@@ -2364,9 +2353,8 @@ body.remote-app-active { overflow: hidden; }
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 4px;
   min-width: 0;
-  border: 1px solid var(--border);
+  padding: 3px;
   border-radius: var(--radius-md);
-  background: var(--flat-content);
 }
 
 .remote-app-keybar {
@@ -2399,9 +2387,7 @@ body.remote-app-active { overflow: hidden; }
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
-  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--flat-content);
 }
 
 .remote-app-extra-keys button { min-width: 0; min-height: var(--touch-target-compact); }
