@@ -8,6 +8,7 @@ Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus 
 
 - pnpm/TypeScript monorepo
 - Agent/Web/protocol/config packages
+- reviewed combined toolchain: TypeScript 7.0.2, Vitest 5.0.2 and Vite 8.3.1 plus updated tsx/@fastify/static/ws, validated together against a single frozen pnpm lockfile (Windows/Ubuntu CI, installed Windows/Linux smoke and security/CodeQL gates); actual Node runtime and @types/node remain major 22.
 - committed pnpm lockfile with frozen-lockfile CI installs; the repository targets Node.js 22 for CI and release, and Dependabot excludes @types/node 23+ until the runtime baseline is intentionally upgraded. Dependency majors are validated individually on up-to-date main, including Windows/Linux installed distribution smoke. Windows native lifecycle smoke waits for surviving Worker/Agent close and bounds transient temp-directory deletion retries.
 - Windows + Ubuntu CI passing
 - root-script syntax checks plus Node built-in tests for private-LAN address/origin discovery
