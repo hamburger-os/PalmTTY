@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { remoteDisplaySize, remoteVideoPoint } from "./remote-app-presentation.js";
+import { remoteAppVisualState, remoteDisplaySize, remoteVideoPoint } from "./remote-app-presentation.js";
 
 const limits = { minWidth: 320, minHeight: 240, maxWidth: 1600, maxHeight: 1000 };
 
 describe("Remote App video presentation", () => {
+  it("does not return to the waiting overlay when a decoded frame is already visible", () => {
+    expect(remoteAppVisualState(false, false, false)).toBe("waiting");
+    expect(remoteAppVisualState(false, false, true)).toBe("waiting");
+    expect(remoteAppVisualState(true, true, false)).toBe("playing");
+    expect(remoteAppVisualState(true, true, true)).toBe("interrupted");
+    expect(remoteAppVisualState(true, false, false)).toBe("interrupted");
+  });
+
   it("preserves a portrait surface ratio under DPR and both maximum bounds", () => {
     const output = remoteDisplaySize(390, 850, 2, limits);
     expect(output?.height).toBe(1000);

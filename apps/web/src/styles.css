@@ -151,7 +151,7 @@ h2 {
   font-size: var(--text-xs);
 }
 
-section {
+.app-shell > section {
   margin-top: 28px;
 }
 
@@ -2158,20 +2158,28 @@ body.remote-app-active { overflow: hidden; }
 .remote-app-surface video.fit-cover { object-fit: cover; }
 
 .remote-app-toolbar {
-  position: absolute;
-  z-index: 5;
-  top: 8px;
-  left: 8px;
-  max-width: calc(100% - 102px);
-  min-height: 42px;
+  position: relative;
+  z-index: 6;
   display: flex;
   align-items: center;
-  gap: 3px;
+  justify-content: space-between;
+  min-width: 0;
+  min-height: var(--touch-target);
+  gap: 4px;
   padding: 3px;
-  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  background: var(--flat-modal);
-  box-shadow: var(--shadow);
+  background: var(--flat-content);
+}
+
+.remote-app-toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 3px;
+}
+
+.remote-app-immersive-trigger {
+  min-width: var(--touch-target-compact);
 }
 
 .remote-app-modes {
@@ -2206,12 +2214,15 @@ body.remote-app-active { overflow: hidden; }
 .remote-app-options {
   position: absolute;
   z-index: 7;
-  top: calc(100% + 5px);
-  left: 0;
+  bottom: calc(100% + 5px);
+  right: 0;
   width: min(280px, calc(100vw - 36px));
+  max-height: min(70dvh, 480px);
   display: grid;
   gap: 5px;
   padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   background: var(--flat-modal);
@@ -2254,21 +2265,14 @@ body.remote-app-active { overflow: hidden; }
 }
 
 .remote-app-diagnostics {
-  position: absolute;
-  z-index: 6;
-  top: 8px;
-  right: 8px;
-  display: grid;
-  width: min(280px, calc(100% - 16px));
+  width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--flat-modal);
+  background: var(--flat-content);
   color: var(--text-secondary);
   font-size: var(--text-xs);
 }
-
-.remote-app-diagnostics:not([open]) { width: auto; }
 .remote-app-diagnostics summary { cursor: pointer; }
 .remote-app-diagnostics span {
   display: block;
@@ -2276,33 +2280,23 @@ body.remote-app-active { overflow: hidden; }
   overflow-wrap: anywhere;
 }
 
-.remote-app-waiting {
-  position: absolute;
-  z-index: 2;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+.remote-app-media-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--flat-content);
   color: var(--text-secondary);
-  font-size: var(--text-sm);
-  text-align: center;
+  font-size: var(--text-xs);
 }
 
-.remote-app-mode-hint {
-  position: absolute;
-  z-index: 2;
-  bottom: 6px;
-  left: 50%;
-  max-width: min(88%, 620px);
-  padding: 5px 8px;
-  transform: translateX(-50%);
-  color: var(--text-secondary);
-  background: var(--flat-content);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  font-size: var(--text-xs);
-  line-height: 1.35;
-  text-align: center;
-  pointer-events: none;
+.remote-app-media-warning span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .remote-app-dock {
@@ -2391,10 +2385,8 @@ body.remote-app-active { overflow: hidden; }
   .selected-executable { align-items: stretch; flex-direction: column; }
   .workbench-activity-switcher { max-width: 42vw; }
   .workbench-activity-name { display: none; }
-  .remote-app-toolbar { max-width: calc(100% - 94px); }
   .remote-app-modes button { padding: 5px 7px; }
   .remote-app-keybar button { padding: 5px 11px; }
-  .remote-app-mode-hint { font-size: 10px; }
 }
 
 @media (max-width: 760px) {
@@ -2432,6 +2424,9 @@ body.remote-app-active { overflow: hidden; }
   }
   .workbench-page.is-remote-app .mobile-app-tools { display: inline-flex; }
   .workbench-page.is-remote-app .workbench-actions { gap: 4px; }
+  .workbench-page.is-remote-app.remote-app-immersive {
+    grid-template-rows: minmax(0, 1fr);
+  }
   .workbench-page.is-remote-app.remote-app-immersive .workbench-header { display: none; }
 }
 
@@ -2439,6 +2434,4 @@ body.remote-app-active { overflow: hidden; }
   .workbench-page.is-remote-app:not(.remote-app-immersive) .workbench-header {
     min-height: 36px;
   }
-  .remote-app-toolbar { top: 4px; left: 4px; }
-  .remote-app-mode-hint { display: none; }
 }

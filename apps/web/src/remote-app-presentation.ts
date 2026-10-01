@@ -1,4 +1,13 @@
 export type VideoFit = "contain" | "cover";
+export type RemoteAppVisualState = "waiting" | "playing" | "interrupted";
+
+/** Only browser-decoded frames can clear initial loading; hints and worker polling cannot. */
+export function remoteAppVisualState(
+  hasRenderedFrame: boolean, currentTrackRendered: boolean, hasPlaybackIssue: boolean
+): RemoteAppVisualState {
+  if (!hasRenderedFrame) return "waiting";
+  return currentTrackRendered && !hasPlaybackIssue ? "playing" : "interrupted";
+}
 export type Geometry = { left: number; top: number; width: number; height: number };
 export type DisplayBounds = { width: number; height: number };
 export type UnitPoint = { x: number; y: number };
