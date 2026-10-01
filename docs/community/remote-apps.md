@@ -3,84 +3,120 @@
 
 ## English
 
-PalmTTY Remote Apps let a phone control a **single desktop application launched by PalmTTY** on a Windows host. Remote Apps are a separate activity type from terminal sessions; they do not turn the terminal protocol into a remote-desktop protocol.
+PalmTTY Remote Apps let a phone operate a **single desktop application launched by PalmTTY** on a Windows host. Remote Apps are a separate Activity type from Terminal Sessions. They do not extend the PTY/xterm protocol into a remote-desktop protocol.
 
-### Current support
+### Configure an app
 
-The first implementation targets Windows x64 Host workspaces. Configure one or more Remote App profiles in the Workspace editor. A profile contains a name, executable, optional argv values, frame rate, and maximum capture dimensions.
+Workspace editing is intentionally split into separate surfaces:
 
-The browser starts an App Session by saved profile ID. It cannot supply a one-off executable, PID, window handle, or arbitrary command at launch time.
+- **Workspace** owns name, working directory and bounded environment values.
+- **Terminal** owns the Terminal runtime/profile and optional startup command.
+- **Remote Apps** owns saved application profiles.
 
-Examples of intended workloads include Codex Desktop, VS Code, or another current-user development application. A profile being launchable does not imply that the application's rendering has been validated; real Windows/mobile testing remains required.
+A Remote App profile now contains only an ID, display name, executable and optional argv. Capture FPS and pixel dimensions are not user settings. PalmTTY adapts the bounded capture size from the live Remote App surface on the phone.
 
-### Mobile controls
+The normal flow is **Add application → choose a detected app or browse for an .exe → optionally add argv → save**. Discovery is bounded: PalmTTY checks a small known set of developer apps and its executable browser exposes only directories and `.exe` files. A manual executable path remains an Advanced fallback.
+
+An App Session is created only by persisted `workspaceId + profileId`. The browser cannot provide an arbitrary executable, PID, HWND, environment override or capture target when starting a session.
+
+Remote Apps are Windows-host activities even when the Workspace Terminal uses WSL. Terminal/Git/Files may use the persisted WSL runtime while a Remote App still launches as the current Windows user.
+
+### Mobile controls and automatic presentation
 
 The App surface exposes three explicit pointer modes:
 
-- **View**: sends no pointer input. Browser scrolling and pinch zoom remain local.
-- **Touch**: maps touches directly into the captured application window.
-- **Trackpad**: one finger moves the remote pointer, a tap clicks, and two fingers scroll.
+- **View**: sends no pointer input. Browser gestures stay local.
+- **Touch**: maps touches into the captured application window.
+- **Trackpad**: one finger moves the remote pointer, tap clicks, and two fingers scroll.
 
-A special-key strip provides Ctrl/Alt/Shift and common navigation keys. The text panel is intended for mobile IME, paste, and dictation; it sends bounded Unicode text rather than trying to emulate every mobile keyboard event as a desktop key.
+The special-key strip provides Ctrl/Alt/Shift and common navigation keys. The text panel sends bounded Unicode text for mobile IME, paste and dictation.
 
-### Security model
+Presentation is automatic. The browser sends a bounded display-size hint when the App surface changes size or orientation; the Windows helper scales capture within PalmTTY hard limits. The toolbar reports **Quality · Auto** rather than exposing FPS/width/height controls.
 
-PalmTTY launches the configured application under the same normal OS user as the Agent. The Windows helper places the launched application into its own Job Object and only accepts a visible top-level window whose process is still a member of that Job as its capture/input target.
+The Workbench can switch among live Activities for the same Workspace without returning to the home page, while Git/Files remain shared Workspace tools.
 
-The current implementation deliberately does **not** provide full-desktop or monitor capture, browser-selected windows/PIDs, UAC/elevated application control, clipboard/audio/microphone/camera/file-drag channels, or arbitrary keyboard/input command execution.
+### Connection and capture diagnostics
 
-Windows UIPI remains in force. PalmTTY does not elevate or bypass it.
+PalmTTY distinguishes these states instead of showing an unexplained black surface:
 
-Video uses WebRTC. Input uses a bounded typed WebRTC DataChannel. Lifecycle/signaling remains authenticated + exact-Origin HTTP through the PalmTTY Agent.
+- waiting for the PalmTTY-owned application window;
+- window found, waiting for a capturable frame;
+- streaming;
+- capture unavailable;
+- WebRTC path unavailable.
 
-### Persistence
+The capture boundary remains fail-closed. The current Windows helper uses window-only `PrintWindow(PW_RENDERFULLCONTENT)` and never falls back to desktop/monitor capture. GPU-accelerated or protected windows may therefore remain unsupported until a safer single-window backend is implemented.
 
-An App Session is owned by a detached AppWorker with a separate authenticated local IPC generation (app-runtime-v1). Restarting the Agent does not intentionally terminate an adopted App Session. If the AppWorker/control pipe itself is lost, the Windows helper terminates its Job Object so the PalmTTY-launched app does not become an unmanaged orphan.
+### WebRTC on LAN, VPN and public ingress
 
-OS reboot, user logoff, and AppWorker death are not recoverable App Session persistence boundaries.
+WebRTC signaling still goes through the authenticated + exact-Origin PalmTTY Agent. Direct LAN/VPN routing may work with host candidates only. For reverse-proxy or public deployments, configure `remoteApps.webrtc.iceServers` with STUN/TURN as needed. PalmTTY exposes the configured ICE servers only to authenticated Remote App clients and reports whether a TURN relay is configured.
 
-### Capture compatibility
+PalmTTY does not provide or operate a cloud relay service. TURN credentials are host configuration and should be treated as sensitive deployment data.
 
-The current conservative Windows capture backend uses window-only PrintWindow(PW_RENDERFULLCONTENT) and never falls back to copying the desktop. Some GPU-accelerated or protected windows may not produce usable frames. That is treated as an unsupported/validation gap instead of widening capture authority.
+### Security and lifecycle
+
+PalmTTY launches the configured app as the same normal OS user as the Agent. The Windows helper places the launched process tree in a PalmTTY-owned Job Object and only accepts a visible top-level window whose process remains in that Job as its capture/input target.
+
+PalmTTY deliberately does **not** provide full-desktop capture, browser-selected windows/PIDs, UAC/elevated control, clipboard/audio/microphone/camera/file-drag channels, or arbitrary keyboard/input commands. Windows UIPI remains a security boundary.
+
+Each App Session is owned by a detached AppWorker with an authenticated local IPC generation separate from Terminal Workers. Agent restart does not intentionally terminate an adopted App Session. OS reboot, user logoff and AppWorker death are not recoverable persistence boundaries. If AppWorker/helper control is lost, the Job Object is closed so the PalmTTY-launched process tree does not become an unmanaged orphan.
 
 ## 中文
 
-PalmTTY Remote Apps 允许手机控制 **由 PalmTTY 在 Windows 宿主机上启动的单个桌面应用**。它是与终端 Session 并列的 Activity，不会把终端协议扩成远程桌面协议。
+PalmTTY Remote Apps 允许手机操作 **由 PalmTTY 在 Windows 宿主机上启动的单个桌面应用**。它和 Terminal Session 是并列的 Activity，不会把 PTY/xterm 协议扩成远程桌面协议。
 
-### 当前支持范围
+### 配置 App
 
-第一版只支持 Windows x64 Host Workspace。可以在工作区编辑器中保存一个或多个 Remote App Profile，包括名称、可执行文件、可选独立 argv、帧率与最大画面尺寸。
+工作区编辑现在明确拆成三个配置面：
 
-手机启动 App Session 时只提交已保存的 Profile ID，不能临时指定 executable、PID、窗口句柄或任意命令。
+- **Workspace**：名称、工作目录、有界环境变量；
+- **Terminal**：终端运行环境/Profile 与可选启动命令；
+- **Remote Apps**：持久化应用 Profile。
 
-预期工作负载包括 Codex Desktop、VS Code 等当前用户开发应用。能成功启动 Profile 不代表该应用的画面捕获/输入已经通过实机兼容性验证，仍需要真实 Windows + 手机测试。
+Remote App Profile 只包含 ID、显示名称、可执行文件和可选 argv。FPS、最大宽高不再属于用户配置；手机端 Remote App Surface 会根据实际可视尺寸自动请求有界捕获尺寸。
 
-### 手机操作
+正常流程是：**添加应用 → 选择检测到的 App 或浏览 .exe → 可选填写 argv → 保存**。应用检测是有界能力：PalmTTY 只检查少量已知开发应用；可执行文件浏览器只暴露目录和 `.exe`。手动路径仍保留在“高级”中作为兜底。
 
-App 画面有三种显式模式：
+创建 App Session 时浏览器仍只能提交持久化的 `workspaceId + profileId`，不能临时提交 executable、PID、HWND、环境覆盖或捕获目标。
 
-- **查看**：不发送指针输入，页面滚动和双指缩放仍由手机浏览器处理；
-- **直触**：触摸位置直接映射到远端应用窗口；
-- **触控板**：单指移动远端光标、轻点点击、双指滚动。
+Remote App 是 Windows 宿主 Activity，即使 Workspace 的 Terminal 使用 WSL 也可以独立存在。Terminal/Git/Files 可以继续使用持久化 WSL runtime，而 Remote App 仍以当前 Windows 普通用户启动。
 
-底部特殊键栏提供 Ctrl/Alt/Shift 和常用导航键。文本面板用于手机 IME、粘贴和语音输入，发送的是有界 Unicode 文本，不把所有手机键盘事件强行模拟成桌面 keydown。
+### 手机操作与自动画面
 
-### 安全模型
+App 画面提供三种显式模式：
 
-Remote App 与 Agent 使用同一个普通 OS 用户。Windows helper 把 PalmTTY 启动的应用放入自己持有的 Job Object，并且只把仍属于该 Job 的进程所拥有的可见顶层窗口作为画面和输入目标。
+- **查看**：不发送指针输入，浏览器手势留在本地；
+- **直触**：触摸坐标映射到远端应用窗口；
+- **触控板**：单指移动光标、轻点点击、双指滚动。
 
-当前明确不提供整桌面/显示器捕获、浏览器选择任意窗口/PID、UAC/elevated 应用控制、clipboard/音频/麦克风/摄像头/文件拖放通道，也不提供任意键盘/输入命令执行。
+特殊键栏提供 Ctrl/Alt/Shift 和常用导航键；文本面板使用有界 Unicode 文本通道，适合手机 IME、粘贴和语音输入。
 
-Windows UIPI 保持有效，PalmTTY 不提权也不绕过它。
+画面策略自动适配。手机 Surface 尺寸或横竖屏变化时，浏览器发送有界 display hint，Windows helper 在 PalmTTY 硬上限内缩放捕获；UI 只显示“**画质 · 自动**”，不再让用户手工配置 FPS/宽高。
 
-视频使用 WebRTC；输入使用 typed、有大小上限的 WebRTC DataChannel；生命周期与 signaling 仍经过 PalmTTY Agent 的认证 + 精确 Origin HTTP API。
+同一 Workspace 的多个活动可以直接在 Workbench 中切换，无需返回首页；Git/Files 仍是共享 Workspace Tool。
 
-### 持久化
+### 连接与捕获诊断
 
-每个 App Session 由 detached AppWorker 持有，并使用独立的 app-runtime-v1 authenticated local IPC。Agent 重启不会主动终止已经 adoption 的 App Session。若 AppWorker/控制管道本身丢失，Windows helper 会终止其 Job Object，避免 PalmTTY 启动的应用变成无人管理的孤儿进程。
+PalmTTY 会区分以下状态，而不是只显示无法解释的黑屏：
 
-OS reboot、用户注销以及 AppWorker 自身死亡不属于可恢复边界。
+- 等待 PalmTTY 持有的应用窗口；
+- 已找到窗口，等待第一帧；
+- 正在串流；
+- 当前窗口无法捕获；
+- WebRTC 媒体通道无法建立。
 
-### 捕获兼容性
+捕获边界继续 fail closed。当前 Windows helper 只使用窗口级 `PrintWindow(PW_RENDERFULLCONTENT)`，不会失败后退化为整桌面/显示器捕获。因此 GPU 加速或受保护窗口仍可能不兼容，直到未来引入同样保持“单个受权窗口”边界的更安全 backend。
 
-当前保守的 Windows 捕获后端只使用窗口级 PrintWindow(PW_RENDERFULLCONTENT)，不会失败后退化成桌面复制。部分 GPU 加速或受保护窗口可能无法得到有效画面；这种情况视为当前未支持/未验证，而不是扩大捕获权限。
+### LAN、VPN 与公网 WebRTC
+
+WebRTC signaling 仍经过 PalmTTY Agent 的认证 + 精确 Origin。LAN/VPN 中如果 host candidate 可直接路由，可以不配置额外 ICE 服务；反向代理或公网部署可按需在 `remoteApps.webrtc.iceServers` 配置 STUN/TURN。只有已认证的 Remote App 客户端能拿到这些 ICE 配置，能力接口还会指出是否配置了 TURN relay。
+
+PalmTTY 本身不提供云中继服务。TURN 凭据属于宿主部署配置，应按敏感部署数据处理。
+
+### 安全与生命周期
+
+Remote App 与 Agent 使用同一个普通 OS 用户。Windows helper 把 PalmTTY 启动的进程树放进自己持有的 Job Object，只把仍属于该 Job 的进程拥有的可见顶层窗口作为捕获/输入目标。
+
+PalmTTY 明确不提供整桌面捕获、浏览器选择任意窗口/PID、UAC/elevated 控制、clipboard/音频/麦克风/摄像头/文件拖放或任意键盘/输入命令。Windows UIPI 继续作为安全边界。
+
+每个 App Session 由独立 detached AppWorker 持有，并使用与 Terminal Worker 分离的 authenticated local IPC generation。Agent 重启不会主动终止已经 adopt 的 App Session；OS reboot、用户注销和 AppWorker 自身死亡不属于可恢复边界。如果 AppWorker/helper 控制链路丢失，Job Object 会关闭，避免 PalmTTY 启动的应用树变成无人管理的孤儿进程。
