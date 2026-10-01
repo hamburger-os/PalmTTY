@@ -10,6 +10,12 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 
+function launchLabel(entry: RemoteAppCatalogEntry): string {
+  return entry.launch.kind === "win32"
+    ? entry.launch.executable
+    : entry.launch.appUserModelId;
+}
+
 export function RemoteAppExecutablePicker({
   onChoose
 }: {
@@ -93,24 +99,24 @@ export function RemoteAppExecutablePicker({
             />
             <div className="settings-list executable-browser-list">
               {catalog.filter((entry) =>
-                (entry.name + " " + entry.executable).toLowerCase()
+                (entry.name + " " + launchLabel(entry)).toLowerCase()
                   .includes(search.trim().toLowerCase())
               ).map((entry) => (
                 <button
                   type="button"
                   className="settings-list-row"
-                  key={entry.executable}
+                  key={launchLabel(entry)}
                   onClick={() => onChoose(entry)}
                 >
                   <span>
                     <strong>{entry.name}</strong>
-                    <small>{entry.executable}</small>
+                    <small>{launchLabel(entry)}</small>
                   </span>
                   <span aria-hidden="true">›</span>
                 </button>
               ))}
               {search.trim() && !catalog.some((entry) =>
-                (entry.name + " " + entry.executable).toLowerCase()
+                (entry.name + " " + launchLabel(entry)).toLowerCase()
                   .includes(search.trim().toLowerCase())
               ) && <div className="settings-empty">{t("workspace.remoteAppNoMatch")}</div>}
             </div>
@@ -193,7 +199,7 @@ export function RemoteAppExecutablePicker({
                 <button
                   type="button"
                   className="directory-row executable-row"
-                  key={entry.executable}
+                  key={launchLabel(entry)}
                   disabled={browseBusy}
                   onClick={() => onChoose(entry)}
                 >
