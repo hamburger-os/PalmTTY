@@ -111,3 +111,10 @@ Remote App Surface 使用三种显式触摸语义：
 
 Remote App 画面状态必须可诊断：等待窗口、等待首帧、正在串流、capture unavailable 与 WebRTC 路径失败分别显示；不能把所有失败都退化成黑屏。公网/反向代理环境如果需要 TURN，Web 只使用认证 capability 返回的 host-configured ICE servers；UI 不提供任意 ICE 注入。
 
+
+
+## 远程 App 沉浸式手机布局
+
+工作区在远程 App 活动中使用紧凑单行顶栏，Git/文件改由工具菜单进入，沉浸模式可隐藏顶栏并在视频内保留退出动作。操作模式浮于视频上，不再永久占用单独一行；核心快捷键 Dock 固定在 VisualViewport 底部，额外导航按键通过“更多”展开。视频默认完整等比展示，用户可以选择裁切填充；坐标映射与实际 object-fit 对齐，不会盲目拉伸内容。
+
+直触/触控板模式使用主动的表面级 touch-action 和非被动 touchmove，仅拦截远端画面区域内部的手势；查看模式保留原生浏览器缩放。触控板状态机明确管理单指移动/轻点、双指中心滚动、部分抬起和取消；取消不合成 click。可选窗口适配通过有界 typed display hint 请求，Windows Host 必须重新验证 Job 归属才能改变尺寸。

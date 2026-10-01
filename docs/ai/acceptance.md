@@ -135,6 +135,13 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 
 ## Remote App acceptance
 
+Additional mobile/Windows release review:
+- Host startup failure must expose bounded stage/type/HRESULT even when the helper exits before READY. AppWorker must not load native WebRTC before ownership and readiness and must not kill an unverified MSIX PID.
+- Explicit typed adaptWindow may adjust only the session-owned HWND within native/protocol limits, respect application minimum sizes and restore dimensions on disable/exit. The live display hint keeps portrait aspect ratio with one clamp factor and cannot select an HWND, desktop or executable.
+- Unit tests cover single-finger tap, two-finger centroid scroll, partial finger release and pointercancel without phantom clicks. Control modes claim active-surface scroll from Safari; View mode must keep browser pinch.
+- Verify mobile header, on-demand Git/Files, immersive exit, complete/cropped video mapping, bottom key dock and text panel in portrait, short landscape and keyboard-open VisualViewport. Test 8-second first-frame timeout and post-first-frame stall separately.
+- Solid-dark successful capture stays ambiguous and must continue streaming after the bounded authorized-window retry; do not declare an application compatible without real Windows + browser tests.
+
 Automated/static acceptance for any Remote App change:
 
 - protocol tests prove App profile id/name/executable/argv bounds, unique IDs, App Session/media-state classification, signaling bounds, ICE server bounds and typed pointer/key/text/display-hint control bounds;

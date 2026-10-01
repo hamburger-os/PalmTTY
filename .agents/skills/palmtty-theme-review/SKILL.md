@@ -56,6 +56,10 @@ For each relevant combination inspect:
 
 Theme or workbench-pane switching while a terminal is live must not recreate xterm or WebSocket state. Presentation-state changes must not be wired into the terminal transport lifecycle.
 
+## Additional Remote App matrix
+
+Check all three themes, Quality/Performance, portrait/short landscape, keyboard open and reduced motion with a video-first Remote App. Verify compact header, Tools overlay, video-only controls, bottom dock, immersive exit, readable diagnostics and non-overlapping overlays. On real mobile Safari, verify View pinch remains browser-owned and Trackpad/Direct touch never scroll the page, including two-finger partial lifts/pointercancel; test contain/cover mapping and user-consented Windows window resize/restore. Confirm switching Git/Files does not reset App/Terminal connections. Windows native compile and installed video smoke cannot replace real Codex/7-Zip capture tests.
+
 ## Review priorities
 
 CRITICAL:
