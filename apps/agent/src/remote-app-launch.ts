@@ -38,9 +38,10 @@ export async function resolveRemoteAppLaunch(
 
   const hostEnvironment = await readHostEnvironment();
   const cwd = await hostWorkspaceCwd(workspace);
-  const environment = workspace.terminal.runtime.kind === "host"
-    ? applyEnvironmentOverrides(hostEnvironment, workspace.environment ?? {})
-    : hostEnvironment;
+  const environment = applyEnvironmentOverrides(
+    hostEnvironment,
+    workspace.environment ?? {}
+  );
   const executable = await resolveExecutable(profile.executable, {
     cwd,
     env: environment
