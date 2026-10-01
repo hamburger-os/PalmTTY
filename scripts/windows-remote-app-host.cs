@@ -18,6 +18,8 @@ internal static class PalmTTYRemoteAppHost
     private const uint CREATE_SUSPENDED = 0x00000004;
     private const uint RESUME_FAILED = 0xFFFFFFFF;
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    private const uint PROCESS_TERMINATE = 0x0001;
+    private const uint PROCESS_SET_QUOTA = 0x0100;
     private const int JobObjectBasicAccountingInformation = 1;
     private const int JobObjectExtendedLimitInformation = 9;
     private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
@@ -57,7 +59,16 @@ internal static class PalmTTYRemoteAppHost
     [DataContract]
     private sealed class AppConfig
     {
-        [DataMember(Name = "executable", IsRequired = true)]
+        [DataMember(Name = "kind", IsRequired = true)]
+        public string Kind { get; set; }
+
+        [DataMember(Name = "appUserModelId")]
+        public string AppUserModelId { get; set; }
+
+        [DataMember(Name = "packageFamilyName")]
+        public string PackageFamilyName { get; set; }
+
+        [DataMember(Name = "executable")]
         public string Executable { get; set; }
 
         [DataMember(Name = "cwd", IsRequired = true)]
@@ -151,6 +162,19 @@ internal static class PalmTTYRemoteAppHost
     {
         public int X;
         public int Y;
+    }
+
+    [ComImport]
+    [Guid("2e941141-7f97-4756-ba1d-9decde894a3d")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IApplicationActivationManager
+    {
+        [PreserveSig]
+        int ActivateApplication(
+            [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
+            [MarshalAs(UnmanagedType.LPWStr)] string arguments,
+            uint options,
+            out uint processId);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -293,6 +317,13 @@ internal static class PalmTTYRemoteAppHost
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool TerminateJobObject(IntPtr hJob, uint uExitCode);
 
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern int GetPackageFamilyName(
+        IntPtr process, ref uint length, StringBuilder familyName);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateProcess(IntPtr process, uint exitCode);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool CreateProcess(
         string lpApplicationName,
@@ -413,6 +444,7 @@ internal static class PalmTTYRemoteAppHost
     private static volatile int CaptureMaxWidth = 1280;
     private static volatile int CaptureMaxHeight = 800;
     private static string LastMediaState = "";
+    private static string LastCaptureReason = "";
     private static BinaryWriter Output;
     private static StreamWriter ErrorOutput;
 
@@ -446,17 +478,26 @@ internal static class PalmTTYRemoteAppHost
 
             job = CreateConfiguredJob();
             JobHandle = job;
-            process = StartApplicationSuspended(config);
+            bool packaged = String.Equals(config.Kind, "packaged", StringComparison.Ordinal);
+            process = packaged
+                ? StartPackagedApplication(config)
+                : StartApplicationSuspended(config);
             if (!AssignProcessToJobObject(job, process.hProcess))
             {
-                ThrowLastError("AssignProcessToJobObject");
+                // Windows Store may deny assignment to an existing OS Job.
+                // Reject that app rather than broadening capture to external PIDs.
+                if (packaged) TerminateProcess(process.hProcess, 1);
+                ThrowLastError("AssignProcessToJobObject (the packaged app must be newly launched and job-ownable)");
             }
-            if (ResumeThread(process.hThread) == RESUME_FAILED)
+            if (!packaged)
             {
-                ThrowLastError("ResumeThread");
+                if (ResumeThread(process.hThread) == RESUME_FAILED)
+                {
+                    ThrowLastError("ResumeThread");
+                }
+                CloseHandle(process.hThread);
+                process.hThread = IntPtr.Zero;
             }
-            CloseHandle(process.hThread);
-            process.hThread = IntPtr.Zero;
 
             ErrorOutput.WriteLine("PALMTTY_APP_HOST_READY " + process.dwProcessId.ToString());
             PublishMediaState("waiting-for-window");
@@ -520,10 +561,20 @@ internal static class PalmTTYRemoteAppHost
     private static void ValidateConfig(AppConfig config)
     {
         if (config == null) throw new InvalidDataException("Remote App config is missing");
-        if (String.IsNullOrWhiteSpace(config.Executable) || !File.Exists(config.Executable))
+        if (String.Equals(config.Kind, "win32", StringComparison.Ordinal))
         {
-            throw new FileNotFoundException("Remote App executable does not exist", config.Executable);
+            if (String.IsNullOrWhiteSpace(config.Executable) || !File.Exists(config.Executable))
+                throw new FileNotFoundException("Remote App executable does not exist", config.Executable);
         }
+        else if (String.Equals(config.Kind, "packaged", StringComparison.Ordinal))
+        {
+            if (String.IsNullOrWhiteSpace(config.PackageFamilyName) ||
+                String.IsNullOrWhiteSpace(config.AppUserModelId) ||
+                !config.AppUserModelId.StartsWith(
+                    config.PackageFamilyName + "!", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("MSIX package identity is invalid");
+        }
+        else throw new InvalidDataException("Unsupported Remote App launch kind");
         if (String.IsNullOrWhiteSpace(config.Cwd) || !Directory.Exists(config.Cwd))
         {
             throw new DirectoryNotFoundException("Remote App working directory does not exist: " + config.Cwd);
@@ -570,6 +621,74 @@ internal static class PalmTTYRemoteAppHost
         finally
         {
             Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static PROCESS_INFORMATION StartPackagedApplication(AppConfig config)
+    {
+        // Do not attach to an existing Store singleton; that would grant
+        // control over a window PalmTTY never launched.
+        HashSet<uint> previous = new HashSet<uint>();
+        foreach (Process existing in Process.GetProcesses())
+        {
+            try { previous.Add(unchecked((uint)existing.Id)); }
+            catch { }
+            finally { existing.Dispose(); }
+        }
+
+        Type type = Type.GetTypeFromCLSID(
+            new Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C"), true);
+        IApplicationActivationManager activation =
+            (IApplicationActivationManager)Activator.CreateInstance(type);
+        uint pid = 0;
+        try
+        {
+            StringBuilder arguments = new StringBuilder();
+            foreach (string argument in config.Args)
+            {
+                if (arguments.Length != 0) arguments.Append(' ');
+                arguments.Append(QuoteArgument(argument ?? ""));
+            }
+            int hr = activation.ActivateApplication(
+                config.AppUserModelId, arguments.ToString(), 0, out pid);
+            if (hr < 0) Marshal.ThrowExceptionForHR(hr);
+        }
+        finally { Marshal.ReleaseComObject(activation); }
+
+        if (pid == 0) throw new InvalidOperationException("MSIX activation returned no process");
+        if (previous.Contains(pid))
+            throw new InvalidOperationException(
+                "MSIX application reused an existing process. Close the app on the PC and try again.");
+
+        IntPtr handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION |
+            PROCESS_TERMINATE | PROCESS_SET_QUOTA, false, pid);
+        if (handle == IntPtr.Zero) ThrowLastError("OpenProcess activated MSIX app");
+        bool accepted = false;
+        try
+        {
+            uint length = 0;
+            int result = GetPackageFamilyName(handle, ref length, null);
+            if (result != 122 || length < 2 || length > 257)
+                throw new InvalidOperationException("Activated process has no verifiable package family");
+            StringBuilder family = new StringBuilder((int)length);
+            result = GetPackageFamilyName(handle, ref length, family);
+            if (result != 0 || !String.Equals(
+                family.ToString(), config.PackageFamilyName, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Activated process package identity mismatch");
+
+            PROCESS_INFORMATION info = new PROCESS_INFORMATION();
+            info.hProcess = handle;
+            info.dwProcessId = pid;
+            accepted = true;
+            return info;
+        }
+        finally
+        {
+            if (!accepted)
+            {
+                TerminateProcess(handle, 1);
+                CloseHandle(handle);
+            }
         }
     }
 
@@ -690,6 +809,7 @@ internal static class PalmTTYRemoteAppHost
                 {
                     captureFailures = 0;
                     streaming = false;
+                    PublishCaptureReason("window-not-found");
                     PublishMediaState("waiting-for-window");
                 }
                 else
@@ -700,6 +820,7 @@ internal static class PalmTTYRemoteAppHost
                     }
                     if (CaptureWindow(hwnd, rect, CaptureMaxWidth, CaptureMaxHeight))
                     {
+                        PublishCaptureReason("none");
                         captureFailures = 0;
                         streaming = true;
                         PublishMediaState("streaming");
@@ -717,6 +838,7 @@ internal static class PalmTTYRemoteAppHost
             }
             catch
             {
+                PublishCaptureReason("capture-exception");
                 captureFailures += 1;
                 if (captureFailures >= Math.Max(8, config.FrameRate * 2))
                 {
@@ -738,6 +860,17 @@ internal static class PalmTTYRemoteAppHost
             {
                 ErrorOutput.WriteLine("PALMTTY_APP_HOST_STATE " + state);
             }
+        }
+    }
+
+    private static void PublishCaptureReason(string reason)
+    {
+        lock (StateLock)
+        {
+            if (String.Equals(LastCaptureReason, reason, StringComparison.Ordinal)) return;
+            LastCaptureReason = reason;
+            if (ErrorOutput != null)
+                ErrorOutput.WriteLine("PALMTTY_APP_HOST_CAPTURE_REASON " + reason);
         }
     }
 
@@ -874,6 +1007,13 @@ internal static class PalmTTYRemoteAppHost
 
     private static bool CaptureWindow(IntPtr hwnd, RECT rect, int maxWidth, int maxHeight)
     {
+        // Ownership is revalidated immediately before capture, not merely
+        // during an earlier EnumWindows callback (HWND may be recycled).
+        if (!IsOwnedWindow(hwnd))
+        {
+            PublishCaptureReason("window-not-found");
+            return false;
+        }
         int sourceWidth = rect.Width;
         int sourceHeight = rect.Height;
         if (
@@ -883,24 +1023,36 @@ internal static class PalmTTYRemoteAppHost
             sourceHeight > 4096 ||
             (long)sourceWidth * (long)sourceHeight > 12000000L)
         {
+            PublishCaptureReason("window-too-large");
             return false;
         }
 
         using (Bitmap source = new Bitmap(sourceWidth, sourceHeight, PixelFormat.Format32bppArgb))
         {
-            using (Graphics graphics = Graphics.FromImage(source))
+            bool ok = PrintOwnedWindow(hwnd, source, PW_RENDERFULLCONTENT);
+            // PW_RENDERFULLCONTENT can return TRUE while leaving a blank
+            // bitmap. Retry only the same owned HWND with standard PrintWindow;
+            // never read the desktop/window DC or include occluding windows.
+            if (!ok || !HasVisiblePixels(source))
             {
-                IntPtr hdc = graphics.GetHdc();
-                bool ok;
-                try
+                if (!IsOwnedWindow(hwnd))
                 {
-                    ok = PrintWindow(hwnd, hdc, PW_RENDERFULLCONTENT);
+                    PublishCaptureReason("window-not-found");
+                    return false;
                 }
-                finally
-                {
-                    graphics.ReleaseHdc(hdc);
-                }
-                if (!ok) return false;
+                using (Graphics clear = Graphics.FromImage(source))
+                    clear.Clear(Color.Transparent);
+                ok = PrintOwnedWindow(hwnd, source, 0);
+            }
+            if (!ok)
+            {
+                PublishCaptureReason("printwindow-failed");
+                return false;
+            }
+            if (!HasVisiblePixels(source))
+            {
+                PublishCaptureReason("blank-window");
+                return false;
             }
 
             double scale = Math.Min(
@@ -935,6 +1087,34 @@ internal static class PalmTTYRemoteAppHost
         }
     }
 
+    private static bool PrintOwnedWindow(IntPtr hwnd, Bitmap target, uint flags)
+    {
+        using (Graphics graphics = Graphics.FromImage(target))
+        {
+            IntPtr hdc = graphics.GetHdc();
+            try { return PrintWindow(hwnd, hdc, flags); }
+            finally { graphics.ReleaseHdc(hdc); }
+        }
+    }
+
+    private static bool HasVisiblePixels(Bitmap bitmap)
+    {
+        // PrintWindow success means API success, not visible content. A sparse
+        // bounded scan is enough to detect common entirely blank captures;
+        // do not send a misleading black frame as successful video.
+        int stepX = Math.Max(1, bitmap.Width / 16);
+        int stepY = Math.Max(1, bitmap.Height / 16);
+        for (int y = stepY / 2; y < bitmap.Height; y += stepY)
+        {
+            for (int x = stepX / 2; x < bitmap.Width; x += stepX)
+            {
+                Color pixel = bitmap.GetPixel(x, y);
+                if (pixel.R > 4 || pixel.G > 4 || pixel.B > 4) return true;
+            }
+        }
+        return false;
+    }
+
     private static bool WriteBitmap(Bitmap bitmap)
     {
         Rectangle rectangle = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
@@ -946,7 +1126,11 @@ internal static class PalmTTYRemoteAppHost
         {
             int rowBytes = checked(bitmap.Width * 4);
             int payloadBytes = checked(rowBytes * bitmap.Height);
-            if (payloadBytes > 8 * 1024 * 1024) return false;
+            if (payloadBytes > 8 * 1024 * 1024)
+            {
+                PublishCaptureReason("frame-write-failed");
+                return false;
+            }
             byte[] rgba = new byte[payloadBytes];
             byte[] row = new byte[rowBytes];
 

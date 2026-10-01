@@ -44,7 +44,7 @@ Security, session and reconnect changes should include or update tests for:
 - exit delivery and retention-expiry cleanup
 - concurrent maxSessions enforcement
 - workspace CRUD requires authentication + exact Origin
-- workspace persistence round-trip and duplicate-ID rejection
+- workspace v3 persistence round-trip, v1/v2 rejection and duplicate-ID rejection
 - workspace deletion blocked while a Session is active, but allowed after exit even during retention
 - Host runtime executable/cwd validation, Windows fresh Machine/User environment rebuilding, workspace-environment override/exclusion behavior, and removal/reservation of PalmTTY control variables before Worker bootstrap
 - bounded unified terminal-profile discovery with exact-Origin authentication, known Host-shell detection, WSL distribution enumeration without distro startup, and a manual Custom fallback in the Web editor
@@ -142,7 +142,7 @@ Automated/static acceptance for any Remote App change:
 - Remote App recovery storage generation stays independent from Terminal Worker state and aligned with the Remote App Worker protocol version;
 - App Session creation accepts only persisted workspaceId + profileId. It rejects unknown profiles/unsupported platforms and never accepts browser executable/argv/environment/PID/HWND;
 - a Workspace using WSL for its Terminal profile may still retain/launch Windows Remote App profiles; Git/Files continue to interpret the nested Terminal runtime;
-- Remote App discovery endpoints require authentication + exact Origin and rate limiting. Detection covers known PATH targets, bounded common Windows installation locations, App Paths registry entries and a capped Start Menu shortcut list, deduplicates by executable and caps its catalog at 64 entries; browsing exposes only directories + `.exe`, not file contents or command execution;
+- Remote App discovery endpoints require authentication + exact Origin and rate limiting. Detection covers verified Get-StartApps/Get-AppxPackage current-user MSIX identities plus known PATH/install locations, App Paths and bounded Start Menu shortcuts. Store entries are prioritized, typed launch identities are deduplicated and the public catalog remains capped at 64 entries; browsing exposes only directories + `.exe`, not file contents or command execution;
 - Workspace mutation and App Session creation both revalidate executable resolution;
 - Workspace deletion is blocked by active Terminal **or** active Remote App Sessions;
 - AppWorker bootstrap removes PalmTTY control/auth environment keys, requires authenticated adoption, retains recovery authority across Agent reconnect and never treats persisted PID as kill authority;
@@ -150,7 +150,7 @@ Automated/static acceptance for any Remote App change:
 - Linux/Ubuntu build/test paths do not initialize Windows capture/WebRTC native runtime merely because schemas/control-plane routes exist;
 - browser WebRTC configuration maps only bounded authenticated `remoteApps.webrtc.iceServers`; empty ICE config is valid, TURN presence is reported without implying PalmTTY operates a relay;
 - browser display hints are derived from live App-surface geometry/DPR, clamped to protocol bounds, and native code clamps again; FPS/width/height must not reappear in persisted Remote App profiles;
-- App media diagnostics distinguish waiting-for-window, waiting-for-frame, streaming and capture-unavailable, while Web separately reports repeated WebRTC connection failure;
+- App media diagnostics distinguish capture state and a bounded reason code for no-owned-window/oversized/PrintWindow-failed/blank/error, native received/converted frame counters and actual browser-decoded video; Web must not treat ICE connection alone as video readiness. A bounded single-allocation PTF1 parser must pass every split boundary, multiple-frame and invalid-frame tests; Windows installed smoke must complete a synthetic RGBA → I420 → WebRTC → video sink round trip;
 - Web keeps active Terminal/App surfaces mounted while switching Git/Files and supports direct switching among live Activities for the same Workspace;
 - View mode sends no pointer controls; Touch/Trackpad use bounded typed control messages; text stays bounded Unicode; special keys stay allowlisted;
 - no terminal protocol/schema is expanded with Remote App video/input messages and there is no full-desktop capture fallback.

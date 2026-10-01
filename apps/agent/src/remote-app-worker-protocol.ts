@@ -2,7 +2,8 @@ import { z } from "zod";
 import {
   AppSessionPublicSchema,
   REMOTE_APP_MAX_SDP_BYTES,
-  RemoteAppIceServerSchema
+  RemoteAppIceServerSchema,
+  RemoteAppLaunchSchema
 } from "@palmtty/protocol";
 import { FramedJsonSocket } from "./worker-protocol.js";
 
@@ -16,7 +17,7 @@ const RequestIdSchema = z.string().min(1).max(128);
 export const ResolvedRemoteAppProfileSchema = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(100),
-  executable: z.string().min(1).max(4096),
+  launch: RemoteAppLaunchSchema,
   args: z.array(z.string().max(4096)).max(32),
   cwd: z.string().min(1).max(4096),
   environment: z.record(z.string(), z.string())

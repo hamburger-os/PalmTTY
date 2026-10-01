@@ -49,13 +49,13 @@ describe("protocol", () => {
       remoteApps: [{
         id: "codex-desktop",
         name: "Codex Desktop",
-        executable: "codex.exe"
+        launch: { kind: "win32", executable: "codex.exe" }
       }]
     });
     expect(workspace.remoteApps[0]).toEqual({
       id: "codex-desktop",
       name: "Codex Desktop",
-      executable: "codex.exe",
+      launch: { kind: "win32", executable: "codex.exe" },
       args: []
     });
     expect(() => WorkspaceDefinitionSchema.parse({
@@ -64,8 +64,8 @@ describe("protocol", () => {
       cwd: "C:\\workspace",
       terminal: { runtime: { kind: "host" } },
       remoteApps: [
-        { id: "app", name: "One", executable: "one.exe" },
-        { id: "app", name: "Two", executable: "two.exe" }
+        { id: "app", name: "One", launch: { kind: "win32", executable: "one.exe" } },
+        { id: "app", name: "Two", launch: { kind: "win32", executable: "two.exe" } }
       ]
     })).toThrow();
 
@@ -77,11 +77,34 @@ describe("protocol", () => {
       remoteApps: [{
         id: "app",
         name: "App",
-        executable: "app.exe",
+        launch: { kind: "win32", executable: "app.exe" },
         args: Array.from({ length: 8 }, () => "x".repeat(4096))
       }]
     })).toThrow();
 
+    expect(WorkspaceDefinitionSchema.parse({
+      id: "store", name: "Store", cwd: "C:\\workspace",
+      terminal: { runtime: { kind: "host" } },
+      remoteApps: [{
+        id: "store-codex", name: "Codex",
+        launch: {
+          kind: "packaged",
+          packageFamilyName: "Codex_123abc",
+          appUserModelId: "Codex_123abc!App"
+        }
+      }]
+    }).remoteApps[0]?.launch.kind).toBe("packaged");
+    expect(() => WorkspaceDefinitionSchema.parse({
+      id: "wrong-package", name: "Invalid", cwd: "C:\\workspace",
+      terminal: { runtime: { kind: "host" } },
+      remoteApps: [{
+        id: "app", name: "Invalid",
+        launch: {
+          kind: "packaged", packageFamilyName: "Other_123",
+          appUserModelId: "Codex_123!App"
+        }
+      }]
+    })).toThrow();
     expect(CreateAppSessionSchema.parse({
       workspaceId: "host-apps",
       profileId: "codex-desktop"
@@ -136,7 +159,7 @@ describe("protocol", () => {
       directories: [],
       executables: [{
         name: "Tool",
-        executable: "C:\\Tools\\Tool.exe",
+        launch: { kind: "win32", executable: "C:\\Tools\\Tool.exe" },
         source: "path"
       }],
       truncated: false

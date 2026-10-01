@@ -19,11 +19,31 @@ export const RemoteAppProfileIdSchema = z.string()
   .max(64)
   .regex(/^[a-z0-9][a-z0-9-]*$/);
 
+const ExecutableSchema = z.string().trim().min(1).max(4096)
+  .refine((value) => !value.includes("\0"), "Remote App executable must not contain NUL");
+const AppUserModelIdSchema = z.string().min(5).max(384)
+  .regex(/^[a-zA-Z0-9._-]+![a-zA-Z0-9._-]+$/, "Invalid packaged application ID");
+const PackageFamilyNameSchema = z.string().min(3).max(256)
+  .regex(/^[a-zA-Z0-9._~-]+$/, "Invalid package family name");
+
+/** Launch identity is persisted, never supplied to session create/signaling. */
+export const RemoteAppLaunchSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("win32"), executable: ExecutableSchema }).strict(),
+  z.object({
+    kind: z.literal("packaged"),
+    appUserModelId: AppUserModelIdSchema,
+    packageFamilyName: PackageFamilyNameSchema
+  }).strict().refine(
+    (entry) => entry.appUserModelId.startsWith(entry.packageFamilyName + "!"),
+    "Packaged application ID must belong to the selected package"
+  )
+]);
+export type RemoteAppLaunch = z.infer<typeof RemoteAppLaunchSchema>;
+
 export const RemoteAppProfileSchema = z.object({
   id: RemoteAppProfileIdSchema,
   name: z.string().trim().min(1).max(100),
-  executable: z.string().trim().min(1).max(4096)
-    .refine((value) => !value.includes("\0"), "Remote App executable must not contain NUL"),
+  launch: RemoteAppLaunchSchema,
   args: z.array(
     z.string().max(4096)
       .refine((value) => !value.includes("\0"), "Remote App argv must not contain NUL")
@@ -111,6 +131,19 @@ export function isTerminalAppSessionState(state: AppSessionState): boolean {
   return state === "exited" || state === "failed";
 }
 
+export const RemoteAppMediaDiagnosticsSchema = z.object({
+  sourceFrames: z.number().int().nonnegative(),
+  submittedFrames: z.number().int().nonnegative(),
+  conversionFailures: z.number().int().nonnegative(),
+  lastSubmittedAt: z.string().datetime().optional(),
+  failure: z.enum(["invalid-frame", "frame-conversion"]).optional(),
+  nativeFailure: z.enum([
+    "window-not-found", "window-too-large", "printwindow-failed",
+    "blank-window", "capture-exception", "frame-write-failed"
+  ]).optional()
+}).strict();
+export type RemoteAppMediaDiagnostics = z.infer<typeof RemoteAppMediaDiagnosticsSchema>;
+
 export const AppSessionPublicSchema = z.object({
   id: z.string().min(16).max(128),
   workspaceId: z.string().min(1).max(64),
@@ -118,6 +151,7 @@ export const AppSessionPublicSchema = z.object({
   profileName: z.string().min(1).max(100),
   state: AppSessionStateSchema,
   mediaState: AppSessionMediaStateSchema,
+  mediaDiagnostics: RemoteAppMediaDiagnosticsSchema.optional(),
   createdAt: z.string().datetime(),
   connections: z.number().int().nonnegative(),
   pid: z.number().int().positive().optional(),
@@ -164,7 +198,7 @@ export type RemoteAppCapabilities = z.infer<typeof RemoteAppCapabilitiesSchema>;
 
 export const RemoteAppCatalogEntrySchema = z.object({
   name: z.string().trim().min(1).max(100),
-  executable: z.string().min(1).max(4096),
+  launch: RemoteAppLaunchSchema,
   source: z.enum(["detected", "path"])
 }).strict();
 export type RemoteAppCatalogEntry = z.infer<typeof RemoteAppCatalogEntrySchema>;

@@ -347,7 +347,7 @@ export function WorkspaceDialog({
     setAppDraft({
       id: appId(),
       name: "",
-      executable: "",
+      launch: { kind: "win32", executable: "" },
       args: []
     });
     setView("app");
@@ -362,11 +362,14 @@ export function WorkspaceDialog({
   };
 
   const commitAppDraft = () => {
-    if (!appDraft || !appDraft.name.trim() || !appDraft.executable.trim()) return;
+    if (!appDraft || !appDraft.name.trim() ||
+      (appDraft.launch.kind === "win32" && !appDraft.launch.executable.trim())) return;
     const normalized: RemoteAppProfile = {
       ...appDraft,
       name: appDraft.name.trim(),
-      executable: appDraft.executable.trim()
+      launch: appDraft.launch.kind === "win32"
+        ? { kind: "win32", executable: appDraft.launch.executable.trim() }
+        : appDraft.launch
     };
     setRemoteApps((current) => {
       const index = current.findIndex((profile) => profile.id === normalized.id);
@@ -383,7 +386,7 @@ export function WorkspaceDialog({
     setAppDraft((current) => current
       ? {
           ...current,
-          executable: entry.executable,
+          launch: entry.launch,
           name: current.name.trim() ? current.name : suggestedAppName(entry)
         }
       : current
@@ -787,7 +790,7 @@ export function WorkspaceDialog({
                         >
                           <span>
                             <strong>{profile.name}</strong>
-                            <small>{profile.executable}</small>
+                            <small>{profile.launch.kind === "win32" ? profile.launch.executable : profile.launch.appUserModelId}</small>
                           </span>
                           <span aria-hidden="true">›</span>
                         </button>
@@ -833,11 +836,12 @@ export function WorkspaceDialog({
 
                 <div className="workspace-field">
                   <label>{t("workspace.remoteAppExecutable")}</label>
-                  {appDraft.executable ? (
+                  {(appDraft.launch.kind === "packaged" ||
+                    appDraft.launch.executable) ? (
                     <div className="selected-executable glass-content">
                       <span>
                         <strong>{appDraft.name || t("workspace.remoteAppSelected")}</strong>
-                        <small>{appDraft.executable}</small>
+                        <small>{appDraft.launch.kind === "win32" ? appDraft.launch.executable : appDraft.launch.appUserModelId}</small>
                       </span>
                       <button
                         type="button"
@@ -865,11 +869,11 @@ export function WorkspaceDialog({
                     <span>{t("workspace.remoteAppManualPath")}</span>
                     <input
                       className="glass-input"
-                      value={appDraft.executable}
+                      value={appDraft.launch.kind === "win32" ? appDraft.launch.executable : ""}
                       maxLength={4096}
                       onChange={(event) => setAppDraft({
                         ...appDraft,
-                        executable: event.target.value
+                        launch: { kind: "win32", executable: event.target.value }
                       })}
                       placeholder={t("workspace.remoteAppExecutablePlaceholder")}
                     />
@@ -933,7 +937,7 @@ export function WorkspaceDialog({
                       !name.trim() ||
                       !cwd.trim() ||
                       remoteApps.some(
-                        (profile) => !profile.name.trim() || !profile.executable.trim()
+                        (profile) => !profile.name.trim() || (profile.launch.kind === "win32" && !profile.launch.executable.trim())
                       )
                     }
                   >
@@ -958,7 +962,7 @@ export function WorkspaceDialog({
                   <button
                     type="button"
                     className="prism-primary"
-                    disabled={!appDraft?.name.trim() || !appDraft?.executable.trim()}
+                    disabled={!appDraft?.name.trim() || (appDraft?.launch.kind === "win32" && !appDraft.launch.executable.trim())}
                     onClick={commitAppDraft}
                   >
                     {t("workspace.done")}

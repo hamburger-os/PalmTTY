@@ -10,11 +10,16 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
+- Detect current-user Microsoft Store/MSIX apps by registered AUMID with a typed Win32/packaged launch model; packaged activation verifies a fresh PID, exact package family and mandatory PalmTTY Job ownership before remote control.
+- Add Remote App video-stage diagnostics (native/Worker received and submitted frames, conversion failures, browser decoded-frame watchdog) and a Windows installed native WebRTC round-trip smoke.
+
 - Add Windows x64 Remote Apps alpha as a terminal-independent Activity: persisted Workspace App profiles launch through a detached authenticated AppWorker and a PalmTTY-owned native Windows app host, stream one owned application window over WebRTC, and accept only bounded typed mobile pointer/key/text/display control. Full-desktop capture, browser-selected PID/HWND, elevation/UAC bypass, clipboard, audio, camera, microphone and file-drag channels are intentionally absent.
 - Replace the terminal-specific SessionWorkbench shell with an activity-aware WorkspaceWorkbench so live Terminal and Remote App activities can be switched in place and share Git/Files without being unmounted; Terminal Artifacts remain Session-scoped.
 - Add mobile Remote App View / direct-touch / trackpad modes, two-finger scrolling, special keys, Unicode text/IME/dictation input, automatic viewport/DPR capture sizing and explicit capture/network diagnostics.
 
 ### Changed
+
+- Replace the Remote App executable-only profile with a typed Win32/MSIX launch identity and increment the persistence generation to `workspaces-v3.json`; v1/v2 catalogs are left untouched and Workspaces must be recreated. This intentionally breaks the pre-release profile format. The native AppWorker receives bounded single-allocation PTF1 frames rather than repeatedly concatenating large stdout chunks.
 
 - Separate Workspace basics, nested Terminal launch settings and Remote App profiles. Remote App profiles now persist only app identity/executable/argv; capture size is automatically adapted from the live phone surface inside a 320×240–1600×1000 envelope, with a 1280×800 @ 12 fps runtime default and 4096×4096 / 12 MP source-window allocation ceiling.
 - Windows packages now include a precompiled GUI-subsystem Remote App host; source mode compiles the same helper into the private per-user App runtime on first use.
@@ -42,6 +47,8 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - **Upgrade note:** moving from `0.1.0` to `0.2.0` requires replacing those legacy exposure fields with one explicit `local`, `lan`, `reverseProxy`, or `https` profile. PalmTTY intentionally provides no compatibility migration; review the current examples before restarting the Agent.
 
 ### Fixed
+- Retry standard PrintWindow on the same verified window when full-content capture fails or yields blank pixels, and report bounded native capture failure reasons. Stop reporting successful video merely because PrintWindow or WebRTC signaling succeeded; show the actual browser playback state and provide a manual-play action when autoplay is blocked.
+- Use an almost opaque theme-aware modal backing to keep the mobile App picker legible over the Workbench; use a semantic opaque video background to prevent the ambient gradient showing through an empty Remote App viewport.
 - Expand Windows Remote App discovery beyond PATH to known install roots, App Paths and capped Start Menu shortcut targets, and add searchable mobile results. Detect missing/incompatible native `@roamhq/wrtc` before AppWorker launch and validate the packaged WebRTC addon during Windows installed-runtime smoke.
 
 - Harden mobile terminal input for iOS/CJK IMEs: defer and deduplicate keyCode-229 punctuation (including literal `/`), recover confirmed keydown-only Ctrl+letter/Ctrl+Space/Escape physical-key cases without stealing real composition, honor DECCKM application-cursor sequences in the virtual keybar, preserve bracketed-paste semantics for long text, add literal symbol fallbacks, and allow browser-local A−/A+ terminal density adjustment without reconnecting the Session.

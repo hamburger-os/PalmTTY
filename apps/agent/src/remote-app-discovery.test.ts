@@ -2,7 +2,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   knownAppCandidates,
-  parseInstalledAppDiscovery
+  parseInstalledAppDiscovery,
+  parsePackagedAppDiscovery
 } from "./remote-app-discovery.js";
 
 describe("Remote App executable discovery", () => {
@@ -32,7 +33,23 @@ describe("Remote App executable discovery", () => {
       { name: "Empty", executable: "", source: "detected" },
       { name: "", executable: "C:\\Tools\\empty.exe", source: "detected" }
     ])).toEqual([
-      { name: "DeepSeek Harness", executable: "C:\\Tools\\Harness.exe", source: "detected" }
+      { name: "DeepSeek Harness", launch: { kind: "win32", executable: "C:\\Tools\\Harness.exe" }, source: "detected" }
+    ]);
+  });
+
+  it("accepts only matching Store package families and prioritizes Codex", () => {
+    expect(parsePackagedAppDiscovery([
+      { name: "System app", appUserModelId: "System_123!App", packageFamilyName: "System_123" },
+      { name: "Codex", appUserModelId: "Codex_123!App", packageFamilyName: "Codex_123" },
+      { name: "Spoofed", appUserModelId: "Other_123!App", packageFamilyName: "Unrelated_123" },
+      { name: "Duplicate", appUserModelId: "codex_123!App", packageFamilyName: "Codex_123" }
+    ])).toEqual([
+      { name: "Codex", launch: {
+        kind: "packaged", appUserModelId: "Codex_123!App", packageFamilyName: "Codex_123"
+      }, source: "detected" },
+      { name: "System app", launch: {
+        kind: "packaged", appUserModelId: "System_123!App", packageFamilyName: "System_123"
+      }, source: "detected" }
     ]);
   });
 

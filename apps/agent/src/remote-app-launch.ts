@@ -9,11 +9,12 @@ import {
   readHostEnvironment
 } from "./host-environment.js";
 import { resolveExecutable } from "./workspace-runtime.js";
+import { findRegisteredPackagedApp } from "./remote-app-discovery.js";
 
 export type ResolvedRemoteAppLaunch = {
   id: string;
   name: string;
-  executable: string;
+  launch: RemoteAppProfile["launch"];
   args: string[];
   cwd: string;
   environment: Record<string, string>;
@@ -42,15 +43,23 @@ export async function resolveRemoteAppLaunch(
     hostEnvironment,
     workspace.environment ?? {}
   );
-  const executable = await resolveExecutable(profile.executable, {
-    cwd,
-    env: environment
-  });
+  const identity = profile.launch;
+  const resolvedLaunch = identity.kind === "win32"
+    ? {
+        kind: "win32" as const,
+        executable: await resolveExecutable(identity.executable, { cwd, env: environment })
+      }
+    : await findRegisteredPackagedApp(
+        identity.appUserModelId, identity.packageFamilyName, environment
+      ).then((present) => {
+        if (!present) throw new Error("Windows package registration is missing or does not match AUMID");
+        return identity;
+      });
 
   return {
     id: profile.id,
     name: profile.name,
-    executable,
+    launch: resolvedLaunch,
     args: profile.args,
     cwd,
     environment

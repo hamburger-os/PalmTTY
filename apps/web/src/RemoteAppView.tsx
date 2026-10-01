@@ -13,6 +13,7 @@ import {
   REMOTE_APP_CAPTURE_MIN_WIDTH,
   encodeRemoteAppControlMessage,
   type AppSessionMediaState,
+  type RemoteAppMediaDiagnostics,
   type AppSessionPublic,
   type RemoteAppCapabilities,
   type RemoteAppControlMessage
@@ -169,6 +170,12 @@ export function RemoteAppView({
     session.mediaState
   );
   const [networkIssue, setNetworkIssue] = useState(false);
+  const [videoRendered, setVideoRendered] = useState(false);
+  const [videoTimedOut, setVideoTimedOut] = useState(false);
+  const [playRejected, setPlayRejected] = useState(false);
+  const [mediaDiagnostics, setMediaDiagnostics] = useState<RemoteAppMediaDiagnostics | null>(session.mediaDiagnostics ?? null);
+  const videoRenderedRef = useRef(false);
+  const connectedAt = useRef<number | null>(null);
   const activePointers = useRef(new Map<number, Point>());
   const pointerMoved = useRef(false);
   const connectionChangeRef = useRef(onConnectionChange);
@@ -179,7 +186,8 @@ export function RemoteAppView({
 
   useEffect(() => {
     setMediaState(session.mediaState);
-  }, [session.mediaState, session.id]);
+    setMediaDiagnostics(session.mediaDiagnostics ?? null);
+  }, [session.mediaState, session.mediaDiagnostics, session.id]);
 
   const send = useCallback((message: RemoteAppControlMessage): boolean => {
     const channel = channelRef.current;
@@ -230,6 +238,39 @@ export function RemoteAppView({
   }, [sendDisplayHint]);
 
   useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    let stopped = false;
+    let callbackId: number | undefined;
+    const frame = () => {
+      if (stopped) return;
+      videoRenderedRef.current = true;
+      setVideoRendered(true);
+      setVideoTimedOut(false);
+      if (typeof video.requestVideoFrameCallback === "function") {
+        callbackId = video.requestVideoFrameCallback(frame);
+      }
+    };
+    if (typeof video.requestVideoFrameCallback === "function") {
+      callbackId = video.requestVideoFrameCallback(frame);
+    }
+    const timer = window.setInterval(() => {
+      if (stopped) return;
+      if (!videoRenderedRef.current &&
+          video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+          video.videoWidth > 0 && video.videoHeight > 0 &&
+          typeof video.requestVideoFrameCallback !== "function") frame();
+      if (connectedAt.current !== null && !videoRenderedRef.current &&
+          Date.now() - connectedAt.current > 8000) setVideoTimedOut(true);
+    }, 1000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      if (callbackId !== undefined) video.cancelVideoFrameCallback?.(callbackId);
+    };
+  }, [session.id]);
+
+  useEffect(() => {
     const controller = new AbortController();
     let connection: RTCPeerConnection | undefined;
     let connectionId: string | undefined;
@@ -250,6 +291,7 @@ export function RemoteAppView({
     const cleanupPeer = () => {
       clearConnectionTimer();
       channelRef.current = null;
+      connectedAt.current = null;
       if (connection) {
         try { connection.close(); } catch { /* ignore */ }
         connection = undefined;
@@ -271,6 +313,10 @@ export function RemoteAppView({
     const connect = async () => {
       if (controller.signal.aborted || ended) return;
       cleanupPeer();
+      videoRenderedRef.current = false;
+      setVideoRendered(false);
+      setVideoTimedOut(false);
+      setPlayRejected(false);
       connectionChangeRef.current(firstAttempt ? "connecting" : "reconnecting");
       firstAttempt = false;
 
@@ -290,7 +336,7 @@ export function RemoteAppView({
         if (!video) return;
         const stream = event.streams[0] ?? new MediaStream([event.track]);
         video.srcObject = stream;
-        void video.play().catch(() => undefined);
+        void video.play().then(() => setPlayRejected(false), () => setPlayRejected(true));
       };
       peer.onconnectionstatechange = () => {
         if (connection !== peer || controller.signal.aborted) return;
@@ -298,6 +344,7 @@ export function RemoteAppView({
           clearConnectionTimer();
           failedAttempts = 0;
           setNetworkIssue(false);
+          connectedAt.current = Date.now();
           connectionChangeRef.current("connected");
           sendDisplayHint();
           return;
@@ -336,6 +383,7 @@ export function RemoteAppView({
           try {
             const current = await getAppSession(session.id);
             setMediaState(current.session.mediaState);
+            setMediaDiagnostics(current.session.mediaDiagnostics ?? null);
             if (
               current.session.state === "exited" ||
               current.session.state === "failed"
@@ -358,6 +406,7 @@ export function RemoteAppView({
       try {
         const current = await getAppSession(session.id);
         setMediaState(current.session.mediaState);
+        setMediaDiagnostics(current.session.mediaDiagnostics ?? null);
         if (
           current.session.state === "exited" ||
           current.session.state === "failed"
@@ -544,18 +593,24 @@ export function RemoteAppView({
   };
 
   const diagnostic = networkIssue
-    ? (
-        capabilities?.relayConfigured
-          ? t("remoteApp.networkUnavailable")
-          : t("remoteApp.networkNoRelay")
-      )
-    : mediaState === "capture-unavailable"
-      ? t("remoteApp.captureUnavailable")
-      : mediaState === "waiting-for-window"
-        ? t("remoteApp.waitingForWindow")
-        : mediaState === "waiting-for-frame"
-          ? t("remoteApp.waitingForFrame")
-          : null;
+    ? (capabilities?.relayConfigured
+      ? t("remoteApp.networkUnavailable")
+      : t("remoteApp.networkNoRelay"))
+    : playRejected
+      ? t("remoteApp.playBlocked")
+      : videoTimedOut
+        ? mediaDiagnostics && mediaDiagnostics.sourceFrames === 0
+          ? t("remoteApp.noSourceFrames")
+          : mediaDiagnostics && mediaDiagnostics.submittedFrames === 0
+            ? t("remoteApp.noConvertedFrames")
+            : t("remoteApp.noDecodedFrames")
+        : mediaState === "capture-unavailable"
+          ? t("remoteApp.captureUnavailable")
+          : mediaState === "waiting-for-window"
+            ? t("remoteApp.waitingForWindow")
+            : mediaState === "waiting-for-frame"
+              ? t("remoteApp.waitingForFrame")
+              : null;
 
   return (
     <section className="remote-app-view">
@@ -596,15 +651,49 @@ export function RemoteAppView({
         }}
       >
         <video ref={videoRef} autoPlay playsInline muted />
+        <details className="remote-app-diagnostics"
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerMove={(event) => event.stopPropagation()}
+          onPointerUp={(event) => event.stopPropagation()}
+          onPointerCancel={(event) => event.stopPropagation()}
+          onWheel={(event) => event.stopPropagation()}>
+          <summary>{t("remoteApp.diagnostics")}</summary>
+          <span>{t("remoteApp.hostState")}: {mediaState}</span>
+          <span>{t("remoteApp.frames")}: {mediaDiagnostics?.sourceFrames ?? "–"} /
+            {mediaDiagnostics?.submittedFrames ?? "–"}</span>
+          <span>{t("remoteApp.failures")}: {mediaDiagnostics?.conversionFailures ?? "–"}</span>
+          {mediaDiagnostics?.nativeFailure && (
+            <span>{t("remoteApp.captureReason")}: {mediaDiagnostics.nativeFailure}</span>
+          )}
+          <span>{t("remoteApp.videoState")}: {videoRendered ? t("remoteApp.videoReady") :
+            t("remoteApp.videoWaiting")}</span>
+        </details>
         {diagnostic ? (
-          <div className="remote-app-status-overlay glass-content">
+          <div className="remote-app-status-overlay glass-content"
+            onPointerDown={(event) => event.stopPropagation()}
+            onPointerMove={(event) => event.stopPropagation()}
+            onPointerUp={(event) => event.stopPropagation()}
+            onPointerCancel={(event) => event.stopPropagation()}
+            onWheel={(event) => event.stopPropagation()}>
             <strong>{t("remoteApp.statusTitle")}</strong>
             <span>{diagnostic}</span>
+            {playRejected && (
+              <button type="button" className="ghost"
+                onClick={() => {
+                  const video = videoRef.current;
+                  if (video) void video.play().then(
+                    () => setPlayRejected(false),
+                    () => setPlayRejected(true)
+                  );
+                }}>{t("remoteApp.retryPlay")}</button>
+            )}
           </div>
-        ) : (
+        ) : videoRendered ? (
           <div className="remote-app-mode-hint">
             {t(interactionModeHintKey(mode))}
           </div>
+        ) : (
+          <div className="remote-app-waiting">{t("remoteApp.videoWaiting")}</div>
         )}
       </div>
 

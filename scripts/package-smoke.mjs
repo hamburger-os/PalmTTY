@@ -40,7 +40,8 @@ function run(command, args, options = {}) {
     cwd: options.cwd,
     env: options.env,
     encoding: "utf8",
-    windowsHide: true
+    windowsHide: true,
+    ...(options.timeout ? { timeout: options.timeout } : {})
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
@@ -108,6 +109,10 @@ async function main() {
         "  throw new Error('Packaged Remote App WebRTC native APIs are unavailable');"
       ].join("\n");
       run(node, ["-e", webRtcScript], { cwd: path.join(root, "app") });
+      run(node, [
+        path.join(root, "tools", "remote-app-video-smoke.mjs"),
+        path.join(root, "app")
+      ], { cwd: path.join(root, "app"), timeout: 20_000 });
     }
     if (process.platform !== "win32") {
       await chmod(node, 0o755);

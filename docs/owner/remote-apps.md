@@ -14,7 +14,7 @@ Workspace
 │  └─ startupCommand
 └─ Remote App profiles
    ├─ id / name
-   ├─ executable
+   ├─ launch: win32/executable | packaged/AUMID+package family
    └─ argv
 ~~~
 
@@ -59,7 +59,7 @@ Workspace 持久化：
 - 一个 Terminal launch profile；
 - 一组 Remote App profile。
 
-创建/修改 Workspace 仍属于“认证 + 精确 Origin”的高权限持久操作。
+创建/修改 Workspace 仍属于“认证 + 精确 Origin”的高权限持久操作。当前 typed launch catalog 使用 `workspaces-v3.json`，故意不读取旧的 v1/v2 文件，用户需重新创建 Workspace。
 
 ### Terminal
 
@@ -73,7 +73,7 @@ Remote App profile 只持久化：
 
 - id；
 - display name；
-- executable；
+- typed launch：Win32 executable 或已注册 MSIX 的 AUMID + package family；
 - 独立 argv。
 
 不再持久化 frameRate/maxWidth/maxHeight。画面大小属于浏览器 presentation state：Remote App Surface 在尺寸、DPR 或横竖屏改变时发送有界 display hint，由 AppWorker/native helper 在协议硬上限内适配。用户界面只显示“画质 · 自动”。
@@ -88,10 +88,10 @@ Remote App 是 Windows 宿主 Activity。即使 Workspace 的 Terminal profile �
 
 PalmTTY 提供两个有界选择面：
 
-1. **Detected applications**：检查已知 PATH/常见用户与系统安装目录，再有界读取 Windows App Paths 注册项和开始菜单快捷方式中的本地 `.exe` 目标；按 executable 去重，最多 64 项，手机端可搜索；
+1. **Detected applications**：优先枚举当前用户 Get-StartApps 中可与 Get-AppxPackage 注册匹配的 MSIX/AUMID；再检查已知 PATH/常见安装目录、App Paths 和有界开始菜单快捷方式，按 launch identity 去重，总数最多 64 项，手机端可搜索；
 2. **Executable browser**：只列目录和 `.exe` 文件，不返回文件内容，也不执行被浏览的程序。
 
-手工 executable 路径保留在“高级”作为兜底。保存 Workspace 与真正启动 App Session 时都会重新解析 executable。
+手工 executable 路径保留在“高级”作为兜底。保存 Workspace 与真正启动 App Session 时都会重新验证 typed launch identity；MSIX 不通过 WindowsApps 受保护路径直接执行 EXE。
 
 这一能力不是通用文件 API，也不是浏览器任意进程启动 API。
 
@@ -102,7 +102,7 @@ App Session 采用和终端相似但独立的 durability 原则：
 1. Agent 生成 App Session ID、endpoint 和独立 secret；
 2. detached 启动 AppWorker；
 3. AppWorker 启动 Windows helper；
-4. helper 先 suspended 创建应用，再加入自己持有的 `KILL_ON_JOB_CLOSE` Job Object；
+4. Win32 helper 先 suspended 创建应用再加入 `KILL_ON_JOB_CLOSE` Job；MSIX helper 通过 IApplicationActivationManager 激活 AUMID，确认全新 PID、包身份与 Job 归属，已有单实例或拒绝 Job 加入的应用直接拒绝接管；
 5. AppWorker 发布独立 Remote App runtime generation recovery record + secret 并监听本地 IPC；
 6. Agent 认证后发送幂等 adopt，adoption 后才进入 durable 生命周期；
 7. Agent 重启只断开控制 IPC，不结束 AppWorker/helper/App；
@@ -120,12 +120,12 @@ PID 仍只用于诊断，不能成为 Agent 任意 kill 进程的 authority。
 
 - 源窗口最大 4096×4096；
 - 源像素总量有上限；
-- AppWorker frame buffer 有硬上限；
+- AppWorker 使用有界单次分配的 PTF1 帧解析器，避免 stdout 分片反复拷贝大帧；
 - WebRTC/control/SDP/Session 数量都有独立限制。
 
 浏览器发送的 display hint 只能在协议允许的 320×240 ～ 1600×1000 区间内变化；helper 再次 clamp 且强制偶数尺寸。它是 presentation hint，不是授权改变 capture target。
 
-当前 Windows backend 仍使用 `PrintWindow(PW_RENDERFULLCONTENT)`。捕获失败不会退化成 BitBlt/desktop/monitor capture。
+当前 Windows backend 先使用 `PrintWindow(PW_RENDERFULLCONTENT)`，如果失败或得到纯黑空帧，则只对同一个已验证归属的 HWND 重试普通 `PrintWindow`；区分窗口未找到、太大、PrintWindow 失败、空帧、捕获异常等原因。捕获失败不会退化成 BitBlt/desktop/monitor capture。
 
 媒体状态显式区分：
 
@@ -135,7 +135,7 @@ PID 仍只用于诊断，不能成为 Agent 任意 kill 进程的 authority。
 - `streaming`
 - `capture-unavailable`
 
-Web 端会把 capture failure 与 WebRTC connectivity failure 分开显示，避免黑屏无诊断。
+Web 端分别显示原生捕获状态、AppWorker 收到帧/成功提交帧/转换失败计数、浏览器实际已解码首帧状态。WebRTC 已连接但无首帧会触发明确诊断；浏览器禁止自动播放时提供手动播放动作。
 
 ## ICE / TURN
 
@@ -187,7 +187,8 @@ Workbench 顶部可以在同一 Workspace 的 live Terminal/App Activity 间切�
 - Remote App runtime 只实现 Windows x64；
 - 只允许一个媒体 peer，新连接替换旧连接；
 - 没有 audio/clipboard/multi-window/full desktop/UAC；
-- PrintWindow 对某些 GPU/protected window 可能无画面；
+- PrintWindow 对某些 GPU/protected window 仍可能无画面；尚未声称支持 WGC；
+- MSIX 激活可能复用已运行的单实例或无法加入 Job，均拒绝接管并保留可诊断错误；
 - STUN/TURN 由用户部署配置，PalmTTY 不运营 relay；
 - Agent/AppWorker/App 可跨 Agent restart 继续，但不承诺 OS reboot、用户注销或 AppWorker 死亡后的恢复；
 - Codex Desktop、VS Code 等具体应用仍需要真实 Windows + 手机验收，不能因为 executable 能启动就宣称兼容。

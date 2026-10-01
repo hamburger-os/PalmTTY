@@ -29,6 +29,7 @@
   --space-5: 20px;
   --space-6: 24px;
 
+  --remote-video-background: #0c1117;
   --touch-target: 44px;
   --touch-target-compact: 36px;
 
@@ -339,7 +340,7 @@ button:disabled {
   background:
     var(--specular-panel),
     var(--theme-modal-veil),
-    var(--clear-panel);
+    var(--flat-modal);
   border: 1px solid var(--border-strong);
   border-top-color: var(--border-highlight);
   box-shadow: var(--modal-shadow);
