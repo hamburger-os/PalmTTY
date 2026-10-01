@@ -107,7 +107,7 @@ Remote App Surface 使用三种显式触摸语义：
 
 画质为自动模式。Surface 的实际几何/DPR 通过 bounded display hint 发给 AppWorker/helper，横竖屏或 viewport 变化后自动缩放，不把 FPS/宽高存进 Profile。
 
-手机 Terminal 和 Remote App 复用共享「键盘、长文本」主按钮。Terminal 键盘继续聚焦 xterm；Remote App 键盘在点击时同步聚焦独立的 16px 即时输入框，组合完成的 Unicode 沿现有有界 WebRTC text control 发送；长文本保留可编辑预览和明确发送，断线时即时输入中尚未发送的文字可转到长文本面板。常用 Ctrl/Alt/Shift、方向、Enter、Tab、Esc、Backspace/Delete 沿用 allowlisted typed key。Remote App 不复用 xterm textarea，也不把桌面输入逻辑混入 TerminalView。
+手机 Terminal 和 Remote App 复用共享「键盘、长文本」主按钮。Terminal 键盘继续聚焦 xterm；Remote App 键盘在点击时同步聚焦 16px 字号、1px 大小的 Safari 隐形输入桥，不再覆盖远程应用画面；已确认 Unicode 以有界消息按帧合并发送，连续 Backspace/Delete 每批最多 32 次；长文本保留可编辑预览和明确发送，断线时即时输入中尚未发送的文字可转到长文本面板。常用 Ctrl/Alt/Shift、方向、Enter、Tab、Esc、Backspace/Delete 沿用 allowlisted typed key。Remote App 不复用 xterm textarea，也不把桌面输入逻辑混入 TerminalView。
 
 Remote App 画面状态必须可诊断：等待窗口、等待首帧、正在串流、capture unavailable 与 WebRTC 路径失败分别显示；不能把所有失败都退化成黑屏。浏览器首帧成功解码后停止初始等待覆盖层，后续故障以外置控制条中的非阻塞提示呈现；详细计数在选项中按需查看。公网/反向代理环境如果需要 TURN，Web 只使用认证 capability 返回的 host-configured ICE servers；UI 不提供任意 ICE 注入。
 
