@@ -34,7 +34,6 @@ export const RemoteAppWorkerBootstrapSchema = z.object({
   workspaceId: z.string().min(1).max(64),
   helperPath: z.string().min(1).max(4096),
   exitedRetentionMinutes: z.number().int().min(1).max(1440),
-  iceServers: z.array(RemoteAppIceServerSchema).max(8),
   profile: ResolvedRemoteAppProfileSchema
 }).strict();
 export type RemoteAppWorkerBootstrap = z.infer<typeof RemoteAppWorkerBootstrapSchema>;
@@ -60,7 +59,8 @@ export const RemoteAppWorkerRequestSchema = z.discriminatedUnion("type", [
     type: z.literal("negotiate"),
     requestId: RequestIdSchema,
     clientId: z.string().min(1).max(128),
-    offerSdp: SdpSchema
+    offerSdp: SdpSchema,
+    iceServers: z.array(RemoteAppIceServerSchema).max(8)
   }).strict(),
   z.object({
     type: z.literal("detach"),
