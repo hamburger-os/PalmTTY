@@ -2162,6 +2162,8 @@ body.remote-app-active { overflow: hidden; }
   -webkit-user-select: none;
 }
 
+.remote-app-surface.is-adapted { border: 0; }
+
 .remote-app-surface.mode-view { touch-action: pan-x pan-y pinch-zoom; }
 .remote-app-surface.mode-direct,
 .remote-app-surface.mode-touchpad { touch-action: none; }
@@ -2182,7 +2184,7 @@ body.remote-app-active { overflow: hidden; }
   background: var(--remote-video-background);
 }
 
-.remote-app-surface video.fit-cover { object-fit: cover; }
+.remote-app-surface video.fit-adapted { object-fit: cover; }
 
 .remote-app-cursor {
   position: absolute;
