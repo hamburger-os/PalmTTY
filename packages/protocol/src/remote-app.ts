@@ -111,6 +111,15 @@ export function isTerminalAppSessionState(state: AppSessionState): boolean {
   return state === "exited" || state === "failed";
 }
 
+export const RemoteAppMediaDiagnosticsSchema = z.object({
+  sourceFrames: z.number().int().nonnegative(),
+  submittedFrames: z.number().int().nonnegative(),
+  conversionFailures: z.number().int().nonnegative(),
+  lastSubmittedAt: z.string().datetime().optional(),
+  failure: z.enum(["invalid-frame", "frame-conversion"]).optional()
+}).strict();
+export type RemoteAppMediaDiagnostics = z.infer<typeof RemoteAppMediaDiagnosticsSchema>;
+
 export const AppSessionPublicSchema = z.object({
   id: z.string().min(16).max(128),
   workspaceId: z.string().min(1).max(64),
@@ -118,6 +127,7 @@ export const AppSessionPublicSchema = z.object({
   profileName: z.string().min(1).max(100),
   state: AppSessionStateSchema,
   mediaState: AppSessionMediaStateSchema,
+  mediaDiagnostics: RemoteAppMediaDiagnosticsSchema.optional(),
   createdAt: z.string().datetime(),
   connections: z.number().int().nonnegative(),
   pid: z.number().int().positive().optional(),

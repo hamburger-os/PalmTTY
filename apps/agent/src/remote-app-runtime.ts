@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createRequire } from "node:module";
+import { RemoteAppFrameDecoder } from "./remote-app-frame-decoder.js";
 import {
   AppSessionPublicSchema,
   REMOTE_APP_CAPTURE_DEFAULT_FPS,
@@ -23,8 +24,6 @@ type Peer = {
   connection: any;
 };
 
-const FRAME_HEADER_BYTES = 16;
-const MAX_FRAME_BYTES = 8 * 1024 * 1024;
 const MAX_HELPER_STDERR_BYTES = 16 * 1024;
 const HELPER_READY_PREFIX = "PALMTTY_APP_HOST_READY ";
 const HELPER_STATE_PREFIX = "PALMTTY_APP_HOST_STATE ";
@@ -49,7 +48,14 @@ export class RemoteAppRuntime {
   private helper: ChildProcessWithoutNullStreams | undefined;
   private appPid: number | undefined;
   private exitCode: number | undefined;
-  private frameBuffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  private readonly frameDecoder = new RemoteAppFrameDecoder();
+  private sourceFrames = 0;
+  private submittedFrames = 0;
+  private conversionFailures = 0;
+  private lastSubmittedAt: string | undefined;
+  private lastFailure: "invalid-frame" | "frame-conversion" | undefined;
+  private lastFrameStatusAt = 0;
+  private helperMediaState: AppSessionMediaState = "launching";
   private readonly statusListeners = new Set<StatusListener>();
   private readonly exitListeners = new Set<ExitListener>();
   private peer: Peer | undefined;
@@ -92,9 +98,17 @@ export class RemoteAppRuntime {
         }
         if (line.startsWith(HELPER_STATE_PREFIX)) {
           const next = line.slice(HELPER_STATE_PREFIX.length).trim() as AppSessionMediaState;
-          if (MEDIA_STATES.has(next) && next !== this.mediaState) {
-            this.mediaState = next;
-            this.publishStatus();
+          if (MEDIA_STATES.has(next)) {
+            this.helperMediaState = next;
+            // A successful PrintWindow call does not prove that WebRTC accepted
+            // its pixels. Report streaming only after onFrame succeeds.
+            const visible = next === "streaming"
+              ? (this.submittedFrames ? "streaming" : "waiting-for-frame")
+              : next;
+            if (visible !== this.mediaState) {
+              this.mediaState = visible;
+              this.publishStatus();
+            }
           }
         }
       }
@@ -185,6 +199,13 @@ export class RemoteAppRuntime {
       profileName: this.bootstrap.profile.name,
       state: this.state,
       mediaState: this.mediaState,
+      mediaDiagnostics: {
+        sourceFrames: this.sourceFrames,
+        submittedFrames: this.submittedFrames,
+        conversionFailures: this.conversionFailures,
+        ...(this.lastSubmittedAt ? { lastSubmittedAt: this.lastSubmittedAt } : {}),
+        ...(this.lastFailure ? { failure: this.lastFailure } : {})
+      },
       createdAt: this.bootstrap.createdAt,
       connections,
       ...(this.appPid ? { pid: this.appPid } : {}),
@@ -295,61 +316,43 @@ export class RemoteAppRuntime {
 
   private consumeFrames(chunk: Buffer): void {
     if (this.disposed || !this.videoSource) return;
-    this.frameBuffer = this.frameBuffer.length === 0
-      ? chunk
-      : Buffer.concat([this.frameBuffer, chunk]);
-
-    if (this.frameBuffer.length > MAX_FRAME_BYTES + FRAME_HEADER_BYTES) {
-      this.frameBuffer = Buffer.alloc(0);
-      return;
-    }
-
-    while (this.frameBuffer.length >= FRAME_HEADER_BYTES) {
-      if (
-        this.frameBuffer[0] !== 0x50 ||
-        this.frameBuffer[1] !== 0x54 ||
-        this.frameBuffer[2] !== 0x46 ||
-        this.frameBuffer[3] !== 0x31
-      ) {
-        this.frameBuffer = Buffer.alloc(0);
-        return;
-      }
-      const width = this.frameBuffer.readUInt32LE(4);
-      const height = this.frameBuffer.readUInt32LE(8);
-      const length = this.frameBuffer.readUInt32LE(12);
-      const expected = width * height * 4;
-      if (
-        width < 2 || height < 2 ||
-        width > 1600 || height > 1000 ||
-        width % 2 !== 0 || height % 2 !== 0 ||
-        length !== expected ||
-        length < 1 || length > MAX_FRAME_BYTES
-      ) {
-        this.frameBuffer = Buffer.alloc(0);
-        return;
-      }
-      if (this.frameBuffer.length < FRAME_HEADER_BYTES + length) return;
-
-      const rgba = this.frameBuffer.subarray(FRAME_HEADER_BYTES, FRAME_HEADER_BYTES + length);
-      this.frameBuffer = this.frameBuffer.subarray(FRAME_HEADER_BYTES + length);
-      try {
-        const i420 = new Uint8ClampedArray((width * height * 3) / 2);
-        this.wrtc.nonstandard.rgbaToI420(
-          {
-            width,
-            height,
-            data: new Uint8ClampedArray(rgba.buffer, rgba.byteOffset, rgba.byteLength)
-          },
-          { width, height, data: i420 }
-        );
-        this.videoSource.onFrame({ width, height, data: i420 });
-        if (this.mediaState !== "streaming") {
+    try {
+      this.frameDecoder.push(chunk, (rgba, width, height) => {
+        this.sourceFrames += 1;
+        try {
+          const i420 = new Uint8ClampedArray((width * height * 3) / 2);
+          this.wrtc.nonstandard.rgbaToI420(
+            {
+              width,
+              height,
+              data: new Uint8ClampedArray(rgba.buffer, rgba.byteOffset, rgba.byteLength)
+            },
+            { width, height, data: i420 }
+          );
+          this.videoSource.onFrame({ width, height, data: i420 });
+          this.submittedFrames += 1;
+          this.lastSubmittedAt = new Date().toISOString();
+          this.lastFailure = undefined;
+          const changed = this.mediaState !== "streaming";
           this.mediaState = "streaming";
+          if (changed || Date.now() - this.lastFrameStatusAt >= 2000) {
+            this.lastFrameStatusAt = Date.now();
+            this.publishStatus();
+          }
+        } catch {
+          this.conversionFailures += 1;
+          this.lastFailure = "frame-conversion";
+          if (this.mediaState !== "capture-unavailable") {
+            this.mediaState = "waiting-for-frame";
+          }
           this.publishStatus();
         }
-      } catch {
-        // A malformed/native conversion failure drops only the current frame.
-      }
+      });
+    } catch {
+      this.lastFailure = "invalid-frame";
+      this.conversionFailures += 1;
+      this.mediaState = "capture-unavailable";
+      this.publishStatus();
     }
   }
 
