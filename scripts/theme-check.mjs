@@ -80,6 +80,7 @@ const gitPanePath = path.join(webSource, "GitPane.tsx");
 const filesPanePath = path.join(webSource, "FilesPane.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
 const terminalKeyBar = await readFile(terminalKeyBarPath, "utf8");
+const remoteAppPresentation = await readFile(path.join(webSource, "remote-app-presentation.ts"), "utf8");
 const terminalImeInput = await readFile(terminalImeInputPath, "utf8");
 const terminalKeyInput = await readFile(terminalKeyInputPath, "utf8");
 const terminalPreferences = await readFile(terminalPreferencesPath, "utf8");
@@ -256,12 +257,22 @@ if (/^section\s*\{/m.test(styles) || !styles.includes(".app-shell > section {"))
 if (!/\.workbench-page\.is-remote-app\.remote-app-immersive\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);/.test(styles)) {
   failures.push("apps/web/src/styles.css [remote-app-immersive] missing single-row content grid");
 }
+if (!terminalKeyBar.includes('className="keybar-pinned"') ||
+    !terminalKeyBar.includes('className="keybar-restore"') ||
+    !terminalKeyBar.includes('dockMode === "full"') ||
+    !workspaceWorkbench.includes('mobile-workbench-tools') ||
+    !workspaceWorkbench.includes('is-terminal')) {
+  failures.push("apps/web [terminal-mobile-dock] compact/full/hidden or pinned Tools navigation missing");
+}
 if (!remoteAppView.includes('className="remote-app-dock"') ||
     !remoteAppView.includes('className="remote-app-toolbar glass-panel"') ||
     !remoteAppView.includes('visualState === "waiting"') ||
     !remoteAppView.includes('visualState === "interrupted"') ||
     remoteAppView.includes('className="remote-app-waiting"') ||
-    !remoteAppView.includes('<details className="remote-app-diagnostics">')) {
+    !remoteAppView.includes('<details className="remote-app-diagnostics">') ||
+    !remoteAppView.includes('className="remote-app-cursor"') ||
+    !remoteAppPresentation.includes('remoteVideoCursorPosition(') ||
+    !styles.includes('.remote-app-cursor {')) {
   failures.push("apps/web/src/RemoteAppView.tsx [remote-app-video-first] loading states or dock controls regressed");
 }
 
