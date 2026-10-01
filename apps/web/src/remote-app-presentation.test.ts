@@ -1,9 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition } from "./remote-app-presentation.js";
+import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta } from "./remote-app-presentation.js";
 
 const limits = { minWidth: 320, minHeight: 240, maxWidth: 1600, maxHeight: 1000 };
 
 describe("Remote App video presentation", () => {
+  it("moves the trackpad cursor in displayed video coordinates, even when cropped", () => {
+    const surface = { width: 360, height: 700 };
+    const video = { width: 1280, height: 720 };
+    const motion = { x: .1, y: .1 };
+    const contained = remoteTouchpadDelta(motion, surface, video, "contain");
+    const covered = remoteTouchpadDelta(motion, surface, video, "cover");
+    expect(contained.y).toBeGreaterThan(covered.y);
+    expect(contained.x).toBeCloseTo(.16);
+    expect(covered.y).toBeCloseTo(.16);
+    expect(remoteTouchpadDelta({ x: 2, y: -2 }, surface, video, "cover"))
+      .toEqual({ x: 1, y: -1 });
+  });
+
   it("positions the remote cursor exactly where the same video point would click", () => {
     const surface = { left: 0, top: 0, width: 360, height: 700 };
     const video = { width: 1280, height: 720 };

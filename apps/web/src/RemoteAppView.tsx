@@ -26,7 +26,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
-import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, type VideoFit } from "./remote-app-presentation.js";
+import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta, type VideoFit } from "./remote-app-presentation.js";
 
 export type RemoteAppConnectionState =
   | "connecting"
@@ -602,6 +602,10 @@ export function RemoteAppView({
       normalizedPoint(event.currentTarget, event.clientX, event.clientY)
     );
     cancelDragTimer();
+    if (dragRef.current?.held && dragRef.current.pointerId !== event.pointerId) {
+      send({ type: "pointerRelative", dx: 0, dy: 0, action: "up", button: 0 });
+      dragRef.current = null;
+    }
     // Long press without movement holds the primary button for a drag.
     if (touchpad.current.canLongPress(event.pointerId)) {
       const pointerId = event.pointerId;
@@ -647,10 +651,11 @@ export function RemoteAppView({
           motion.dy * event.currentTarget.clientHeight * 3))
       });
     } else {
+      const relative = remoteTouchpadDelta(
+        { x: motion.dx, y: motion.dy }, surfaceSize, videoSize, fit
+      );
       send({
-        type: "pointerRelative",
-        dx: Math.max(-1, Math.min(1, motion.dx * 1.6)),
-        dy: Math.max(-1, Math.min(1, motion.dy * 1.6)),
+        type: "pointerRelative", dx: relative.x, dy: relative.y,
         action: "move", button: 0
       });
     }

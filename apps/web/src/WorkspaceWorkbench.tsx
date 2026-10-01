@@ -187,9 +187,9 @@ export function WorkspaceWorkbench({
   return (
     <main ref={workbenchRef}
       className={"workbench-page" +
-        (activity.kind === "remoteApp" && pane === "remoteApp"
-          ? " is-remote-app" + (appImmersive ? " remote-app-immersive" : "")
-          : activity.kind === "terminal" ? " is-terminal" : "")}>
+        (activity.kind === "remoteApp"
+          ? " is-remote-app" + (pane === "remoteApp" && appImmersive ? " remote-app-immersive" : "")
+          : " is-terminal")}>
       <header className="workbench-header glass-panel">
         <div className="workbench-leading">
           <button

@@ -92,3 +92,22 @@ export function remoteVideoCursorPosition(
   if (x < 0 || x > surface.width || y < 0 || y > surface.height) return undefined;
   return { x, y };
 }
+
+/** Keep finger-to-preview cursor travel stable in contain and cropped cover modes. */
+export function remoteTouchpadDelta(
+  motion: UnitPoint, surface: DisplayBounds, video: DisplayBounds,
+  fit: VideoFit, gain = 1.6
+): UnitPoint {
+  const clamp = (value: number) => Math.max(-1, Math.min(1, value));
+  if (surface.width <= 0 || surface.height <= 0 ||
+      video.width <= 0 || video.height <= 0) {
+    return { x: clamp(motion.x * gain), y: clamp(motion.y * gain) };
+  }
+  const scale = (fit === "cover" ? Math.max : Math.min)(
+    surface.width / video.width, surface.height / video.height
+  );
+  return {
+    x: clamp((motion.x * surface.width / (video.width * scale)) * gain),
+    y: clamp((motion.y * surface.height / (video.height * scale)) * gain)
+  };
+}
