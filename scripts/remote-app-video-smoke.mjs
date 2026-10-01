@@ -36,12 +36,17 @@ try {
     timer = setTimeout(() => reject(new Error(
       "Synthetic Remote App video did not arrive through the native WebRTC media path"
     )), 12_000);
-    sender.onicecandidate = ({ candidate }) => {
-      if (candidate) void receiver.addIceCandidate(candidate).catch(reject);
-    };
-    receiver.onicecandidate = ({ candidate }) => {
-      if (candidate) void sender.addIceCandidate(candidate).catch(reject);
-    };
+    const waitForIce = (peer) => new Promise((done, fail) => {
+      if (peer.iceGatheringState === "complete") return done();
+      const limit = setTimeout(() => fail(new Error("Local ICE gathering timed out")), 5000);
+      const onState = () => {
+        if (peer.iceGatheringState !== "complete") return;
+        clearTimeout(limit);
+        peer.removeEventListener("icegatheringstatechange", onState);
+        done();
+      };
+      peer.addEventListener("icegatheringstatechange", onState);
+    });
     receiver.ontrack = ({ track: incoming }) => {
       sink = new wrtc.nonstandard.RTCVideoSink(incoming);
       sink.onframe = ({ frame }) => {
@@ -53,9 +58,11 @@ try {
     try {
       const offer = await sender.createOffer();
       await sender.setLocalDescription(offer);
+      await waitForIce(sender);
       await receiver.setRemoteDescription(sender.localDescription);
       const answer = await receiver.createAnswer();
       await receiver.setLocalDescription(answer);
+      await waitForIce(receiver);
       await sender.setRemoteDescription(receiver.localDescription);
       frames = setInterval(() => source.onFrame({ width, height, data: i420 }), 60);
     } catch (error) { reject(error); }
