@@ -45,7 +45,7 @@ describe("protocol", () => {
       id: "host-apps",
       name: "Host apps",
       cwd: "C:\\workspace",
-      runtime: { kind: "host" },
+      terminal: { runtime: { kind: "host" } },
       remoteApps: [{
         id: "codex-desktop",
         name: "Codex Desktop",
@@ -62,7 +62,7 @@ describe("protocol", () => {
       id: "duplicates",
       name: "Duplicates",
       cwd: "C:\\workspace",
-      runtime: { kind: "host" },
+      terminal: { runtime: { kind: "host" } },
       remoteApps: [
         { id: "app", name: "One", executable: "one.exe" },
         { id: "app", name: "Two", executable: "two.exe" }
@@ -73,7 +73,7 @@ describe("protocol", () => {
       id: "oversized-app-argv",
       name: "Oversized app argv",
       cwd: "C:\\workspace",
-      runtime: { kind: "host" },
+      terminal: { runtime: { kind: "host" } },
       remoteApps: [{
         id: "app",
         name: "App",
