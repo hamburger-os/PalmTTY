@@ -541,9 +541,17 @@ internal static class PalmTTYRemoteAppHost
             capture.Name = "PalmTTY Remote App capture";
             capture.Start();
 
+            // Independent pointer telemetry is not throttled by PrintWindow,
+            // image encoding, or the configured 5-15 fps video capture loop.
+            Thread cursor = new Thread(CursorLoop);
+            cursor.IsBackground = true;
+            cursor.Name = "PalmTTY Remote App cursor";
+            cursor.Start();
+
             uint exitCode = WaitForJobExit(job, process.hProcess);
             Stopping = true;
             capture.Join(1000);
+            cursor.Join(1000);
             return unchecked((int)exitCode);
         }
         catch (Exception error)
@@ -852,6 +860,11 @@ internal static class PalmTTYRemoteAppHost
                 {
                     captureFailures = 0;
                     streaming = false;
+                    lock (TargetLock)
+                    {
+                        TargetWindow = IntPtr.Zero;
+                        TargetRect = new RECT();
+                    }
                     PublishCaptureReason("window-not-found");
                     PublishMediaState("waiting-for-window");
                     PublishCursorHidden();
@@ -869,7 +882,6 @@ internal static class PalmTTYRemoteAppHost
                         Thread.Sleep(delay);
                         continue;
                     }
-                    PublishCursorForOwnedWindow(hwnd, rect);
                     if (!streaming && captureFailures == 0)
                     {
                         PublishMediaState("waiting-for-frame");
@@ -906,6 +918,34 @@ internal static class PalmTTYRemoteAppHost
         }
     }
 
+    // This lightweight 30 Hz sampler stays responsive even if PrintWindow
+    // blocks or a native frame encoder takes longer than the video interval.
+    // Revalidate job ownership and current geometry for every visible sample.
+    private static void CursorLoop()
+    {
+        while (!Stopping)
+        {
+            try
+            {
+                IntPtr hwnd;
+                lock (TargetLock) { hwnd = TargetWindow; }
+                RECT rect;
+                if (hwnd == IntPtr.Zero || !IsWindowVisible(hwnd) ||
+                    !TryGetWindowBounds(hwnd, out rect))
+                {
+                    PublishCursorHidden();
+                }
+                else
+                {
+                    PublishCursorForOwnedWindow(hwnd, rect);
+                }
+            }
+            catch { PublishCursorHidden(); }
+            Thread.Sleep(33);
+        }
+        PublishCursorHidden();
+    }
+
     // Only normalized coordinates inside the verified application window leave
     // the host. Desktop positions, unrelated windows and cursor imagery never do.
     private static void PublishCursorForOwnedWindow(IntPtr hwnd, RECT rect)
@@ -938,6 +978,10 @@ internal static class PalmTTYRemoteAppHost
             // a stable snapshot without increasing media/IPC traffic every frame.
             if (x == LastCursorX && y == LastCursorY &&
                 now - LastCursorSampleTicks < TimeSpan.TicksPerSecond) return;
+            // Visibility changes must be immediate. Rate-limit only visible
+            // position updates; never delay an off-window hiding transition.
+            if (x >= 0 && LastCursorX >= 0 &&
+                now - LastCursorSampleTicks < TimeSpan.TicksPerMillisecond * 30) return;
             LastCursorX = x;
             LastCursorY = y;
             LastCursorSampleTicks = now;
