@@ -153,7 +153,7 @@ test("Windows native host compiles as GUI, propagates Agent exit, and preserves 
     writeFileSync(configPath, "server:\n  port: 17688\n  exposure:\n    mode: local\n", "utf8");
     writeFileSync(
       workerPath,
-      `const { writeFileSync } = require("node:fs");\nsetTimeout(() => { writeFileSync(${JSON.stringify(markerPath)}, "ok"); }, 300);\n`,
+      `const { writeFileSync } = require("node:fs");\nsetTimeout(() => { writeFileSync(${JSON.stringify(markerPath)}, "ok"); process.exit(0); }, 300);\n`,
       "utf8"
     );
     writeFileSync(
@@ -205,6 +205,9 @@ test("Windows native host compiles as GUI, propagates Agent exit, and preserves 
     while (Date.now() < deadline) {
       try {
         assert.equal(readFileSync(markerPath, "utf8"), "ok");
+        // Marker write precedes detached worker shutdown. Windows must not
+        // remove the executable/cwd while that survivor is still exiting.
+        await new Promise((resolve) => setTimeout(resolve, 500));
         return;
       } catch {
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -212,7 +215,16 @@ test("Windows native host compiles as GUI, propagates Agent exit, and preserves 
     }
     assert.fail("detached Worker did not survive native host Job close");
   } finally {
-    rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    try {
+      rmSync(directory, { recursive: true, force: true, maxRetries: 60, retryDelay: 250 });
+    } catch (error) {
+      // Windows AV/indexing can transiently retain handles after a detached
+      // survivor has finished; cleanup must not mask an otherwise passing
+      // lifecycle assertion. Unexpected filesystem errors still fail.
+      if (process.platform !== "win32" ||
+          !["EBUSY", "EPERM", "ENOTEMPTY"].includes(error?.code)) throw error;
+      console.warn(`Windows deferred temp cleanup: ${error.code}`);
+    }
   }
 });
 

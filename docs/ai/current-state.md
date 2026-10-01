@@ -8,7 +8,7 @@ Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus 
 
 - pnpm/TypeScript monorepo
 - Agent/Web/protocol/config packages
-- committed pnpm lockfile with frozen-lockfile CI installs
+- committed pnpm lockfile with frozen-lockfile CI installs; the repository targets Node.js 22 for CI and release, and Dependabot excludes @types/node 23+ until the runtime baseline is intentionally upgraded. Dependency majors are validated individually on up-to-date main, including Windows/Linux installed distribution smoke. Windows native lifecycle smoke waits for surviving Worker/Agent close and bounds transient temp-directory deletion retries.
 - Windows + Ubuntu CI passing
 - root-script syntax checks plus Node built-in tests for private-LAN address/origin discovery
 - Windows ConPTY smoke coverage that prefers PowerShell 7 locally, falls back to Windows PowerShell for generic host checks, and is forced to PowerShell 7 in repository Windows CI
@@ -74,7 +74,7 @@ Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus 
 - no full desktop, arbitrary existing-window capture, elevated control, clipboard, audio, microphone, camera, file drag/drop or arbitrary input-command channel is implemented.
 - `WorkspaceWorkbench` can switch among live Terminal/App Activities for the same Workspace; Git/Files remain Workspace tools and Artifacts remains Terminal Session-scoped.
 - mobile Remote App interaction has View / Touch / Trackpad modes, two-finger scroll, special keys and Unicode text/IME/dictation.
-- Windows distributions precompile/include `palmtty-remote-app-host.exe`; source mode compiles the same helper into private runtime state on first use.
+- Windows distributions precompile/include `palmtty-remote-app-host.exe`; source mode compiles the helper into private runtime state under a SHA-256 fingerprint of the exact C# source snapshot and compiler options. A newly started Agent after a source update automatically chooses the new native binary without reusing the old fixed-name cache; existing detached AppWorkers continue to use their already launched helper.
 - the native host now emits bounded startup stage, exception class and HRESULT; AppWorker preserves these before READY, and initializes native WebRTC only after app ownership and readiness are proven, so MSIX startup errors are not obscured by native addon teardown. An unverified returned PID is never terminated.
 - Remote App mobile presentation is video-first: one-row mobile header with on-demand Git/Files Tools, optional immersive header removal, in-video pointer modes, a pinned core key dock with expandable navigation, and contain/cover presentation with matching touch mapping. A dedicated pointer state machine owns one/two-finger gestures and cancellation; active Touch/Trackpad modes suppress native Safari scroll only inside the remote surface.
 - display hints preserve portrait aspect ratio under one bounded scale factor. An optional explicit adaptWindow flag adjusts only the current verified owned HWND and restores its previous size on disable/helper exit. Dark successful PrintWindow frames are still forwarded after a same-owned-window retry, while an ambiguous blank-frame diagnostic remains visible. Browser video callback also detects stalls after the first decoded frame.

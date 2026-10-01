@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { access, mkdir, rename, unlink } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { installedRoot } from "./runtime-layout.js";
@@ -32,58 +33,77 @@ async function exists(filePath: string): Promise<boolean> {
   return access(filePath).then(() => true, () => false);
 }
 
-async function compileSourceHelper(outputPath: string): Promise<void> {
-  const sourcePath = fileURLToPath(
-    new URL("../../../scripts/windows-remote-app-host.cs", import.meta.url)
-  );
-  if (!await exists(sourcePath)) {
-    throw new Error(`Windows Remote App helper source is unavailable: ${sourcePath}`);
-  }
+const HELPER_REFERENCES = [
+  "System.dll",
+  "System.Core.dll",
+  "System.Drawing.dll",
+  "System.Runtime.Serialization.dll",
+  "System.Xml.dll"
+] as const;
 
+/**
+ * Content-addressed source helpers ensure a freshly restarted source Agent
+ * never reuses an older compiled executable after a native C# change. Keep
+ * the compiler options in the fingerprint so output semantics are covered.
+ * Different paths allow existing AppWorkers to keep using their old host.
+ */
+export function sourceRemoteAppHostFilename(source: Buffer): string {
+  const hash = createHash("sha256").update(source).update("\0WindowsApplication\0");
+  for (const reference of HELPER_REFERENCES) hash.update(reference).update("\0");
+  return `palmtty-remote-app-host-${hash.digest("hex").slice(0, 16)}.exe`;
+}
+
+async function compileSourceHelper(outputPath: string, source: Buffer): Promise<void> {
   await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
   const temporary = `${outputPath}.${process.pid}.${Date.now()}.tmp.exe`;
-  const command = [
-    "$ErrorActionPreference = 'Stop'",
-    "Add-Type `",
-    `  -Path ${quotePowerShellLiteral(sourcePath)} \``,
-    `  -OutputAssembly ${quotePowerShellLiteral(temporary)} \``,
-    "  -OutputType WindowsApplication `",
-    "  -ReferencedAssemblies 'System.dll','System.Core.dll','System.Drawing.dll','System.Runtime.Serialization.dll','System.Xml.dll'"
-  ].join("\n");
-
-  const child = spawn(
-    powershellPath(),
-    [
-      "-NoLogo",
-      "-NoProfile",
-      "-NonInteractive",
-      "-EncodedCommand",
-      encodePowerShellCommand(command)
-    ],
-    { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] }
-  );
-  let stderr = "";
-  child.stderr?.setEncoding("utf8");
-  child.stderr?.on("data", (chunk: string) => {
-    if (stderr.length < 16 * 1024) stderr += chunk;
-  });
-
-  const code = await new Promise<number | null>((resolve, reject) => {
-    child.once("error", reject);
-    child.once("close", resolve);
-  });
-  if (code !== 0 || !await exists(temporary)) {
-    await unlink(temporary).catch(() => undefined);
-    throw new Error(
-      `Could not compile Windows Remote App helper${stderr.trim() ? `: ${stderr.trim()}` : ""}`
-    );
-  }
-
+  const sourceSnapshot = `${temporary}.cs`;
+  // Compile exactly the bytes used to generate the filename, even when a
+  // developer edits the source during the PowerShell Add-Type invocation.
+  await writeFile(sourceSnapshot, source, { mode: 0o600 });
+  let installed = false;
   try {
-    await rename(temporary, outputPath);
-  } catch (error) {
-    if (!await exists(outputPath)) throw error;
-    await unlink(temporary).catch(() => undefined);
+    const command = [
+      "$ErrorActionPreference = 'Stop'",
+      "Add-Type `",
+      `  -Path ${quotePowerShellLiteral(sourceSnapshot)} \``,
+      `  -OutputAssembly ${quotePowerShellLiteral(temporary)} \``,
+      "  -OutputType WindowsApplication `",
+      `  -ReferencedAssemblies ${HELPER_REFERENCES.map(quotePowerShellLiteral).join(",")}`
+    ].join("\n");
+
+    const child = spawn(
+      powershellPath(),
+      ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand",
+        encodePowerShellCommand(command)],
+      { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] }
+    );
+    let stderr = "";
+    child.stderr?.setEncoding("utf8");
+    child.stderr?.on("data", (chunk: string) => {
+      if (stderr.length < 16 * 1024) stderr += chunk;
+    });
+
+    const code = await new Promise<number | null>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", resolve);
+    });
+    if (code !== 0 || !await exists(temporary)) {
+      throw new Error(
+        `Could not compile Windows Remote App helper${stderr.trim() ? `: ${stderr.trim()}` : ""}`
+      );
+    }
+
+    try {
+      await rename(temporary, outputPath);
+      installed = true;
+    } catch (error) {
+      // Concurrent source Agents compiling the same fingerprint are safe:
+      // the other process may have installed its identical snapshot first.
+      if (!await exists(outputPath)) throw error;
+    }
+  } finally {
+    await unlink(sourceSnapshot).catch(() => undefined);
+    if (!installed) await unlink(temporary).catch(() => undefined);
   }
 }
 
@@ -104,14 +124,23 @@ export async function resolveRemoteAppHost(): Promise<string> {
       return bundled;
     }
 
-    const output = path.join(
-      defaultRemoteAppRuntimeDir(),
-      "native",
-      "palmtty-remote-app-host.exe"
+    const sourcePath = fileURLToPath(
+      new URL("../../../scripts/windows-remote-app-host.cs", import.meta.url)
     );
-    if (!await exists(output)) await compileSourceHelper(output);
+    const source = await readFile(sourcePath).catch(() => {
+      throw new Error(`Windows Remote App helper source is unavailable: ${sourcePath}`);
+    });
+    const output = path.join(
+      defaultRemoteAppRuntimeDir(), "native",
+      sourceRemoteAppHostFilename(source)
+    );
+    if (!await exists(output)) await compileSourceHelper(output, source);
     return output;
-  })();
+  })().catch((error: unknown) => {
+    // A transient compiler failure should be retryable on the next Session.
+    helperPromise = undefined;
+    throw error;
+  });
 
   return helperPromise;
 }
