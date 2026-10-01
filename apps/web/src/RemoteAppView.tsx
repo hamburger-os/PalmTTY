@@ -25,6 +25,7 @@ import {
   negotiateRemoteApp
 } from "./api.js";
 import { useI18n } from "./i18n.js";
+import { RemoteAppKeybar } from "./RemoteAppKeybar.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
 import { RemoteCursorPreview, REMOTE_CURSOR_RECONCILE_DELAY_MS } from "./remote-app-cursor-preview.js";
 import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta, remoteAdaptedVideoFit, type VideoFit } from "./remote-app-presentation.js";
@@ -1077,7 +1078,7 @@ export function RemoteAppView({
           )}
         </div>
         {moreKeysOpen && (
-          <div className="remote-app-extra-keys glass-panel" aria-label={t("remoteApp.extraKeys")}>
+          <div id="remote-app-extra-keys" className="remote-app-extra-keys glass-panel" aria-label={t("remoteApp.extraKeys")}>
             {([
               ["ArrowLeft", "←"], ["ArrowUp", "↑"],
               ["ArrowDown", "↓"], ["ArrowRight", "→"],
@@ -1088,34 +1089,19 @@ export function RemoteAppView({
             ))}
           </div>
         )}
-        <div className="remote-app-keybar-shell glass-panel">
-          <div className="remote-app-keybar" aria-label={t("remoteApp.keys")}>
-            <button type="button" className={textOpen ? "selected compact" : "compact"}
-              aria-pressed={textOpen}
-              onClick={() => { setTextOpen((current) => !current); setOptionsOpen(false); }}>
-              {t("remoteApp.text")}
-            </button>
-            <button type="button" aria-pressed={ctrl}
-              className={ctrl ? "selected compact" : "compact"}
-              onClick={() => setCtrl((value) => !value)}>Ctrl</button>
-            <button type="button" aria-pressed={alt}
-              className={alt ? "selected compact" : "compact"}
-              onClick={() => setAlt((value) => !value)}>Alt</button>
-            <button type="button" aria-pressed={shift}
-              className={shift ? "selected compact" : "compact"}
-              onClick={() => setShift((value) => !value)}>Shift</button>
-            {([["Escape", "Esc"], ["Tab", "Tab"], ["Enter", "Enter"]] as const)
-              .map(([key, label]) => (
-                <button key={key} type="button" className="compact"
-                  onClick={() => sendKey(key)}>{label}</button>
-              ))}
-          </div>
-          <button type="button" className={moreKeysOpen ? "selected compact remote-app-more-keys" : "compact remote-app-more-keys"}
-            aria-expanded={moreKeysOpen}
-            onClick={() => setMoreKeysOpen((previous) => !previous)}>
-            {moreKeysOpen ? t("remoteApp.fewerKeys") : t("remoteApp.moreKeys")}
-          </button>
-        </div>
+        <RemoteAppKeybar
+          active={active} controlReady={controlReady}
+          keyboardOpen={keyboardOpen} textOpen={textOpen}
+          moreKeysOpen={moreKeysOpen}
+          ctrl={ctrl} alt={alt} shift={shift}
+          onKeyboard={toggleKeyboard}
+          onLongText={toggleLongText}
+          onToggleCtrl={() => setCtrl((value) => !value)}
+          onToggleAlt={() => setAlt((value) => !value)}
+          onToggleShift={() => setShift((value) => !value)}
+          onSendKey={sendKey}
+          onToggleMore={() => setMoreKeysOpen((previous) => !previous)}
+        />
       </div>
     </section>
   );
