@@ -446,7 +446,7 @@ internal static class PalmTTYRemoteAppHost
             CloseHandle(process.hThread);
             process.hThread = IntPtr.Zero;
 
-            ErrorOutput.WriteLine("PALMTTY_APP_HOST_READY " + RootPid.ToString());
+            ErrorOutput.WriteLine("PALMTTY_APP_HOST_READY " + process.dwProcessId.ToString());
 
             Thread control = new Thread(delegate() { ControlLoop(input); });
             control.IsBackground = true;
