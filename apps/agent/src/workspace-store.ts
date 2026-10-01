@@ -44,7 +44,7 @@ export function defaultWorkspaceStorePath(): string {
     return path.join(
       process.env.APPDATA ?? os.homedir(),
       "PalmTTY",
-      "workspaces.json"
+      `workspaces-v${WORKSPACE_STORE_VERSION}.json`
     );
   }
   if (process.platform === "darwin") {
@@ -53,13 +53,13 @@ export function defaultWorkspaceStorePath(): string {
       "Library",
       "Application Support",
       "PalmTTY",
-      "workspaces.json"
+      `workspaces-v${WORKSPACE_STORE_VERSION}.json`
     );
   }
   return path.join(
     process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share"),
     "palmtty",
-    "workspaces.json"
+    `workspaces-v${WORKSPACE_STORE_VERSION}.json`
   );
 }
 
