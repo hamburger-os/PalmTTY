@@ -383,7 +383,6 @@ export function RemoteAppView({
           try {
             const current = await getAppSession(session.id);
             setMediaState(current.session.mediaState);
-        setMediaDiagnostics(current.session.mediaDiagnostics ?? null);
             setMediaDiagnostics(current.session.mediaDiagnostics ?? null);
             if (
               current.session.state === "exited" ||
@@ -407,6 +406,7 @@ export function RemoteAppView({
       try {
         const current = await getAppSession(session.id);
         setMediaState(current.session.mediaState);
+        setMediaDiagnostics(current.session.mediaDiagnostics ?? null);
         if (
           current.session.state === "exited" ||
           current.session.state === "failed"
