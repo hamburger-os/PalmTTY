@@ -98,6 +98,11 @@ async function main() {
       if (helper.length < 2 || helper[0] !== 0x4d || helper[1] !== 0x5a) {
         throw new Error("Packaged Windows runtime is missing a valid Remote App host");
       }
+      // Exercise the actual packaged GUI-subsystem host in a safe invalid
+      // bootstrap case. A concrete startup stage must survive to stderr.
+      run(node, [
+        path.join(root, "tools", "remote-app-host-smoke.mjs"), root
+      ], { cwd: root, timeout: 12_000 });
       // A healthy Agent alone does not prove that its detached AppWorker can
       // load the native WebRTC addon. Test the packaged Node+node_modules in
       // isolation, never accidentally resolving from the source checkout.
