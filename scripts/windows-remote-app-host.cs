@@ -19,6 +19,7 @@ internal static class PalmTTYRemoteAppHost
     private const uint RESUME_FAILED = 0xFFFFFFFF;
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
     private const uint PROCESS_TERMINATE = 0x0001;
+    private const uint PROCESS_SET_QUOTA = 0x0100;
     private const int JobObjectBasicAccountingInformation = 1;
     private const int JobObjectExtendedLimitInformation = 9;
     private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
@@ -619,6 +620,74 @@ internal static class PalmTTYRemoteAppHost
         finally
         {
             Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static PROCESS_INFORMATION StartPackagedApplication(AppConfig config)
+    {
+        // Do not attach to an existing Store singleton; that would grant
+        // control over a window PalmTTY never launched.
+        HashSet<uint> previous = new HashSet<uint>();
+        foreach (Process existing in Process.GetProcesses())
+        {
+            try { previous.Add(unchecked((uint)existing.Id)); }
+            catch { }
+            finally { existing.Dispose(); }
+        }
+
+        Type type = Type.GetTypeFromCLSID(
+            new Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C"), true);
+        IApplicationActivationManager activation =
+            (IApplicationActivationManager)Activator.CreateInstance(type);
+        uint pid = 0;
+        try
+        {
+            StringBuilder arguments = new StringBuilder();
+            foreach (string argument in config.Args)
+            {
+                if (arguments.Length != 0) arguments.Append(' ');
+                arguments.Append(QuoteArgument(argument ?? ""));
+            }
+            int hr = activation.ActivateApplication(
+                config.AppUserModelId, arguments.ToString(), 0, out pid);
+            if (hr < 0) Marshal.ThrowExceptionForHR(hr);
+        }
+        finally { Marshal.ReleaseComObject(activation); }
+
+        if (pid == 0) throw new InvalidOperationException("MSIX activation returned no process");
+        if (previous.Contains(pid))
+            throw new InvalidOperationException(
+                "MSIX application reused an existing process. Close the app on the PC and try again.");
+
+        IntPtr handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION |
+            PROCESS_TERMINATE | PROCESS_SET_QUOTA, false, pid);
+        if (handle == IntPtr.Zero) ThrowLastError("OpenProcess activated MSIX app");
+        bool accepted = false;
+        try
+        {
+            uint length = 0;
+            int result = GetPackageFamilyName(handle, ref length, null);
+            if (result != 122 || length < 2 || length > 257)
+                throw new InvalidOperationException("Activated process has no verifiable package family");
+            StringBuilder family = new StringBuilder((int)length);
+            result = GetPackageFamilyName(handle, ref length, family);
+            if (result != 0 || !String.Equals(
+                family.ToString(), config.PackageFamilyName, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Activated process package identity mismatch");
+
+            PROCESS_INFORMATION info = new PROCESS_INFORMATION();
+            info.hProcess = handle;
+            info.dwProcessId = pid;
+            accepted = true;
+            return info;
+        }
+        finally
+        {
+            if (!accepted)
+            {
+                TerminateProcess(handle, 1);
+                CloseHandle(handle);
+            }
         }
     }
 
