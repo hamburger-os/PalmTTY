@@ -124,7 +124,7 @@ export class RemoteAppRuntime {
     });
 
     const bootstrap = {
-      executable: this.bootstrap.profile.executable,
+      ...this.bootstrap.profile.launch,
       cwd: this.bootstrap.profile.cwd,
       args: this.bootstrap.profile.args,
       frameRate: REMOTE_APP_CAPTURE_DEFAULT_FPS,
