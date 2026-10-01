@@ -18,6 +18,7 @@ internal static class PalmTTYRemoteAppHost
     private const uint CREATE_SUSPENDED = 0x00000004;
     private const uint RESUME_FAILED = 0xFFFFFFFF;
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    private const uint PROCESS_TERMINATE = 0x0001;
     private const int JobObjectBasicAccountingInformation = 1;
     private const int JobObjectExtendedLimitInformation = 9;
     private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
@@ -57,7 +58,16 @@ internal static class PalmTTYRemoteAppHost
     [DataContract]
     private sealed class AppConfig
     {
-        [DataMember(Name = "executable", IsRequired = true)]
+        [DataMember(Name = "kind", IsRequired = true)]
+        public string Kind { get; set; }
+
+        [DataMember(Name = "appUserModelId")]
+        public string AppUserModelId { get; set; }
+
+        [DataMember(Name = "packageFamilyName")]
+        public string PackageFamilyName { get; set; }
+
+        [DataMember(Name = "executable")]
         public string Executable { get; set; }
 
         [DataMember(Name = "cwd", IsRequired = true)]
@@ -151,6 +161,19 @@ internal static class PalmTTYRemoteAppHost
     {
         public int X;
         public int Y;
+    }
+
+    [ComImport]
+    [Guid("2e941141-7f97-4756-ba1d-9decde894a3d")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IApplicationActivationManager
+    {
+        [PreserveSig]
+        int ActivateApplication(
+            [MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
+            [MarshalAs(UnmanagedType.LPWStr)] string arguments,
+            uint options,
+            out uint processId);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -292,6 +315,13 @@ internal static class PalmTTYRemoteAppHost
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool TerminateJobObject(IntPtr hJob, uint uExitCode);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern int GetPackageFamilyName(
+        IntPtr process, ref uint length, StringBuilder familyName);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateProcess(IntPtr process, uint exitCode);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool CreateProcess(
