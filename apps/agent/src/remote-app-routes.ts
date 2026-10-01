@@ -37,7 +37,10 @@ export function registerRemoteAppRoutes(
   app.get(
     "/api/v1/remote-apps/capabilities",
     { preHandler: options.requireAuth },
-    async () => options.manager.capabilities()
+    async (_request, reply) => {
+      reply.header("cache-control", "private, no-store");
+      return options.manager.capabilities();
+    }
   );
 
   app.post(
