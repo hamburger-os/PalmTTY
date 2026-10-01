@@ -47,7 +47,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 - **Upgrade note:** moving from `0.1.0` to `0.2.0` requires replacing those legacy exposure fields with one explicit `local`, `lan`, `reverseProxy`, or `https` profile. PalmTTY intentionally provides no compatibility migration; review the current examples before restarting the Agent.
 
 ### Fixed
-- Stop reporting successful video merely because PrintWindow or WebRTC signaling succeeded; show the actual browser playback state and provide a manual-play action when autoplay is blocked.
+- Retry standard PrintWindow on the same verified window when full-content capture fails or yields blank pixels, and report bounded native capture failure reasons. Stop reporting successful video merely because PrintWindow or WebRTC signaling succeeded; show the actual browser playback state and provide a manual-play action when autoplay is blocked.
 - Use a semantic opaque video background to prevent the ambient gradient showing through an empty Remote App viewport.
 - Expand Windows Remote App discovery beyond PATH to known install roots, App Paths and capped Start Menu shortcut targets, and add searchable mobile results. Detect missing/incompatible native `@roamhq/wrtc` before AppWorker launch and validate the packaged WebRTC addon during Windows installed-runtime smoke.
 

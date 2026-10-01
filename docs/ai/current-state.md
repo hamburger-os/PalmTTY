@@ -75,7 +75,7 @@ Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus 
 - `WorkspaceWorkbench` can switch among live Terminal/App Activities for the same Workspace; Git/Files remain Workspace tools and Artifacts remains Terminal Session-scoped.
 - mobile Remote App interaction has View / Touch / Trackpad modes, two-finger scroll, special keys and Unicode text/IME/dictation.
 - Windows distributions precompile/include `palmtty-remote-app-host.exe`; source mode compiles the same helper into private runtime state on first use.
-- known gaps: Windows x64 only; one peer; no audio/clipboard/multi-window/full desktop/UAC; PrintWindow compatibility still varies for GPU/protected apps and a true window-only Windows Graphics Capture backend is not yet implemented. MSIX activation may be denied by an existing singleton or OS Job restrictions; real Codex Store/7-Zip/VS Code plus browser validation is still required. STUN/TURN remains operator supplied; no OS reboot/logoff/AppWorker-death recovery.
+- known gaps: Windows x64 only; one peer; no audio/clipboard/multi-window/full desktop/UAC; PrintWindow compatibility still varies for GPU/protected apps and a true window-only Windows Graphics Capture backend is not yet implemented; PrintWindow now retries its standard mode on blank/failed same-window frames and exposes native failure categories. MSIX activation may be denied by an existing singleton or OS Job restrictions; real Codex Store/7-Zip/VS Code plus browser validation is still required. STUN/TURN remains operator supplied; no OS reboot/logoff/AppWorker-death recovery.
 
 ### Durable Session Workers
 

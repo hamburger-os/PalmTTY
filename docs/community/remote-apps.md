@@ -45,7 +45,7 @@ PalmTTY distinguishes these states and exposes received/submitted video-frame co
 - capture unavailable;
 - WebRTC path unavailable.
 
-The capture boundary remains fail-closed. The current Windows helper uses window-only `PrintWindow(PW_RENDERFULLCONTENT)` and never falls back to desktop/monitor capture. GPU-accelerated or protected windows may therefore remain unsupported until a safer single-window backend is implemented.
+The capture boundary remains fail-closed. The current Windows helper uses window-only `PrintWindow(PW_RENDERFULLCONTENT)` with standard same-window `PrintWindow` retry if the first call fails or returns blank and never falls back to desktop/monitor capture. GPU-accelerated or protected windows may therefore remain unsupported until a safer single-window backend is implemented.
 
 ### WebRTC on LAN, VPN and public ingress
 
@@ -105,7 +105,7 @@ PalmTTY 会分别显示捕获状态、Worker 收到/成功提交视频帧计数�
 - 当前窗口无法捕获；
 - WebRTC 媒体通道无法建立。
 
-捕获边界继续 fail closed。当前 Windows helper 只使用窗口级 `PrintWindow(PW_RENDERFULLCONTENT)`，不会失败后退化为整桌面/显示器捕获。因此 GPU 加速或受保护窗口仍可能不兼容，直到未来引入同样保持“单个受权窗口”边界的更安全 backend。
+捕获边界继续 fail closed。当前 Windows helper 先使用窗口级 `PrintWindow(PW_RENDERFULLCONTENT)`；若失败或返回纯黑空帧，只对同一个已验证 HWND 重试普通 `PrintWindow`，不会失败后退化为整桌面/显示器捕获。因此 GPU 加速或受保护窗口仍可能不兼容，直到未来引入同样保持“单个受权窗口”边界的更安全 backend。
 
 ### LAN、VPN 与公网 WebRTC
 

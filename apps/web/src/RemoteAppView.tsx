@@ -662,6 +662,9 @@ export function RemoteAppView({
           <span>{t("remoteApp.frames")}: {mediaDiagnostics?.sourceFrames ?? "–"} /
             {mediaDiagnostics?.submittedFrames ?? "–"}</span>
           <span>{t("remoteApp.failures")}: {mediaDiagnostics?.conversionFailures ?? "–"}</span>
+          {mediaDiagnostics?.nativeFailure && (
+            <span>{t("remoteApp.captureReason")}: {mediaDiagnostics.nativeFailure}</span>
+          )}
           <span>{t("remoteApp.videoState")}: {videoRendered ? t("remoteApp.videoReady") :
             t("remoteApp.videoWaiting")}</span>
         </details>

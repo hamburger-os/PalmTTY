@@ -125,7 +125,7 @@ PID 仍只用于诊断，不能成为 Agent 任意 kill 进程的 authority。
 
 浏览器发送的 display hint 只能在协议允许的 320×240 ～ 1600×1000 区间内变化；helper 再次 clamp 且强制偶数尺寸。它是 presentation hint，不是授权改变 capture target。
 
-当前 Windows backend 仍使用 `PrintWindow(PW_RENDERFULLCONTENT)`。捕获失败不会退化成 BitBlt/desktop/monitor capture。
+当前 Windows backend 先使用 `PrintWindow(PW_RENDERFULLCONTENT)`，如果失败或得到纯黑空帧，则只对同一个已验证归属的 HWND 重试普通 `PrintWindow`；区分窗口未找到、太大、PrintWindow 失败、空帧、捕获异常等原因。捕获失败不会退化成 BitBlt/desktop/monitor capture。
 
 媒体状态显式区分：
 

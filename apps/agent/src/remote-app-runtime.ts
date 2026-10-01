@@ -27,6 +27,7 @@ type Peer = {
 const MAX_HELPER_STDERR_BYTES = 16 * 1024;
 const HELPER_READY_PREFIX = "PALMTTY_APP_HOST_READY ";
 const HELPER_STATE_PREFIX = "PALMTTY_APP_HOST_STATE ";
+const HELPER_REASON_PREFIX = "PALMTTY_APP_HOST_CAPTURE_REASON ";
 const ICE_GATHER_TIMEOUT_MS = 8_000;
 
 const MEDIA_STATES = new Set<AppSessionMediaState>([
@@ -55,6 +56,9 @@ export class RemoteAppRuntime {
   private lastSubmittedAt: string | undefined;
   private lastFailure: "invalid-frame" | "frame-conversion" | undefined;
   private lastFrameStatusAt = 0;
+  private nativeFailure: "window-not-found" | "window-too-large" |
+    "printwindow-failed" | "blank-window" | "capture-exception" |
+    "frame-write-failed" | undefined;
   private helperMediaState: AppSessionMediaState = "launching";
   private readonly statusListeners = new Set<StatusListener>();
   private readonly exitListeners = new Set<ExitListener>();
@@ -94,6 +98,18 @@ export class RemoteAppRuntime {
         if (line.startsWith(HELPER_READY_PREFIX)) {
           const pid = Number(line.slice(HELPER_READY_PREFIX.length).trim());
           if (Number.isSafeInteger(pid) && pid > 0) this.appPid = pid;
+          continue;
+        }
+        if (line.startsWith(HELPER_REASON_PREFIX)) {
+          const reason = line.slice(HELPER_REASON_PREFIX.length).trim();
+          const valid = [
+            "window-not-found", "window-too-large", "printwindow-failed",
+            "blank-window", "capture-exception", "frame-write-failed"
+          ];
+          this.nativeFailure = valid.includes(reason)
+            ? reason as typeof this.nativeFailure
+            : undefined;
+          this.publishStatus();
           continue;
         }
         if (line.startsWith(HELPER_STATE_PREFIX)) {
@@ -204,7 +220,8 @@ export class RemoteAppRuntime {
         submittedFrames: this.submittedFrames,
         conversionFailures: this.conversionFailures,
         ...(this.lastSubmittedAt ? { lastSubmittedAt: this.lastSubmittedAt } : {}),
-        ...(this.lastFailure ? { failure: this.lastFailure } : {})
+        ...(this.lastFailure ? { failure: this.lastFailure } : {}),
+        ...(this.nativeFailure ? { nativeFailure: this.nativeFailure } : {})
       },
       createdAt: this.bootstrap.createdAt,
       connections,

@@ -136,7 +136,11 @@ export const RemoteAppMediaDiagnosticsSchema = z.object({
   submittedFrames: z.number().int().nonnegative(),
   conversionFailures: z.number().int().nonnegative(),
   lastSubmittedAt: z.string().datetime().optional(),
-  failure: z.enum(["invalid-frame", "frame-conversion"]).optional()
+  failure: z.enum(["invalid-frame", "frame-conversion"]).optional(),
+  nativeFailure: z.enum([
+    "window-not-found", "window-too-large", "printwindow-failed",
+    "blank-window", "capture-exception", "frame-write-failed"
+  ]).optional()
 }).strict();
 export type RemoteAppMediaDiagnostics = z.infer<typeof RemoteAppMediaDiagnosticsSchema>;
 

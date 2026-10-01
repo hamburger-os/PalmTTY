@@ -444,6 +444,7 @@ internal static class PalmTTYRemoteAppHost
     private static volatile int CaptureMaxWidth = 1280;
     private static volatile int CaptureMaxHeight = 800;
     private static string LastMediaState = "";
+    private static string LastCaptureReason = "";
     private static BinaryWriter Output;
     private static StreamWriter ErrorOutput;
 
@@ -808,6 +809,7 @@ internal static class PalmTTYRemoteAppHost
                 {
                     captureFailures = 0;
                     streaming = false;
+                    PublishCaptureReason("window-not-found");
                     PublishMediaState("waiting-for-window");
                 }
                 else
@@ -818,6 +820,7 @@ internal static class PalmTTYRemoteAppHost
                     }
                     if (CaptureWindow(hwnd, rect, CaptureMaxWidth, CaptureMaxHeight))
                     {
+                        PublishCaptureReason("none");
                         captureFailures = 0;
                         streaming = true;
                         PublishMediaState("streaming");
@@ -835,6 +838,7 @@ internal static class PalmTTYRemoteAppHost
             }
             catch
             {
+                PublishCaptureReason("capture-exception");
                 captureFailures += 1;
                 if (captureFailures >= Math.Max(8, config.FrameRate * 2))
                 {
@@ -856,6 +860,17 @@ internal static class PalmTTYRemoteAppHost
             {
                 ErrorOutput.WriteLine("PALMTTY_APP_HOST_STATE " + state);
             }
+        }
+    }
+
+    private static void PublishCaptureReason(string reason)
+    {
+        lock (StateLock)
+        {
+            if (String.Equals(LastCaptureReason, reason, StringComparison.Ordinal)) return;
+            LastCaptureReason = reason;
+            if (ErrorOutput != null)
+                ErrorOutput.WriteLine("PALMTTY_APP_HOST_CAPTURE_REASON " + reason);
         }
     }
 
@@ -1001,24 +1016,31 @@ internal static class PalmTTYRemoteAppHost
             sourceHeight > 4096 ||
             (long)sourceWidth * (long)sourceHeight > 12000000L)
         {
+            PublishCaptureReason("window-too-large");
             return false;
         }
 
         using (Bitmap source = new Bitmap(sourceWidth, sourceHeight, PixelFormat.Format32bppArgb))
         {
-            using (Graphics graphics = Graphics.FromImage(source))
+            bool ok = PrintOwnedWindow(hwnd, source, PW_RENDERFULLCONTENT);
+            // PW_RENDERFULLCONTENT can return TRUE while leaving a blank
+            // bitmap. Retry only the same owned HWND with standard PrintWindow;
+            // never read the desktop/window DC or include occluding windows.
+            if (!ok || !HasVisiblePixels(source))
             {
-                IntPtr hdc = graphics.GetHdc();
-                bool ok;
-                try
-                {
-                    ok = PrintWindow(hwnd, hdc, PW_RENDERFULLCONTENT);
-                }
-                finally
-                {
-                    graphics.ReleaseHdc(hdc);
-                }
-                if (!ok) return false;
+                using (Graphics clear = Graphics.FromImage(source))
+                    clear.Clear(Color.Transparent);
+                ok = PrintOwnedWindow(hwnd, source, 0);
+            }
+            if (!ok)
+            {
+                PublishCaptureReason("printwindow-failed");
+                return false;
+            }
+            if (!HasVisiblePixels(source))
+            {
+                PublishCaptureReason("blank-window");
+                return false;
             }
 
             double scale = Math.Min(
@@ -1053,6 +1075,34 @@ internal static class PalmTTYRemoteAppHost
         }
     }
 
+    private static bool PrintOwnedWindow(IntPtr hwnd, Bitmap target, uint flags)
+    {
+        using (Graphics graphics = Graphics.FromImage(target))
+        {
+            IntPtr hdc = graphics.GetHdc();
+            try { return PrintWindow(hwnd, hdc, flags); }
+            finally { graphics.ReleaseHdc(hdc); }
+        }
+    }
+
+    private static bool HasVisiblePixels(Bitmap bitmap)
+    {
+        // PrintWindow success means API success, not visible content. A sparse
+        // bounded scan is enough to detect common entirely blank captures;
+        // do not send a misleading black frame as successful video.
+        int stepX = Math.Max(1, bitmap.Width / 16);
+        int stepY = Math.Max(1, bitmap.Height / 16);
+        for (int y = stepY / 2; y < bitmap.Height; y += stepY)
+        {
+            for (int x = stepX / 2; x < bitmap.Width; x += stepX)
+            {
+                Color pixel = bitmap.GetPixel(x, y);
+                if (pixel.R > 4 || pixel.G > 4 || pixel.B > 4) return true;
+            }
+        }
+        return false;
+    }
+
     private static bool WriteBitmap(Bitmap bitmap)
     {
         Rectangle rectangle = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
@@ -1064,7 +1114,11 @@ internal static class PalmTTYRemoteAppHost
         {
             int rowBytes = checked(bitmap.Width * 4);
             int payloadBytes = checked(rowBytes * bitmap.Height);
-            if (payloadBytes > 8 * 1024 * 1024) return false;
+            if (payloadBytes > 8 * 1024 * 1024)
+            {
+                PublishCaptureReason("frame-write-failed");
+                return false;
+            }
             byte[] rgba = new byte[payloadBytes];
             byte[] row = new byte[rowBytes];
 
