@@ -651,7 +651,12 @@ export function RemoteAppView({
         }}
       >
         <video ref={videoRef} autoPlay playsInline muted />
-        <details className="remote-app-diagnostics">
+        <details className="remote-app-diagnostics"
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerMove={(event) => event.stopPropagation()}
+          onPointerUp={(event) => event.stopPropagation()}
+          onPointerCancel={(event) => event.stopPropagation()}
+          onWheel={(event) => event.stopPropagation()}>
           <summary>{t("remoteApp.diagnostics")}</summary>
           <span>{t("remoteApp.hostState")}: {mediaState}</span>
           <span>{t("remoteApp.frames")}: {mediaDiagnostics?.sourceFrames ?? "–"} /
@@ -661,7 +666,12 @@ export function RemoteAppView({
             t("remoteApp.videoWaiting")}</span>
         </details>
         {diagnostic ? (
-          <div className="remote-app-status-overlay glass-content">
+          <div className="remote-app-status-overlay glass-content"
+            onPointerDown={(event) => event.stopPropagation()}
+            onPointerMove={(event) => event.stopPropagation()}
+            onPointerUp={(event) => event.stopPropagation()}
+            onPointerCancel={(event) => event.stopPropagation()}
+            onWheel={(event) => event.stopPropagation()}>
             <strong>{t("remoteApp.statusTitle")}</strong>
             <span>{diagnostic}</span>
             {playRejected && (
