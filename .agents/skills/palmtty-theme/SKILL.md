@@ -58,6 +58,7 @@ Surface tiers:
 - `.glass-modal`: modal dialogs that must visually isolate form/readability content from the ambient field. It uses a stronger theme veil and shadow, never large-area backdrop blur.
 - `.glass-panel`: structural controls such as terminal header, key bar and composer shell. No large-area backdrop blur.
 - `.terminal-surface`: the single terminal viewport owner. Its opaque background must come from the same active xterm theme background value; do not place `.glass-content` behind xterm.
+- `.remote-app-surface`: the separately owned video viewport uses the opaque semantic `--remote-video-background` token when no remote frame is available. It must not leak ambient gradients or inherit the Terminal palette.
 - `.glass-content`: stable non-terminal read areas and empty states. No backdrop blur.
 - `.glass-control`: dense nested controls such as the directory picker. No backdrop blur.
 - `.glass-card`: workspace/session cards derived from the same physics.

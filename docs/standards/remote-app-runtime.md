@@ -25,3 +25,12 @@ Project interpretation:
 - configured ICE servers are signaling configuration, not a PalmTTY-operated relay service; adding a PalmTTY-hosted relay would require a separate privacy/security/deployment design;
 - executable discovery is a bounded control-plane surface: known PATH/install-root candidates plus capped Windows App Paths registry and Start Menu shortcut target inspection, followed by directory/.exe enumeration only; never a general browser file-read, unbounded filesystem scan or command API.
 - native WebRTC readiness must be checked in a disposable process; installed Windows runtime smoke must load the packaged addon rather than relying only on compiled TypeScript or PE presence.
+
+MSIX and media diagnostic references:
+- Get-StartApps (Windows PowerShell): https://learn.microsoft.com/powershell/module/startlayout/get-startapps
+- Get-AppxPackage (current-user package registration): https://learn.microsoft.com/powershell/module/appx/get-appxpackage
+- IApplicationActivationManager::ActivateApplication: https://learn.microsoft.com/windows/win32/api/shobjidl_core/nf-shobjidl_core-iapplicationactivationmanager-activateapplication
+- GetPackageFamilyName: https://learn.microsoft.com/windows/win32/api/appmodel/nf-appmodel-getpackagefamilyname
+- HTMLVideoElement.requestVideoFrameCallback: https://developer.mozilla.org/docs/Web/API/HTMLVideoElement/requestVideoFrameCallback
+
+MSIX activation returns a PID but does not prove ownership. PalmTTY requires a fresh process, exact package-family verification and successful Job assignment before granting capture/input. Window-only PrintWindow remains the actual capture backend pending real Windows Graphics Capture integration; synthetic WebRTC round-trip smoke does not prove any particular real application's PrintWindow compatibility.

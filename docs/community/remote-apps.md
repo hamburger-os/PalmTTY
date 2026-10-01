@@ -13,9 +13,9 @@ Workspace editing is intentionally split into separate surfaces:
 - **Terminal** owns the Terminal runtime/profile and optional startup command.
 - **Remote Apps** owns saved application profiles.
 
-A Remote App profile now contains only an ID, display name, executable and optional argv. Capture FPS and pixel dimensions are not user settings. PalmTTY adapts the bounded capture size from the live Remote App surface on the phone.
+A Remote App profile contains an ID, display name, typed Win32 executable or registered MSIX AUMID/package-family launch identity, and optional argv. Capture FPS and pixel dimensions are not user settings. PalmTTY adapts the bounded capture size from the live Remote App surface on the phone.
 
-The normal flow is **Add application → choose a detected app or browse for an .exe → optionally add argv → save**. Discovery is bounded: PalmTTY checks known PATH entries, common Windows installation directories, App Paths registry entries and a capped set of Start Menu shortcuts. The detected catalog is searchable and limited to 64 applications; the separate executable browser exposes only directories and `.exe` files. A manual executable path remains an Advanced fallback.
+The normal flow is **Add application → choose a detected Win32/Store app or browse for an .exe → optionally add argv → save**. Discovery is bounded: PalmTTY prioritizes Get-StartApps entries verified against current-user MSIX package registrations, then checks known PATH entries, installation roots, App Paths and capped Start Menu shortcuts. The detected catalog is searchable and limited to 64 applications; the separate executable browser exposes only directories and `.exe` files. A manual executable path remains an Advanced fallback.
 
 An App Session is created only by persisted `workspaceId + profileId`. The browser cannot provide an arbitrary executable, PID, HWND, environment override or capture target when starting a session.
 
@@ -37,7 +37,7 @@ The Workbench can switch among live Activities for the same Workspace without re
 
 ### Connection and capture diagnostics
 
-PalmTTY distinguishes these states instead of showing an unexplained black surface:
+PalmTTY distinguishes these states and exposes received/submitted video-frame counts, conversion failures and browser decoded-frame readiness instead of treating an ICE connection as successful video:
 
 - waiting for the PalmTTY-owned application window;
 - window found, waiting for a capturable frame;
@@ -55,7 +55,7 @@ PalmTTY does not provide or operate a cloud relay service. TURN credentials are 
 
 ### Security and lifecycle
 
-PalmTTY launches the configured app as the same normal OS user as the Agent. The Windows helper places the launched process tree in a PalmTTY-owned Job Object and only accepts a visible top-level window whose process remains in that Job as its capture/input target.
+PalmTTY launches the configured app as the same normal OS user as the Agent. For MSIX, activation requires a registered AUMID, a newly created PID, an exact matching package family and successful Job assignment; a reused singleton or an unassignable process is rejected. The Windows helper places the launched process tree in a PalmTTY-owned Job Object and only accepts a visible top-level window whose process remains in that Job as its capture/input target.
 
 PalmTTY deliberately does **not** provide full-desktop capture, browser-selected windows/PIDs, UAC/elevated control, clipboard/audio/microphone/camera/file-drag channels, or arbitrary keyboard/input commands. Windows UIPI remains a security boundary.
 
@@ -73,9 +73,9 @@ PalmTTY Remote Apps 允许手机操作 **由 PalmTTY 在 Windows 宿主机上启
 - **Terminal**：终端运行环境/Profile 与可选启动命令；
 - **Remote Apps**：持久化应用 Profile。
 
-Remote App Profile 只包含 ID、显示名称、可执行文件和可选 argv。FPS、最大宽高不再属于用户配置；手机端 Remote App Surface 会根据实际可视尺寸自动请求有界捕获尺寸。
+Remote App Profile 只包含 ID、显示名称、Win32 可执行文件或已注册 MSIX 的 AUMID/包家族身份，以及可选 argv。FPS、最大宽高不再属于用户配置；手机端 Remote App Surface 会根据实际可视尺寸自动请求有界捕获尺寸。
 
-正常流程是：**添加应用 → 选择检测到的 App 或浏览 .exe → 可选填写 argv → 保存**。应用检测是有界能力：PalmTTY 只检查少量已知开发应用；可执行文件浏览器只暴露目录和 `.exe`。手动路径仍保留在“高级”中作为兜底。
+正常流程是：**添加应用 → 选择检测到的 Win32/Store 应用或浏览 .exe → 可选填写 argv → 保存**。应用检测是有界能力：PalmTTY 优先读取 Get-StartApps 中与当前用户 Get-AppxPackage 注册信息匹配的 MSIX 应用，再有界检查已知应用、PATH、App Paths 和开始菜单快捷方式；可执行文件浏览器只暴露目录和 `.exe`。手动路径仍保留在“高级”中作为兜底。
 
 创建 App Session 时浏览器仍只能提交持久化的 `workspaceId + profileId`，不能临时提交 executable、PID、HWND、环境覆盖或捕获目标。
 
@@ -97,7 +97,7 @@ App 画面提供三种显式模式：
 
 ### 连接与捕获诊断
 
-PalmTTY 会区分以下状态，而不是只显示无法解释的黑屏：
+PalmTTY 会分别显示捕获状态、Worker 收到/成功提交视频帧计数、转换失败次数和浏览器是否真正显示首帧，而不是仅凭 WebRTC 已连接就宣称画面正常：
 
 - 等待 PalmTTY 持有的应用窗口；
 - 已找到窗口，等待第一帧；
@@ -115,7 +115,7 @@ PalmTTY 本身不提供云中继服务。TURN 凭据属于宿主部署配置，�
 
 ### 安全与生命周期
 
-Remote App 与 Agent 使用同一个普通 OS 用户。Windows helper 把 PalmTTY 启动的进程树放进自己持有的 Job Object，只把仍属于该 Job 的进程拥有的可见顶层窗口作为捕获/输入目标。
+Remote App 与 Agent 使用同一个普通 OS 用户。MSIX 必须先通过 AUMID 激活、验证新 PID 和包家族，并成功加入 Job；复用的单实例或 Windows 拒绝加入 Job 的应用会拒绝接管。Windows helper 把 PalmTTY 启动的进程树放进自己持有的 Job Object，只把仍属于该 Job 的进程拥有的可见顶层窗口作为捕获/输入目标。
 
 PalmTTY 明确不提供整桌面捕获、浏览器选择任意窗口/PID、UAC/elevated 控制、clipboard/音频/麦克风/摄像头/文件拖放或任意键盘/输入命令。Windows UIPI 继续作为安全边界。
 
