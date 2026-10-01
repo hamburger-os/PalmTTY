@@ -4,9 +4,12 @@ import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
 describe("remote trackpad gestures", () => {
   it("recognizes a one-finger tap and suppresses moved and long taps", () => {
     const gesture = new RemoteTouchpadGesture();
+    expect(gesture.active).toBe(false);
     gesture.down(1, { x: .2, y: .3 }, 100);
+    expect(gesture.active).toBe(true);
     expect(gesture.canLongPress(1)).toBe(true);
     expect(gesture.up(1, 200)).toBe("left");
+    expect(gesture.active).toBe(false);
     gesture.down(2, { x: .2, y: .3 }, 1000);
     expect(gesture.move(2, { x: .4, y: .5 })).toEqual({ type: "move", dx: .2, dy: .2 });
     expect(gesture.canLongPress(2)).toBe(false);

@@ -29,7 +29,7 @@ The App surface exposes three explicit pointer modes:
 - **Touch**: maps touches into the captured application window.
 - **Trackpad**: the visible, verified Windows pointer follows one-finger movement; tap clicks, long press drags, two-finger tap right-clicks, and two-finger movement scrolls.
 
-The special-key strip provides Ctrl/Alt/Shift and common navigation keys. The text panel sends bounded Unicode text for mobile IME, paste and dictation.
+The bottom special-key strip puts **Text first**, followed by Ctrl/Alt/Shift and common navigation keys. Text opens a bounded Unicode panel for mobile IME, paste and dictation; the Options menu is reserved for display, size and diagnostics.
 
 Presentation is automatic. The browser sends a bounded display-size hint when the App surface changes size or orientation; the Windows helper scales capture within PalmTTY hard limits. The toolbar reports **Quality · Auto** rather than exposing FPS/width/height controls.
 
@@ -101,7 +101,7 @@ App 画面提供三种显式模式：
 - **直触**：触摸坐标映射到远端应用窗口；
 - **触控板**：显示 Windows 确认的受控窗口光标；单指移动、轻点左键、长按拖动、双指轻点右键、双指移动滚动。
 
-特殊键栏提供 Ctrl/Alt/Shift 和常用导航键；文本面板使用有界 Unicode 文本通道，适合手机 IME、粘贴和语音输入。
+最下面特殊键栏将 **文本放在第一位**，其后是 Ctrl/Alt/Shift 和常用导航键。文本按钮直接打开有界 Unicode 输入面板，支持手机 IME、粘贴及语音输入；上方选项菜单只保留显示、窗口适配和诊断。
 
 画面策略自动适配。手机 Surface 尺寸或横竖屏变化时，浏览器发送有界 display hint，Windows helper 在 PalmTTY 硬上限内缩放捕获；UI 只显示“**画质 · 自动**”，不再让用户手工配置 FPS/宽高。
 
@@ -144,3 +144,9 @@ Remote App 与 Agent 使用同一个普通 OS 用户。MSIX 必须先通过 AUMI
 PalmTTY 明确不提供整桌面捕获、浏览器选择任意窗口/PID、UAC/elevated 控制、clipboard/音频/麦克风/摄像头/文件拖放或任意键盘/输入命令。Windows UIPI 继续作为安全边界。
 
 每个 App Session 由独立 detached AppWorker 持有，并使用与 Terminal Worker 分离的 authenticated local IPC generation。Agent 重启不会主动终止已经 adopt 的 App Session；OS reboot、用户注销和 AppWorker 自身死亡不属于可恢复边界。如果 AppWorker/helper 控制链路丢失，Job Object 会关闭，避免 PalmTTY 启动的应用树变成无人管理的孤儿进程。
+
+### Responsive cursor feedback / 流畅鼠标反馈
+
+The tiny verified-window arrow now occupies about 5.667 × 8 CSS pixels, one third of its former 17 × 24 size. Native Windows cursor sampling runs on an independent ~30 Hz thread instead of waiting for 5–15 fps window-video capture; ownership and visibility are rechecked on every sample. Browser Trackpad movement coalesces relative deltas to at most one WebRTC control message per animation frame and paints a bounded, optimistic local pointer transform without rendering the React tree on every cursor update. When fingers lift, the preview reconciles to the latest authenticated native position; leaving the owned window hides it immediately. This reduces perceived cursor lag, but actual network and Windows input latency still depend on the connection and host workload.
+
+已验证窗口内的 SVG 箭头由 17×24 缩为约 5.667×8 CSS 像素。Windows 光标采样改用独立约 30Hz 线程，不再与 5–15fps 视频截图共用采样时机，每次仍校验窗口归属和可见性。手机触控板将一帧内的位移合并为一条 WebRTC 控制消息，预测光标通过逐帧 DOM transform 绘制而不是每次触发 React 整树渲染；抬起手指后以最新原生位置校准，移出受控窗口立即隐藏。网络与 Windows 真实输入延迟仍受部署环境影响。

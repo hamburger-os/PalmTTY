@@ -275,6 +275,10 @@ if (!remoteAppView.includes('className="remote-app-dock"') ||
     !remoteAppView.includes('className="remote-app-cursor"') ||
     !remoteAppView.includes('className="remote-app-keybar-shell glass-panel"') ||
     !remoteAppView.includes('className="remote-app-extra-keys glass-panel"') ||
+    !remoteAppView.includes('ref={cursorOverlayRef}') ||
+    !remoteAppView.includes('queueRelativeMotion(relative)') ||
+    !styles.includes('width: 5.667px;') ||
+    !styles.includes('height: 8px;') ||
     !remoteAppPresentation.includes('remoteVideoCursorPosition(') ||
     !styles.includes('.remote-app-cursor {')) {
   failures.push("apps/web/src/RemoteAppView.tsx [remote-app-video-first] loading states or dock controls regressed");
@@ -450,6 +454,13 @@ for (const marker of [
   }
 }
 
+const appKeybar = remoteAppView.split('<div className="remote-app-keybar"')[1]?.split('</div>')[0] ?? "";
+if (!appKeybar.includes('aria-pressed={textOpen}') ||
+    appKeybar.indexOf('aria-pressed={textOpen}') > appKeybar.indexOf('aria-pressed={ctrl}') ||
+    remoteAppView.split('<div className="remote-app-options">')[1]?.split('</div>')[0]?.includes('t("remoteApp.text")')) {
+  failures.push("apps/web [remote-app-text-dock] Text must be the first bottom key and absent from display options");
+}
+
 if (failures.length) {
   console.error("Theme contract check failed:");
   for (const failure of failures) console.error(`- ${failure}`);
@@ -457,3 +468,4 @@ if (failures.length) {
 }
 
 console.log("Theme contract check passed.");
+

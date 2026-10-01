@@ -227,3 +227,9 @@ Windows Host 的启动阶段为 `validate-profile → create-job → activate-ms
 原生 Host 仅采样当前 Job-owned HWND 内部的鼠标位置，发送 0–1000000 定点归一化坐标；窗口外发送隐藏状态，不传桌面全局坐标或其他窗口内容。AppWorker 严格解析有界 stderr 记录，只经当前已认证的单一 WebRTC DataChannel 发送有类型的 cursor/inputState 消息，缓冲超限即丢弃，Peer 重建后补发最新状态。手机用相同 contain/cover 几何逆映射绘制主题 SVG 光标，裁切区域外隐藏。
 
 触控板单指移动、轻点左键、长按拖动、双指轻点右键和双指中心滚动。取消、切换模式须释放已经按下的左键且不得补发点击。控制通道未就绪与 Windows 前台/UIPI 输入被拒绝分别提示；不增加任何提权或任意桌面控制路径。「适应手机」继续只调整当前已验证应用窗口。
+
+## 低延迟光标与底部文本入口
+
+最底部特殊键栏第一项为「文本」，保留原来的有界 Unicode/IME/粘贴/语音输入与独立发送确认；从上方选项菜单删除重复的文本入口。鼠标 SVG 保留相同的路径与命中热点，但实际 CSS 尺寸缩至约 5.667×8（上版 17×24 的三分之一），继续消费主题填充/描边令牌。
+
+Windows Host 用独立约 30Hz 线程对当前已验证的 Job-owned HWND 重新校验窗口可见性、归属和实际尺寸后采样光标，而不是等视频 PrintWindow / 编码；窗口外立即隐藏，重复位置限流。常见已前台的受控窗口不再为每次鼠标位移重复执行 ShowWindow/跨线程激活，但不改变现有 Job/UIPI/前台输入权限边界。手机端在 requestAnimationFrame 中合并相对鼠标位移，指针用轻量 DOM transform 显示本地预测，不再为每条坐标遥测触发 React rerender；抬手后短时等待新采样，再与最新原生坐标校准，重连、切模式、离开受控窗口会清理预测/待发送移动。绝不把预测位置当成 Windows 输入成功凭据，真实网络/系统延迟仍需 iPhone Safari + Windows 真机验收。
