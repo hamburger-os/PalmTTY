@@ -795,11 +795,11 @@ export function RemoteAppView({
     if (keyboardComposingRef.current || keyboardFlushFrameRef.current !== null) return;
     const field = liveKeyboardRef.current;
     if (!field) return;
-    if (inputType.startsWith("delete")) {
+    if (inputType.startsWith("delete") || field.value === "") {
       queueKeyboardDelete(inputType.includes("Forward") ? "Delete" : "Backspace");
     } else if (inputType === "insertLineBreak" || inputType === "insertParagraph") {
-      flushKeyboardQueue();
-      sendKey("Enter");
+      if (flushKeyboardQueue()) sendKey("Enter");
+      else setInputBlocked(true);
     } else {
       const value = field.value.replace(LIVE_KEYBOARD_SENTINEL, "");
       const previous = lastCompositionRef.current;
@@ -1144,52 +1144,65 @@ export function RemoteAppView({
       </div>
 
       {keyboardOpen && (
-        <div className="remote-app-live-keyboard glass-panel" role="group"
-          aria-label={t("remoteApp.keyboard")}>
-          <textarea ref={liveKeyboardRef} className="glass-input"
-            value={keyboardDraft} rows={1} maxLength={16 * 1024}
-            placeholder={t("remoteApp.keyboardPlaceholder")}
-            aria-label={t("remoteApp.keyboardPlaceholder")}
+        <div className="remote-app-live-keyboard">
+          <textarea ref={liveKeyboardRef} className="remote-app-live-bridge"
+            defaultValue={LIVE_KEYBOARD_SENTINEL} rows={1} maxLength={16 * 1024 + 1}
+            aria-label={t("remoteApp.keyboard")}
             autoComplete="off" autoCapitalize="off" autoCorrect="off"
             spellCheck={false}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              keyboardDraftRef.current = value;
-              setKeyboardDraft(value);
-              if (shouldCommitRemoteLiveText(
-                keyboardComposingRef.current,
-                (event.nativeEvent as InputEvent).isComposing === true,
-                keyboardFlushFrameRef.current !== null
-              )) commitLiveKeyboardText(value);
+            onBeforeInput={(event) => {
+              const native = event.nativeEvent as InputEvent;
+              if (keyboardComposingRef.current || native.isComposing ||
+                  keyboardFlushFrameRef.current !== null || !native.cancelable) return;
+              if (native.inputType === "deleteContentBackward" ||
+                  native.inputType === "deleteContentForward") {
+                event.preventDefault();
+                queueKeyboardDelete(native.inputType === "deleteContentForward"
+                  ? "Delete" : "Backspace");
+              } else if (native.inputType === "insertLineBreak" ||
+                  native.inputType === "insertParagraph") {
+                event.preventDefault();
+                if (flushKeyboardQueue()) sendKey("Enter");
+                else setInputBlocked(true);
+              }
             }}
-            onCompositionStart={() => { keyboardComposingRef.current = true; }}
+            onInput={(event) => {
+              const native = event.nativeEvent as InputEvent;
+              if (!shouldCommitRemoteLiveText(keyboardComposingRef.current,
+                native.isComposing === true, keyboardFlushFrameRef.current !== null)) return;
+              // If beforeinput was cancelled, there should be no input event.
+              // A stray Safari event must not double-send a deleted sentinel.
+              if (native.inputType?.startsWith("delete") &&
+                  liveKeyboardRef.current?.value === LIVE_KEYBOARD_SENTINEL) return;
+              readKeyboardInput(native.inputType ?? "");
+            }}
+            onCompositionStart={() => {
+              keyboardComposingRef.current = true;
+              lastCompositionRef.current = null;
+            }}
             onCompositionEnd={() => {
               keyboardComposingRef.current = false;
               if (keyboardFlushFrameRef.current !== null)
                 window.cancelAnimationFrame(keyboardFlushFrameRef.current);
-              // Read the post-composition value: some Safari versions deliver
-              // the final input event before, others just after compositionend.
+              // Safari may emit the final input before or after compositionend.
+              // Read the final DOM value only once after that event settles.
               keyboardFlushFrameRef.current = window.requestAnimationFrame(() => {
                 keyboardFlushFrameRef.current = null;
-                const pending = liveKeyboardRef.current?.value ?? keyboardDraftRef.current;
-                if (pending) commitLiveKeyboardText(pending);
+                readKeyboardInput("insertFromComposition", true);
               });
             }}
             onKeyDown={(event) => {
               if (keyboardComposingRef.current || event.nativeEvent.isComposing ||
                   event.keyCode === 229) return;
               const key = remoteAppLiveKeyboardKey(event.key);
-              if (!key) return;
-              if (key === "Backspace" && keyboardDraftRef.current) return;
+              if (!key || key === "Backspace" || key === "Delete") return;
+              // Delete is handled by beforeinput/input (including long-press);
+              // navigating through keydown must not inject a duplicate input.
               event.preventDefault();
-              if (keyboardDraftRef.current &&
-                  !commitLiveKeyboardText(keyboardDraftRef.current)) return;
-              sendKey(key);
+              if (flushKeyboardQueue()) sendKey(key);
+              else setInputBlocked(true);
             }}
           />
-          <button type="button" className="ghost compact"
-            aria-label={t("remoteApp.closeKeyboard")}
-            onClick={closeKeyboard}>×</button>
         </div>
       )}
       {textOpen && (
