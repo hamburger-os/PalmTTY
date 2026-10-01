@@ -310,7 +310,8 @@ export class RemoteAppWorkerServer {
         case "negotiate": {
           const answerSdp = await this.runtime.negotiate(
             request.clientId,
-            request.offerSdp
+            request.offerSdp,
+            request.iceServers
           );
           this.respond(connection, request.requestId, { answerSdp });
           this.publishStatus();
