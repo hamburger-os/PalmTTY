@@ -825,6 +825,9 @@ export function RemoteAppView({
     if (keyboardFlushFrameRef.current !== null) {
       window.cancelAnimationFrame(keyboardFlushFrameRef.current);
       keyboardFlushFrameRef.current = null;
+      // Closing immediately after IME compositionend must not drop the
+      // final committed character before its next animation frame.
+      readKeyboardInput("insertFromComposition", true);
     }
     if (keyboardInputFrameRef.current !== null) {
       window.cancelAnimationFrame(keyboardInputFrameRef.current);
