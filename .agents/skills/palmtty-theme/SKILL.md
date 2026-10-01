@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.13.0"
+  version: "1.14.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -166,7 +166,7 @@ PalmTTY is primarily operated from a phone.
 - Keep mobile editable controls at 16px or larger; achieve compactness with spacing and control dimensions, not sub-16px form text.
 - Keep terminal viewport ownership simple: one decorative frame around one padding-free xterm mount; xterm remains the only terminal scroll-physics implementation.
 - Controls must remain reachable in portrait and short landscape layouts.
-- The mobile terminal keybar may use horizontally scrollable rows, but it must not become a competing vertical scroll owner. Compact/full/hidden dock modes pin expand/hide controls outside scrolling and retain an always-reachable restore action. The mobile Terminal and Remote App share a single-row header with Tools on demand. Changing any of these presentation states must not reconnect xterm/WebSocket. Keep high-frequency actions (including Enter and a literal `/` fallback) in the core row; lower-frequency symbol/navigation actions belong in an optional second horizontal row, and modifier buttons must expose pressed state accessibly. Browser-local terminal font-size controls may refit the mounted xterm in place, but must not recreate transport/session state.
+- The mobile terminal keybar may use horizontally scrollable rows, but it must not become a competing vertical scroll owner. An always-visible row places Keyboard first and frequent Long Text second; one pinned More/Collapse control directly toggles its advanced row without separate full or hidden modes. The mobile Terminal and Remote App share a single-row header with Tools on demand. Changing any of these presentation states must not reconnect xterm/WebSocket. Keep high-frequency actions (including Enter and a literal `/` fallback) in the core row; lower-frequency symbol/navigation actions belong in an optional second horizontal row, and modifier buttons must expose pressed state accessibly. Browser-local terminal font-size controls may refit the mounted xterm in place, but must not recreate transport/session state.
 - Workspace dialogs keep one intentional body scroll owner with header/footer actions always reachable; nested data regions may scroll only when bounded.
 - Dense workbench regions also need one intentional vertical scroll owner. In particular, the Git sidebar owns scrolling for repository summary, the first-class Changes/History switch, change/history lists and Git tools; group/list descendants must not create nested competing vertical scrollers. Commit detail/diff replaces the Git list on narrow screens and must keep an explicit back action reachable. Files and Artifacts use one list scroller plus one independent preview scroller on wide screens; on narrow screens the selected preview replaces the list rather than creating side-by-side overflow. File preview actions (copy/share-download/history) belong to the preview toolbar/action row, must remain reachable as touch targets, and must not create a new vertical scroll owner. Image previews use ordinary bounded `<img>` content inside `.glass-content`, never a new backdrop/material layer.
 - High-frequency touch targets use the shared 44px target where space allows; compact secondary controls use the shared compact target rather than ad-hoc geometry.
@@ -197,3 +197,7 @@ At minimum validate:
 - theme changes while a terminal remains connected.
 
 Hard-coded visual color values belong only in the theme layer or explicit xterm theme definitions. Business/component layout CSS should consume tokens.
+
+### Remote App dock and cursor visual scale
+
+Use `.glass-panel` for both the primary and extended Remote App key docks, never override their material with `--flat-content`; keep nested buttons theme-tokenized. The verified-window pointer overlay should remain a restrained high-contrast arrow (17×24 CSS px) with a fine theme-owned outline and compact shadow; retain the exact hotspot and contain/cover geometry to avoid obscuring application controls.

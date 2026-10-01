@@ -786,9 +786,9 @@ export function RemoteAppView({
         <video ref={videoRef} className={"fit-" + fit}
           autoPlay playsInline muted />
         {active && mode === "touchpad" && controlReady && videoRendered && projectedCursor && (
-          <svg aria-hidden="true" className="remote-app-cursor" viewBox="0 0 26 34"
+          <svg aria-hidden="true" className="remote-app-cursor" viewBox="0 0 17 24"
             style={{ left: projectedCursor.x, top: projectedCursor.y }}>
-            <path d="M2 2 L2 27 L8 21 L13 32 L18 29 L13 19 L23 19 Z" />
+            <path d="M1.5 1.5 V19 L5.5 15.2 L8.5 22 L12 20.6 L9 14 H15.5 Z" />
           </svg>
         )}
         {blockingNotice && (
@@ -910,35 +910,35 @@ export function RemoteAppView({
           )}
         </div>
         {moreKeysOpen && (
-          <div className="remote-app-extra-keys" aria-label={t("remoteApp.extraKeys")}>
+          <div className="remote-app-extra-keys glass-panel" aria-label={t("remoteApp.extraKeys")}>
             {([
               ["ArrowLeft", "←"], ["ArrowUp", "↑"],
               ["ArrowDown", "↓"], ["ArrowRight", "→"],
               ["Backspace", "⌫"], ["Delete", "Del"]
             ] as const).map(([key, label]) => (
-              <button key={key} type="button" className="ghost compact"
+              <button key={key} type="button" className="compact"
                 onClick={() => sendKey(key)}>{label}</button>
             ))}
           </div>
         )}
-        <div className="remote-app-keybar-shell">
+        <div className="remote-app-keybar-shell glass-panel">
           <div className="remote-app-keybar" aria-label={t("remoteApp.keys")}>
             <button type="button" aria-pressed={ctrl}
-              className={ctrl ? "selected compact" : "ghost compact"}
+              className={ctrl ? "selected compact" : "compact"}
               onClick={() => setCtrl((value) => !value)}>Ctrl</button>
             <button type="button" aria-pressed={alt}
-              className={alt ? "selected compact" : "ghost compact"}
+              className={alt ? "selected compact" : "compact"}
               onClick={() => setAlt((value) => !value)}>Alt</button>
             <button type="button" aria-pressed={shift}
-              className={shift ? "selected compact" : "ghost compact"}
+              className={shift ? "selected compact" : "compact"}
               onClick={() => setShift((value) => !value)}>Shift</button>
             {([["Escape", "Esc"], ["Tab", "Tab"], ["Enter", "Enter"]] as const)
               .map(([key, label]) => (
-                <button key={key} type="button" className="ghost compact"
+                <button key={key} type="button" className="compact"
                   onClick={() => sendKey(key)}>{label}</button>
               ))}
           </div>
-          <button type="button" className="ghost compact remote-app-more-keys"
+          <button type="button" className={moreKeysOpen ? "selected compact remote-app-more-keys" : "compact remote-app-more-keys"}
             aria-expanded={moreKeysOpen}
             onClick={() => setMoreKeysOpen((previous) => !previous)}>
             {moreKeysOpen ? t("remoteApp.fewerKeys") : t("remoteApp.moreKeys")}

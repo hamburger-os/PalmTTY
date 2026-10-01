@@ -9,7 +9,6 @@ import { Terminal } from "@xterm/xterm";
 import { ensureModalDialogOpen } from "./dialog-controller.js";
 import { useI18n } from "./i18n.js";
 import { TerminalKeyBar } from "./TerminalKeyBar.js";
-import { type TerminalDockMode } from "./terminal-dock.js";
 import {
   Ime229InputTransaction,
   recoverIme229ControlKey
@@ -151,7 +150,6 @@ export function TerminalView({
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
   const [moreKeysOpen, setMoreKeysOpen] = useState(false);
-  const [dockMode, setDockMode] = useState<TerminalDockMode>("compact");
   const [longInputOpen, setLongInputOpen] = useState(false);
 
   useEffect(() => {
@@ -637,11 +635,6 @@ export function TerminalView({
         ctrl={ctrl}
         alt={alt}
         moreOpen={moreKeysOpen}
-        dockMode={dockMode}
-        onChangeDockMode={(mode) => {
-          setDockMode(mode);
-          if (mode !== "full") setMoreKeysOpen(false);
-        }}
         onFocusKeyboard={() => terminalRef.current?.focus()}
         onToggleCtrl={toggleCtrl}
         onToggleAlt={toggleAlt}

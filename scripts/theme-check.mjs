@@ -258,11 +258,13 @@ if (!/\.workbench-page\.is-remote-app\.remote-app-immersive\s*\{[^}]*grid-templa
   failures.push("apps/web/src/styles.css [remote-app-immersive] missing single-row content grid");
 }
 if (!terminalKeyBar.includes('className="keybar-pinned"') ||
-    !terminalKeyBar.includes('className="keybar-restore"') ||
-    !terminalKeyBar.includes('dockMode === "full"') ||
+    !terminalKeyBar.includes('onClick={onToggleMore}') ||
+    !terminalKeyBar.includes('onClick={onLongInput}') ||
+    !terminalKeyBar.includes('id="terminal-keybar-more"') ||
+    terminalKeyBar.includes('dockMode') ||
     !workspaceWorkbench.includes('mobile-workbench-tools') ||
     !workspaceWorkbench.includes('is-terminal')) {
-  failures.push("apps/web [terminal-mobile-dock] compact/full/hidden or pinned Tools navigation missing");
+  failures.push("apps/web [terminal-mobile-dock] direct More or primary Long Text missing");
 }
 if (!remoteAppView.includes('className="remote-app-dock"') ||
     !remoteAppView.includes('className="remote-app-toolbar glass-panel"') ||
@@ -271,6 +273,8 @@ if (!remoteAppView.includes('className="remote-app-dock"') ||
     remoteAppView.includes('className="remote-app-waiting"') ||
     !remoteAppView.includes('<details className="remote-app-diagnostics">') ||
     !remoteAppView.includes('className="remote-app-cursor"') ||
+    !remoteAppView.includes('className="remote-app-keybar-shell glass-panel"') ||
+    !remoteAppView.includes('className="remote-app-extra-keys glass-panel"') ||
     !remoteAppPresentation.includes('remoteVideoCursorPosition(') ||
     !styles.includes('.remote-app-cursor {')) {
   failures.push("apps/web/src/RemoteAppView.tsx [remote-app-video-first] loading states or dock controls regressed");
