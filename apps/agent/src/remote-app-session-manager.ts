@@ -206,7 +206,6 @@ export class RemoteAppSessionManager {
         workspaceId,
         helperPath,
         exitedRetentionMinutes: this.config.remoteApps.exitedRetentionMinutes,
-        iceServers: this.config.remoteApps.webrtc.iceServers,
         profile: {
           id: launch.id,
           name: launch.name,
@@ -259,7 +258,11 @@ export class RemoteAppSessionManager {
       throw new Error("Remote App Session is not running");
     }
     const clientId = randomBytes(12).toString("base64url");
-    const answerSdp = await managed.worker.negotiate(clientId, offerSdp);
+    const answerSdp = await managed.worker.negotiate(
+      clientId,
+      offerSdp,
+      this.config.remoteApps.webrtc.iceServers
+    );
     return { clientId, answerSdp };
   }
 
