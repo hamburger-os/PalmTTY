@@ -25,6 +25,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
+import { remoteDisplaySize, remoteVideoPoint, type VideoFit } from "./remote-app-presentation.js";
 
 export type RemoteAppConnectionState =
   | "connecting"
@@ -72,43 +73,14 @@ function normalizedPoint(
 }
 
 function normalizedVideoPoint(
-  element: HTMLElement,
-  video: HTMLVideoElement | null,
-  clientX: number,
-  clientY: number,
-  fit: "contain" | "cover",
-  clamp: boolean
+  element: HTMLElement, video: HTMLVideoElement | null,
+  clientX: number, clientY: number, fit: VideoFit, clamp: boolean
 ): Point | undefined {
-  const bounds = element.getBoundingClientRect();
-  const videoWidth = video?.videoWidth ?? 0;
-  const videoHeight = video?.videoHeight ?? 0;
-  if (
-    bounds.width <= 0 ||
-    bounds.height <= 0 ||
-    videoWidth <= 0 ||
-    videoHeight <= 0
-  ) return undefined;
-
-  const scale = (fit === "cover" ? Math.max : Math.min)(
-    bounds.width / videoWidth,
-    bounds.height / videoHeight
+  return remoteVideoPoint(
+    element.getBoundingClientRect(),
+    { width: video?.videoWidth ?? 0, height: video?.videoHeight ?? 0 },
+    clientX, clientY, fit, clamp
   );
-  const contentWidth = videoWidth * scale;
-  const contentHeight = videoHeight * scale;
-  const left = bounds.left + (bounds.width - contentWidth) / 2;
-  const top = bounds.top + (bounds.height - contentHeight) / 2;
-  let x = (clientX - left) / contentWidth;
-  let y = (clientY - top) / contentHeight;
-
-  if (!clamp && (x < 0 || x > 1 || y < 0 || y > 1)) return undefined;
-  x = Math.max(0, Math.min(1, x));
-  y = Math.max(0, Math.min(1, y));
-  return { x, y };
-}
-
-function boundedEven(value: number, minimum: number, maximum: number): number {
-  const bounded = Math.max(minimum, Math.min(maximum, Math.round(value)));
-  return bounded % 2 === 0 ? bounded : bounded - 1;
 }
 
 function browserIceServers(
@@ -220,17 +192,14 @@ export function RemoteAppView({
     if (bounds.width < 1 || bounds.height < 1) return;
     // Clamp the single scale factor before computing both dimensions;
     // independent width/height clamps otherwise distort a portrait ratio.
-    const ratio = Math.max(1, Math.min(2, window.devicePixelRatio || 1,
-      REMOTE_APP_CAPTURE_MAX_WIDTH / bounds.width,
-      REMOTE_APP_CAPTURE_MAX_HEIGHT / bounds.height));
-    send({
-      type: "display",
-      width: boundedEven(bounds.width * ratio,
-        REMOTE_APP_CAPTURE_MIN_WIDTH, REMOTE_APP_CAPTURE_MAX_WIDTH),
-      height: boundedEven(bounds.height * ratio,
-        REMOTE_APP_CAPTURE_MIN_HEIGHT, REMOTE_APP_CAPTURE_MAX_HEIGHT),
-      adaptWindow
-    });
+    const size = remoteDisplaySize(bounds.width, bounds.height,
+      window.devicePixelRatio || 1, {
+        minWidth: REMOTE_APP_CAPTURE_MIN_WIDTH,
+        minHeight: REMOTE_APP_CAPTURE_MIN_HEIGHT,
+        maxWidth: REMOTE_APP_CAPTURE_MAX_WIDTH,
+        maxHeight: REMOTE_APP_CAPTURE_MAX_HEIGHT
+      });
+    if (size) send({ type: "display", ...size, adaptWindow });
   }, [send, adaptWindow]);
 
   useEffect(() => {
