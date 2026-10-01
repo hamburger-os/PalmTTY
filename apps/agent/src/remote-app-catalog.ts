@@ -124,7 +124,7 @@ export async function browseRemoteAppExecutables(
     }
     executables.push({
       name: displayName(candidate),
-      executable: candidate,
+      launch: { kind: "win32", executable: candidate },
       source: "path"
     });
     count += 1;
