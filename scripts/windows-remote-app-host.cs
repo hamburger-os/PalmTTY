@@ -126,6 +126,12 @@ internal static class PalmTTYRemoteAppHost
 
         [DataMember(Name = "text")]
         public string Text { get; set; }
+
+        [DataMember(Name = "width")]
+        public int Width { get; set; }
+
+        [DataMember(Name = "height")]
+        public int Height { get; set; }
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -399,10 +405,14 @@ internal static class PalmTTYRemoteAppHost
 
     private static readonly object TargetLock = new object();
     private static readonly object OutputLock = new object();
+    private static readonly object StateLock = new object();
     private static IntPtr JobHandle = IntPtr.Zero;
     private static IntPtr TargetWindow = IntPtr.Zero;
     private static RECT TargetRect;
     private static volatile bool Stopping;
+    private static volatile int CaptureMaxWidth = 1280;
+    private static volatile int CaptureMaxHeight = 800;
+    private static string LastMediaState = "";
     private static BinaryWriter Output;
     private static StreamWriter ErrorOutput;
 
@@ -431,6 +441,8 @@ internal static class PalmTTYRemoteAppHost
             }
             AppConfig config = ParseJson<AppConfig>(firstLine);
             ValidateConfig(config);
+            CaptureMaxWidth = config.MaxWidth;
+            CaptureMaxHeight = config.MaxHeight;
 
             job = CreateConfiguredJob();
             JobHandle = job;
@@ -447,6 +459,7 @@ internal static class PalmTTYRemoteAppHost
             process.hThread = IntPtr.Zero;
 
             ErrorOutput.WriteLine("PALMTTY_APP_HOST_READY " + process.dwProcessId.ToString());
+            PublishMediaState("waiting-for-window");
 
             Thread control = new Thread(delegate() { ControlLoop(input); });
             control.IsBackground = true;
@@ -664,23 +677,59 @@ internal static class PalmTTYRemoteAppHost
 
     private static void CaptureLoop(AppConfig config)
     {
-        int delay = Math.Max(33, 1000 / config.FrameRate);
+        int delay = Math.Max(66, 1000 / config.FrameRate);
+        int captureFailures = 0;
         while (!Stopping)
         {
             try
             {
                 IntPtr hwnd;
                 RECT rect;
-                if (TryResolveOwnedWindow(out hwnd, out rect))
+                if (!TryResolveOwnedWindow(out hwnd, out rect))
                 {
-                    CaptureWindow(hwnd, rect, config.MaxWidth, config.MaxHeight);
+                    captureFailures = 0;
+                    PublishMediaState("waiting-for-window");
+                }
+                else
+                {
+                    PublishMediaState("waiting-for-frame");
+                    if (CaptureWindow(hwnd, rect, CaptureMaxWidth, CaptureMaxHeight))
+                    {
+                        captureFailures = 0;
+                        PublishMediaState("streaming");
+                    }
+                    else
+                    {
+                        captureFailures += 1;
+                        if (captureFailures >= Math.Max(8, config.FrameRate * 2))
+                        {
+                            PublishMediaState("capture-unavailable");
+                        }
+                    }
                 }
             }
             catch
             {
-                // A temporary capture failure must not terminate the app.
+                captureFailures += 1;
+                if (captureFailures >= Math.Max(8, config.FrameRate * 2))
+                {
+                    PublishMediaState("capture-unavailable");
+                }
             }
             Thread.Sleep(delay);
+        }
+    }
+
+    private static void PublishMediaState(string state)
+    {
+        lock (StateLock)
+        {
+            if (String.Equals(LastMediaState, state, StringComparison.Ordinal)) return;
+            LastMediaState = state;
+            if (ErrorOutput != null)
+            {
+                ErrorOutput.WriteLine("PALMTTY_APP_HOST_STATE " + state);
+            }
         }
     }
 
@@ -815,7 +864,7 @@ internal static class PalmTTYRemoteAppHost
         return bounds.Width >= 1 && bounds.Height >= 1;
     }
 
-    private static void CaptureWindow(IntPtr hwnd, RECT rect, int maxWidth, int maxHeight)
+    private static bool CaptureWindow(IntPtr hwnd, RECT rect, int maxWidth, int maxHeight)
     {
         int sourceWidth = rect.Width;
         int sourceHeight = rect.Height;
@@ -826,7 +875,7 @@ internal static class PalmTTYRemoteAppHost
             sourceHeight > 4096 ||
             (long)sourceWidth * (long)sourceHeight > 12000000L)
         {
-            return;
+            return false;
         }
 
         using (Bitmap source = new Bitmap(sourceWidth, sourceHeight, PixelFormat.Format32bppArgb))
@@ -843,7 +892,7 @@ internal static class PalmTTYRemoteAppHost
                 {
                     graphics.ReleaseHdc(hdc);
                 }
-                if (!ok) return;
+                if (!ok) return false;
             }
 
             double scale = Math.Min(
@@ -856,8 +905,7 @@ internal static class PalmTTYRemoteAppHost
 
             if (width == sourceWidth && height == sourceHeight)
             {
-                WriteBitmap(source);
-                return;
+                return WriteBitmap(source);
             }
 
             using (Bitmap scaled = new Bitmap(width, height, PixelFormat.Format32bppArgb))
@@ -874,12 +922,12 @@ internal static class PalmTTYRemoteAppHost
                     sourceWidth,
                     sourceHeight,
                     GraphicsUnit.Pixel);
-                WriteBitmap(scaled);
+                return WriteBitmap(scaled);
             }
         }
     }
 
-    private static void WriteBitmap(Bitmap bitmap)
+    private static bool WriteBitmap(Bitmap bitmap)
     {
         Rectangle rectangle = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
         BitmapData data = bitmap.LockBits(
@@ -890,7 +938,7 @@ internal static class PalmTTYRemoteAppHost
         {
             int rowBytes = checked(bitmap.Width * 4);
             int payloadBytes = checked(rowBytes * bitmap.Height);
-            if (payloadBytes > 32 * 1024 * 1024) return;
+            if (payloadBytes > 8 * 1024 * 1024) return false;
             byte[] rgba = new byte[payloadBytes];
             byte[] row = new byte[rowBytes];
 
@@ -919,6 +967,7 @@ internal static class PalmTTYRemoteAppHost
                 Output.Write(rgba);
                 Output.Flush();
             }
+            return true;
         }
         finally
         {
@@ -929,6 +978,15 @@ internal static class PalmTTYRemoteAppHost
     private static void HandleControl(ControlMessage message)
     {
         if (message == null || String.IsNullOrWhiteSpace(message.Type)) return;
+        if (message.Type == "display")
+        {
+            int width = Math.Max(320, Math.Min(1600, message.Width));
+            int height = Math.Max(240, Math.Min(1000, message.Height));
+            CaptureMaxWidth = width & ~1;
+            CaptureMaxHeight = height & ~1;
+            return;
+        }
+
         IntPtr hwnd;
         RECT rect;
         lock (TargetLock)
