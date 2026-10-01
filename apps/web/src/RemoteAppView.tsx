@@ -777,7 +777,7 @@ export function RemoteAppView({
   const queueKeyboardText = (value: string, fromComposition = false) => {
     if (!value) return;
     if (fromComposition) lastCompositionRef.current = { text: value, at: performance.now() };
-    if (!keyboardQueueRef.current.enqueueText(value)) {
+    if (keyboardOverflowRef.current || !keyboardQueueRef.current.enqueueText(value)) {
       // Large paste or exhausted input budget: retain it for explicit sending.
       keyboardOverflowRef.current += value;
       setInputBlocked(true);
@@ -795,7 +795,8 @@ export function RemoteAppView({
     if (keyboardComposingRef.current || keyboardFlushFrameRef.current !== null) return;
     const field = liveKeyboardRef.current;
     if (!field) return;
-    if (inputType.startsWith("delete") || field.value === "") {
+    if (inputType.startsWith("delete") ||
+        (field.value === "" && !fromComposition && !inputType.startsWith("insert"))) {
       queueKeyboardDelete(inputType.includes("Forward") ? "Delete" : "Backspace");
     } else if (inputType === "insertLineBreak" || inputType === "insertParagraph") {
       if (flushKeyboardQueue()) sendKey("Enter");
