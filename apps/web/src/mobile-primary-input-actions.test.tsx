@@ -37,8 +37,10 @@ describe("shared mobile primary inputs", () => {
     });
     const html = renderToStaticMarkup(createElement(I18nProvider, null, app));
     const buttons = html.match(/<button[^>]*>.*?<\/button>/g) ?? [];
-    expect(buttons.slice(0, 4).map((button) => button.replace(/<[^>]+>/g, "")))
-      .toEqual(["⌨", "长文本", "Ctrl", "Alt"]);
+    expect(buttons[0]).toContain('>⌨</button>');
+    expect(buttons[1]).toContain('>长文本</button>');
+    expect(buttons[2]).toContain('>Ctrl</button>');
+    expect(buttons[3]).toContain('>Alt</button>');
     expect(html).toContain('aria-controls="remote-app-extra-keys"');
   });
 });
