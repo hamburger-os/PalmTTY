@@ -454,6 +454,13 @@ for (const marker of [
   }
 }
 
+const appKeybar = remoteAppView.split('<div className="remote-app-keybar"')[1]?.split('</div>')[0] ?? "";
+if (!appKeybar.includes('aria-pressed={textOpen}') ||
+    appKeybar.indexOf('aria-pressed={textOpen}') > appKeybar.indexOf('aria-pressed={ctrl}') ||
+    remoteAppView.split('<div className="remote-app-options">')[1]?.split('</div>')[0]?.includes('t("remoteApp.text")')) {
+  failures.push("apps/web [remote-app-text-dock] Text must be the first bottom key and absent from display options");
+}
+
 if (failures.length) {
   console.error("Theme contract check failed:");
   for (const failure of failures) console.error(`- ${failure}`);
@@ -462,9 +469,3 @@ if (failures.length) {
 
 console.log("Theme contract check passed.");
 
-const appKeybar = remoteAppView.split('<div className="remote-app-keybar"')[1]?.split('</div>')[0] ?? "";
-if (!appKeybar.includes('aria-pressed={textOpen}') ||
-    appKeybar.indexOf('aria-pressed={textOpen}') > appKeybar.indexOf('aria-pressed={ctrl}') ||
-    remoteAppView.split('<div className="remote-app-options">')[1]?.split('</div>')[0]?.includes('t("remoteApp.text")')) {
-  failures.push("apps/web [remote-app-text-dock] Text must be the first bottom key and absent from display options");
-}
