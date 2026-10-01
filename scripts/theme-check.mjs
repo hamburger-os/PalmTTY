@@ -277,6 +277,11 @@ if (!remoteAppView.includes('className="remote-app-dock"') ||
     !remoteAppView.includes('className="remote-app-extra-keys glass-panel"') ||
     !remoteAppView.includes('ref={cursorOverlayRef}') ||
     !remoteAppView.includes('queueRelativeMotion(relative)') ||
+    !remoteAppView.includes('remoteAdaptedVideoFit(adaptWindow, surfaceSize, videoSize)') ||
+    remoteAppView.includes('setFit(') ||
+    remoteAppView.includes('t("remoteApp.fillScreen")') ||
+    !styles.includes('.remote-app-surface.is-adapted { border: 0; }') ||
+    !styles.includes('video.fit-adapted { object-fit: cover; }') ||
     !styles.includes('width: 5.667px;') ||
     !styles.includes('height: 8px;') ||
     !remoteAppPresentation.includes('remoteVideoCursorPosition(') ||

@@ -6,6 +6,10 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+### Remote App phone adaptation (unreleased)
+
+- Remove the separate Fill screen option. Compensate bounded invisible DWM resize margins when adapting the owned Windows app, automatically eliminate residual ≤4% video letterbox gaps without stretching, and keep unresizable apps fully visible with correctly aligned touch/cursor input.
+
 <!-- Add changes here after the latest release. Publishing requires this section to be empty. -->
 
 ### Mobile cursor and CLI dock (unreleased)
@@ -15,7 +19,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
-- Introduce portrait-first Remote App immersion: outside-video mode/options/diagnostics, single-row phone header with on-demand Git/Files, optional full-window or cropped fill, opt-in bounded current-window resize, and a pinned expandable key dock.
+- Introduce portrait-first Remote App immersion: outside-video mode/options/diagnostics, single-row phone header with on-demand Git/Files, default full-window view and opt-in bounded current-window resize with automatic tiny-edge fill, and a pinned expandable key dock.
 - Add independent two-finger centroid gesture tests and detection of video stalls after first-frame success.
 
 - Detect current-user Microsoft Store/MSIX apps by registered AUMID with a typed Win32/packaged launch model; packaged activation verifies a fresh PID, exact package family and mandatory PalmTTY Job ownership before remote control.
