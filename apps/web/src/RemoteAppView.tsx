@@ -141,6 +141,8 @@ export function RemoteAppView({
   const [mode, setMode] = useState<InteractionMode>("view");
   const [fit, setFit] = useState<"contain" | "cover">("contain");
   const [adaptWindow, setAdaptWindow] = useState(false);
+  const adaptWindowRef = useRef(false);
+  adaptWindowRef.current = adaptWindow;
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [moreKeysOpen, setMoreKeysOpen] = useState(false);
   const [showModeHint, setShowModeHint] = useState(true);
@@ -199,8 +201,8 @@ export function RemoteAppView({
         maxWidth: REMOTE_APP_CAPTURE_MAX_WIDTH,
         maxHeight: REMOTE_APP_CAPTURE_MAX_HEIGHT
       });
-    if (size) send({ type: "display", ...size, adaptWindow });
-  }, [send, adaptWindow]);
+    if (size) send({ type: "display", ...size, adaptWindow: adaptWindowRef.current });
+  }, [send]);
 
   useEffect(() => {
     const surface = surfaceRef.current;
@@ -433,7 +435,7 @@ export function RemoteAppView({
     if (!active) return;
     surfaceRef.current?.focus({ preventScroll: true });
     sendDisplayHint();
-  }, [active, sendDisplayHint]);
+  }, [active, adaptWindow, sendDisplayHint]);
 
   useEffect(() => {
     setShowModeHint(true);
