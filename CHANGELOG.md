@@ -22,6 +22,8 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Changed
 
+- Recompile the source-mode Windows Remote App Host automatically after native C# or compiler-option changes using a content-addressed private EXE and exact source snapshot; avoid silently reusing stale native helpers after updating the checkout.
+
 - Initialize native WebRTC only after the Windows host verifies a launched app and emits READY. MSIX startup failures retain a bounded stage/type/HRESULT instead of being masked by native teardown; never terminate a PID before package verification.
 
 - Replace the Remote App executable-only profile with a typed Win32/MSIX launch identity and increment the persistence generation to `workspaces-v3.json`; v1/v2 catalogs are left untouched and Workspaces must be recreated. This intentionally breaks the pre-release profile format. The native AppWorker receives bounded single-allocation PTF1 frames rather than repeatedly concatenating large stdout chunks.

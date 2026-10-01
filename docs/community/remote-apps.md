@@ -43,6 +43,10 @@ View mode preserves browser pinch. Direct Touch and Trackpad modes claim only ge
 
 The optional **Resize PC window for phone** switch attempts to resize only the session-owned verified HWND within protocol limits, and attempts to restore its original dimensions when disabled or the helper stops. Some desktop apps enforce a minimum width and cannot become native mobile UIs. Display hints remain presentation state, not an executable/PID/HWND selection channel. Native WebRTC is initialized only after the Windows app reaches READY; on an MSIX launch failure the browser receives the bounded native startup stage, error type and HRESULT instead of a misleading addon teardown code. Fully dark successful captures remain ambiguous: after retrying the same authorized window, PalmTTY forwards the frame with a blank-window diagnostic rather than treating every black theme as failed.
 
+### Updating a source checkout
+
+In source mode, the native Windows Host is cached by the SHA-256 fingerprint of its C# source and compiler settings, not by an unchanged executable filename. Restart the Agent after pulling a source update: the next App Session automatically builds the matching Host while existing detached AppWorkers can continue using their prior binary. Installed distributions always ship their precompiled Host and must be upgraded normally.
+
 ### Connection and capture diagnostics
 
 PalmTTY distinguishes these states and exposes received/submitted video-frame counts, conversion failures and browser decoded-frame readiness instead of treating an ICE connection as successful video:
@@ -110,6 +114,10 @@ App 画面提供三种显式模式：
 查看模式保留浏览器捏合；直触与触控板模式只接管从远程画面内开始的触摸。独立手势状态机区分单指移动/点击、双指中心滚动以及取消/部分抬起，避免误触。默认完整等比显示，裁切铺满作为显式可选操作，并同步修正触控映射。
 
 “适应手机（调整电脑窗口）”是单独的用户开关，只尝试有界调整当前 App Session 验证过的 HWND，关闭或退出时尝试恢复原尺寸。部分桌面软件限制最小宽度，不能承诺自动生成原生手机布局。MSIX 启动失败显示受限长度的阶段、异常类型和 HRESULT；Windows 应用 READY 之前不加载原生 WebRTC。纯黑帧不能独立证明捕获失败，完成同一合法窗口重试后仍会发送并提示歧义。
+
+### 从源码更新 PalmTTY
+
+源码运行模式的 Windows 原生 Host 以 C# 源码和编译参数的 SHA-256 指纹命名缓存，不再反复使用固定名称的旧 EXE。拉取更新后重启 Agent，下一次创建 App Session 会自动编译对应版本，已有独立 AppWorker 可以继续使用以前启动的 Host。安装包使用内置预编译 Host，需要正常升级安装版本。
 
 ### 连接与捕获诊断
 
