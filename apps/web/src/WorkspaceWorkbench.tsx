@@ -1,0 +1,365 @@
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState
+} from "react";
+import type {
+  AppSessionPublic,
+  RemoteAppCapabilities,
+  WorkspacePublic
+} from "@palmtty/protocol";
+import { ArtifactsPane } from "./ArtifactsPane.js";
+import { ConfirmDialog } from "./ConfirmDialog.js";
+import { FilesPane } from "./FilesPane.js";
+import { GitPane } from "./GitPane.js";
+import { useI18n } from "./i18n.js";
+import {
+  RemoteAppView,
+  type RemoteAppConnectionState
+} from "./RemoteAppView.js";
+import {
+  TerminalView,
+  type ConnectionState,
+  type TerminalInsertRequest
+} from "./TerminalView.js";
+import { workbenchVisualViewportFrame } from "./visual-viewport.js";
+
+export type WorkbenchActivity =
+  | {
+      kind: "terminal";
+      sessionId: string;
+      onRestart(): Promise<void>;
+    }
+  | {
+      kind: "remoteApp";
+      session: AppSessionPublic;
+    };
+
+type WorkbenchPane =
+  | "terminal"
+  | "remoteApp"
+  | "git"
+  | "files"
+  | "artifacts";
+
+export type WorkbenchActivityOption = {
+  value: string;
+  label: string;
+};
+
+export function WorkspaceWorkbench({
+  workspace,
+  activity,
+  activityOptions,
+  appCapabilities,
+  onSwitchActivity,
+  onBack
+}: {
+  workspace?: WorkspacePublic;
+  activity: WorkbenchActivity;
+  activityOptions: WorkbenchActivityOption[];
+  appCapabilities: RemoteAppCapabilities | null;
+  onSwitchActivity(value: string): void;
+  onBack(): void;
+}) {
+  const { t } = useI18n();
+  const initialPane: WorkbenchPane = activity.kind === "terminal"
+    ? "terminal"
+    : "remoteApp";
+  const [pane, setPane] = useState<WorkbenchPane>(initialPane);
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
+  const [appImmersive, setAppImmersive] = useState(false);
+  const [terminalConnection, setTerminalConnection] =
+    useState<ConnectionState>("connecting");
+  const [appConnection, setAppConnection] =
+    useState<RemoteAppConnectionState>("connecting");
+  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
+  const [restarting, setRestarting] = useState(false);
+  const [restartError, setRestartError] = useState<string | null>(null);
+  const [gitWritesEnabled, setGitWritesEnabled] = useState(false);
+  const [gitHistoryPath, setGitHistoryPath] = useState<string>();
+  const [terminalInsert, setTerminalInsert] = useState<TerminalInsertRequest>();
+  const terminalInsertSequence = useRef(0);
+  const workbenchRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    setPane(activity.kind === "terminal" ? "terminal" : "remoteApp");
+    setMobileToolsOpen(false);
+    setAppImmersive(false);
+  }, [
+    activity.kind,
+    activity.kind === "terminal" ? activity.sessionId : activity.session.id
+  ]);
+
+  useEffect(() => {
+    const remoteActive = activity.kind === "remoteApp" && pane === "remoteApp";
+    if (remoteActive) document.body.classList.add("remote-app-active");
+    return () => document.body.classList.remove("remote-app-active");
+  }, [activity.kind, pane]);
+
+  const terminalConnectionChanged = useCallback((next: ConnectionState) => {
+    setTerminalConnection(next);
+  }, []);
+  const appConnectionChanged = useCallback((next: RemoteAppConnectionState) => {
+    setAppConnection(next);
+  }, []);
+
+  useLayoutEffect(() => {
+    const element = workbenchRef.current;
+    const visualViewport = window.visualViewport;
+    if (!element || !visualViewport) return;
+
+    let animationFrame: number | undefined;
+
+    const clearVisualViewportFrame = () => {
+      element.classList.remove("has-visual-viewport-frame");
+      for (const property of [
+        "--workbench-visual-top",
+        "--workbench-visual-left",
+        "--workbench-visual-width",
+        "--workbench-visual-height"
+      ]) {
+        element.style.removeProperty(property);
+      }
+    };
+
+    const syncVisualViewportFrame = () => {
+      animationFrame = undefined;
+      const frame = workbenchVisualViewportFrame(visualViewport);
+      if (!frame) {
+        clearVisualViewportFrame();
+        return;
+      }
+      element.style.setProperty("--workbench-visual-top", `${frame.top}px`);
+      element.style.setProperty("--workbench-visual-left", `${frame.left}px`);
+      element.style.setProperty("--workbench-visual-width", `${frame.width}px`);
+      element.style.setProperty("--workbench-visual-height", `${frame.height}px`);
+      element.classList.add("has-visual-viewport-frame");
+    };
+
+    const scheduleVisualViewportSync = () => {
+      if (animationFrame !== undefined) return;
+      animationFrame = window.requestAnimationFrame(syncVisualViewportFrame);
+    };
+
+    syncVisualViewportFrame();
+    visualViewport.addEventListener("resize", scheduleVisualViewportSync);
+    visualViewport.addEventListener("scroll", scheduleVisualViewportSync);
+    window.addEventListener("resize", scheduleVisualViewportSync);
+
+    return () => {
+      if (animationFrame !== undefined) window.cancelAnimationFrame(animationFrame);
+      visualViewport.removeEventListener("resize", scheduleVisualViewportSync);
+      visualViewport.removeEventListener("scroll", scheduleVisualViewportSync);
+      window.removeEventListener("resize", scheduleVisualViewportSync);
+      clearVisualViewportFrame();
+    };
+  }, []);
+
+  const tabs: WorkbenchPane[] = [
+    activity.kind === "terminal" ? "terminal" : "remoteApp",
+    ...(workspace ? (["git", "files"] as const) : []),
+    ...(activity.kind === "terminal" ? (["artifacts"] as const) : [])
+  ];
+
+  const showFileHistory = (path: string) => {
+    if (!workspace) return;
+    setGitHistoryPath(path);
+    setPane("git");
+  };
+
+  const insertArtifactPath = (artifactPath: string) => {
+    if (activity.kind !== "terminal") return;
+    terminalInsertSequence.current += 1;
+    setTerminalInsert({
+      id: terminalInsertSequence.current,
+      text: `${artifactPath} `
+    });
+    setPane("terminal");
+  };
+
+  const status = activity.kind === "terminal"
+    ? terminalConnection
+    : appConnection;
+
+  return (
+    <main ref={workbenchRef}
+      className={"workbench-page" +
+        (activity.kind === "remoteApp" && pane === "remoteApp"
+          ? " is-remote-app" + (appImmersive ? " remote-app-immersive" : "")
+          : "")}>
+      <header className="workbench-header glass-panel">
+        <div className="workbench-leading">
+          <button
+            type="button"
+            className="ghost compact"
+            onClick={onBack}
+            disabled={restarting}
+          >
+            ← {t("workbench.back")}
+          </button>
+          <strong className="workbench-name">
+            {workspace?.name ?? t("workbench.session")}
+          </strong>
+          {activityOptions.length > 1 && (
+            <select
+              className="glass-input glass-select workbench-activity-switcher"
+              aria-label={t("workbench.activitySwitcher")}
+              value={
+                activity.kind === "terminal"
+                  ? "terminal:" + activity.sessionId
+                  : "app:" + activity.session.id
+              }
+              onChange={(event) => onSwitchActivity(event.target.value)}
+            >
+              {activityOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          )}
+          {activityOptions.length <= 1 && activity.kind === "remoteApp" && (
+            <span className="workbench-activity-name">
+              {activity.session.profileName}
+            </span>
+          )}
+        </div>
+
+        <nav
+          className={"workbench-tabs" + (mobileToolsOpen ? " mobile-open" : "")}
+          role="tablist"
+          aria-label={t("workbench.views")}
+        >
+          {tabs.map((item) => (
+            <button
+              type="button"
+              role="tab"
+              key={item}
+              className={pane === item ? "selected" : ""}
+              aria-selected={pane === item}
+              onClick={() => {
+                if (item === "git") setGitHistoryPath(undefined);
+                setPane(item);
+                setMobileToolsOpen(false);
+                if (item !== "remoteApp") setAppImmersive(false);
+              }}
+            >
+              {t(`workbench.${item}`)}
+            </button>
+          ))}
+        </nav>
+
+        <div className="workbench-actions">
+          {activity.kind === "remoteApp" && (
+            <button type="button" className="ghost compact mobile-app-tools"
+              aria-label={t("workbench.tools")}
+              aria-expanded={mobileToolsOpen}
+              onClick={() => setMobileToolsOpen((open) => !open)}>
+              {t("workbench.tools")}
+            </button>
+          )}
+          {restartError && (
+            <span className="workbench-error" title={restartError}>
+              {restartError}
+            </span>
+          )}
+          {activity.kind === "terminal" && (
+            <button
+              type="button"
+              className="ghost compact"
+              title={t("terminal.restart")}
+              aria-label={t("terminal.restart")}
+              disabled={restarting || terminalConnection === "stopping"}
+              onClick={() => setRestartConfirmOpen(true)}
+            >
+              {restarting ? "…" : "↻"}
+            </button>
+          )}
+          <span className={`connection ${status}`}>
+            {activity.kind === "terminal"
+              ? t(`terminal.connection.${terminalConnection}`)
+              : t(`remoteApp.connection.${appConnection}`)}
+          </span>
+        </div>
+      </header>
+
+      <div className="workbench-content">
+        {activity.kind === "terminal" && (
+          <div className={`workbench-pane${pane === "terminal" ? " is-active" : ""}`}>
+            <TerminalView
+              sessionId={activity.sessionId}
+              active={pane === "terminal"}
+              insertRequest={terminalInsert}
+              onConnectionChange={terminalConnectionChanged}
+            />
+          </div>
+        )}
+
+        {activity.kind === "remoteApp" && (
+          <div className={`workbench-pane${pane === "remoteApp" ? " is-active" : ""}`}>
+            <RemoteAppView
+              session={activity.session}
+              capabilities={appCapabilities}
+              active={pane === "remoteApp"}
+              immersive={appImmersive}
+              onImmersiveChange={setAppImmersive}
+              onConnectionChange={appConnectionChanged}
+            />
+          </div>
+        )}
+
+        {workspace && pane === "git" && (
+          <div className="workbench-pane is-active">
+            <GitPane
+              workspaceId={workspace.id}
+              writesEnabled={gitWritesEnabled}
+              onEnableWrites={() => setGitWritesEnabled(true)}
+              {...(gitHistoryPath ? { initialHistoryPath: gitHistoryPath } : {})}
+            />
+          </div>
+        )}
+
+        {workspace && pane === "files" && (
+          <div className="workbench-pane is-active">
+            <FilesPane
+              workspaceId={workspace.id}
+              onShowHistory={showFileHistory}
+            />
+          </div>
+        )}
+
+        {activity.kind === "terminal" && pane === "artifacts" && (
+          <div className="workbench-pane is-active">
+            <ArtifactsPane
+              sessionId={activity.sessionId}
+              canUpload={terminalConnection === "connected"}
+              canInsert={terminalConnection === "connected"}
+              onInsertPath={insertArtifactPath}
+            />
+          </div>
+        )}
+      </div>
+
+      {activity.kind === "terminal" && restartConfirmOpen && (
+        <ConfirmDialog
+          title={t("terminal.restartTitle")}
+          message={t("terminal.restartConfirm")}
+          confirmLabel={t("terminal.restart")}
+          busy={restarting}
+          onCancel={() => setRestartConfirmOpen(false)}
+          onConfirm={() => {
+            setRestartConfirmOpen(false);
+            setRestarting(true);
+            setRestartError(null);
+            void activity.onRestart()
+              .catch(() => setRestartError(t("errors.session_restart_failed")))
+              .finally(() => setRestarting(false));
+          }}
+        />
+      )}
+    </main>
+  );
+}

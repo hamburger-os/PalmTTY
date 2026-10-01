@@ -1,0 +1,82 @@
+import { createRequire } from "node:module";
+import path from "node:path";
+
+const appRoot = process.argv[2];
+if (!appRoot) throw new Error("Usage: remote-app-video-smoke.mjs <installed-app-root>");
+const require = createRequire(path.join(appRoot, "package.json"));
+const wrtc = require("@roamhq/wrtc");
+
+if (typeof wrtc.nonstandard?.RTCVideoSink !== "function")
+  throw new Error("Native WebRTC video sink required for video round-trip smoke");
+
+const width = 32;
+const height = 16;
+const rgba = new Uint8ClampedArray(width * height * 4);
+for (let pixel = 0; pixel < width * height; pixel++) {
+  const offset = pixel * 4;
+  rgba[offset] = pixel % 255;
+  rgba[offset + 1] = (pixel * 3) % 255;
+  rgba[offset + 2] = 200;
+  rgba[offset + 3] = 255;
+}
+const i420 = new Uint8ClampedArray(width * height * 3 / 2);
+wrtc.nonstandard.rgbaToI420(
+  { width, height, data: rgba }, { width, height, data: i420 }
+);
+
+const source = new wrtc.nonstandard.RTCVideoSource();
+const track = source.createTrack();
+const sender = new wrtc.RTCPeerConnection({ iceServers: [] });
+const receiver = new wrtc.RTCPeerConnection({ iceServers: [] });
+let sink;
+let timer;
+let frames;
+try {
+  await new Promise(async (resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(
+      "Synthetic Remote App video did not arrive through the native WebRTC media path"
+    )), 12_000);
+    const waitForIce = (peer) => new Promise((done, fail) => {
+      if (peer.iceGatheringState === "complete") return done();
+      const limit = setTimeout(() => fail(new Error("Local ICE gathering timed out")), 5000);
+      const onState = () => {
+        if (peer.iceGatheringState !== "complete") return;
+        clearTimeout(limit);
+        peer.removeEventListener("icegatheringstatechange", onState);
+        done();
+      };
+      peer.addEventListener("icegatheringstatechange", onState);
+    });
+    receiver.ontrack = ({ track: incoming }) => {
+      sink = new wrtc.nonstandard.RTCVideoSink(incoming);
+      sink.onframe = ({ frame }) => {
+        if (frame.width === width && frame.height === height &&
+          frame.data?.length === width * height * 3 / 2) resolve();
+      };
+    };
+    sender.addTrack(track);
+    try {
+      const offer = await sender.createOffer();
+      await sender.setLocalDescription(offer);
+      await waitForIce(sender);
+      await receiver.setRemoteDescription(sender.localDescription);
+      const answer = await receiver.createAnswer();
+      await receiver.setLocalDescription(answer);
+      await waitForIce(receiver);
+      await sender.setRemoteDescription(receiver.localDescription);
+      frames = setInterval(() => source.onFrame({ width, height, data: i420 }), 60);
+    } catch (error) { reject(error); }
+  });
+  clearTimeout(timer);
+  clearInterval(frames);
+  // @roamhq/wrtc may crash on Windows during libwebrtc teardown. AppWorkers
+  // likewise isolate this native lifecycle in a disposable process. Assert a
+  // real received video frame above, then exit before unsafe addon teardown.
+  process.stdout.write("Remote App synthetic RGBA → I420 → WebRTC → RTCVideoSink: passed\n",
+    () => process.exit(0));
+} catch (error) {
+  clearTimeout(timer);
+  clearInterval(frames);
+  console.error(error);
+  process.exit(1);
+}

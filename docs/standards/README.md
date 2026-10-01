@@ -9,6 +9,7 @@ This layer records the external technical basis used by PalmTTY. It is not a pla
 - [autostart.md](autostart.md) — Microsoft Task Scheduler and systemd user-service behavior used by PalmTTY autostart
 - [github-actions.md](github-actions.md) — GitHub reusable-workflow contexts, inputs and concurrency semantics used by release gates
 - [mobile-web-viewport.md](mobile-web-viewport.md) — VisualViewport, iOS focus zoom and WebKit viewport caveats used by mobile layout
+- [remote-app-runtime.md](remote-app-runtime.md) — WebRTC, Windows Job Object, window capture and restricted input references for Remote Apps
 
 ## Rule
 

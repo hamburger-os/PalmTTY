@@ -37,7 +37,8 @@ async function definition(): Promise<WorkspaceDefinition> {
     id: "git-test",
     name: "Git test",
     cwd: root,
-    runtime: { kind: "host", args: [] }
+    terminal: { runtime: { kind: "host", args: [] } },
+    remoteApps: []
   };
 }
 

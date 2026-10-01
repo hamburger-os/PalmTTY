@@ -12,17 +12,17 @@
 - 在网页端创建、编辑、删除持久化 Workspace；
 - “新建工作区”不等待可选运行环境探测即可打开；Host 始终可配置，WSL 选项在能力探测完成后按结果显示；
 - Workspace 对话框由 React 状态控制开关，原生 `dialog` 的激活逻辑可重复执行，兼容开发环境 StrictMode；
-- Host / WSL runtime 选择与运行目标校验；
+- Workspace 根页不再直接堆叠 Host/WSL/App 高级字段：基础页只保留名称、cwd、environment，并通过独立的 Terminal / Remote Apps 设置入口进入对应 Activity 配置；
 - 工作目录支持在网页内浏览并选择 Agent 宿主机或所选 WSL 发行版中的目录；这是远端目录浏览，不调用浏览器本机文件选择器；
-- Workspace 弹窗使用固定 Header / 单一可滚动 Body / 固定 Footer 的三段结构，长表单滚动时关闭、取消、保存操作始终可达；目录列表作为有界数据区可独立滚动；删除确认使用统一主题确认框，不再调用浏览器原生 `confirm()`；
-- 正常流程只显示一个“终端环境”选择器：已知 Host Shell 与已注册 WSL 发行版都作为一级 Profile 出现；Host/WSL 内部 runtime、显式 executable/argv 只在“自定义”高级路径展开；
+- Workspace 弹窗继续使用固定 Header / 单一可滚动 Body / 固定 Footer，但 Body 现在是层级设置页：Workspace → Terminal 或 Remote Apps → 单个 App / App 选择器；返回/关闭/保存操作始终可达，目录与 executable 列表各自只作为有界数据区滚动；删除确认使用统一主题确认框；
+- Terminal 设置页只显示一个“终端环境”选择器：已知 Host Shell 与已注册 WSL 发行版作为一级 Profile；Host/WSL 内部 runtime、显式 shell/argv 只在“自定义”高级路径展开；Terminal startup command 也归入此页；
 - 环境变量使用每行一个 `NAME=value` 的结构化编辑，适合代理等必须在 Shell 启动前存在的变量；为兼容从 PowerShell/文档复制的写法，最外层成对单引号/双引号会在保存时去除，不成对引号直接报错；它们持久化在 Workspace 中，不是密钥存储；
 - 启动命令改为多行输入，并提供常用终端 Agent 快捷项，目前包括 Codex、Claude Code、Antigravity、Gemini CLI、OpenCode、Aider，点击只填写命令，不负责安装工具；
-- 新建会话；
-- 已运行会话列表；
-- 会话状态和连接数；运行/终止中的会话显示连接数，已退出会话显示退出码（如果可用）；
+- Workspace 卡片可创建 Terminal Session，也可直接启动已保存 Remote App Profile；
+- 首页把 Terminal Session 与 Remote App Session 合并为一个 Activity 列表；
+- Activity 状态和连接数保持显式；运行/终止中的 Activity 显示连接状态，已退出 Activity 显示退出码（如果可用）；
 - 会话动作按生命周期分离：运行中的会话显示“终止”，已退出/失败会话显示“清除”；会话工作台提供经确认的“重启终端”，它会替换 PTY/Session 并重新读取最新 Workspace/宿主环境；不再使用含义模糊的红色 ×；
-- 会话页面是轻量工作台，顶栏提供“终端 / Git / 文件 / 附件”一级切换；Git 与文件视图使用 Workspace authority，而不是尝试从 PTY 猜测当前 `cd`；
+- WorkspaceWorkbench 是 Activity-aware 工作台：顶栏可在同一 Workspace 的 live Terminal/App Activity 间直接切换；当前 Activity 旁仍提供 Git/Files Workspace Tool；Artifacts 只在 Terminal Activity 中出现。Git 与 Files 使用 Workspace authority，不从 PTY 当前 `cd` 猜测作用域；
 - 登录/退出；
 - 中文 / English 语言切换并在浏览器本地保存偏好。
 
@@ -59,7 +59,7 @@
 - 竖屏/横屏布局；
 - Safe Area 处理；
 - 终端视觉框与 Fit 几何已拆成两层：外层 `terminal-frame` 负责主题背景、边框、圆角、padding 与裁剪，内层 `terminal-mount` 保持无 padding/无 border 并作为 `terminal.open()`、FitAddon 与 ResizeObserver 的唯一几何基准；这避免 FitAddon 把外层 padding 误算成可用行高后再被 `overflow:hidden` 裁掉最后一行。xterm viewport/scrollable remainder 与 canvas 继承同一个 `--terminal-background`，因此整数行之外的剩余高度不会显示成默认黑条；xterm 继续使用略大的 lineHeight，主题背景保持与页面基底协调；
-- SessionWorkbench 是移动端可视几何的唯一 owner：无论 `visualViewport.scale` 是否为 1，整个工作台都跟随当前 VisualViewport 的 width/height/offset，因此 Safari 地址栏、双指缩放与软键盘出现/消失时 Header、终端和 keybar 仍留在真实可见区域；scale 只作为诊断值，不作为关闭布局修正的条件，PalmTTY 也不会写入、禁止或强制重置浏览器缩放；viewport meta 同时声明 `interactive-widget=resizes-content` 作为支持浏览器的渐进增强；
+- WorkspaceWorkbench 是移动端可视几何的唯一 owner：无论 `visualViewport.scale` 是否为 1，整个工作台都跟随当前 VisualViewport 的 width/height/offset，因此 Safari 地址栏、双指缩放与软键盘出现/消失时 Header、终端和 keybar 仍留在真实可见区域；scale 只作为诊断值，不作为关闭布局修正的条件，PalmTTY 也不会写入、禁止或强制重置浏览器缩放；viewport meta 同时声明 `interactive-widget=resizes-content` 作为支持浏览器的渐进增强；
 - 首次连接/重连会先 `fit` 得到浏览器实际 rows/cols，并把几何尺寸随 resume 一起提交；snapshot/replay 完成前冻结再次 fit，避免把服务端按旧尺寸序列化的终端状态写进新尺寸 xterm；TerminalView 只监听 terminal mount 的 ResizeObserver，Workbench/软键盘造成的可用高度变化先改变 mount，再由同一 ResizeObserver → FitAddon 路径传播；只有实际 rows/cols 变化才向 Worker 发送 resize；
 - 恢复期间终端输入与长文本发送按钮保持不可用，尚未提交的长文本不会因为连接尚未就绪而被静默清空；
 - PWA manifest 已补齐 PalmTTY 自有品牌资产：保留透明 `logo.png` 作为标准横版品牌图，提供 192/512 方形应用图标并接入 favicon、Apple touch icon 与安装 manifest；界面标题采用图标 + 主题文字而不是把固定颜色的位图字标强塞进所有主题，保证 Spectrum / Obsidian / Frosted 下的对比度与可访问性；
@@ -87,3 +87,34 @@
 ## 你审查时重点看
 
 手机体验优化不能绕开终端协议新增隐式高权限 API。Git/文件能力已经通过独立、有界 Workspace API 落地：Files 保持只读，Git 只开放 typed 写操作。继续增加更高级 Git 或文件写能力时仍必须单独审查权限、仓库 hooks/filters、并发写、symlink/路径逃逸与敏感环境变量继承。
+
+## Remote App 手机交互
+
+WorkspaceWorkbench 把 Terminal 与 Remote App 作为独立 Activity，把 Git/Files 作为共享 Workspace Tool，把 Artifacts 保持为 Terminal Session scope。切换 Git/Files 不卸载当前 Activity；如果同一 Workspace 有多个 live Terminal/App，Header 的 Activity selector 可以直接切换，不必先回首页。
+
+Remote App Profile 的普通编辑流程不再要求用户理解帧率/分辨率：
+
+1. 添加应用；
+2. 从已检测应用选择，或浏览宿主 Windows 的目录 + `.exe`；
+3. 可选填写 argv；
+4. 手工 executable 路径只在 Advanced 中作为兜底。
+
+Remote App Surface 使用三种显式触摸语义：
+
+- 查看：不发送 pointer，浏览器保留 pinch zoom/页面手势；
+- 直触：屏幕坐标映射到目标应用窗口；
+- 触控板：单指相对移动、轻点点击、双指滚动。
+
+画质为自动模式。Surface 的实际几何/DPR 通过 bounded display hint 发给 AppWorker/helper，横竖屏或 viewport 变化后自动缩放，不把 FPS/宽高存进 Profile。
+
+手机 IME/语音/长文本使用独立 Unicode text control；常用 Ctrl/Alt/Shift、方向、Enter、Tab、Esc、Backspace/Delete 使用 allowlisted typed key。Remote App 不复用 xterm textarea，也不把桌面输入逻辑混入 TerminalView。
+
+Remote App 画面状态必须可诊断：等待窗口、等待首帧、正在串流、capture unavailable 与 WebRTC 路径失败分别显示；不能把所有失败都退化成黑屏。公网/反向代理环境如果需要 TURN，Web 只使用认证 capability 返回的 host-configured ICE servers；UI 不提供任意 ICE 注入。
+
+
+
+## 远程 App 沉浸式手机布局
+
+工作区在远程 App 活动中使用紧凑单行顶栏，Git/文件改由工具菜单进入，沉浸模式可隐藏顶栏并在视频内保留退出动作。操作模式浮于视频上，不再永久占用单独一行；核心快捷键 Dock 固定在 VisualViewport 底部，额外导航按键通过“更多”展开。视频默认完整等比展示，用户可以选择裁切填充；坐标映射与实际 object-fit 对齐，不会盲目拉伸内容。
+
+直触/触控板模式使用主动的表面级 touch-action 和非被动 touchmove，仅拦截远端画面区域内部的手势；查看模式保留原生浏览器缩放。触控板状态机明确管理单指移动/轻点、双指中心滚动、部分抬起和取消；取消不合成 click。可选窗口适配通过有界 typed display hint 请求，Windows Host 必须重新验证 Job 归属才能改变尺寸。

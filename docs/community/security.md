@@ -16,8 +16,8 @@ PalmTTY provides shell access with the privileges of the OS user running it. Tre
 - Authentication and Origin are separate controls. The LAN Vite proxy does not rewrite an arbitrary browser Origin into a trusted one; requests still have to match the generated exact development Origin and authenticate.
 - Workspace management is an explicit authenticated, exact-Origin-protected mutation surface. The directory picker and terminal-profile discovery endpoint are separate authenticated + exact-Origin bounded inspection APIs. Profile discovery checks only known Host shells and enumerates registered WSL distributions without starting them; it does not expose file contents or arbitrary command execution.
 - Session-workbench Files/Git/Artifacts use separate authenticated + exact-Origin APIs rather than the terminal WebSocket. Session image uploads never accept a destination path and are written only to a private per-Session runtime directory outside the Workspace; the server validates actual PNG/JPEG/WebP/GIF signatures/dimensions instead of trusting filenames or Content-Type, uses random storage names, enforces 8 MiB/file, 32 files/Session, 64 MiB aggregate, 8192-pixel dimension bounds and a 32 MiPixel total-pixel bound, and excludes attachment bytes from default logs. Artifact read/upload/delete are separately rate-limited and tied to Session lifecycle cleanup. Workspace image preview remains read-only and reuses canonical Host/WSL containment before returning validated image bytes. Files accepts canonical Workspace-relative paths, contains Host/WSL symlinks inside the persisted Workspace root, limits directory entries and caps UTF-8 preview at 512 KiB. Complete-file copy/share/download uses a separate 8 MiB bounded stable read under the same containment and returns private no-store/no-sniff bytes; it remains read-only and accepts no destination path. Git explicitly operates on the complete repository containing the Workspace cwd and reports that scope. Reads use porcelain-v2 status plus bounded diff/branch queries, snapshot-stable opaque-cursor history pagination, optional file history, and bounded commit metadata/changed-file/file-diff inspection; external diff/textconv/fsmonitor plus log signature-helper execution remain disabled. Working-tree diff also resolves the selected path's `filter` attribute and overrides that driver's clean/process commands plus `required` for the diff command, so inspection does not execute repository-configured content filters; filter names that cannot be neutralized safely are rejected. Writes accept only typed stage/unstage/restore/commit/branch/stash/fetch/pull/push operations. They are serialized per resolved repository, including across multiple Workspaces that share one repository; incomplete/truncated status is rejected as write authority; requests require the current state token and explicit trusted-repository acknowledgement, and destructive restore verifies the viewed diff snapshot. Hooks, editors and interactive credential prompts are disabled; Git config/exec/SSH/askpass override environment variables are stripped; remote transport is allowlisted to http/https/ssh/git and denies ext/file/unknown protocols. Normal Git filters and trusted host/repository Git configuration may still execute under standard Git semantics.
-- The browser may persist cwd/runtime/shell, a bounded workspace environment map, and startup input. Session creation and restart do not accept ad-hoc cwd/shell/environment overrides; they resolve the persisted workspace authority by ID.
-- Workspace create/update validates the selected runtime. Host shells are resolved to absolute executables. On Windows, each new/restarted Host terminal refreshes current Machine/User environment values before applying workspace overrides. WSL launch data is passed as structured argv, and configured workspace variable names are forwarded with `WSLENV`. Session creation/restart validates the stored workspace again before Worker creation.
+- Workspace authority is layered: top-level cwd + bounded environment, nested `workspace.terminal` runtime/startup input, and saved `workspace.remoteApps` profiles. Terminal/App Session creation does not accept ad-hoc runtime/executable/environment overrides; each resolves persisted authority by ID.
+- Workspace create/update validates the Terminal launch target and saved Remote App executables where supported. Terminal creation/restart revalidates the nested Terminal profile; App creation re-resolves the saved executable from the current Windows host environment. WSL belongs to Terminal/Git/Files authority and does not turn a Windows Remote App into a WSL process.
 - Workspace environment values are local persistent configuration and may be sensitive, but PalmTTY does not treat the workspace catalog as a secret vault. The `PALMTTY_*` namespace plus any separately configured login-token variable is reserved and rejected from Workspace environment mutations.
 - Terminal I/O, login tokens, Worker secrets and workspace environment values are excluded from default logs.
 - Login attempts, Session creation/lifecycle mutations, directory/profile/workbench reads, Git mutations, Git remote operations, terminal dimensions, input size, replay state, exited-session retention and socket backpressure are bounded.
@@ -71,8 +71,8 @@ PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑�
 - 认证与 Origin 是独立控制。LAN Vite 代理不会把任意浏览器 Origin 改写成可信 Origin，请求仍必须精确匹配自动生成的 development Origin 并通过认证。
 - Workspace 目录选择器与终端 Profile 发现使用独立的“已认证 + 精确 Origin”有界 API；前者只返回目录名称/路径，后者只探测已知 Host Shell 并枚举已注册 WSL 发行版，不启动发行版，也不提供文件内容或任意命令执行。
 - Session Workbench 的 Files/Git/Artifacts 都使用独立“已认证 + 精确 Origin”API，不扩展终端 WebSocket。Session 图片上传不接受目标路径，只能写入 Workspace 之外的当前用户私有 Session runtime 目录；服务端按真实 PNG/JPEG/WebP/GIF 签名/尺寸校验而不是信任文件名或 Content-Type，随机化存储名，并限制单文件 8 MiB、每 Session 32 个、合计 64 MiB、边长 8192、总像素 32 MiPixels。附件读/传/删分别限流，内容不进入默认日志，并随 Session retirement 清理。Workspace 图片预览仍保持只读并复用 Host/WSL canonical/symlink containment。Files 只接收规范化 Workspace 相对路径，Host/WSL 都会把 symlink 约束在持久 Workspace 根目录内，并限制目录项与 512 KiB UTF-8 预览；完整文件复制/分享/下载使用同 containment 下独立 8 MiB 稳定有界读取，返回 private no-store/no-sniff bytes，仍是只读且不接受目标路径。Git 明确操作“包含 Workspace cwd 的完整仓库”并返回该 scope；读取使用 porcelain v2 status、有界 diff/branches、固定 HEAD snapshot 的 opaque cursor history 分页、可选文件 history，以及有界 commit metadata/changed-files/file-diff，禁用 external diff/textconv/fsmonitor 与 log signature-helper execution。working-tree diff 还会先解析该路径的 `filter` attribute，并在本次 diff 命令中清空对应 driver 的 clean/process、将 required 设为 false，避免只读查看触发仓库配置的内容过滤程序；无法安全中和的 filter 名称会被拒绝。写入只允许 typed stage/unstage/restore/commit/branch/stash/fetch/pull/push；按“已解析 Git 仓库”而不是 Workspace ID 串行执行，多个 Workspace 指向同一仓库时也共享写队列；truncated/不完整 status 不能作为写 authority；请求必须带当前 state token 和可信仓库确认，破坏性 restore 还校验已查看 diff snapshot。Git hooks、编辑器和交互式 credential prompt 被禁用，Git config/exec/SSH/askpass 覆盖环境被剔除；remote 只允许 http/https/ssh/git，拒绝 ext/file/未知协议。正常 Git filter 与可信宿主/仓库 Git 配置仍可能执行。
-- Workspace 管理是显式的高权限修改面，可以持久化 cwd、运行环境、Shell、有界环境变量与启动输入；真正创建或重启 Session 时不接受临时 cwd/shell/env 覆盖，而是按 workspace ID 解析持久化配置。
-- 新建/修改 workspace 时会验证运行目标；Host Shell 解析为绝对可执行文件。Windows 每个新建/重启终端会重新读取 Machine/User 环境后再应用 Workspace environment；WSL 参数按结构化 argv 传递，并通过 `WSLENV` 转发配置变量名；创建/重启 Session 前还会再次验证持久化 workspace。
+- Workspace 管理是显式高权限修改面，并明确分层：顶层 cwd + bounded environment、`workspace.terminal` 的 runtime/startup input、`workspace.remoteApps` 的 saved profiles。Terminal/App Session 创建都只解析持久 authority，不接受临时 runtime/executable/env 覆盖。
+- 新建/修改 Workspace 时会验证 Terminal launch target 与支持平台上的 saved Remote App executable；Terminal 创建/重启再次验证嵌套 Terminal profile，App 创建再次从当前 Windows host environment 解析 saved executable。WSL 只属于 Terminal/Git/Files runtime，不会让 Remote App 进入 WSL。
 - Workspace environment 是本机持久化配置，值可能敏感，但 PalmTTY 不把 Workspace 目录当作密钥保险箱。`PALMTTY_*` 命名空间以及单独配置的认证 token 环境变量属于保留项，Workspace mutation 会直接拒绝。
 - 默认日志不记录终端 I/O、登录 token、Worker secret 或 workspace 环境变量。
 - 登录、Session 创建/生命周期修改、目录/Profile/Workbench 检查、Session 附件读/传/删、终端尺寸、输入、replay、退出保留和 socket backlog 都有资源上限。
@@ -110,3 +110,30 @@ PalmTTY 自启动始终属于当前用户：Windows Task Scheduler 使用交互�
 ### 推荐部署
 
 优先使用私有 HTTPS 入口，例如 Tailscale Serve；或使用 Caddy/QNAP 等可信 HTTPS 反向代理。PalmTTY 上游端口保持私有。
+
+### Remote Apps / 远程 App
+
+Windows Remote Apps deliberately expose less authority than a general remote desktop.
+
+- Session creation selects only a persisted `workspaceId + profileId`; browser requests cannot provide executable/argv/env/PID/HWND.
+- Profiles persist only app id/name/executable/argv. Capture FPS and dimensions are automatic presentation state, not launch authority.
+- App discovery is bounded and authenticated: known-app detection plus directory/`.exe` enumeration only. It is not a general file-read or command API.
+- A Workspace may use WSL for Terminal/Git/Files while the Remote App still launches as the current Windows user.
+- The native helper captures/controls only a visible top-level window whose process belongs to the PalmTTY-owned Job Object. Capture failure never authorizes desktop/monitor fallback.
+- Typed DataChannel controls are bounded. Display hints may change only bounded scaling and cannot choose a window.
+- PalmTTY does not elevate or bypass UIPI/UAC.
+- `remoteApps.webrtc.iceServers` may contain bounded operator-supplied STUN/TURN configuration. It is returned only to authenticated clients; PalmTTY itself does not operate a cloud relay. Treat TURN credentials as sensitive deployment configuration.
+- Clipboard, audio, camera, microphone and file drag/drop are absent.
+
+Windows Remote Apps 有意保持比完整远程桌面更窄的权限。
+
+- 创建 App Session 只能选择持久化 `workspaceId + profileId`，浏览器不能临时提交 executable/argv/env/PID/HWND；
+- Profile 只保存 app id/name/executable/argv，FPS/分辨率属于自动 presentation state，不属于启动 authority；
+- App 检测是受认证、有边界的 known-app + 目录/`.exe` 枚举，不是通用文件读取或命令执行接口；
+- Workspace 的 Terminal/Git/Files 可以使用 WSL，但 Remote App 仍作为 Windows 当前用户应用启动；
+- helper 只捕获/控制 PalmTTY-owned Job 成员进程的可见顶层窗口，capture failure 不能退化成整桌面/显示器捕获；
+- DataChannel control 全部 typed + bounded，display hint 只能改变有界缩放，不能选择窗口；
+- PalmTTY 不提权、不绕过 UIPI/UAC；
+- `remoteApps.webrtc.iceServers` 可以配置 operator-owned STUN/TURN，但只对已认证客户端返回；PalmTTY 不运营云中继，TURN credential 应按敏感部署配置处理；
+- 当前没有剪贴板、音频、摄像头、麦克风或文件拖放通道。
+

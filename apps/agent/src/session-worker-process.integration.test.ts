@@ -75,21 +75,27 @@ function processWorkspace(windowsShellPath?: string): WorkspaceDefinition {
         id: "process",
         name: "Process worker",
         cwd: process.cwd(),
-        runtime: {
-          kind: "host",
-          shell: requiredWindowsShellPath(windowsShellPath),
-          args: ["-NoLogo", "-NoProfile"]
-        }
+        terminal: {
+          runtime: {
+            kind: "host",
+            shell: requiredWindowsShellPath(windowsShellPath),
+            args: ["-NoLogo", "-NoProfile"]
+          }
+        },
+        remoteApps: []
       }
     : {
         id: "process",
         name: "Process worker",
         cwd: process.cwd(),
-        runtime: {
-          kind: "host",
-          shell: "/bin/sh",
-          args: ["-i"]
-        }
+        terminal: {
+          runtime: {
+            kind: "host",
+            shell: "/bin/sh",
+            args: ["-i"]
+          }
+        },
+        remoteApps: []
       };
 }
 

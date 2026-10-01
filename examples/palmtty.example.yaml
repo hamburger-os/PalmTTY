@@ -28,3 +28,13 @@ sessions:
   scrollbackLines: 10000
   replayBytes: 2097152
   maxSocketBufferedBytes: 2097152
+
+remoteApps:
+  enabled: true
+  maxSessions: 4
+  exitedRetentionMinutes: 30
+  webrtc:
+    # Empty is sufficient on the same LAN/VPN when direct host candidates are
+    # routable. Reverse-proxy/public deployments may need STUN/TURN here.
+    # ICE credentials are delivered only to authenticated Remote App clients.
+    iceServers: []

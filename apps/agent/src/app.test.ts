@@ -104,6 +104,48 @@ describe("HTTP security boundary", () => {
     await app.close();
   });
 
+  it("keeps authenticated Remote App ICE capabilities out of caches", async () => {
+    process.env.PALMTTY_TEST_TOKEN = TOKEN;
+    const config = parseConfig({
+      server: {
+        port: 7688,
+        exposure: { mode: "local" }
+      },
+      auth: {
+        enabled: true,
+        tokenEnv: "PALMTTY_TEST_TOKEN",
+        sessionTtlMinutes: 60
+      },
+      remoteApps: {
+        webrtc: {
+          iceServers: [{
+            urls: ["turns:relay.example.test:5349"],
+            username: "palmtty",
+            credential: "secret"
+          }]
+        }
+      }
+    });
+    const app = await buildTestApp(config);
+    const cookie = await loginCookie(app);
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/remote-apps/capabilities",
+      headers: { cookie }
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(response.json()).toMatchObject({
+      iceServers: [{
+        urls: ["turns:relay.example.test:5349"],
+        username: "palmtty",
+        credential: "secret"
+      }],
+      relayConfigured: true
+    });
+    await app.close();
+  });
+
   it("creates an HttpOnly SameSite login session for a trusted origin", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
     const app = await buildTestApp();
@@ -130,7 +172,7 @@ describe("HTTP security boundary", () => {
       payload: {
         name: "Blocked",
         cwd: process.cwd(),
-        runtime: { kind: "host", shell: process.execPath, args: [] }
+        terminal: { runtime: { kind: "host", shell: process.execPath, args: [] } }
       }
     });
     expect(unauthenticated.statusCode).toBe(401);
@@ -143,7 +185,7 @@ describe("HTTP security boundary", () => {
       payload: {
         name: "Blocked",
         cwd: process.cwd(),
-        runtime: { kind: "host", shell: process.execPath, args: [] }
+        terminal: { runtime: { kind: "host", shell: process.execPath, args: [] } }
       }
     });
     expect(wrongOrigin.statusCode).toBe(403);
@@ -214,10 +256,12 @@ describe("HTTP security boundary", () => {
         payload: {
           name: "Reserved",
           cwd: process.cwd(),
-          runtime: {
-            kind: "host",
-            shell: process.execPath,
-            args: []
+          terminal: {
+            runtime: {
+              kind: "host",
+              shell: process.execPath,
+              args: []
+            }
           },
           environment: {
             [reserved]: "must-not-be-persisted"
@@ -339,10 +383,12 @@ describe("HTTP security boundary", () => {
       payload: {
         name: "Local",
         cwd: process.cwd(),
-        runtime: {
-          kind: "host",
-          shell: process.execPath,
-          args: []
+        terminal: {
+          runtime: {
+            kind: "host",
+            shell: process.execPath,
+            args: []
+          }
         },
         environment: {
           HTTPS_PROXY: "http://127.0.0.1:10808"
@@ -362,10 +408,12 @@ describe("HTTP security boundary", () => {
       payload: {
         name: "Renamed",
         cwd: process.cwd(),
-        runtime: {
-          kind: "host",
-          shell: process.execPath,
-          args: []
+        terminal: {
+          runtime: {
+            kind: "host",
+            shell: process.execPath,
+            args: []
+          }
         }
       }
     });

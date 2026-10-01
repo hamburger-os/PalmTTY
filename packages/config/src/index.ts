@@ -71,6 +71,40 @@ const SessionConfigSchema = z.object({
   maxSocketBufferedBytes: z.number().int().min(65536).max(64 * 1024 * 1024).default(2 * 1024 * 1024)
 }).strict();
 
+const RemoteAppIceServerConfigSchema = z.object({
+  urls: z.array(
+    z.string()
+      .trim()
+      .min(1)
+      .max(2048)
+      .regex(
+        /^(stun|turn|turns):[^\s\u0000-\u001F\u007F]+$/i,
+        "Remote App ICE URLs must use stun:, turn:, or turns: without whitespace/control characters"
+      )
+  ).min(1).max(8),
+  username: z.string().max(512).optional(),
+  credential: z.string().max(1024).optional()
+}).strict().superRefine((server, ctx) => {
+  for (const [index, value] of server.urls.entries()) {
+    if (!/^(stun|turn|turns):/i.test(value)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["urls", index],
+        message: "Remote App ICE URLs must use stun:, turn:, or turns:"
+      });
+    }
+  }
+});
+
+const RemoteAppsConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  maxSessions: z.number().int().min(1).max(16).default(4),
+  exitedRetentionMinutes: z.number().int().min(1).max(1440).default(30),
+  webrtc: z.object({
+    iceServers: z.array(RemoteAppIceServerConfigSchema).max(8).default([])
+  }).strict().default({ iceServers: [] })
+}).strict();
+
 export const PalmTTYConfigSchema = z.object({
   server: ServerConfigSchema.default({
     port: 7688,
@@ -88,6 +122,12 @@ export const PalmTTYConfigSchema = z.object({
     scrollbackLines: 10000,
     replayBytes: 2 * 1024 * 1024,
     maxSocketBufferedBytes: 2 * 1024 * 1024
+  }),
+  remoteApps: RemoteAppsConfigSchema.default({
+    enabled: true,
+    maxSessions: 4,
+    exitedRetentionMinutes: 30,
+    webrtc: { iceServers: [] }
   })
 }).strict();
 

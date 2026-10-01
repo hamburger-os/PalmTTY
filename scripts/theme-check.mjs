@@ -74,7 +74,7 @@ const viewportDebugPath = path.join(webSource, "ViewportDebug.tsx");
 const mainPath = path.join(webSource, "main.tsx");
 const indexHtmlPath = path.join(root, "apps", "web", "index.html");
 const stylesPath = path.join(webSource, "styles.css");
-const sessionWorkbenchPath = path.join(webSource, "SessionWorkbench.tsx");
+const workspaceWorkbenchPath = path.join(webSource, "WorkspaceWorkbench.tsx");
 const workspaceDialogPath = path.join(webSource, "WorkspaceDialog.tsx");
 const gitPanePath = path.join(webSource, "GitPane.tsx");
 const filesPanePath = path.join(webSource, "FilesPane.tsx");
@@ -88,7 +88,7 @@ const viewportDebug = await readFile(viewportDebugPath, "utf8");
 const mainSource = await readFile(mainPath, "utf8");
 const indexHtml = await readFile(indexHtmlPath, "utf8");
 const styles = (await readFile(stylesPath, "utf8")).replaceAll("\r\n", "\n");
-const sessionWorkbench = await readFile(sessionWorkbenchPath, "utf8");
+const workspaceWorkbench = await readFile(workspaceWorkbenchPath, "utf8");
 const workspaceDialog = await readFile(workspaceDialogPath, "utf8");
 const gitPane = await readFile(gitPanePath, "utf8");
 const filesPane = await readFile(filesPanePath, "utf8");
@@ -96,23 +96,25 @@ const filesPane = await readFile(filesPanePath, "utf8");
 for (const marker of [
   '<TerminalView',
   'active={pane === "terminal"}',
+  '<RemoteAppView',
+  'active={pane === "remoteApp"}',
   'workbench-pane',
   'pane === "git"',
   'pane === "files"',
   'pane === "artifacts"',
   '<ArtifactsPane'
 ]) {
-  if (!sessionWorkbench.includes(marker)) {
-    failures.push(`apps/web/src/SessionWorkbench.tsx [workbench-lifecycle-contract] missing ${marker}`);
+  if (!workspaceWorkbench.includes(marker)) {
+    failures.push(`apps/web/src/WorkspaceWorkbench.tsx [workbench-lifecycle-contract] missing ${marker}`);
   }
 }
 
 for (const forbidden of [
-  'pane === "terminal" && (',
-  'pane === "terminal" ? <TerminalView'
+  'pane === "terminal" ? <TerminalView',
+  'pane === "remoteApp" ? <RemoteAppView'
 ]) {
-  if (sessionWorkbench.includes(forbidden)) {
-    failures.push(`apps/web/src/SessionWorkbench.tsx [workbench-lifecycle-contract] forbidden ${forbidden}`);
+  if (workspaceWorkbench.includes(forbidden)) {
+    failures.push(`apps/web/src/WorkspaceWorkbench.tsx [workbench-lifecycle-contract] forbidden ${forbidden}`);
   }
 }
 
@@ -229,9 +231,9 @@ for (const marker of [
   'visualViewport.addEventListener("scroll", scheduleVisualViewportSync);',
   'workbenchVisualViewportFrame(visualViewport)'
 ]) {
-  if (!sessionWorkbench.includes(marker)) {
+  if (!workspaceWorkbench.includes(marker)) {
     failures.push(
-      `apps/web/src/SessionWorkbench.tsx [mobile-viewport-contract] missing ${marker}`
+      `apps/web/src/WorkspaceWorkbench.tsx [mobile-viewport-contract] missing ${marker}`
     );
   }
 }

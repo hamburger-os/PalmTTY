@@ -38,6 +38,41 @@ describe("configuration", () => {
     expect(config.auth.maxLoginSessions).toBe(32);
     expect(config.sessions.maxSessions).toBe(8);
     expect(config.sessions.exitedRetentionMinutes).toBe(30);
+    expect(config.remoteApps.enabled).toBe(true);
+    expect(config.remoteApps.maxSessions).toBe(4);
+    expect(config.remoteApps.exitedRetentionMinutes).toBe(30);
+    expect(config.remoteApps.webrtc.iceServers).toEqual([]);
+  });
+
+  it("parses bounded Remote App ICE servers", () => {
+    const config = parseConfig({
+      remoteApps: {
+        enabled: true,
+        maxSessions: 4,
+        exitedRetentionMinutes: 30,
+        webrtc: {
+          iceServers: [{
+            urls: [
+              "stun:stun.example.test:3478",
+              "turns:turn.example.test:5349"
+            ],
+            username: "palmtty",
+            credential: "secret"
+          }]
+        }
+      }
+    });
+    expect(config.remoteApps.webrtc.iceServers[0]?.urls).toHaveLength(2);
+    expect(() => parseConfig({
+      remoteApps: {
+        enabled: true,
+        maxSessions: 4,
+        exitedRetentionMinutes: 30,
+        webrtc: {
+          iceServers: [{ urls: ["https://not-ice.example.test"] }]
+        }
+      }
+    })).toThrow();
   });
 
   it("derives LAN listeners and exact private origins", () => {

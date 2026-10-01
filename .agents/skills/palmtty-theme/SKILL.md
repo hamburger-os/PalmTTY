@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.10.0"
+  version: "1.11.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -55,14 +55,19 @@ All themes share the same clear/specular glass tokens. Theme identity comes from
 Surface tiers:
 
 - `.glass-shell`: small application shells, top bars and login cards. Quality mode may use bounded backdrop sampling.
-- `.glass-modal`: modal dialogs that must visually isolate form/readability content from the ambient field. It uses a stronger theme veil and shadow, never large-area backdrop blur.
+- `.glass-modal`: modal dialogs that must visually isolate form/readability content from the ambient field. It uses a stronger theme veil, an almost opaque semantic `--flat-modal` base under the specular material, and shadow; never large-area backdrop blur or transparent overlay of underlying text.
 - `.glass-panel`: structural controls such as terminal header, key bar and composer shell. No large-area backdrop blur.
 - `.terminal-surface`: the single terminal viewport owner. Its opaque background must come from the same active xterm theme background value; do not place `.glass-content` behind xterm.
+- `.remote-app-surface`: the separately owned video viewport uses the opaque semantic `--remote-video-background` token when no remote frame is available. It must not leak ambient gradients or inherit the Terminal palette.
 - `.glass-content`: stable non-terminal read areas and empty states. No backdrop blur.
 - `.glass-control`: dense nested controls such as the directory picker. No backdrop blur.
 - `.glass-card`: workspace/session cards derived from the same physics.
 
 A visual region has one surface owner. Do not stack equivalent glass surfaces merely to make an element look "more glassy".
+
+### Immersive Remote App on phones
+
+The remote app video is the one visual owner of all available workbench content height. Overlay pointer mode controls and diagnostics must use semantic `--flat-modal` rather than opaque hard-coded palettes or permanent additional grid rows. The one-row mobile Workspace header can collapse into a Tools overlay; immersive mode retains an exit button inside the video. The bottom core key dock remains reachable inside VisualViewport above browser chrome, with an explicit expandable second row. Complete aspect-ratio display is default; cropped cover is optional and its pointer mapping must be adjusted without image stretching. Remote App native touch ownership must not steal xterm's independent gesture path.
 
 ## 4. Theme identity
 

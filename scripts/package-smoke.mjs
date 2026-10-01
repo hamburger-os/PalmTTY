@@ -40,7 +40,8 @@ function run(command, args, options = {}) {
     cwd: options.cwd,
     env: options.env,
     encoding: "utf8",
-    windowsHide: true
+    windowsHide: true,
+    ...(options.timeout ? { timeout: options.timeout } : {})
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
@@ -90,6 +91,34 @@ async function main() {
     );
     const cli = path.join(root, "tools", "installed-cli.mjs");
     const agent = path.join(root, "app", "dist", "index.js");
+    if (process.platform === "win32") {
+      const helper = await readFile(
+        path.join(root, "bin", "palmtty-remote-app-host.exe")
+      );
+      if (helper.length < 2 || helper[0] !== 0x4d || helper[1] !== 0x5a) {
+        throw new Error("Packaged Windows runtime is missing a valid Remote App host");
+      }
+      // Exercise the actual packaged GUI-subsystem host in a safe invalid
+      // bootstrap case. A concrete startup stage must survive to stderr.
+      run(node, [
+        path.join(root, "tools", "remote-app-host-smoke.mjs"), root
+      ], { cwd: root, timeout: 12_000 });
+      // A healthy Agent alone does not prove that its detached AppWorker can
+      // load the native WebRTC addon. Test the packaged Node+node_modules in
+      // isolation, never accidentally resolving from the source checkout.
+      const webRtcScript = [
+        "const wrtc = require('@roamhq/wrtc');",
+        "if (typeof wrtc.RTCPeerConnection !== 'function' ||",
+        "    typeof wrtc.nonstandard?.RTCVideoSource !== 'function' ||",
+        "    typeof wrtc.nonstandard?.rgbaToI420 !== 'function')",
+        "  throw new Error('Packaged Remote App WebRTC native APIs are unavailable');"
+      ].join("\n");
+      run(node, ["-e", webRtcScript], { cwd: path.join(root, "app") });
+      run(node, [
+        path.join(root, "tools", "remote-app-video-smoke.mjs"),
+        path.join(root, "app")
+      ], { cwd: path.join(root, "app"), timeout: 20_000 });
+    }
     if (process.platform !== "win32") {
       await chmod(node, 0o755);
       await chmod(path.join(root, "bin", "palmtty"), 0o755);
