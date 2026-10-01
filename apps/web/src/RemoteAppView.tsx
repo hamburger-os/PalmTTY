@@ -27,7 +27,7 @@ import {
 import { useI18n } from "./i18n.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
 import { RemoteCursorPreview, REMOTE_CURSOR_RECONCILE_DELAY_MS } from "./remote-app-cursor-preview.js";
-import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta, type VideoFit } from "./remote-app-presentation.js";
+import { hasPresentableVideoFrame, hasStalledVideoFrames, remoteAppVisualState, remoteDisplaySize, remoteVideoPoint, remoteVideoCursorPosition, remoteTouchpadDelta, remoteAdaptedVideoFit, type VideoFit } from "./remote-app-presentation.js";
 
 export type RemoteAppConnectionState =
   | "connecting"
@@ -143,7 +143,6 @@ export function RemoteAppView({
   const toolbarRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RTCDataChannel | null>(null);
   const [mode, setMode] = useState<InteractionMode>("view");
-  const [fit, setFit] = useState<"contain" | "cover">("contain");
   const [adaptWindow, setAdaptWindow] = useState(false);
   const adaptWindowRef = useRef(false);
   adaptWindowRef.current = adaptWindow;
@@ -158,6 +157,8 @@ export function RemoteAppView({
   const [inputBlocked, setInputBlocked] = useState(false);
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
   const [surfaceSize, setSurfaceSize] = useState({ width: 0, height: 0 });
+  // Only phone-adapted windows may crop tiny DWM/codec rounding gaps.
+  const fit = remoteAdaptedVideoFit(adaptWindow, surfaceSize, videoSize);
   const dragRef = useRef<{ pointerId: number; timer: number | undefined; held: boolean } | null>(null);
   const cursorOverlayRef = useRef<SVGSVGElement>(null);
   const cursorPreviewRef = useRef(new RemoteCursorPreview());
@@ -195,10 +196,11 @@ export function RemoteAppView({
     if (!node) return;
     const surface = surfaceRef.current;
     const video = videoRef.current;
-    const bounds = surface?.getBoundingClientRect();
+    const surfaceBounds = surface?.getBoundingClientRect();
+    const videoBounds = video?.getBoundingClientRect();
     const cursor = cursorPreviewRef.current.position;
-    const projected = cursor && bounds && remoteVideoCursorPosition(
-      { left: 0, top: 0, width: bounds.width, height: bounds.height },
+    const projected = cursor && videoBounds && remoteVideoCursorPosition(
+      { left: 0, top: 0, width: videoBounds.width, height: videoBounds.height },
       { width: video?.videoWidth ?? 0, height: video?.videoHeight ?? 0 },
       cursor, fitRef.current
     );
@@ -207,7 +209,12 @@ export function RemoteAppView({
       node.style.display = "none";
       return;
     }
-    node.style.transform = `translate3d(${projected.x - 0.5}px, ${projected.y - 0.5}px, 0)`;
+    // The SVG is absolutely positioned from the surface padding edge.
+    const insetX = surfaceBounds && videoBounds && surface
+      ? videoBounds.left - surfaceBounds.left - surface.clientLeft : 0;
+    const insetY = surfaceBounds && videoBounds && surface
+      ? videoBounds.top - surfaceBounds.top - surface.clientTop : 0;
+    node.style.transform = `translate3d(${projected.x + insetX - 0.5}px, ${projected.y + insetY - 0.5}px, 0)`;
     node.style.display = "block";
   }, []);
 
@@ -344,7 +351,7 @@ export function RemoteAppView({
   const sendDisplayHint = useCallback(() => {
     const surface = surfaceRef.current;
     if (!surface) return;
-    const bounds = surface.getBoundingClientRect();
+    const bounds = (videoRef.current ?? surface).getBoundingClientRect();
     if (bounds.width < 1 || bounds.height < 1) return;
     // Clamp the single scale factor before computing both dimensions;
     // independent width/height clamps otherwise distort a portrait ratio.
@@ -363,7 +370,7 @@ export function RemoteAppView({
     if (!surface) return;
     let timer: number | undefined;
     const observer = new ResizeObserver(() => {
-      const bounds = surface.getBoundingClientRect();
+      const bounds = (videoRef.current ?? surface).getBoundingClientRect();
       setSurfaceSize((current) => current.width === bounds.width && current.height === bounds.height
         ? current : { width: bounds.width, height: bounds.height });
       if (timer !== undefined) window.clearTimeout(timer);
@@ -733,7 +740,7 @@ export function RemoteAppView({
     if (!active || mode === "view") return;
     if (mode === "direct") {
       const point = normalizedVideoPoint(
-        event.currentTarget, videoRef.current, event.clientX, event.clientY, fit, false
+        videoRef.current ?? event.currentTarget, videoRef.current, event.clientX, event.clientY, fit, false
       );
       if (!point) return;
       event.preventDefault();
@@ -788,7 +795,7 @@ export function RemoteAppView({
       if (!activePointers.current.has(event.pointerId)) return;
       event.preventDefault();
       const point = normalizedVideoPoint(
-        event.currentTarget, videoRef.current, event.clientX, event.clientY, fit, true
+        videoRef.current ?? event.currentTarget, videoRef.current, event.clientX, event.clientY, fit, true
       );
       if (!point) return;
       activePointers.current.set(event.pointerId, point);
@@ -832,7 +839,7 @@ export function RemoteAppView({
       if (!previous) return;
       activePointers.current.delete(event.pointerId);
       const point = normalizedVideoPoint(
-        event.currentTarget, videoRef.current, event.clientX, event.clientY, fit, true
+        videoRef.current ?? event.currentTarget, videoRef.current, event.clientX, event.clientY, fit, true
       ) ?? previous;
       send({ type: "pointer", action: "up", x: point.x, y: point.y,
         button: Math.max(0, Math.min(2, event.button)) });
@@ -934,7 +941,7 @@ export function RemoteAppView({
     <section className="remote-app-view">
       <div
         ref={surfaceRef}
-        className={"remote-app-surface mode-" + mode}
+        className={"remote-app-surface mode-" + mode + (adaptWindow ? " is-adapted" : "")}
         tabIndex={0}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -945,7 +952,7 @@ export function RemoteAppView({
           if (mode !== "view") event.preventDefault();
         }}
       >
-        <video ref={videoRef} className={"fit-" + fit}
+        <video ref={videoRef} className={fit === "cover" ? "fit-adapted" : ""}
           autoPlay playsInline muted />
         {active && mode === "touchpad" && (
           <svg ref={cursorOverlayRef} aria-hidden="true" className="remote-app-cursor"
@@ -1039,15 +1046,17 @@ export function RemoteAppView({
           </div>
           {optionsOpen && (
             <div className="remote-app-options">
-              <button type="button" className="ghost compact"
-                onClick={() => { setFit((current) => current === "contain" ? "cover" : "contain"); setOptionsOpen(false); }}>
-                {fit === "contain" ? t("remoteApp.fillScreen") : t("remoteApp.showAll")}
-              </button>
               <button type="button" className={adaptWindow ? "selected compact" : "ghost compact"}
                 aria-pressed={adaptWindow}
                 onClick={() => { setAdaptWindow((previous) => !previous); setOptionsOpen(false); }}>
                 {t("remoteApp.adaptWindow")}
               </button>
+              {adaptWindow && surfaceSize.width > 0 && videoSize.width > 0 &&
+                fit === "contain" && (
+                  <span className="remote-app-quality" role="status">
+                    {t("remoteApp.adaptLimited")}
+                  </span>
+                )}
               <span className="remote-app-quality">{t("remoteApp.qualityAuto")}</span>
               <details className="remote-app-diagnostics">
                 <summary>{t("remoteApp.diagnostics")}</summary>
