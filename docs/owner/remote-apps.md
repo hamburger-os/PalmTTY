@@ -243,3 +243,7 @@ Windows Host 用独立约 30Hz 线程对当前已验证的 Job-owned HWND 重新
 保留真实、屏幕内、可聚焦但仅 1px 且透明度 0.01 的 Safari 输入桥，并维持 16px 字号，禁止 display:none。点击底部「键盘」直接同步 focus；仅「长文本」保留可见的显式发送面板。非空输入哨兵确保 Safari 连续 beforeinput/input 能产生退格事件；不在 keydown 中重复触发 Backspace/Delete。中文 IME 组合结束后才提交，不为每个即时字符更新 React 状态。
 
 普通文字进入按顺序的 16KiB 有界缓冲，每帧按最多 2KiB 消息提交；Backspace/Delete 单包最多重复 32 次。Windows Host 严格确认 Job-owned HWND/前台/UIPI；当前窗口已是前台时跳过重复 ShowWindow、线程关联和 SetFocus，防止重置软件内部编辑焦点。原生对批量键类型与次数再次校验，并在一次 SendInput 中发送成对的按下/抬起。网络拥塞时未发送的文字转至长文本；DataChannel 接收不能证明原生已经输入。部署后复测长按退格、中文组合结束立即删除、粘贴、断线和目标软件高负载时的响应。
+
+### Agent 输入背压
+
+此前 `helper.stdin.writableNeedDrain` 时会直接丢弃后续按键/文字控制，现由单一 64KiB/128 消息上限的有序队列串行处理，`write(false)` 表示消息已由 Writable 接收，必须等 `drain` 再继续，绝不能重发这条消息。原生 helper 退出或 Worker dispose 会清空待发队列，超过预算拒绝继续堆积。此改动仅改善控制消息完整性及拥塞表现，没有增加新权限；DataChannel 或 Node stdin 接收仍不能等同目标 Windows 应用已经成功执行。
