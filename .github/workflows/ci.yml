@@ -54,3 +54,17 @@ jobs:
             [ref]$errors
           ) | Out-Null
           if ($errors.Count -gt 0) { throw ($errors | Out-String) }
+      - name: Smoke native gateway diagnostic without installation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $raw = & node scripts/unattended-readiness.mjs --json
+          $status = $LASTEXITCODE
+          if ($status -gt 1) { throw 'The Windows native gateway read-only probe failed to run' }
+          $result = ($raw -join "`n") | ConvertFrom-Json
+          if ($result.schema -ne 2 -or $result.target -ne 'windows-native') {
+            throw 'Unexpected native gateway probe protocol'
+          }
+          if ($result.endToEndCertified -ne $false) {
+            throw 'The readiness probe must never certify browser RDP without real-device tests'
+          }
