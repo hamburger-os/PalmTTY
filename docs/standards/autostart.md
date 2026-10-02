@@ -40,3 +40,7 @@ PalmTTY interpretation:
 ## Secret transport
 
 PalmTTY may pass an **environment-file path** in OS service/task arguments, but secret values themselves must not be placed in those arguments. The Agent reads strict `NAME=value` entries before configuration/auth bootstrap. Operators remain responsible for file permissions; Linux autostart installation requires no group/world access.
+
+## Headless Windows contract
+
+Current-user `InteractiveToken` sign-in tasks require the intended user to have an interactive Windows logon session. PalmTTY neither starts a pre-login LocalSystem service nor grants control over Winlogon, lock screens, UAC secure desktops or disconnected Remote Desktop sessions. A connected WebRTC peer may still receive `PrintWindow` frames without Windows being ready for `SendInput`. Diagnostic input readiness is a separate validated channel. An active signed virtual display is a valid monitor target but is not a substitute for login or an input desktop.

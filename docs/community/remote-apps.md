@@ -156,3 +156,17 @@ The tiny verified-window arrow now occupies about 5.667 × 8 CSS pixels, one thi
 The iPhone still needs a real, in-viewport editable element to open its native keyboard, but it does not need another visible field over the remotely captured application's own input. A nearly invisible 1px editable bridge with 16px computed font and a nonempty sentinel keeps iOS autorepeat working. Confirmed Unicode is serialized into bounded <=2 KiB text messages, and consecutive Backspace/Delete actions into typed batches of at most 32. The Windows host revalidates repeat requests and skips repeated SetFocus/ShowWindow when the verified owned app is already foreground. The explicit Long Text composer preserves text that could not be sent under congestion. This improves input-path latency but does not increase the application's media capture frame rate or guarantee exactly-once delivery after disconnection.
 
 iPhone 唤起软键盘依然需要真实、位于屏幕内的输入元素，但不需要再在远程软件已有输入框上方显示第二个灰色输入框。1px 的隐形桥保留 16px 字号及非空哨兵，支持 iOS 连续删除。已确认文字以最多 2KiB 的消息按序批量发送，连续 Backspace/Delete 每批最多 32 次；Windows 已处于前台的已验证窗口跳过每键重复激活和 SetFocus。拥塞时未发送文字保留给「长文本」。视频自身帧率和中断后的恰好一次交付并未改变。
+
+### Headless Windows input / 无显示器输入
+
+A successful WebRTC video stream only proves that the PalmTTY-owned app window was captured; it does **not** prove Windows will accept `SendInput`. Remote App now reports separately: disconnected Windows session, locked/secure/noninteractive desktop, no active physical **or virtual** display output, missing owned app window, foreground activation denied, click occluded by taskbar/another window, and native input rejected. The first three environmental states are checked at startup and roughly once per second even if you never tap. No desktop coordinates, HWNDs, PIDs, monitor identities or typed text are included in this diagnostic.
+
+Windows autostart is a *current-user sign-in task*, not a pre-login service. For an unattended machine, sign in to the intended user session and leave its ordinary interactive desktop available. A dummy HDMI/EDID adapter or a trusted, signed virtual display may provide a working display output if the machine exposes none, but it does not log in or unlock Windows. PalmTTY will not bypass lock/UAC, create a hidden desktop, install a driver or request elevation. If you previously used RDP, a disconnected RDP session can also make input unavailable.
+
+Phone adaptation now uses the nearest monitor's *work area* (excluding the taskbar), scales only the verified Job-owned app window when needed, and restores both original size and position when turned off or stopped. It crops the full `PrintWindow` bitmap to the same DWM visible-frame rectangle used by native cursor and pointer coordinates. Before pointing/clicking/scrolling, Windows hit-tests against the **same captured top-level window**; clicks on Start, taskbar, Task View and unrelated overlays are rejected rather than injected into the desktop. A warning may appear below the video while the capture continues; fix the actual Windows state and retry. This is not a full desktop, remote login or elevated input feature.
+
+#### 无显示器 Windows 的排查
+
+远程画面正常不代表 `SendInput` 有权限在当前用户桌面执行。新诊断会分别提示：登录会话断开、桌面锁定／安全桌面、没有活动的实体或虚拟显示输出、受控窗口失效、无法切到前台、点击被任务栏／其他窗口覆盖、以及 Windows 输入 API 拒绝请求。环境状态每秒检查一次，恢复后重新提示；手机不需要通过盲点一次来获取错误原因。
+
+Windows 登录自启要求**真实用户已登录**，不是开机前的系统服务。无屏运行必须确保当前用户的普通交互桌面可用；如果没有显示输出，可考虑可信的 HDMI 虚拟显示器或已签名虚拟显示驱动，但它们都不能替代登录、解锁，也不能绕过 UAC。如果此前使用 RDP，还应检查远程用户会话是否已断开。适应手机只调整已验证的应用窗口，并约束在显示器排除任务栏后的可用工作区内；关闭适配或结束 Helper 时尝试恢复原始大小和位置。输入位置与 DWM 裁切后的画面共用坐标系，被任务栏或系统浮层覆盖的区域拒绝点击，而不是误操作 Windows。
