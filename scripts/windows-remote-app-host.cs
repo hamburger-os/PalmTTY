@@ -62,6 +62,8 @@ internal static class PalmTTYRemoteAppHost
     private const int UOI_NAME = 2;
     private const int WTS_CONNECT_STATE = 8;
     private const int WTS_ACTIVE = 0;
+    private const uint MONITOR_DEFAULTTONEAREST = 2;
+    private const uint GA_ROOT = 2;
 
     [DataContract]
     private sealed class AppConfig
@@ -272,6 +274,15 @@ internal static class PalmTTYRemoteAppHost
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct MONITORINFO
+    {
+        public uint cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct INPUT
     {
         public uint type;
@@ -470,6 +481,14 @@ internal static class PalmTTYRemoteAppHost
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool EnumDisplayMonitors(
         IntPtr hdc, IntPtr clip, MonitorEnumProc callback, IntPtr data);
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(POINT point);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(
@@ -1290,44 +1309,89 @@ internal static class PalmTTYRemoteAppHost
         return bounds.Width >= 1 && bounds.Height >= 1;
     }
 
+    // Adaptation is explicit, per-session, and constrained to the nearest
+    // active display WORK area (taskbar excluded). No virtual driver, monitor
+    // changes, system display setting or arbitrary window can be touched.
     private static void ApplyRequestedWindowSize(IntPtr hwnd)
     {
         lock (AdaptLock)
         {
             if (!AdaptRequested || !IsOwnedWindow(hwnd)) return;
-            int width = Math.Max(320, Math.Min(1600, AdaptWidth));
-            int height = Math.Max(240, Math.Min(1000, AdaptHeight));
+            string issue = GetInputEnvironmentIssue();
+            if (issue != null)
+            {
+                PublishInputState(issue);
+                return;
+            }
+            IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            MONITORINFO info = new MONITORINFO();
+            info.cbSize = (uint)Marshal.SizeOf(typeof(MONITORINFO));
+            if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info) ||
+                info.rcWork.Width < 320 || info.rcWork.Height < 240)
+            {
+                PublishInputState("display-unavailable");
+                return;
+            }
+            int requestedWidth = Math.Max(320, Math.Min(1600, AdaptWidth));
+            int requestedHeight = Math.Max(240, Math.Min(1000, AdaptHeight));
+            RECT current;
+            if (!GetWindowRect(hwnd, out current)) return;
             if (AdaptedWindow != hwnd)
             {
                 RestoreAdaptedWindowLocked();
-                RECT original;
-                if (!GetWindowRect(hwnd, out original)) return;
-                OriginalWindowRect = original;
+                if (!GetWindowRect(hwnd, out current)) return;
+                OriginalWindowRect = current;
                 AdaptedWindow = hwnd;
             }
-            if (LastAppliedWidth == width && LastAppliedHeight == height) return;
-            // SetWindowPos sizes the outer HWND, while capture uses the DWM
-            // visible frame (which omits invisible Win32 resize borders).
-            // Compensate only those small bounded non-client margins so the
-            // captured frame matches the phone's requested presentation ratio.
-            int extraWidth = 0;
-            int extraHeight = 0;
-            RECT outer;
+            // PrintWindow uses a DWM-visible image; SetWindowPos sizes the
+            // outer HWND. Compensate at most 32px of invisible resize margins.
             RECT visible;
-            if (GetWindowRect(hwnd, out outer) &&
-                TryGetWindowBounds(hwnd, out visible))
+            int extraWidth = 0, extraHeight = 0;
+            if (TryGetWindowBounds(hwnd, out visible))
             {
-                extraWidth = Math.Max(0, Math.Min(32, outer.Width - visible.Width));
-                extraHeight = Math.Max(0, Math.Min(32, outer.Height - visible.Height));
+                extraWidth = Math.Max(0, Math.Min(32, current.Width - visible.Width));
+                extraHeight = Math.Max(0, Math.Min(32, current.Height - visible.Height));
             }
-            // Still only resize the verified Job-owned HWND: no desktop
-            // capture, window selection, DPI bypass or elevation.
-            if (SetWindowPos(hwnd, IntPtr.Zero, 0, 0,
-                width + extraWidth, height + extraHeight,
-                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE))
+            int desiredWidth = requestedWidth + extraWidth;
+            int desiredHeight = requestedHeight + extraHeight;
+            double scale = Math.Min(1.0, Math.Min(
+                info.rcWork.Width / (double)desiredWidth,
+                info.rcWork.Height / (double)desiredHeight));
+            int width = Math.Max(1, (int)Math.Floor(desiredWidth * scale));
+            int height = Math.Max(1, (int)Math.Floor(desiredHeight * scale));
+            bool first = LastAppliedWidth != requestedWidth ||
+                LastAppliedHeight != requestedHeight;
+            bool outsideWork = current.Left < info.rcWork.Left ||
+                current.Top < info.rcWork.Top ||
+                current.Right > info.rcWork.Right ||
+                current.Bottom > info.rcWork.Bottom;
+            if (!first && !outsideWork) return;
+
+            int x = Math.Max(info.rcWork.Left,
+                Math.Min(info.rcWork.Right - width, current.Left));
+            int y = Math.Max(info.rcWork.Top,
+                Math.Min(info.rcWork.Bottom - height, current.Top));
+            // Initial phone adaptation must not push the lower editor below
+            // the taskbar; center only when the original position won't fit.
+            if (first && (current.Left + width > info.rcWork.Right ||
+                          current.Top + height > info.rcWork.Bottom))
             {
-                LastAppliedWidth = width;
-                LastAppliedHeight = height;
+                x = info.rcWork.Left + (info.rcWork.Width - width) / 2;
+                y = info.rcWork.Top + (info.rcWork.Height - height) / 2;
+            }
+            if (SetWindowPos(hwnd, IntPtr.Zero, x, y, width, height,
+                SWP_NOZORDER | SWP_NOACTIVATE))
+            {
+                LastAppliedWidth = requestedWidth;
+                LastAppliedHeight = requestedHeight;
+                // Minimum-size constrained apps may still exceed this work
+                // area; guarded pointer hit-testing remains authoritative.
+                RECT actual;
+                if (!GetWindowRect(hwnd, out actual) ||
+                    actual.Left < info.rcWork.Left || actual.Top < info.rcWork.Top ||
+                    actual.Right > info.rcWork.Right ||
+                    actual.Bottom > info.rcWork.Bottom)
+                    PublishCaptureReason("window-resize-rejected");
             }
             else PublishCaptureReason("window-resize-rejected");
         }
@@ -1347,8 +1411,9 @@ internal static class PalmTTYRemoteAppHost
         if (hwnd == IntPtr.Zero || !IsOwnedWindow(hwnd)) return;
         RECT original = OriginalWindowRect;
         if (original.Width < 64 || original.Height < 64) return;
-        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, original.Width, original.Height,
-            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        // Restore both original size and position on switch-off/shutdown.
+        SetWindowPos(hwnd, IntPtr.Zero, original.Left, original.Top,
+            original.Width, original.Height, SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
     private static bool CaptureWindow(IntPtr hwnd, RECT rect, int maxWidth, int maxHeight)
