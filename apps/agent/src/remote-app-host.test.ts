@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,6 +53,12 @@ describe("source Windows Remote App helper cache", () => {
       expect(stderr).toMatch(
         /PALMTTY_APP_HOST_ERROR stage=validate-profile type=InvalidDataException hresult=0x[0-9A-F]{8}/
       );
+      const geometry = spawnSync(helper, ["--geometry-self-test"], {
+        windowsHide: true, encoding: "utf8", timeout: 8_000
+      });
+      expect(geometry.error).toBeUndefined();
+      expect(geometry.status).toBe(0);
+      expect(geometry.stdout).toContain("work-area and DWM crop geometry: passed");
     },
     60_000
   );

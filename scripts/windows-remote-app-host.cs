@@ -58,6 +58,12 @@ internal static class PalmTTYRemoteAppHost
     private const int SM_YVIRTUALSCREEN = 77;
     private const int SM_CXVIRTUALSCREEN = 78;
     private const int SM_CYVIRTUALSCREEN = 79;
+    private const uint DESKTOP_READOBJECTS = 0x0001;
+    private const int UOI_NAME = 2;
+    private const int WTS_CONNECT_STATE = 8;
+    private const int WTS_ACTIVE = 0;
+    private const uint MONITOR_DEFAULTTONEAREST = 2;
+    private const uint GA_ROOT = 2;
 
     [DataContract]
     private sealed class AppConfig
@@ -268,6 +274,15 @@ internal static class PalmTTYRemoteAppHost
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct MONITORINFO
+    {
+        public uint cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct INPUT
     {
         public uint type;
@@ -306,6 +321,7 @@ internal static class PalmTTYRemoteAppHost
     }
 
     private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+    private delegate bool MonitorEnumProc(IntPtr monitor, IntPtr hdc, IntPtr rect, IntPtr data);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr GetStdHandle(int nStdHandle);
@@ -441,12 +457,48 @@ internal static class PalmTTYRemoteAppHost
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int nIndex);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool ProcessIdToSessionId(uint processId, out uint sessionId);
+    [DllImport("wtsapi32.dll", SetLastError = true)]
+    private static extern bool WTSQuerySessionInformation(
+        IntPtr server, uint sessionId, int infoClass,
+        out IntPtr buffer, out uint bytesReturned);
+    [DllImport("wtsapi32.dll")]
+    private static extern void WTSFreeMemory(IntPtr buffer);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool CloseDesktop(IntPtr desktop);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetThreadDesktop(uint threadId);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetProcessWindowStation();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool GetUserObjectInformation(
+        IntPtr handle, int index, StringBuilder buffer, uint bufferBytes,
+        out uint bytesRequired);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool EnumDisplayMonitors(
+        IntPtr hdc, IntPtr clip, MonitorEnumProc callback, IntPtr data);
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(POINT point);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(
         uint nInputs,
         [In] INPUT[] pInputs,
         int cbSize);
 
+    private static readonly object EnvironmentLock = new object();
+    private static long LastEnvironmentCheckTicks;
+    private static string LastEnvironmentIssue;
     private static readonly object TargetLock = new object();
     private static readonly object OutputLock = new object();
     private static readonly object AdaptLock = new object();
@@ -470,13 +522,18 @@ internal static class PalmTTYRemoteAppHost
     private static int LastCursorX = -2;
     private static int LastCursorY = -2;
     private static long LastCursorSampleTicks;
+    private static long LastInputHealthPollTicks;
     private static string StartupStage = "bootstrap";
     private static BinaryWriter Output;
     private static StreamWriter ErrorOutput;
 
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
+        // Packaged/native smoke exercises pure geometry without an attached
+        // monitor, signed-in desktop, arbitrary HWND or input injection.
+        if (args != null && args.Length == 1 && args[0] == "--geometry-self-test")
+            return GeometrySelfTest();
         PROCESS_INFORMATION process = new PROCESS_INFORMATION();
         IntPtr job = IntPtr.Zero;
         try
@@ -533,6 +590,7 @@ internal static class PalmTTYRemoteAppHost
             StartupStage = "ready";
             ErrorOutput.WriteLine("PALMTTY_APP_HOST_READY " + process.dwProcessId.ToString());
             PublishMediaState("waiting-for-window");
+            PublishInputState(GetInputEnvironmentIssue() ?? "ready");
 
             Thread control = new Thread(delegate() { ControlLoop(input); });
             control.IsBackground = true;
@@ -930,6 +988,25 @@ internal static class PalmTTYRemoteAppHost
         {
             try
             {
+                // A peer must see lock/disconnect/display changes without
+                // having to click the inaccessible application first.
+                long now = DateTime.UtcNow.Ticks;
+                if (now - LastInputHealthPollTicks >= TimeSpan.TicksPerSecond)
+                {
+                    LastInputHealthPollTicks = now;
+                    string issue = GetInputEnvironmentIssue();
+                    if (issue != null) PublishInputState(issue);
+                    else
+                    {
+                        lock (StateLock)
+                        {
+                            if (LastInputState == "session-disconnected" ||
+                                LastInputState == "desktop-unavailable" ||
+                                LastInputState == "display-unavailable")
+                                PublishInputStateLocked("ready");
+                        }
+                    }
+                }
                 IntPtr hwnd;
                 lock (TargetLock) { hwnd = TargetWindow; }
                 RECT rect;
@@ -997,13 +1074,88 @@ internal static class PalmTTYRemoteAppHost
 
     private static void PublishInputState(string state)
     {
-        lock (StateLock)
+        lock (StateLock) PublishInputStateLocked(state);
+    }
+
+    private static void PublishInputStateLocked(string state)
+    {
+        if (LastInputState == state) return;
+        LastInputState = state;
+        if (ErrorOutput != null)
+            ErrorOutput.WriteLine("PALMTTY_APP_HOST_INPUT_STATE " + state);
+    }
+
+    private static string UserObjectName(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero) return null;
+        StringBuilder name = new StringBuilder(128);
+        uint needed;
+        if (!GetUserObjectInformation(handle, UOI_NAME,
+            name, (uint)(name.Capacity * 2), out needed)) return null;
+        return name.ToString();
+    }
+
+    private static string GetInputEnvironmentIssue()
+    {
+        lock (EnvironmentLock)
         {
-            if (LastInputState == state) return;
-            LastInputState = state;
-            if (ErrorOutput != null)
-                ErrorOutput.WriteLine("PALMTTY_APP_HOST_INPUT_STATE " + state);
+            long now = DateTime.UtcNow.Ticks;
+            if (LastEnvironmentCheckTicks != 0 &&
+                now - LastEnvironmentCheckTicks < TimeSpan.TicksPerMillisecond * 100)
+                return LastEnvironmentIssue;
+            LastEnvironmentIssue = ProbeInputEnvironment();
+            LastEnvironmentCheckTicks = now;
+            return LastEnvironmentIssue;
         }
+    }
+
+    // A captured HWND is not proof of a usable input desktop. Refuse to
+    // target Winlogon, a disconnected RDP session, or a non-interactive task.
+    private static string ProbeInputEnvironment()
+    {
+        uint sessionId;
+        if (!ProcessIdToSessionId((uint)Process.GetCurrentProcess().Id,
+            out sessionId)) return "session-disconnected";
+        IntPtr info = IntPtr.Zero;
+        uint length;
+        try
+        {
+            if (!WTSQuerySessionInformation(IntPtr.Zero, sessionId,
+                WTS_CONNECT_STATE, out info, out length) ||
+                info == IntPtr.Zero || length < 4 ||
+                Marshal.ReadInt32(info) != WTS_ACTIVE)
+                return "session-disconnected";
+        }
+        finally { if (info != IntPtr.Zero) WTSFreeMemory(info); }
+
+        string station = UserObjectName(GetProcessWindowStation());
+        if (!String.Equals(station, "WinSta0", StringComparison.OrdinalIgnoreCase))
+            return "desktop-unavailable";
+        IntPtr inputDesktop = OpenInputDesktop(0, false, DESKTOP_READOBJECTS);
+        if (inputDesktop == IntPtr.Zero) return "desktop-unavailable";
+        try
+        {
+            string inputName = UserObjectName(inputDesktop);
+            string appName = UserObjectName(GetThreadDesktop(GetCurrentThreadId()));
+            if (!String.Equals(inputName, "Default", StringComparison.OrdinalIgnoreCase) ||
+                !String.Equals(appName, inputName, StringComparison.OrdinalIgnoreCase))
+                return "desktop-unavailable";
+        }
+        finally { CloseDesktop(inputDesktop); }
+
+        if (GetSystemMetrics(SM_CXVIRTUALSCREEN) < 1 ||
+            GetSystemMetrics(SM_CYVIRTUALSCREEN) < 1)
+            return "display-unavailable";
+        bool found = false;
+        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
+            delegate(IntPtr monitor, IntPtr hdc, IntPtr rect, IntPtr data)
+            {
+                found = true;
+                return false;
+            }, IntPtr.Zero);
+        // A dummy HDMI output or signed virtual display is valid; a monitor
+        // physically connected is not required. No driver is installed here.
+        return found ? null : "display-unavailable";
     }
 
     private static void PublishMediaState(string state)
@@ -1161,44 +1313,147 @@ internal static class PalmTTYRemoteAppHost
         return bounds.Width >= 1 && bounds.Height >= 1;
     }
 
+    private static RECT FitAdaptedRect(RECT work, RECT current,
+        int desiredWidth, int desiredHeight, bool first)
+    {
+        double scale = Math.Min(1.0, Math.Min(
+            work.Width / (double)desiredWidth,
+            work.Height / (double)desiredHeight));
+        int width = Math.Max(1, (int)Math.Floor(desiredWidth * scale));
+        int height = Math.Max(1, (int)Math.Floor(desiredHeight * scale));
+        int x = Math.Max(work.Left, Math.Min(work.Right - width, current.Left));
+        int y = Math.Max(work.Top, Math.Min(work.Bottom - height, current.Top));
+        if (first && (current.Left + width > work.Right ||
+                      current.Top + height > work.Bottom))
+        {
+            x = work.Left + (work.Width - width) / 2;
+            y = work.Top + (work.Height - height) / 2;
+        }
+        return new RECT {
+            Left = x, Top = y, Right = x + width, Bottom = y + height
+        };
+    }
+
+    private static bool TryGetVisibleCrop(RECT outer, RECT visible,
+        out int cropX, out int cropY)
+    {
+        cropX = visible.Left - outer.Left;
+        cropY = visible.Top - outer.Top;
+        return visible.Width > 0 && visible.Height > 0 &&
+            cropX >= 0 && cropY >= 0 && cropX <= 64 && cropY <= 64 &&
+            cropX + visible.Width <= outer.Width &&
+            cropY + visible.Height <= outer.Height &&
+            outer.Width - cropX - visible.Width <= 64 &&
+            outer.Height - cropY - visible.Height <= 64;
+    }
+
+    private static RECT TestRect(int left, int top, int right, int bottom)
+    {
+        return new RECT { Left = left, Top = top, Right = right, Bottom = bottom };
+    }
+
+    private static int GeometrySelfTest()
+    {
+        RECT work = TestRect(0, 0, 1920, 1040);
+        RECT offscreen = TestRect(1500, 780, 2500, 1780);
+        RECT fitted = FitAdaptedRect(work, offscreen, 430, 900, true);
+        if (fitted.Left < 0 || fitted.Top < 0 ||
+            fitted.Right > 1920 || fitted.Bottom > 1040)
+            return 2; // taskbar-safe on initial adaptation
+        RECT secondary = FitAdaptedRect(TestRect(-1600, 0, 0, 900),
+            TestRect(-1700, 600, -700, 1600), 1400, 1000, true);
+        if (secondary.Left < -1600 || secondary.Right > 0 ||
+            secondary.Top < 0 || secondary.Bottom > 900)
+            return 3; // negative-coordinate secondary display
+        RECT stable = FitAdaptedRect(work, TestRect(100, 120, 600, 700),
+            500, 580, false);
+        if (stable.Left != 100 || stable.Top != 120) return 4;
+        int x, y;
+        if (!TryGetVisibleCrop(TestRect(0, 0, 408, 808),
+                TestRect(8, 0, 400, 800), out x, out y) ||
+            x != 8 || y != 0)
+            return 5;
+        if (TryGetVisibleCrop(TestRect(0, 0, 400, 800),
+                TestRect(-10, 0, 390, 800), out x, out y))
+            return 6; // inconsistent DWM frame must fail closed
+        // This helper is built as WindowsApplication (no attached console).
+        // The installed-runtime smoke pipes the native STD_OUTPUT_HANDLE.
+        using (Stream stdout = OpenStandardStream(STD_OUTPUT_HANDLE, FileAccess.Write))
+        using (StreamWriter writer = new StreamWriter(stdout, new UTF8Encoding(false)))
+        {
+            writer.WriteLine("Remote App work-area and DWM crop geometry: passed");
+            writer.Flush();
+        }
+        return 0;
+    }
+
+    // Adaptation is explicit, per-session, and constrained to the nearest
+    // active display WORK area (taskbar excluded). No virtual driver, monitor
+    // changes, system display setting or arbitrary window can be touched.
     private static void ApplyRequestedWindowSize(IntPtr hwnd)
     {
         lock (AdaptLock)
         {
             if (!AdaptRequested || !IsOwnedWindow(hwnd)) return;
-            int width = Math.Max(320, Math.Min(1600, AdaptWidth));
-            int height = Math.Max(240, Math.Min(1000, AdaptHeight));
+            string issue = GetInputEnvironmentIssue();
+            if (issue != null)
+            {
+                PublishInputState(issue);
+                return;
+            }
+            IntPtr monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            MONITORINFO info = new MONITORINFO();
+            info.cbSize = (uint)Marshal.SizeOf(typeof(MONITORINFO));
+            if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info) ||
+                info.rcWork.Width < 320 || info.rcWork.Height < 240)
+            {
+                PublishInputState("display-unavailable");
+                return;
+            }
+            int requestedWidth = Math.Max(320, Math.Min(1600, AdaptWidth));
+            int requestedHeight = Math.Max(240, Math.Min(1000, AdaptHeight));
+            RECT current;
+            if (!GetWindowRect(hwnd, out current)) return;
             if (AdaptedWindow != hwnd)
             {
                 RestoreAdaptedWindowLocked();
-                RECT original;
-                if (!GetWindowRect(hwnd, out original)) return;
-                OriginalWindowRect = original;
+                if (!GetWindowRect(hwnd, out current)) return;
+                OriginalWindowRect = current;
                 AdaptedWindow = hwnd;
             }
-            if (LastAppliedWidth == width && LastAppliedHeight == height) return;
-            // SetWindowPos sizes the outer HWND, while capture uses the DWM
-            // visible frame (which omits invisible Win32 resize borders).
-            // Compensate only those small bounded non-client margins so the
-            // captured frame matches the phone's requested presentation ratio.
-            int extraWidth = 0;
-            int extraHeight = 0;
-            RECT outer;
+            // PrintWindow uses a DWM-visible image; SetWindowPos sizes the
+            // outer HWND. Compensate at most 32px of invisible resize margins.
             RECT visible;
-            if (GetWindowRect(hwnd, out outer) &&
-                TryGetWindowBounds(hwnd, out visible))
+            int extraWidth = 0, extraHeight = 0;
+            if (TryGetWindowBounds(hwnd, out visible))
             {
-                extraWidth = Math.Max(0, Math.Min(32, outer.Width - visible.Width));
-                extraHeight = Math.Max(0, Math.Min(32, outer.Height - visible.Height));
+                extraWidth = Math.Max(0, Math.Min(32, current.Width - visible.Width));
+                extraHeight = Math.Max(0, Math.Min(32, current.Height - visible.Height));
             }
-            // Still only resize the verified Job-owned HWND: no desktop
-            // capture, window selection, DPI bypass or elevation.
-            if (SetWindowPos(hwnd, IntPtr.Zero, 0, 0,
-                width + extraWidth, height + extraHeight,
-                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE))
+            bool first = LastAppliedWidth != requestedWidth ||
+                LastAppliedHeight != requestedHeight;
+            bool outsideWork = current.Left < info.rcWork.Left ||
+                current.Top < info.rcWork.Top ||
+                current.Right > info.rcWork.Right ||
+                current.Bottom > info.rcWork.Bottom;
+            if (!first && !outsideWork) return;
+
+            RECT target = FitAdaptedRect(info.rcWork, current,
+                requestedWidth + extraWidth, requestedHeight + extraHeight, first);
+            if (SetWindowPos(hwnd, IntPtr.Zero, target.Left, target.Top,
+                target.Width, target.Height,
+                SWP_NOZORDER | SWP_NOACTIVATE))
             {
-                LastAppliedWidth = width;
-                LastAppliedHeight = height;
+                LastAppliedWidth = requestedWidth;
+                LastAppliedHeight = requestedHeight;
+                // Minimum-size constrained apps may still exceed this work
+                // area; guarded pointer hit-testing remains authoritative.
+                RECT actual;
+                if (!GetWindowRect(hwnd, out actual) ||
+                    actual.Left < info.rcWork.Left || actual.Top < info.rcWork.Top ||
+                    actual.Right > info.rcWork.Right ||
+                    actual.Bottom > info.rcWork.Bottom)
+                    PublishCaptureReason("window-resize-rejected");
             }
             else PublishCaptureReason("window-resize-rejected");
         }
@@ -1218,38 +1473,51 @@ internal static class PalmTTYRemoteAppHost
         if (hwnd == IntPtr.Zero || !IsOwnedWindow(hwnd)) return;
         RECT original = OriginalWindowRect;
         if (original.Width < 64 || original.Height < 64) return;
-        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, original.Width, original.Height,
-            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        // Restore both original size and position on switch-off/shutdown.
+        SetWindowPos(hwnd, IntPtr.Zero, original.Left, original.Top,
+            original.Width, original.Height, SWP_NOZORDER | SWP_NOACTIVATE);
     }
 
     private static bool CaptureWindow(IntPtr hwnd, RECT rect, int maxWidth, int maxHeight)
     {
-        // Ownership is revalidated immediately before capture, not merely
-        // during an earlier EnumWindows callback (HWND may be recycled).
         if (!IsOwnedWindow(hwnd))
         {
             PublishCaptureReason("window-not-found");
             return false;
         }
-        int sourceWidth = rect.Width;
-        int sourceHeight = rect.Height;
-        if (
-            sourceWidth <= 0 ||
-            sourceHeight <= 0 ||
-            sourceWidth > 4096 ||
-            sourceHeight > 4096 ||
-            (long)sourceWidth * (long)sourceHeight > 12000000L)
+
+        // PrintWindow paints the *outer* HWND from pixel (0,0), whereas all
+        // pointer/cursor coordinates use DWM visible-frame screen bounds.
+        // Capturing into a DWM-sized bitmap shifted content by the invisible
+        // resize border. Crop the full HWND bitmap to that same DWM rectangle.
+        RECT outer, visible;
+        if (!GetWindowRect(hwnd, out outer) ||
+            !TryGetWindowBounds(hwnd, out visible)) return false;
+        if (visible.Left != rect.Left || visible.Top != rect.Top ||
+            visible.Right != rect.Right || visible.Bottom != rect.Bottom)
+            return false; // geometry changed during this capture: retry next frame
+        int cropX, cropY;
+        int sourceWidth = rect.Width, sourceHeight = rect.Height;
+        int outerWidth = outer.Width, outerHeight = outer.Height;
+        if (sourceWidth < 1 || sourceHeight < 1 || outerWidth < 1 ||
+            outerHeight < 1 || outerWidth > 4096 || outerHeight > 4096 ||
+            (long)outerWidth * outerHeight > 12000000L)
         {
             PublishCaptureReason("window-too-large");
             return false;
         }
+        // Only small differences are valid DWM frame margins; a totally
+        // inconsistent rectangle must not be projected onto a live target.
+        if (!TryGetVisibleCrop(outer, rect, out cropX, out cropY))
+        {
+            PublishCaptureReason("window-resize-rejected");
+            return false;
+        }
 
-        using (Bitmap source = new Bitmap(sourceWidth, sourceHeight, PixelFormat.Format32bppArgb))
+        using (Bitmap source = new Bitmap(outerWidth, outerHeight,
+            PixelFormat.Format32bppArgb))
         {
             bool ok = PrintOwnedWindow(hwnd, source, PW_RENDERFULLCONTENT);
-            // PW_RENDERFULLCONTENT can return TRUE while leaving a blank
-            // bitmap. Retry only the same owned HWND with standard PrintWindow;
-            // never read the desktop/window DC or include occluding windows.
             if (!ok || !HasVisiblePixels(source))
             {
                 if (!IsOwnedWindow(hwnd))
@@ -1266,23 +1534,15 @@ internal static class PalmTTYRemoteAppHost
                 PublishCaptureReason("printwindow-failed");
                 return false;
             }
-            // Uniform near-black desktop themes and splash screens may be
-            // legitimate. Keep forwarding a successful PrintWindow frame, but
-            // report the ambiguity instead of declaring video unavailable.
             PublishCaptureReason(HasVisiblePixels(source) ? "none" : "blank-window");
-
-            double scale = Math.Min(
-                1.0,
-                Math.Min((double)maxWidth / sourceWidth, (double)maxHeight / sourceHeight));
-            int width = Math.Max(2, (int)Math.Round(sourceWidth * scale));
-            int height = Math.Max(2, (int)Math.Round(sourceHeight * scale));
-            width &= ~1;
-            height &= ~1;
-
-            if (width == sourceWidth && height == sourceHeight)
-            {
+            double scale = Math.Min(1.0,
+                Math.Min((double)maxWidth / sourceWidth,
+                         (double)maxHeight / sourceHeight));
+            int width = Math.Max(2, (int)Math.Round(sourceWidth * scale)) & ~1;
+            int height = Math.Max(2, (int)Math.Round(sourceHeight * scale)) & ~1;
+            if (cropX == 0 && cropY == 0 &&
+                width == outerWidth && height == outerHeight)
                 return WriteBitmap(source);
-            }
 
             using (Bitmap scaled = new Bitmap(width, height, PixelFormat.Format32bppArgb))
             using (Graphics graphics = Graphics.FromImage(scaled))
@@ -1290,13 +1550,9 @@ internal static class PalmTTYRemoteAppHost
                 graphics.CompositingMode = CompositingMode.SourceCopy;
                 graphics.InterpolationMode = InterpolationMode.HighQualityBilinear;
                 graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                graphics.DrawImage(
-                    source,
+                graphics.DrawImage(source,
                     new Rectangle(0, 0, width, height),
-                    0,
-                    0,
-                    sourceWidth,
-                    sourceHeight,
+                    new Rectangle(cropX, cropY, sourceWidth, sourceHeight),
                     GraphicsUnit.Pixel);
                 return WriteBitmap(scaled);
             }
@@ -1402,6 +1658,12 @@ internal static class PalmTTYRemoteAppHost
             return;
         }
 
+        string environmentIssue = GetInputEnvironmentIssue();
+        if (environmentIssue != null)
+        {
+            PublishInputState(environmentIssue);
+            return;
+        }
         IntPtr hwnd;
         RECT rect;
         lock (TargetLock)
@@ -1411,7 +1673,7 @@ internal static class PalmTTYRemoteAppHost
         }
         if (hwnd == IntPtr.Zero || !IsOwnedWindow(hwnd))
         {
-            PublishInputState("blocked");
+            PublishInputState("window-unavailable");
             return;
         }
 
@@ -1422,15 +1684,25 @@ internal static class PalmTTYRemoteAppHost
             if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
                 !TryGetWindowBounds(hwnd, out rect))
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             int x = rect.Left + (int)Math.Round(Clamp01(message.X) * Math.Max(1, rect.Width - 1));
             int y = rect.Top + (int)Math.Round(Clamp01(message.Y) * Math.Max(1, rect.Height - 1));
+            if (!IsPointOnCapturedWindow(hwnd, x, y))
+            {
+                PublishInputState("window-occluded");
+                return;
+            }
             MoveAbsolute(x, y);
             if (GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
+                return;
+            }
+            if (message.Action == "down" && !IsPointOnCapturedWindow(hwnd, x, y))
+            {
+                PublishInputState("window-occluded");
                 return;
             }
             ApplyPointerAction(message.Action, message.Button);
@@ -1444,21 +1716,31 @@ internal static class PalmTTYRemoteAppHost
             if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
                 !TryGetWindowBounds(hwnd, out rect))
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             POINT point;
             if (!GetCursorPos(out point))
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             int x = Math.Max(rect.Left, Math.Min(rect.Right - 1, point.X + (int)Math.Round(message.Dx * rect.Width)));
             int y = Math.Max(rect.Top, Math.Min(rect.Bottom - 1, point.Y + (int)Math.Round(message.Dy * rect.Height)));
+            if (!IsPointOnCapturedWindow(hwnd, x, y))
+            {
+                PublishInputState("window-occluded");
+                return;
+            }
             MoveAbsolute(x, y);
             if (GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
+                return;
+            }
+            if (message.Action == "down" && !IsPointOnCapturedWindow(hwnd, x, y))
+            {
+                PublishInputState("window-occluded");
                 return;
             }
             ApplyPointerAction(message.Action, message.Button);
@@ -1467,9 +1749,17 @@ internal static class PalmTTYRemoteAppHost
 
         if (message.Type == "wheel")
         {
-            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd)
+            if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
+                GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
+                return;
+            }
+            POINT pointer;
+            if (!GetCursorPos(out pointer) ||
+                !IsPointOnCapturedWindow(hwnd, pointer.X, pointer.Y))
+            {
+                PublishInputState("window-occluded");
                 return;
             }
             SendWheel(message.DeltaX, message.DeltaY);
@@ -1483,7 +1773,7 @@ internal static class PalmTTYRemoteAppHost
             if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
                 GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             SendUnicodeText(message.Text);
@@ -1495,7 +1785,7 @@ internal static class PalmTTYRemoteAppHost
             if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
                 GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             SendRepeatedEditKey(message);
@@ -1507,11 +1797,23 @@ internal static class PalmTTYRemoteAppHost
             if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
                 GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             SendRestrictedKey(message);
         }
+    }
+
+    // PrintWindow may show application pixels hidden below the taskbar,
+    // Start, Task View or another window. Native mouse input is global.
+    private static bool IsPointOnCapturedWindow(IntPtr hwnd, int x, int y)
+    {
+        POINT point = new POINT();
+        point.X = x;
+        point.Y = y;
+        IntPtr hit = WindowFromPoint(point);
+        if (hit == IntPtr.Zero) return false;
+        return GetAncestor(hit, GA_ROOT) == hwnd && IsOwnedWindow(hwnd);
     }
 
     private static bool IsOwnedWindow(IntPtr hwnd)
@@ -1767,7 +2069,7 @@ internal static class PalmTTYRemoteAppHost
     {
         if (inputs == null || inputs.Length == 0 || inputs.Length > 32768) return;
         uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
-        PublishInputState(sent == inputs.Length ? "ready" : "blocked");
+        PublishInputState(sent == inputs.Length ? "ready" : "input-rejected");
         if (sent != inputs.Length)
         {
             int error = Marshal.GetLastWin32Error();

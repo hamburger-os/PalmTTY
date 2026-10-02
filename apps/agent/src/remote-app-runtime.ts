@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createRequire } from "node:module";
 import { RemoteAppFrameDecoder } from "./remote-app-frame-decoder.js";
 import { parseNativeCursorSample } from "./remote-app-cursor.js";
+import { blocksRemoteAppInput, parseNativeInputStatus } from "./remote-app-input-status.js";
 import { RemoteAppControlForwarder } from "./remote-app-control-forwarder.js";
 import {
   AppSessionPublicSchema,
@@ -11,6 +12,7 @@ import {
   parseRemoteAppControlMessage,
   RemoteAppTelemetryMessageSchema,
   type RemoteAppTelemetryMessage,
+  type RemoteAppInputStatus,
   type RemoteAppCursorMessage,
   type AppSessionMediaState,
   type AppSessionPublic,
@@ -74,7 +76,7 @@ export class RemoteAppRuntime {
   private readonly exitListeners = new Set<ExitListener>();
   private peer: Peer | undefined;
   private cursor: RemoteAppCursorMessage = { type: "cursor", visible: false };
-  private nativeInputState: "ready" | "blocked" | undefined;
+  private nativeInputState: RemoteAppInputStatus | undefined;
   private wrtc: any;
   private videoSource: any;
   private videoTrack: any;
@@ -109,9 +111,10 @@ export class RemoteAppRuntime {
       stderr = lines.pop() ?? "";
       for (const line of lines) {
         if (line.startsWith(HELPER_INPUT_PREFIX)) {
-          const state = line.slice(HELPER_INPUT_PREFIX.length);
-          if (state === "ready" || state === "blocked") {
+          const state = parseNativeInputStatus(line.slice(HELPER_INPUT_PREFIX.length));
+          if (state) {
             this.nativeInputState = state;
+            if (blocksRemoteAppInput(state)) this.nativeControl?.discardPending();
             this.sendTelemetry({ type: "inputState", state });
           }
           continue;
@@ -378,6 +381,10 @@ export class RemoteAppRuntime {
     if (!helper || helper.stdin.destroyed || this.state !== "running") return;
     try {
       const message = parseRemoteAppControlMessage(source);
+      // Never buffer stale clicks or keystrokes across a locked/disconnected
+      // desktop. Display hints are non-input and remain safe.
+      if (message.type !== "display" &&
+          blocksRemoteAppInput(this.nativeInputState)) return;
       // One bounded ordered queue owns helper stdin: a write(false) has
       // accepted bytes, and all subsequent input waits for drain.
       this.nativeControl?.enqueue(`${JSON.stringify(message)}\n`);

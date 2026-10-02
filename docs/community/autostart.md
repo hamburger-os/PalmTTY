@@ -139,3 +139,9 @@ pnpm autostart uninstall
 ### 持久化边界
 
 自启动恢复的是 **Agent 服务**，不是 OS 重启前的旧 PTY。浏览器断线与“仅 Agent 重启”仍通过独立 Worker 保持；OS reboot/用户注销会终止旧 Worker/PTY。机器回来后 Agent 会干净启动，持久化 Workspace 仍可用于创建新 Session。
+
+### Windows Remote App on a headless PC / 无显示器主机
+
+Windows PalmTTY autostart uses `InteractiveToken` at the real user's logon. It is not a LocalSystem service and cannot create, unlock or switch to a login desktop. Running the Agent after boot does not establish an unlocked interactive Windows session, and a successful window-only video capture is not proof of usable remote input. Remote App surfaces typed session/desktop/display/foreground failures and refuses input on secure or disconnected desktops. A virtual display or HDMI EDID adapter can solve *missing output* only; it cannot log in, unlock, elevate or reconnect a disconnected RDP session.
+
+Windows 登录触发的当前用户 Agent 与系统启动前服务不是一回事。无显示器机器必须有可用的已登录交互桌面，锁屏／安全桌面和断开的 RDP 会话不能通过 PalmTTY 输入桥解锁。虚拟显示输出只用于解决缺少显示目标的问题；诊断会区分会话、桌面和显示输出，不会自动修改 Windows 安全设置。

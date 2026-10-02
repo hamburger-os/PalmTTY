@@ -37,12 +37,18 @@ export class RemoteAppControlForwarder {
     return true;
   }
 
+  discardPending(): void {
+    // write(false) was already accepted by the native pipe and cannot be
+    // retracted. Never replay subsequent queued input after a locked session.
+    this.pending.length = 0;
+    this.pendingBytes = 0;
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
     this.sink.off("drain", this.onDrain);
-    this.pending.length = 0;
-    this.pendingBytes = 0;
+    this.discardPending();
     this.draining = false;
   }
 

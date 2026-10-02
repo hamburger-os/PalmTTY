@@ -301,9 +301,17 @@ export const RemoteAppCursorMessageSchema = z.discriminatedUnion("visible", [
   z.object({ type: z.literal("cursor"), visible: z.literal(false) }).strict()
 ]);
 export type RemoteAppCursorMessage = z.infer<typeof RemoteAppCursorMessageSchema>;
+// Native diagnostics expose no HWND, PID, desktop name or monitor identity.
+export const RemoteAppInputStatusSchema = z.enum([
+  "ready", "session-disconnected", "desktop-unavailable",
+  "display-unavailable", "window-unavailable", "focus-denied",
+  "window-occluded", "input-rejected"
+]);
+export type RemoteAppInputStatus = z.infer<typeof RemoteAppInputStatusSchema>;
 export const RemoteAppInputStateMessageSchema = z.object({
-  type: z.literal("inputState"), state: z.enum(["ready", "blocked"])
+  type: z.literal("inputState"), state: RemoteAppInputStatusSchema
 }).strict();
+export type RemoteAppInputStateMessage = z.infer<typeof RemoteAppInputStateMessageSchema>;
 export const RemoteAppTelemetryMessageSchema = z.union([
   RemoteAppCursorMessageSchema, RemoteAppInputStateMessageSchema
 ]);

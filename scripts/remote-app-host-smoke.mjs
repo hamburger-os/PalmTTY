@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 
 const root = process.argv[2];
@@ -34,3 +34,11 @@ const result = await new Promise((resolve, reject) => {
 if (result !== 1 || !/PALMTTY_APP_HOST_ERROR stage=validate-profile type=InvalidDataException hresult=0x[0-9A-F]{8}/.test(stderr))
   throw new Error("Native Host must exit 1 and publish a structured bootstrap failure");
 console.log("Remote App native host failure-stage smoke: passed");
+const geometry = spawnSync(helper, ["--geometry-self-test"], {
+  windowsHide: true, encoding: "utf8", timeout: 8000
+});
+if (geometry.error || geometry.status !== 0 ||
+    !geometry.stdout.includes("Remote App work-area and DWM crop geometry: passed"))
+  throw new Error("Remote App native geometry self-test failed: " +
+    String(geometry.error ?? geometry.stderr ?? geometry.status));
+console.log(geometry.stdout.trim());

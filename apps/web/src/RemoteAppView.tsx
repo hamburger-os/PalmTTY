@@ -18,7 +18,8 @@ import {
   type RemoteAppMediaDiagnostics,
   type AppSessionPublic,
   type RemoteAppCapabilities,
-  type RemoteAppControlMessage
+  type RemoteAppControlMessage,
+  type RemoteAppInputStatus
 } from "@palmtty/protocol";
 import {
   detachRemoteApp,
@@ -27,6 +28,7 @@ import {
 } from "./api.js";
 import { useI18n } from "./i18n.js";
 import { RemoteAppKeybar } from "./RemoteAppKeybar.js";
+import { remoteAppInputStatusKey } from "./remote-app-input-status.js";
 import { LIVE_KEYBOARD_SENTINEL, RemoteLiveInputQueue, remoteAppLiveKeyboardKey, shouldCommitRemoteLiveText } from "./remote-app-live-keyboard.js";
 import { RemoteTouchpadGesture } from "./remote-app-gestures.js";
 import { RemoteCursorPreview, REMOTE_CURSOR_RECONCILE_DELAY_MS } from "./remote-app-cursor-preview.js";
@@ -168,6 +170,7 @@ export function RemoteAppView({
   const [text, setText] = useState("");
   const [controlReady, setControlReady] = useState(false);
   const [inputBlocked, setInputBlocked] = useState(false);
+  const [nativeInputStatus, setNativeInputStatus] = useState<RemoteAppInputStatus>("ready");
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
   const [surfaceSize, setSurfaceSize] = useState({ width: 0, height: 0 });
   // Only phone-adapted windows may crop tiny DWM/codec rounding gaps.
@@ -520,6 +523,7 @@ export function RemoteAppView({
       channelRef.current = null;
       setControlReady(false);
       setInputBlocked(false);
+      setNativeInputStatus("ready");
       cursorPreviewRef.current.reset();
       cancelRelativeMotion();
       scheduleCursorPaint();
@@ -576,6 +580,7 @@ export function RemoteAppView({
           touchpad.current.cancel();
           setControlReady(false);
           setInputBlocked(false);
+          setNativeInputStatus("ready");
           cursorPreviewRef.current.reset();
           cancelRelativeMotion();
           scheduleCursorPaint();
@@ -593,7 +598,8 @@ export function RemoteAppView({
             );
             scheduleCursorPaint();
           } else {
-            setInputBlocked(sample.state === "blocked");
+            setNativeInputStatus(sample.state);
+            setInputBlocked(false);
           }
         } catch { /* No untyped messages may mutate cursor state. */ }
       };
@@ -1247,9 +1253,12 @@ export function RemoteAppView({
       )}
 
       <div className="remote-app-dock">
-        {mode !== "view" && active && (!controlReady || inputBlocked) && (
+        {active && (nativeInputStatus !== "ready" ||
+          (mode !== "view" && (!controlReady || inputBlocked))) && (
           <div className="remote-app-media-warning" role="status">
-            {t(!controlReady ? "remoteApp.controlNotReady" : "remoteApp.inputBlocked")}
+            {nativeInputStatus !== "ready"
+              ? t(remoteAppInputStatusKey(nativeInputStatus))
+              : t(!controlReady ? "remoteApp.controlNotReady" : "remoteApp.inputBlocked")}
           </div>
         )}
         {warningNotice && (
