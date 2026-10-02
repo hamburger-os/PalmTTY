@@ -57,6 +57,18 @@ describe("bounded Remote App native control forwarder", () => {
     expect(sink.received).toEqual(["first\n"]);
     expect(queue.enqueue("late\n")).toBe(false);
   });
+  it("forgets queued input on desktop lock without replaying accepted bytes", () => {
+    const sink = new FakeSink();
+    const queue = new RemoteAppControlForwarder(sink);
+    expect(queue.enqueue("already-accepted\\n")).toBe(true);
+    expect(queue.enqueue("stale-click\\n")).toBe(true);
+    queue.discardPending();
+    sink.drain();
+    expect(sink.received).toEqual(["already-accepted\\n"]);
+    expect(queue.enqueue("fresh-after-unlock\\n")).toBe(true);
+    expect(sink.received).toEqual(["already-accepted\\n", "fresh-after-unlock\\n"]);
+  });
+
   it("rejects oversized input even if a peer bypasses browser batching", () => {
     const queue = new RemoteAppControlForwarder(new FakeSink());
     expect(queue.enqueue("x".repeat(64 * 1024 + 1))).toBe(false);
