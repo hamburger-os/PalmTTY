@@ -8,6 +8,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Windows headless Remote App input and desktop-safe geometry
 
+- Discard pending Agent input on unsafe desktop/session/display transitions and gate fresh control until the native desktop is available, without replaying FIFO contents; already accepted pipe bytes remain subject to native revalidation.
 - Distinguish disconnected user sessions, locked/secure desktops, missing active physical or virtual displays, unavailable app windows, foreground denial, taskbar/window occlusion and rejected Windows input without changing window-only video capture. Phone adaptation constrains the verified app to its monitor's work area and restores original position and size; full-window PrintWindow output is cropped to the same DWM-visible geometry used by cursor/touch input. Mouse and wheel fail closed when their hit target is not the captured top-level HWND. Add strict native/Agent/protocol/mobile status contracts, theme checks and shipped-host native geometry smoke. No pre-login service, lock-screen bypass, elevation or driver installation.
 
 ### Invisible Remote App keyboard and faster deletion (unreleased)

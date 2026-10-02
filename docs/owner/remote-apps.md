@@ -257,3 +257,7 @@ Windows Host 用独立约 30Hz 线程对当前已验证的 Job-owned HWND 重新
 `adaptWindow` 仍只修改经 Job Object 严格核验的 HWND，不过不再只做 `SWP_NOMOVE`。用该窗口所在显示器的 `MONITORINFO.rcWork` 计算可用工作区（避开底部或侧边任务栏），维持请求宽高比的前提下缩小并调整窗口位置；禁用适配／Host 退出时尝试恢复原始位置和大小。高 DPI 与多显示器坐标仍采用 PMv2 和真实物理屏幕坐标。外框 `PrintWindow` 截图先按完整 `GetWindowRect` 绘制，再按同步的 DWM 可见边界有界裁切，确保视频画面和鼠标坐标原点相同。输入前用 `WindowFromPoint` 对屏幕实际命中的根窗口进行核验；如果任务栏、开始菜单、任务视图或其他前置窗口盖住本应用，这块像素绝不能因为视频仍显示旧画面就获得点击权限。对于受限的最小窗口尺寸，保留窗口与显示器工作区限制并给出明确诊断，不能触碰系统浮层。
 
 源码和已安装的 Windows Host 均执行无 GUI、无注入的 `--geometry-self-test`，覆盖任务栏工作区、负坐标第二显示器、稳定窗口位置、DWM 隐形边框偏移及不一致的裁切矩形。CI 只能验证纯几何与编译，真实不插显示器／虚拟显示、锁屏、RDP 断开、高 DPI 下的点击与 Windows 前台焦点，需要在实际 Windows 桌面验收。
+
+### 锁屏与断线期间不积压旧点击
+
+原生检测返回 session-disconnected、desktop-unavailable 或 display-unavailable 时，AppWorker 立即丢弃仍在有界 stdin FIFO 中等待的输入，并拒绝新的键盘／鼠标控制直到原生状态变为 ready；纯画质／尺寸 display hint 仍可更新。focus-denied、window-occluded 和 window-unavailable 不构成持续禁用输入，因为用户可通过新的点击和桌面操作恢复。Node `write(false)` 已进入原生管道的字节不能撤回，Host 执行时还必须再次检查当前交互桌面；这只能降低过期输入风险，不能保证跨极短锁屏切换的绝对恰好一次语义。
