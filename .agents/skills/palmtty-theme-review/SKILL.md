@@ -3,7 +3,7 @@ name: palmtty-theme-review
 description: "Audit PalmTTY Web UI for theme SSOT compliance, mobile rendering quality, semantic surface ownership, terminal lifecycle isolation, and visual performance regressions."
 license: Apache-2.0
 metadata:
-  version: "1.17.0"
+  version: "1.18.0"
 ---
 
 # PalmTTY theme and rendering review
@@ -120,3 +120,7 @@ Write the report in Chinese:
 Do not add new visual rules here. If the specification is incomplete, update `palmtty-theme/SKILL.md`.
 
 When auditing Remote App pointer smoothness, test a low-FPS/slow-capture Windows app and verify the independently sampled cursor stays responsive, high-frequency Safari pointer moves are coalesced per animation frame, and the browser avoids one React tree update per cursor telemetry event. Check that tap and long-press drag flush pending movement before button up, and that new peers, off-window cursor reports, or a switch to View/Direct mode hide or reset a speculative cursor. Simulator/CI cannot prove perceived Safari latency; validate on the owner device.
+
+## Headless input and desktop-safe geometry regression matrix
+
+Review a Windows host with no physical display, with a dummy HDMI / signed virtual output, logged in/unlocked, locked, logged off, and after RDP disconnect. Only an Active interactive WinSta0/Default desktop with a usable display may receive input; video may still be available in other states. Confirm each bounded diagnostic is shown in the outside-video dock even in View mode and updates when the Windows state changes without a tap. Never expose HWND/PID/desktop identity in browser telemetry or recommend elevation as a secure-desktop bypass. On Windows with bottom or side taskbars and a negative-coordinate secondary monitor, adapt only the verified app HWND within rcWork; disable/teardown restores original position and dimensions. Inspect DWM crop vs true cursor/Direct Touch at corners and block WindowFromPoint hits on Start, Task View, taskbar and unrelated windows. Run the packaged native geometry self-test, and require real Windows/Safari acceptance for secure desktops and headless graphics.
