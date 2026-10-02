@@ -58,6 +58,10 @@ internal static class PalmTTYRemoteAppHost
     private const int SM_YVIRTUALSCREEN = 77;
     private const int SM_CXVIRTUALSCREEN = 78;
     private const int SM_CYVIRTUALSCREEN = 79;
+    private const uint DESKTOP_READOBJECTS = 0x0001;
+    private const int UOI_NAME = 2;
+    private const int WTS_CONNECT_STATE = 8;
+    private const int WTS_ACTIVE = 0;
 
     [DataContract]
     private sealed class AppConfig
@@ -306,6 +310,7 @@ internal static class PalmTTYRemoteAppHost
     }
 
     private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+    private delegate bool MonitorEnumProc(IntPtr monitor, IntPtr hdc, IntPtr rect, IntPtr data);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr GetStdHandle(int nStdHandle);
@@ -441,12 +446,40 @@ internal static class PalmTTYRemoteAppHost
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int nIndex);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool ProcessIdToSessionId(uint processId, out uint sessionId);
+    [DllImport("wtsapi32.dll", SetLastError = true)]
+    private static extern bool WTSQuerySessionInformation(
+        IntPtr server, uint sessionId, int infoClass,
+        out IntPtr buffer, out uint bytesReturned);
+    [DllImport("wtsapi32.dll")]
+    private static extern void WTSFreeMemory(IntPtr buffer);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool CloseDesktop(IntPtr desktop);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetThreadDesktop(uint threadId);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetProcessWindowStation();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool GetUserObjectInformation(
+        IntPtr handle, int index, StringBuilder buffer, uint bufferBytes,
+        out uint bytesRequired);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool EnumDisplayMonitors(
+        IntPtr hdc, IntPtr clip, MonitorEnumProc callback, IntPtr data);
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(
         uint nInputs,
         [In] INPUT[] pInputs,
         int cbSize);
 
+    private static readonly object EnvironmentLock = new object();
+    private static long LastEnvironmentCheckTicks;
+    private static string LastEnvironmentIssue;
     private static readonly object TargetLock = new object();
     private static readonly object OutputLock = new object();
     private static readonly object AdaptLock = new object();
@@ -470,6 +503,7 @@ internal static class PalmTTYRemoteAppHost
     private static int LastCursorX = -2;
     private static int LastCursorY = -2;
     private static long LastCursorSampleTicks;
+    private static long LastInputHealthPollTicks;
     private static string StartupStage = "bootstrap";
     private static BinaryWriter Output;
     private static StreamWriter ErrorOutput;
@@ -533,6 +567,7 @@ internal static class PalmTTYRemoteAppHost
             StartupStage = "ready";
             ErrorOutput.WriteLine("PALMTTY_APP_HOST_READY " + process.dwProcessId.ToString());
             PublishMediaState("waiting-for-window");
+            PublishInputState(GetInputEnvironmentIssue() ?? "ready");
 
             Thread control = new Thread(delegate() { ControlLoop(input); });
             control.IsBackground = true;
@@ -930,6 +965,25 @@ internal static class PalmTTYRemoteAppHost
         {
             try
             {
+                // A peer must see lock/disconnect/display changes without
+                // having to click the inaccessible application first.
+                long now = DateTime.UtcNow.Ticks;
+                if (now - LastInputHealthPollTicks >= TimeSpan.TicksPerSecond)
+                {
+                    LastInputHealthPollTicks = now;
+                    string issue = GetInputEnvironmentIssue();
+                    if (issue != null) PublishInputState(issue);
+                    else
+                    {
+                        lock (StateLock)
+                        {
+                            if (LastInputState == "session-disconnected" ||
+                                LastInputState == "desktop-unavailable" ||
+                                LastInputState == "display-unavailable")
+                                PublishInputStateLocked("ready");
+                        }
+                    }
+                }
                 IntPtr hwnd;
                 lock (TargetLock) { hwnd = TargetWindow; }
                 RECT rect;
@@ -997,13 +1051,88 @@ internal static class PalmTTYRemoteAppHost
 
     private static void PublishInputState(string state)
     {
-        lock (StateLock)
+        lock (StateLock) PublishInputStateLocked(state);
+    }
+
+    private static void PublishInputStateLocked(string state)
+    {
+        if (LastInputState == state) return;
+        LastInputState = state;
+        if (ErrorOutput != null)
+            ErrorOutput.WriteLine("PALMTTY_APP_HOST_INPUT_STATE " + state);
+    }
+
+    private static string UserObjectName(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero) return null;
+        StringBuilder name = new StringBuilder(128);
+        uint needed;
+        if (!GetUserObjectInformation(handle, UOI_NAME,
+            name, (uint)(name.Capacity * 2), out needed)) return null;
+        return name.ToString();
+    }
+
+    private static string GetInputEnvironmentIssue()
+    {
+        lock (EnvironmentLock)
         {
-            if (LastInputState == state) return;
-            LastInputState = state;
-            if (ErrorOutput != null)
-                ErrorOutput.WriteLine("PALMTTY_APP_HOST_INPUT_STATE " + state);
+            long now = DateTime.UtcNow.Ticks;
+            if (LastEnvironmentCheckTicks != 0 &&
+                now - LastEnvironmentCheckTicks < TimeSpan.TicksPerMillisecond * 100)
+                return LastEnvironmentIssue;
+            LastEnvironmentIssue = ProbeInputEnvironment();
+            LastEnvironmentCheckTicks = now;
+            return LastEnvironmentIssue;
         }
+    }
+
+    // A captured HWND is not proof of a usable input desktop. Refuse to
+    // target Winlogon, a disconnected RDP session, or a non-interactive task.
+    private static string ProbeInputEnvironment()
+    {
+        uint sessionId;
+        if (!ProcessIdToSessionId((uint)Process.GetCurrentProcess().Id,
+            out sessionId)) return "session-disconnected";
+        IntPtr info = IntPtr.Zero;
+        uint length;
+        try
+        {
+            if (!WTSQuerySessionInformation(IntPtr.Zero, sessionId,
+                WTS_CONNECT_STATE, out info, out length) ||
+                info == IntPtr.Zero || length < 4 ||
+                Marshal.ReadInt32(info) != WTS_ACTIVE)
+                return "session-disconnected";
+        }
+        finally { if (info != IntPtr.Zero) WTSFreeMemory(info); }
+
+        string station = UserObjectName(GetProcessWindowStation());
+        if (!String.Equals(station, "WinSta0", StringComparison.OrdinalIgnoreCase))
+            return "desktop-unavailable";
+        IntPtr inputDesktop = OpenInputDesktop(0, false, DESKTOP_READOBJECTS);
+        if (inputDesktop == IntPtr.Zero) return "desktop-unavailable";
+        try
+        {
+            string inputName = UserObjectName(inputDesktop);
+            string appName = UserObjectName(GetThreadDesktop(GetCurrentThreadId()));
+            if (!String.Equals(inputName, "Default", StringComparison.OrdinalIgnoreCase) ||
+                !String.Equals(appName, inputName, StringComparison.OrdinalIgnoreCase))
+                return "desktop-unavailable";
+        }
+        finally { CloseDesktop(inputDesktop); }
+
+        if (GetSystemMetrics(SM_CXVIRTUALSCREEN) < 1 ||
+            GetSystemMetrics(SM_CYVIRTUALSCREEN) < 1)
+            return "display-unavailable";
+        bool found = false;
+        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
+            delegate(IntPtr monitor, IntPtr hdc, IntPtr rect, IntPtr data)
+            {
+                found = true;
+                return false;
+            }, IntPtr.Zero);
+        // A dummy HDMI output or signed virtual display is valid; a monitor
+        // physically connected is not required. No driver is installed here.
+        return found ? null : "display-unavailable";
     }
 
     private static void PublishMediaState(string state)
