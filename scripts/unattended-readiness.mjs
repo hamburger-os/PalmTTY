@@ -14,7 +14,7 @@ function parseArgs(argv) {
     if (arg === "--json") json = true;
     else if (arg === "--vm" && i + 1 < argv.length && vmName === undefined) {
       vmName = argv[++i];
-      if (!vmName || vmName.length > 128 || /[\u0000-\u001f\u007f]/u.test(vmName)) {
+      if (!vmName || vmName.length > 128 || /[\u0000-\u001f\u007f*?\[\]]/u.test(vmName)) {
         throw new Error("--vm must be a valid 1-128 character Hyper-V VM name");
       }
     } else {
