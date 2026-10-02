@@ -247,3 +247,13 @@ Windows Host 用独立约 30Hz 线程对当前已验证的 Job-owned HWND 重新
 ### Agent 输入背压
 
 此前 `helper.stdin.writableNeedDrain` 时会直接丢弃后续按键/文字控制，现由单一 64KiB/128 消息上限的有序队列串行处理，`write(false)` 表示消息已由 Writable 接收，必须等 `drain` 再继续，绝不能重发这条消息。原生 helper 退出或 Worker dispose 会清空待发队列，超过预算拒绝继续堆积。此改动仅改善控制消息完整性及拥塞表现，没有增加新权限；DataChannel 或 Node stdin 接收仍不能等同目标 Windows 应用已经成功执行。
+
+## 无显示器开机与输入权限诊断（当前实现）
+
+本次实测：手机能接收到远程应用的 `PrintWindow` 视频，但 Windows 拒绝鼠标／键盘。两条链路独立，不能因为 WebRTC 显示「已连接」就认为 Windows 当前用户桌面可输入。当前 Helper 首次启动并每隔约 1 秒诊断自己的 WTS 会话是否 Active、进程是否在 `WinSta0`、活动输入桌面与 Helper 线程桌面是否都是普通 `Default`，以及虚拟桌面大小和 `EnumDisplayMonitors` 是否存在活动实体或虚拟显示目标。收到每条输入前再次检查（最多缓存 100ms）。会话断开、锁屏／UAC、安全桌面和无显示输出应返回各自状态并拒绝注入，不能自动登录、切桌面、安装显卡驱动或提高权限。虚拟显示器只能解决缺少画面输出，不等于可交互登录；RDP 断开时需要确认实际会话状态。
+
+`inputState` 遥测只发送有限白名单状态：ready、session-disconnected、desktop-unavailable、display-unavailable、window-unavailable、focus-denied、window-occluded、input-rejected。原生标准错误输出经 Agent 严格解析、按协议验证后仅向当前授权 WebRTC peer 发送。手机提示与媒体状态分离，具体解释应覆盖登录、解锁、显示输出、失去前台、任务栏遮挡和 UIPI，不再笼统提示用户用管理员权限。环境问题在无输入时也每秒更新，恢复后可重新尝试，不重放失败期间的点击。
+
+`adaptWindow` 仍只修改经 Job Object 严格核验的 HWND，不过不再只做 `SWP_NOMOVE`。用该窗口所在显示器的 `MONITORINFO.rcWork` 计算可用工作区（避开底部或侧边任务栏），维持请求宽高比的前提下缩小并调整窗口位置；禁用适配／Host 退出时尝试恢复原始位置和大小。高 DPI 与多显示器坐标仍采用 PMv2 和真实物理屏幕坐标。外框 `PrintWindow` 截图先按完整 `GetWindowRect` 绘制，再按同步的 DWM 可见边界有界裁切，确保视频画面和鼠标坐标原点相同。输入前用 `WindowFromPoint` 对屏幕实际命中的根窗口进行核验；如果任务栏、开始菜单、任务视图或其他前置窗口盖住本应用，这块像素绝不能因为视频仍显示旧画面就获得点击权限。对于受限的最小窗口尺寸，保留窗口与显示器工作区限制并给出明确诊断，不能触碰系统浮层。
+
+源码和已安装的 Windows Host 均执行无 GUI、无注入的 `--geometry-self-test`，覆盖任务栏工作区、负坐标第二显示器、稳定窗口位置、DWM 隐形边框偏移及不一致的裁切矩形。CI 只能验证纯几何与编译，真实不插显示器／虚拟显示、锁屏、RDP 断开、高 DPI 下的点击与 Windows 前台焦点，需要在实际 Windows 桌面验收。
