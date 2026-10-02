@@ -40,6 +40,8 @@ jobs:
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+        env:
+          PALMTTY_TEST_REQUIRE_PWSH: ${{ runner.os == 'Windows' && '1' || '0' }}
       - name: Validate unattended Windows PowerShell probe syntax
         if: runner.os == 'Windows'
         shell: pwsh
@@ -52,5 +54,3 @@ jobs:
             [ref]$errors
           ) | Out-Null
           if ($errors.Count -gt 0) { throw ($errors | Out-String) }
-        env:
-          PALMTTY_TEST_REQUIRE_PWSH: ${{ runner.os == 'Windows' && '1' || '0' }}
