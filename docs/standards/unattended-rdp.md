@@ -1,27 +1,20 @@
-# Unattended browser RDP: upstream references and non-implementation constraints
+# Windows-native unattended RDP: authoritative upstream references
 
-This document tracks authoritative Windows and Apache Guacamole behavior for the proposed v0.3.0 feature. It does not claim that the current PalmTTY runtime implements a pre-login service or integrated RDP.
+These upstream sources motivate PalmTTY v0.3 **planned** technology. They are not evidence that the complete integration is implemented or has been validated on an iPhone.
 
-## Windows 11 Pro and RDP
+- Devolutions Gateway source, Windows MSI/service, gateway.json native Windows location, standalone WebApp(Custom), pinned provisioner keys and listener documentation: https://github.com/Devolutions/devolutions-gateway/blob/master/README.md
+- Devolutions Gateway 2026.x source, matching release notes and versioned release downloads: https://github.com/Devolutions/devolutions-gateway/releases
+- Devolutions native Windows service account guidance: https://github.com/Devolutions/devolutions-gateway
+- IronRDP protocol implementation and Apache-2.0/MIT license: https://github.com/Devolutions/IronRDP
+- IronRDP official Web Client README: https://github.com/Devolutions/IronRDP/blob/master/web-client/README.md
+- IronRDP official Svelte demo: https://github.com/Devolutions/IronRDP/blob/master/web-client/iron-svelte-client/README.md (explicitly requires Gateway's RDCleanPath; demo not intended for production)
+- Apache Guacamole **open** Windows guacd support issue: https://issues.apache.org/jira/browse/GUACAMOLE-1841 (reason to avoid unsupported native Guacamole port)
+- Microsoft Windows Remote Desktop and NLA: https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/remotepc/remote-desktop-allow-access
+- Windows Session 0 services are separate from interactive user desktops: https://learn.microsoft.com/en-us/windows/win32/services/interactive-services
+- WTS Active vs Disconnected: https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ne-wtsapi32-wts_connectstate_class
 
-- Enable Remote Desktop and NLA (Microsoft): https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/remotepc/remote-desktop-allow-access
-- Windows Services run in session 0, separate from the interactive user's desktop (Microsoft): https://learn.microsoft.com/en-us/windows/win32/services/interactive-services
-- WTS_CONNECTSTATE_CLASS (Active and Disconnected are different): https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ne-wtsapi32-wts_connectstate_class
-- WTSQueryUserToken explicitly requires LocalSystem and SE_TCB_NAME; do not adopt this casually as a general service/user bridge: https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/nf-wtsapi32-wtsqueryusertoken
-- Hyper-V Set-VM -AutomaticStartAction: https://learn.microsoft.com/en-us/powershell/module/hyper-v/set-vm
-- Hyper-V virtualization requirements: https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/reference/hyper-v-requirements
+## PalmTTY interpretation
 
-## Apache Guacamole
+On Windows 11 Pro, the machine-level Gateway Windows service can run before a normal user logs in; a successful RDP connection must still complete Windows NLA. IronRDP official browser client uses RDCleanPath; do not assume a raw WS-to-TCP proxy supports the same security handshake. The Gateway standalone WebApp has an arbitrary-target connection form: it is not an appropriate production device-authority boundary. PalmTTY must enforce fixed-destination, short-lived signed tokens at the machine service/gateway layer before exposing a Desktop Activity.
 
-- Guacamole 1.6.0 client API and input abstraction: https://guacamole.apache.org/doc/gug/guacamole-common-js.html
-- Guacamole Java API for custom authenticated tunnels: https://guacamole.apache.org/doc/gug/guacamole-common.html
-- RDP NLA configuration / interactive credential prompting must be verified against the pinned guacd/webapp version: https://guacamole.apache.org/doc/gug/configuring-guacamole.html
-- Reverse proxy requires correct WebSocket upgrade AND disabled HTTP-stream buffering: https://guacamole.apache.org/doc/gug/reverse-proxy.html
-- Official OIDC authentication extension is an option requiring independent threat review; never pretend PalmTTY's bootstrap token is an OIDC identity provider: https://guacamole.apache.org/doc/gug/openid-auth.html
-
-## PalmTTY interpretations
-
-- A Machine Service is a new separately authenticated device entry point, not the existing current-user Agent run as SYSTEM. It cannot obtain arbitrary user capabilities by querying a PID or by trusting a browser claim.
-- Windows Pro supports a normal RDP desktop, not Windows Server RemoteApp publishing or multi-user terminal services. The existing PalmTTY Remote App remains a distinct window-only Activity.
-- A virtual RDP display solves a remote desktop session's presentation, not an already-disconnected or locked physical-console application's input authority.
-- Do not suppress NLA or the existing native WTS/desktop/input checks to get a green demo. A positive read-only registry probe is not actual browser login proof.
+The host readiness script verifies registry/service/gateway.json signals only; it cannot verify live NLA success, secure Windows ACLs, full network origin protections, production token restrictions or real browser interaction.

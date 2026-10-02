@@ -4,7 +4,7 @@ Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus 
 
 ## v0.3.0 unattended RDP work (NOT implemented end-to-end)
 
-The browser-integrated NLA RDP/Guacamole gateway and pre-login Windows Machine Service are planned, not in the current release. One read-only Windows host readiness CLI and tests have been added; see [unattended-rdp-plan.md](unattended-rdp-plan.md). A passing readiness probe proves neither a working iPhone login nor service/VM access or secure-user-session coordination. Do not bump the release or state that headless Remote Apps work before real-device gates.
+The browser-integrated native Devolutions Gateway/IronRDP NLA path and pre-login Windows Machine Service are planned, not in the current release. The read-only Windows-native service and gateway configuration diagnostic and tests have been updated; see [unattended-rdp-plan.md](unattended-rdp-plan.md). A passing readiness probe proves neither a working iPhone login nor service/VM access or secure-user-session coordination. Do not bump the release or state that headless Remote Apps work before real-device gates.
 
 ## Implemented
 

@@ -1,47 +1,47 @@
-# v0.3.0 无人值守浏览器 RDP：架构决定与交付门槛
+# v0.3.0 Windows 原生无人值守 RDP：架构及交付门槛
 
-状态：**方案已决定；浏览器 RDP、开机机器服务及会话桥接尚未实现。** 本文不表示现有安装包支持冷启动远程登录。目标平台为 Windows 11 Pro x64，客户端为 iPhone Safari；完整桌面必须留在经过 Windows 认证的 RDP 会话中。
+状态：**Windows 原生网关方案已选定，主机只读诊断已更新；PalmTTY 登录前 Machine Service、用户会话桥接及完整浏览器桌面仍待实现。** 本文件不代表已经可以无人值守。目标：同一台 Windows 11 Pro x64，手机 Safari 中使用 PalmTTY，无 Hyper-V、Docker、WSL2 或 Windows 自动登录。
 
-## 为什么不能直接扩展 Remote App
+## 选型及纠偏
 
-现有 AppWorker 只捕获 PalmTTY Job Object 归属的应用窗口，Windows Host 检查 WTS Active、WinSta0、Default 输入桌面及有效显示输出。视频可见不等于有权输入。断开的 RDP 会话、锁屏或 UAC 安全桌面应继续拒绝输入；不能让独立服务注入、代替 Winlogon 或假装 WTS Active。Windows Pro 不是多用户远程应用服务器，不支持把 Server RemoteApp 当作基础依赖。
+此前 Guacamole Linux VM 方案因目标 PC 未安装 Hyper-V 且用户明确要求原生 Windows 部署而撤回。官方 Apache Guacamole guacd Windows 构建支持仍待完成，不应将其当作可直接安装的 Windows 服务。IronRDP 提供浏览器 WASM RDP/NLA 客户端，但官方 web-client 的 RDCleanPath 扩展需要相应 Gateway，**不能假设普通 WebSocket↔TCP 透传便与官方客户端兼容**。
 
-## 最终边界
+采用 Windows 原生 **Devolutions Gateway**（安装 MSI 后作为独立 Windows 服务运行）和经验证的同版本 IronRDP 浏览器组件。Gateway 已有独立网页应用、Custom/Argon2 用户认证、RSA provisioner 与 RDCleanPath；开发/验收先以带独立认证的本地 standalone webapp 跑通 Windows NLA，最终 PalmTTY 前端在自己 UI 中集成客户端，PalmTTY Machine Service 根据独立设备认证签发短期、绑定 **127.0.0.1:3389** 的最小权限会话授权。第三方组件的可再分发许可、精确安全补丁版本及匹配的 WASM 构建必须在发布前锁定，不能随意引用未受审查的 npm 版本或复制官网页面。
 
-1. **Windows Machine Service（未来）**：经操作者显式管理员同意安装的独立、不可交互服务，负责冷启动设备入口、独立 PalmTTY 认证、最小健康状态、固定网关路由及检测 User Agent；不拥有 PTY/桌面/Winlogon，不直接读取用户工作区或凭据，不接受任意启动命令。优先评估 LocalService 及严格 ACL，只有确实需要并经过独立安全审查的特定操作才使用高权限 broker。服务和登录后的用户 Agent **绝不共用工作区文件、登录密钥、Worker recovery 根目录**。
-2. **Windows User Agent（现有 Agent 演进）**：普通用户交互式登录后由现有 InteractiveToken 任务启动。保留现有 Session/AppWorker 生命周期与权威状态；独立的本地 IPC 只暴露必要的会话注册/发现/健康检查，不接受 machine 端的任意 shell/进程参数或跨用户授权。
-3. **Guacamole gateway（未来）**：可选已在线 NAS/Linux，或 Windows 11 Pro Hyper-V Linux VM；单机默认需要验证 VM 在未登录情况下启动。锁定已审查的 Guacamole webapp/guacd/guacamole-common-js 版本；guacd 不暴露公网，目标 RDP 主机与端口只能是绑定的目标 Windows PC。固定、无任意 URL 的 gateway proxy 处理 HTTPS/WebSocket 和 HTTP stream，不允许被浏览器配置成通用 SSRF/隧道。
-4. **PalmTTY 浏览器（未来）**：先认证 PalmTTY，然后在自己的活动界面内输入 Windows 身份凭据并建立 NLA RDP；RDP 成功以后才解锁用户 Agent 的工作区页面。可以先将经独立认证的 Guacamole UI 集成在同一站点以建立端到端链路；最终采用官方 guacamole-common-js 加受控服务器端隧道，不依赖 Guacamole 内部未公开 REST API。禁止静默转发 Windows 密码或强行声称单点登录。
-5. **RDP / Remote App 协同（未来）**：用户切换到单窗口 Remote App 时，保留已认证的 RDP 交互会话；如果 Safari 后台挂起、RDP 断线、锁屏，远程应用输入立即禁止，丢弃排队控制事件，明确要求恢复认证。不能把不受控 keepalive、自动 unlock 或 tscon 桌面切换当作恢复策略。
+## 进程及身份边界
 
-## 信任边界及威胁
+| 边界 | 职责 | 明确禁止 |
+|---|---|---|
+| PalmTTY Machine Service（待实现） | 登录前固定 HTTPS/WSS 入口、独立设备认证、服务状态、短期 RDP 授权及用户会话发现 | 以 SYSTEM 执行用户终端、记录 Windows 密码、输入到 Winlogon/锁屏/UAC |
+| Devolutions Gateway（Windows 第三方服务） | 本机监听、验证签名授权、与同机 RDP 服务协商 RDCleanPath/NLA 转运 | 被客户端指定任意目的主机、作为通用 TCP 代理、向公网直接暴露无认证监听 |
+| Windows TermService（系统自带） | 本机 RDP 服务、NLA 和已认证交互用户桌面 | 自动登录、无身份解锁、充当多用户 Windows Server RemoteApp |
+| User Agent（现有） | 原有普通用户 Workspace、终端、Git、Files、独立 AppWorker | 机器级服务读写用户 token/recovery、跨 Windows SID 暴露工作区 |
+| Safari PalmTTY（待实现） | 单页 Desktop Activity、显式 Windows 凭据、状态提示、现有 Workbench 切换 | 缓存明文密码、URL 中放持久令牌、绕过 NLA 或将全桌面图像当作 Remote App 目标 |
 
-- 移动浏览器只接触同源 TLS 入口；跨站请求需要精确 Origin 和 CSRF 防御，既有 PalmTTY 认证不得被 HTTP/WSS proxy 绕过。接入公网上的入口必须有速率限制、会话失效和支持可部署的 MFA；裸露 3389 不在交付范围。
-- PalmTTY 令牌与 Windows 密码分属两个独立认证域。Windows 密码仅用于一次 RDP 握手，在内存中有界停留，禁止记录/保存于 URL、日志、普通配置或浏览器持久化。Guacamole 内置的账号存储和 RDP 连接参数必须单独审计；如尚未验证交互 NLA 提示，则拒绝发布而不是禁用 NLA。
-- Machine Service 只能通过按 Windows SID 和用户会话身份授权的本地 IPC 找到 User Agent。不能仅按 PID、端口或浏览器提交的 Session ID 关联；不能凭机器服务自身权限访问普通用户的 SSH/Git 凭据。
-- RDP 密钥、虚拟机网卡、反向代理上游地址、Windows ACL、installer 注册/移除、升级回滚及防火墙范围都必须有可复现的测试。
-- Windows 更新、VM 启动失败、RDP 未就绪、NLA 失败、网关不可达分别有错误状态；任何状态都不隐式开启权限或放宽安全配置。
+Machine Service 和 User Agent 通过限定消息种类且按 SID/Session ID/ACL 严格验证的本地 IPC 关联；不能只凭 PID 或请求中的用户 ID 建立授权。Machine Service 的机密与普通用户 Agent 的登录 token、runtime、Worker secret 严格分离。Machine Service 需要管理员**明确同意**安装，其 Windows 服务账户先验证 LocalService/专用虚拟服务账户可行性；不得因为实现方便而把现有 Agent 直接变成 SYSTEM 服务。
 
-## 部署和故障恢复
+网关**只监听本机 loopback**，外网入口由经过认证的 PalmTTY Machine Service 同源反向代理和经过审查的 TLS 终止提供。Gateway standalone web UI 允许用户输入 RDP 目标，只能用于本机**可行性测试**；正式 PalmTTY 不对浏览器暴露 standalone 目标选择，而要使用有签名、限时、单次/会话绑定且目标固定为 127.0.0.1:3389 的授权，并对 WebSocket 及 HTTP 路由逐项限定。单独建立 gateway 密钥与部署 ACL，不将私钥输出给手机或放在普通用户可编辑的目录。登录前的 PalmTTY 入口也必须落实 HTTPS、精确 Origin、CSRF、速率限制、MFA 部署能力及网关进程隔离。
 
-单机部署为 Windows 自身安装 Machine Service + Hyper-V 自启动 Linux Gateway VM（宿主机专用私有交换网络），另可外置 NAS Gateway。安装过程必须验证 Windows 11 Pro、Hyper-V 硬件支持和 RDP NLA。由操作员**显式**启用 Remote Desktop、配置 VPN/HTTPS 和限制 RDP 防火墙；脚本不得偷偷改变系统配置。
+Windows RDP 的连接状态不改变现有 Remote App 单窗口校验：WTSDisconnected、Winlogon、安全桌面、无显示输出或 UIPI 失败时继续 fail closed，不能重放断线期间积压输入。手机切换 Desktop 和 Remote App 时只在经过认证的 RDP 仍活跃时复用会话；Safari 挂起后可能需要重新认证。无实体显示器应利用 RDP 会话自带的虚拟显示；不声称无 RDP 连接时普通控制台也有显示能力。
 
-开机次序：Machine Service 提供设备登录入口；VM 与 guacd 独立启动；手机完成 PalmTTY 身份认证；用户在浏览器完成 Guacamole + Windows NLA 认证；Windows InteractiveToken 任务启动 User Agent；Machine Service 校验 SID/Session ID 后允许工作区路由；RDP 保持活跃期间 Remote App 才可输入。关闭或重启机器不保留之前的 PTY/GUI 进程，只恢复持久化 Workspace 定义。
+## 按顺序交付（关联 #90–#93）
 
-故障必须隔离：服务故障不授权 RDP，网关故障不杀死既有 User Worker，User Agent 重启不破坏已经 adopt 的 Worker，锁屏/断开不会延迟重放输入。操作员可禁用无人值守插件并卸载服务/VM，而不删除普通用户凭据或工作区。
+P0 / #90：在目标 Win11 Pro 上由用户手动安装经审查的原生 Gateway，确保开机自启、仅 loopback 监听、standalone UI Custom 认证、RSA provisioner 正确保护、同机 RDP 启用 NLA。验证真实手机 Safari 认证、显示和输入；在没有显示器且没有 Windows 自动登录的冷启动状态测试，并记录实际 NLA、用户会话和 Remote App 检查结果。**未通过不得宣传无人值守。** `pnpm unattended:check -- --json` 只读校验 Windows/RDP/本地网关配置，明确不能代替此阶段的真实设备实验。
 
-## 交付顺序与停止条件
+P1 / #91：实现独立登录前 Machine Service、凭据及 ACL、设备认证、限定访问和严格 IPC。安装器按明确许可注册服务并支持升级/卸载、失效恢复，服务不获取 Windows 用户令牌执行任意操作。
 
-- P0 可行性实验：未经物理显示器、冷启动未登录，iPhone Safari 能在集成入口完成 Guacamole 交互式 NLA 登录；测试现有 Remote App 运行在 RDP 虚拟显示中的 PrintWindow/SendInput，验证断线恢复。失败时停止，不将自动登录、禁用 NLA 或自动切桌面引入设计。
-- P1 机器控制服务：独立权限边界、配置/证书/令牌存储、登录前认证、安装升级卸载、服务崩溃恢复；Windows 真实服务生命周期及 ACL 集成测试。
-- P2 网关：封闭上游网络、锁定版本的 Guacamole 服务、精确代理路径、WebSocket/HTTP 流及同源认证；NLA 交互式凭据输入和拒绝未授权 RDP 目标。
-- P3 浏览器/协同：单页工作区中完整 Desktop 活动，键鼠/中文 IME/分辨率、状态机、租约与重连；各个 Worker 继续各自拥有生命周期。
-- P4 发布：真机冷启动、锁屏、断开、RDP 重连、升级、VM 重启、安全隔离测试 + Windows/Linux CI/Distribution/CodeQL/Audit；只有全部验收通过后，才将 root version 调到 0.3.0 并清空 Unreleased。
+P2 / #92：用固定配置的签名 authorization token 接入原生 Gateway（正式环境不开放 standalone 的自由目标），经 HTTPS/WSS 限定代理 IronRDP 的协议路由和 WebAssembly 资源，把 Desktop Activity 加入 PalmTTY Workbench，先验证 Safari 中文 IME、触控、软键盘、DPI、切换及超时；客户端只持有短期令牌，不持久保存 Windows 凭据。
 
-## 当前已交付的最小安全切片
+P3 / #93：真实无显示器冷启动、更新后重启、锁屏/RDP 断线、Safari 网络切换、原有 Terminal Worker/Remote App 协同、两个用户 SID 隔离、敌意 Origin/CSRF/URL 目标、私钥 ACL、带宽限制和 Windows/Linux CI/Distribution/CodeQL/Audit；确保安装包 SBOM、第三方 NOTICE 和版本钉住并通过 Release Action。仅此后更新根版本为 0.3.0，整理 Unreleased。
 
-pnpm unattended:check -- --vm <gateway-vm-name> 在**目标 Windows 11 Pro** 上只读取 OS/RDP/NLA/TermService/Hyper-V/指定 VM 状态；允许 --json。无 VM 时按外置网关方案报告。即使所有字段为真，输出仍明确要求实际 Safari/NLA、真实无显示器冷启动、权限及安全审查，绝不报告端到端已认证。该诊断尚未安装 Machine Service 或 Guacamole。
+## 当前诊断与局限
 
-## 本方案不包含
+`pnpm unattended:check -- --json` 在目标 Windows PC 上运行，返回 edition/build、RDP/NLA/TermService 和 **devolutionsgateway** 服务/自动启动、gateway.json 是否可读、standalone Custom 认证、provisioner 字段和本机监听是否明确配置。诊断不读取/输出私钥内容、用户凭据、真实监听 URL 或具体用户名；不会安装/启动网关、开放防火墙或修改 Windows。当前本机尚未安装 Gateway 时，blocking 将包含未安装及配置缺失，直到显式部署。即便所有字段为真，endToEndCertified 仍为 false，因为路由、签名、权限、TLS 和 iPhone RDP 实测尚未证明。
 
-Windows 自动登录、Winlogon 凭据代理、锁屏绕过、UAC/elevation 绕过、无身份任意远程桌面、Windows Pro 多人同时交互、重新启动旧 PTY、单窗口 Remote App 的全桌面 fallback、持久化 Windows 密码、自动开放公网 3389。
+## 外部资料
+
+- https://github.com/Devolutions/devolutions-gateway
+- https://github.com/Devolutions/IronRDP
+- https://github.com/Devolutions/IronRDP/tree/master/web-client
+- https://issues.apache.org/jira/browse/GUACAMOLE-1841
+- https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ne-wtsapi32-wts_connectstate_class

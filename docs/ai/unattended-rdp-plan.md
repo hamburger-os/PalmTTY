@@ -1,26 +1,23 @@
-# v0.3.0 unattended browser-RDP design contract
+# v0.3 Windows-native unattended RDP contract
 
-This is a **planned** architecture with one implemented read-only Windows readiness diagnostic. Neither a pre-login service nor a browser RDP tunnel is present in the 0.2.x runtime. Never claim an implemented unattended path based on the presence of this document or a successful registry probe.
+Status: only the **read-only Windows-native gateway readiness CLI** and architecture docs exist. No PalmTTY pre-login Machine Service, signed authorization bridge, scoped browser RDCleanPath transport or PalmTTY Desktop Activity is implemented. Never report that native unattended login is available because the readiness probe passes.
 
-## Fixed target
+## Selected technology and non-goals
 
-Windows 11 Pro x64 host, iPhone Safari, full browser-integrated RDP after NLA, no auto-logon, no secure-desktop bypass, no elevation for Terminal/AppWorker. Approved gateway options: an always-on external Linux/NAS, or a Hyper-V Linux VM with verified AutomaticStartAction=Start. Guacamole/guacd version, RDP NLA interactive credential prompt and iOS Safari are hard real-device qualification requirements, not assumed guarantees.
+Target: Windows 11 Pro x64 + iPhone Safari on the same physical host. No Hyper-V/WSL2/Docker or Windows auto-login. Use the Windows MSI/service distribution of Devolutions Gateway with matching, pinned, reviewed IronRDP browser WASM/Web Component; the official client requires RDCleanPath support, **not** a naive WebSocket/TCP proxy. Earlier Guacamole Linux gateway is superseded; don't silently implement it. Gateway standalone WebApp(Custom) permits arbitrary user-selected RDP destinations and is therefore **P0 local experiment only**. Do not deploy standalone free-target UI to public ingress or disable NLA.
 
-## Proposed process boundaries
+## Final trust boundaries (not yet implemented)
 
-- Machine Service: operator-approved pre-login Windows service, independently authenticated HTTPS entrypoint; own identity and storage, never own a PTY/window/User Agent credential or execute browser-provided arbitrary commands. The service account and ACL require a dedicated threat-model and lifecycle test.
-- Gateway: version-pinned isolated Guacamole + guacd; proxy fixed upstream/host/port; authenticated tunnel behind same-origin HTTPS/WSS with stream/WebSocket support, bounded transport/connection budget and no generic URL proxy or RDP port exposed publicly. If interactive NLA prompts fail, the release is blocked.
-- User Agent: existing ordinary OS-user InteractiveToken process with its own Workspace and Worker state; Machine Service may discover a user through strict SID/session identity-checked named-pipe IPC, but may not impersonate a user shell.
-- Remote Desktop: separate browser Activity from existing Job-owned single-window Remote Apps. Preserve Windows WTS/WinSta0/Default/display/foreground/UIPI/captured-window validation; RDP disconnect must not silently convert to input-ready. Never replay queued input after unlock/reconnect.
+- Explicit opt-in pre-login Machine Service, separately authenticated device session and trusted HTTPS/WSS, no persistent Windows credentials, no arbitrary shell/desktop access.
+- Local native Gateway service with ACL-protected keys and strictly loopback listeners. Machine Service mints short-lived/single-target association authorization fixed to 127.0.0.1:3389 and proxies only audited Gateway paths. Never let browser choose arbitrary host, path, port or gateway bearer tokens.
+- Existing InteractiveToken User Agent remains unprivileged. Machine/User handoff must authenticate Windows SID and session ID over ACL-bound local IPC, never PID-only authority; machine service never imports user Agent cookies, workspace store or Worker recovery secrets.
+- Reviewed IronRDP WebAssembly client embedded as PalmTTY Desktop Activity. Explicit Windows credential input is transient. Preserve existing AppWorker Job window capture and WTSActive/Default/monitor/foreground/UIPI input gates, no desktop fallback and no queued input replay.
+- RDP disconnected, Safari suspended, Winlogon/UAC, VM-less headless reboot, service startup delays and mobile reconnect each need explicit states and no privilege escalation.
 
-## Security tests required before enabling
+## Test/release sequence (#90–#93)
 
-Cold boot before user login, guest VM boot without display, NLA credentials not in logs/persistent storage, forged Origin/CSRF, TLS termination, host/port allowlist, WebSocket upgrade, HTTP stream no-buffering, bounded client slow-consumer, failed service/gateway/Agent startup and individual restart, incorrect SID/session or named-pipe ACL, two-user isolation, guest compromised-network reachability, unsupported Windows Home/Server, Windows lock/UAC/RDP disconnect and genuine Safari suspend/reconnect. Assert no public 3389 exposure and no arbitrary host selection.
+P0: Target PC native Gateway service installed and loopback-only/Custom, actual monitor-free cold boot, iPhone browser RDP NLA; verify Windows session and Remote App in that RDP desktop. Pin audited Gateway/IronRDP versions, check Apache/MIT/NOTICE and distribution terms. P1: independent Machine Service and SID-scoped IPC and service installer. P2: fixed-destination signed Gateway tokens + trusted same-origin proxy + IronRDP UI. P3: user Agent/Desktop/Remote App lifecycle, real-phone/reboot/lock/IME/network/failure tests and complete Windows/Linux CI/Distribution/CodeQL/Audit. Only then prepare root v0.3.0 metadata and release.
 
-## Device acceptance
+## Current implemented check
 
-From a powered-off monitor-free Windows 11 Pro PC, an iPhone Safari user reaches the PalmTTY login page, authenticates PalmTTY independently, opens the integrated desktop, enters Windows credentials via NLA and obtains an actual interactive desktop. User Agent should then start as the Windows user; terminal/Git/files and PalmTTY-owned Remote App work with RDP active. On Safari backgrounding or RDP disconnection, input is blocked. On Windows reboot all transient PTY/GUI sessions are explicitly lost; only persisted Workspace definitions survive.
-
-## Current implementation
-
-Read-only probe: scripts/unattended-readiness.ps1, .mjs and -core.mjs; Node test cases verify strict parsing, unsupported target/NLA/VM failures and the unconditional manual verification requirement. The probe deliberately cannot prove network routing, browser behavior, credentials, NLA prompt compatibility, Windows service ACL or real cold-boot functionality. Development must not bump the release to 0.3.0, migrate user data or publish a release until real endpoint gates and protected branch CI succeed.
+The `pnpm unattended:check -- --json` output schema is now 2/target=windows-native. Strictly parse typed Windows/RDP/NLA/TermService and native service status, automatic start, whether config is readable, standalone Custom authentication, provisioner configuration and all listeners loopback-only. Missing/unknown fields block. The tool never installs/starts the Gateway, parses credential contents, discloses URLs or prints private keys. It unconditionally sets endToEndCertified=false and enumerates genuine manual device gates. A green result is **not** a statement that P0, P1, P2 or P3 passed.

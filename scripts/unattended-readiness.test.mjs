@@ -1,51 +1,55 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evaluateUnattendedReadiness } from "./unattended-readiness-core.mjs";
-
-const probe = () => ({
-  schema: 1,
-  osEdition: "Professional",
-  osBuild: 26100,
-  windows11Pro: true,
-  rdpEnabled: true,
-  nlaRequired: true,
-  rdpServiceRunning: true,
-  hyperVAvailable: true,
-  vm: { found: true, running: true, automaticStart: true }
+import { evaluateUnattendedReadiness as evaluate } from "./unattended-readiness-core.mjs";
+const ready = () => ({
+  schema: 2, osEdition: "Professional", osBuild: 26300,
+  windows11Pro: true, rdpEnabled: true, nlaRequired: true, rdpServiceRunning: true,
+  gateway: {
+    serviceFound: true, serviceRunning: true, automaticStart: true, configReadable: true,
+    webAppEnabled: true, customAuthEnabled: true, provisionerConfigured: true, loopbackOnly: true
+  }
 });
-test("readiness always requires real browser-to-Windows qualification", () => {
-  const result = evaluateUnattendedReadiness(probe(), true);
-  assert.deepEqual(result.blocking, []);
+test("all-green configuration is never actual unattended certification", () => {
+  const result = evaluate(ready());
+  assert.equal(result.blocking.length, 0);
   assert.equal(result.endToEndCertified, false);
-  assert.equal(result.requiredManualChecks.length, 4);
+  assert.ok(result.requiredManualChecks.length >= 4);
+  assert.equal(result.target, "windows-native");
 });
-test("missing NLA fails closed even when RDP works", () => {
-  const result = evaluateUnattendedReadiness({ ...probe(), nlaRequired: null }, true);
-  assert.match(result.blocking.join(" "), /Network Level Authentication/);
+test("Hyper-V is absent from Windows-native readiness requirements", () => {
+  const { observed } = evaluate(ready());
+  assert.ok(!Object.hasOwn(observed, "hyperVAvailable"));
 });
-test("missing Hyper-V and unverified VM cannot be certified", () => {
-  const result = evaluateUnattendedReadiness({
-    ...probe(), hyperVAvailable: false,
-    vm: { found: null, running: null, automaticStart: null }
-  }, true);
-  assert.ok(result.blocking.length >= 3);
+test("absent gateway blocks without silently falling back to an open RDP listener", () => {
+  const input = ready();
+  for (const key of Object.keys(input.gateway)) input.gateway[key] = null;
+  assert.ok(evaluate(input).blocking.length >= 7);
 });
-test("external gateway does not accidentally require a local VM", () => {
-  const result = evaluateUnattendedReadiness({
-    ...probe(), hyperVAvailable: false,
-    vm: { found: null, running: null, automaticStart: null }
-  });
-  assert.deepEqual(result.blocking, []);
-  assert.match(result.warnings.join(" "), /gateway/);
-  assert.equal(result.endToEndCertified, false);
+test("NLA disabled and loopback misconfiguration both block", () => {
+  const input = ready();
+  input.nlaRequired = false;
+  input.gateway.loopbackOnly = false;
+  input.gateway.customAuthEnabled = false;
+  const result = evaluate(input);
+  assert.ok(result.blocking.some((s) => /NLA/.test(s)));
+  assert.ok(result.blocking.some((s) => /loopback/.test(s)));
+  assert.ok(result.blocking.some((s) => /Custom authentication/.test(s)));
 });
-test("tampered probe cannot masquerade as verified", () => {
-  assert.throws(() => evaluateUnattendedReadiness({ ...probe(), rdpEnabled: "yes" }), /Invalid/);
-  assert.throws(() => evaluateUnattendedReadiness({ ...probe(), schema: 2 }), /Unexpected/);
+test("unknown gateway ACL/config fails closed", () => {
+  const input = ready();
+  input.gateway.configReadable = null;
+  input.gateway.provisionerConfigured = null;
+  assert.ok(evaluate(input).blocking.length >= 2);
 });
-test("unsupported OS and disabled RDP both block readiness", () => {
-  const result = evaluateUnattendedReadiness({
-    ...probe(), windows11Pro: false, rdpEnabled: false
-  });
-  assert.equal(result.blocking.length, 2);
+test("unsupported Windows and stopped TermService fail closed", () => {
+  const input = ready();
+  input.windows11Pro = false;
+  input.rdpServiceRunning = false;
+  assert.equal(evaluate(input).blocking.length, 2);
+});
+test("malformed and type-coerced probes cannot appear valid", () => {
+  assert.throws(() => evaluate({ ...ready(), schema: 1 }), /Unexpected/);
+  assert.throws(() => evaluate({ ...ready(), gateway: { ...ready().gateway, loopbackOnly: "yes" } }), /Invalid/);
+  assert.throws(() => evaluate({ ...ready(), gateway: null }), /Invalid/);
+  assert.throws(() => evaluate({ ...ready(), osBuild: -1 }), /Invalid/);
 });
