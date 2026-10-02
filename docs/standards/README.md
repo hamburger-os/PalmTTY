@@ -16,3 +16,5 @@ This layer records the external technical basis used by PalmTTY. It is not a pla
 When PalmTTY behavior differs from an external source, document the difference in the owner/AI layers. Do not rewrite this layer to make the implementation appear compliant.
 
 Last reviewed: 2026-09-24.
+
+- [Unattended browser RDP / 无人值守浏览器 RDP](unattended-rdp.md) — Official Windows/Guacamole references and their interpretation.

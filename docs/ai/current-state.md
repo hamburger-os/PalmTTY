@@ -2,6 +2,10 @@
 
 Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus a Windows-x64 Remote App Session data plane, Windows/Ubuntu CI, current-user Windows/Linux Agent autostart, installable Windows/Linux release packaging, and a mobile-first Workspace Workbench. Release qualification requires native package builds plus detached installed-runtime smoke before asset-bearing publication. Real mobile/Codex Desktop/CLI/deployment checks remain recommended release evidence rather than a workflow gate.**
 
+## v0.3.0 unattended RDP work (NOT implemented end-to-end)
+
+The browser-integrated NLA RDP/Guacamole gateway and pre-login Windows Machine Service are planned, not in the current release. One read-only Windows host readiness CLI and tests have been added; see [unattended-rdp-plan.md](unattended-rdp-plan.md). A passing readiness probe proves neither a working iPhone login nor service/VM access or secure-user-session coordination. Do not bump the release or state that headless Remote Apps work before real-device gates.
+
 ## Implemented
 
 ### Repository and governance

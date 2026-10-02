@@ -6,6 +6,11 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+### Unattended browser RDP foundation
+
+- Add a read-only Windows 11 Pro/RDP/NLA/Hyper-V gateway-VM readiness diagnostic (`pnpm unattended:check`) with cross-platform pure-function tests; document the v0.3.0 security architecture and genuine iPhone/cold-boot release gates. The Machine Service, Guacamole browser desktop and unattended login remain unimplemented and are not advertised as available.
+
+
 ### Windows headless Remote App input and desktop-safe geometry
 
 - Discard pending Agent input on unsafe desktop/session/display transitions and gate fresh control until the native desktop is available, without replaying FIFO contents; already accepted pipe bytes remain subject to native revalidation.

@@ -42,3 +42,15 @@ jobs:
       - run: pnpm check
         env:
           PALMTTY_TEST_REQUIRE_PWSH: ${{ runner.os == 'Windows' && '1' || '0' }}
+      - name: Validate unattended Windows PowerShell probe syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'scripts/unattended-readiness.ps1').Path,
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) { throw ($errors | Out-String) }

@@ -78,6 +78,10 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 - 0.2.0 发布继续只由 guarded Release Action 执行：锁定 `main` SHA，重新跑质量/安全/许可证/CodeQL/原生发行包 smoke 后再创建 Tag 和 Release；
 - 当前手机实测已经提供正向可用性证据，但未实际验证的平台、浏览器、WSL/Linux 长期路径仍保持为已知验证缺口，不为了发布而虚假关闭。
 
+## v0.3.0 新优先级：Windows 11 Pro 无人值守浏览器 RDP（开发中）
+
+用户已确定方案 B：无 Windows 自动登录，通过 iPhone Safari 在 PalmTTY 浏览器内完成 Windows NLA RDP 登录。当前仅实现只读 readiness 诊断；Machine Service、隔离 Guacamole Gateway、浏览器 Desktop Activity 和 SID 绑定的 User Agent 协调均待开发，绝不能提前宣称可用。请以 [无人值守设计与交付门槛](unattended-rdp.md) 为准。现有 Remote App 的会话/锁屏/显示输入安全校验必须保留，设备无显示器、冷启动及 Safari 真机测试是阻断发布的前置要求。
+
 ## 下一阶段优先级
 
 ### P0：真实设备与长期运行验证
@@ -123,4 +127,4 @@ Git 已完成从只读 status/diff 到受控 Source Control 工作台，并补�
 
 ## 不应提前做
 
-在真实设备与长期运行稳定之前，不建议投入完整浏览器 IDE、完整 Remote Desktop、可安装插件系统、多用户协作、云中继或未经设计的 reboot persistence。当前 Workbench 提供终端核心 + 有界 typed Git Source Control/历史审查 + 只读 Files/图片预览/有界完整文件导出 + Session 图片附件上下文，不引入 Monaco/LSP/插件运行时。
+在真实设备与长期运行稳定之前，除已批准的 v0.3.0 浏览器 RDP（必须独立完成前述安全验收）外，不建议投入完整浏览器 IDE、其他 Remote Desktop 协议、可安装插件系统、多用户协作、云中继或未经设计的 reboot persistence。当前 Workbench 提供终端核心 + 有界 typed Git Source Control/历史审查 + 只读 Files/图片预览/有界完整文件导出 + Session 图片附件上下文，不引入 Monaco/LSP/插件运行时。
