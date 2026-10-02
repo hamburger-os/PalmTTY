@@ -1531,6 +1531,12 @@ internal static class PalmTTYRemoteAppHost
             return;
         }
 
+        string environmentIssue = GetInputEnvironmentIssue();
+        if (environmentIssue != null)
+        {
+            PublishInputState(environmentIssue);
+            return;
+        }
         IntPtr hwnd;
         RECT rect;
         lock (TargetLock)
@@ -1540,7 +1546,7 @@ internal static class PalmTTYRemoteAppHost
         }
         if (hwnd == IntPtr.Zero || !IsOwnedWindow(hwnd))
         {
-            PublishInputState("blocked");
+            PublishInputState("window-unavailable");
             return;
         }
 
@@ -1551,7 +1557,7 @@ internal static class PalmTTYRemoteAppHost
             if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
                 !TryGetWindowBounds(hwnd, out rect))
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             int x = rect.Left + (int)Math.Round(Clamp01(message.X) * Math.Max(1, rect.Width - 1));
@@ -1559,7 +1565,7 @@ internal static class PalmTTYRemoteAppHost
             MoveAbsolute(x, y);
             if (GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             ApplyPointerAction(message.Action, message.Button);
@@ -1573,13 +1579,13 @@ internal static class PalmTTYRemoteAppHost
             if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
                 !TryGetWindowBounds(hwnd, out rect))
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             POINT point;
             if (!GetCursorPos(out point))
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             int x = Math.Max(rect.Left, Math.Min(rect.Right - 1, point.X + (int)Math.Round(message.Dx * rect.Width)));
@@ -1587,7 +1593,7 @@ internal static class PalmTTYRemoteAppHost
             MoveAbsolute(x, y);
             if (GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             ApplyPointerAction(message.Action, message.Button);
@@ -1596,9 +1602,10 @@ internal static class PalmTTYRemoteAppHost
 
         if (message.Type == "wheel")
         {
-            if (!ActivateWindow(hwnd) || GetForegroundWindow() != hwnd)
+            if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
+                GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             SendWheel(message.DeltaX, message.DeltaY);
@@ -1612,7 +1619,7 @@ internal static class PalmTTYRemoteAppHost
             if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
                 GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             SendUnicodeText(message.Text);
@@ -1624,7 +1631,7 @@ internal static class PalmTTYRemoteAppHost
             if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
                 GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             SendRepeatedEditKey(message);
@@ -1636,7 +1643,7 @@ internal static class PalmTTYRemoteAppHost
             if ((GetForegroundWindow() != hwnd && !ActivateWindow(hwnd)) ||
                 GetForegroundWindow() != hwnd)
             {
-                PublishInputState("blocked");
+                PublishInputState("focus-denied");
                 return;
             }
             SendRestrictedKey(message);
@@ -1896,7 +1903,7 @@ internal static class PalmTTYRemoteAppHost
     {
         if (inputs == null || inputs.Length == 0 || inputs.Length > 32768) return;
         uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
-        PublishInputState(sent == inputs.Length ? "ready" : "blocked");
+        PublishInputState(sent == inputs.Length ? "ready" : "input-rejected");
         if (sent != inputs.Length)
         {
             int error = Marshal.GetLastWin32Error();
