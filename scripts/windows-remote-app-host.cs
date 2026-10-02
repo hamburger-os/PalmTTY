@@ -1627,10 +1627,20 @@ internal static class PalmTTYRemoteAppHost
             }
             int x = rect.Left + (int)Math.Round(Clamp01(message.X) * Math.Max(1, rect.Width - 1));
             int y = rect.Top + (int)Math.Round(Clamp01(message.Y) * Math.Max(1, rect.Height - 1));
+            if (!IsPointOnCapturedWindow(hwnd, x, y))
+            {
+                PublishInputState("window-occluded");
+                return;
+            }
             MoveAbsolute(x, y);
             if (GetForegroundWindow() != hwnd)
             {
                 PublishInputState("focus-denied");
+                return;
+            }
+            if (message.Action == "down" && !IsPointOnCapturedWindow(hwnd, x, y))
+            {
+                PublishInputState("window-occluded");
                 return;
             }
             ApplyPointerAction(message.Action, message.Button);
@@ -1655,10 +1665,20 @@ internal static class PalmTTYRemoteAppHost
             }
             int x = Math.Max(rect.Left, Math.Min(rect.Right - 1, point.X + (int)Math.Round(message.Dx * rect.Width)));
             int y = Math.Max(rect.Top, Math.Min(rect.Bottom - 1, point.Y + (int)Math.Round(message.Dy * rect.Height)));
+            if (!IsPointOnCapturedWindow(hwnd, x, y))
+            {
+                PublishInputState("window-occluded");
+                return;
+            }
             MoveAbsolute(x, y);
             if (GetForegroundWindow() != hwnd)
             {
                 PublishInputState("focus-denied");
+                return;
+            }
+            if (message.Action == "down" && !IsPointOnCapturedWindow(hwnd, x, y))
+            {
+                PublishInputState("window-occluded");
                 return;
             }
             ApplyPointerAction(message.Action, message.Button);
@@ -1671,6 +1691,13 @@ internal static class PalmTTYRemoteAppHost
                 GetForegroundWindow() != hwnd)
             {
                 PublishInputState("focus-denied");
+                return;
+            }
+            POINT pointer;
+            if (!GetCursorPos(out pointer) ||
+                !IsPointOnCapturedWindow(hwnd, pointer.X, pointer.Y))
+            {
+                PublishInputState("window-occluded");
                 return;
             }
             SendWheel(message.DeltaX, message.DeltaY);
@@ -1713,6 +1740,18 @@ internal static class PalmTTYRemoteAppHost
             }
             SendRestrictedKey(message);
         }
+    }
+
+    // PrintWindow may show application pixels hidden below the taskbar,
+    // Start, Task View or another window. Native mouse input is global.
+    private static bool IsPointOnCapturedWindow(IntPtr hwnd, int x, int y)
+    {
+        POINT point = new POINT();
+        point.X = x;
+        point.Y = y;
+        IntPtr hit = WindowFromPoint(point);
+        if (hit == IntPtr.Zero) return false;
+        return GetAncestor(hit, GA_ROOT) == hwnd && IsOwnedWindow(hwnd);
     }
 
     private static bool IsOwnedWindow(IntPtr hwnd)
