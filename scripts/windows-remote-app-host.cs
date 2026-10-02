@@ -528,8 +528,12 @@ internal static class PalmTTYRemoteAppHost
     private static StreamWriter ErrorOutput;
 
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
+        // Packaged/native smoke exercises pure geometry without an attached
+        // monitor, signed-in desktop, arbitrary HWND or input injection.
+        if (args != null && args.Length == 1 && args[0] == "--geometry-self-test")
+            return GeometrySelfTest();
         PROCESS_INFORMATION process = new PROCESS_INFORMATION();
         IntPtr job = IntPtr.Zero;
         try
@@ -1309,6 +1313,73 @@ internal static class PalmTTYRemoteAppHost
         return bounds.Width >= 1 && bounds.Height >= 1;
     }
 
+    private static RECT FitAdaptedRect(RECT work, RECT current,
+        int desiredWidth, int desiredHeight, bool first)
+    {
+        double scale = Math.Min(1.0, Math.Min(
+            work.Width / (double)desiredWidth,
+            work.Height / (double)desiredHeight));
+        int width = Math.Max(1, (int)Math.Floor(desiredWidth * scale));
+        int height = Math.Max(1, (int)Math.Floor(desiredHeight * scale));
+        int x = Math.Max(work.Left, Math.Min(work.Right - width, current.Left));
+        int y = Math.Max(work.Top, Math.Min(work.Bottom - height, current.Top));
+        if (first && (current.Left + width > work.Right ||
+                      current.Top + height > work.Bottom))
+        {
+            x = work.Left + (work.Width - width) / 2;
+            y = work.Top + (work.Height - height) / 2;
+        }
+        return new RECT {
+            Left = x, Top = y, Right = x + width, Bottom = y + height
+        };
+    }
+
+    private static bool TryGetVisibleCrop(RECT outer, RECT visible,
+        out int cropX, out int cropY)
+    {
+        cropX = visible.Left - outer.Left;
+        cropY = visible.Top - outer.Top;
+        return visible.Width > 0 && visible.Height > 0 &&
+            cropX >= 0 && cropY >= 0 && cropX <= 64 && cropY <= 64 &&
+            cropX + visible.Width <= outer.Width &&
+            cropY + visible.Height <= outer.Height &&
+            outer.Width - cropX - visible.Width <= 64 &&
+            outer.Height - cropY - visible.Height <= 64;
+    }
+
+    private static RECT TestRect(int left, int top, int right, int bottom)
+    {
+        return new RECT { Left = left, Top = top, Right = right, Bottom = bottom };
+    }
+
+    private static int GeometrySelfTest()
+    {
+        RECT work = TestRect(0, 0, 1920, 1040);
+        RECT offscreen = TestRect(1500, 780, 2500, 1780);
+        RECT fitted = FitAdaptedRect(work, offscreen, 430, 900, true);
+        if (fitted.Left < 0 || fitted.Top < 0 ||
+            fitted.Right > 1920 || fitted.Bottom > 1040)
+            return 2; // taskbar-safe on initial adaptation
+        RECT secondary = FitAdaptedRect(TestRect(-1600, 0, 0, 900),
+            TestRect(-1700, 600, -700, 1600), 1400, 1000, true);
+        if (secondary.Left < -1600 || secondary.Right > 0 ||
+            secondary.Top < 0 || secondary.Bottom > 900)
+            return 3; // negative-coordinate secondary display
+        RECT stable = FitAdaptedRect(work, TestRect(100, 120, 600, 700),
+            500, 580, false);
+        if (stable.Left != 100 || stable.Top != 120) return 4;
+        int x, y;
+        if (!TryGetVisibleCrop(TestRect(0, 0, 408, 808),
+                TestRect(8, 0, 400, 800), out x, out y) ||
+            x != 8 || y != 0)
+            return 5;
+        if (TryGetVisibleCrop(TestRect(0, 0, 400, 800),
+                TestRect(-10, 0, 390, 800), out x, out y))
+            return 6; // inconsistent DWM frame must fail closed
+        Console.WriteLine("Remote App work-area and DWM crop geometry: passed");
+        return 0;
+    }
+
     // Adaptation is explicit, per-session, and constrained to the nearest
     // active display WORK area (taskbar excluded). No virtual driver, monitor
     // changes, system display setting or arbitrary window can be touched.
@@ -1352,13 +1423,6 @@ internal static class PalmTTYRemoteAppHost
                 extraWidth = Math.Max(0, Math.Min(32, current.Width - visible.Width));
                 extraHeight = Math.Max(0, Math.Min(32, current.Height - visible.Height));
             }
-            int desiredWidth = requestedWidth + extraWidth;
-            int desiredHeight = requestedHeight + extraHeight;
-            double scale = Math.Min(1.0, Math.Min(
-                info.rcWork.Width / (double)desiredWidth,
-                info.rcWork.Height / (double)desiredHeight));
-            int width = Math.Max(1, (int)Math.Floor(desiredWidth * scale));
-            int height = Math.Max(1, (int)Math.Floor(desiredHeight * scale));
             bool first = LastAppliedWidth != requestedWidth ||
                 LastAppliedHeight != requestedHeight;
             bool outsideWork = current.Left < info.rcWork.Left ||
@@ -1367,19 +1431,10 @@ internal static class PalmTTYRemoteAppHost
                 current.Bottom > info.rcWork.Bottom;
             if (!first && !outsideWork) return;
 
-            int x = Math.Max(info.rcWork.Left,
-                Math.Min(info.rcWork.Right - width, current.Left));
-            int y = Math.Max(info.rcWork.Top,
-                Math.Min(info.rcWork.Bottom - height, current.Top));
-            // Initial phone adaptation must not push the lower editor below
-            // the taskbar; center only when the original position won't fit.
-            if (first && (current.Left + width > info.rcWork.Right ||
-                          current.Top + height > info.rcWork.Bottom))
-            {
-                x = info.rcWork.Left + (info.rcWork.Width - width) / 2;
-                y = info.rcWork.Top + (info.rcWork.Height - height) / 2;
-            }
-            if (SetWindowPos(hwnd, IntPtr.Zero, x, y, width, height,
+            RECT target = FitAdaptedRect(info.rcWork, current,
+                requestedWidth + extraWidth, requestedHeight + extraHeight, first);
+            if (SetWindowPos(hwnd, IntPtr.Zero, target.Left, target.Top,
+                target.Width, target.Height,
                 SWP_NOZORDER | SWP_NOACTIVATE))
             {
                 LastAppliedWidth = requestedWidth;
@@ -1434,8 +1489,7 @@ internal static class PalmTTYRemoteAppHost
         if (visible.Left != rect.Left || visible.Top != rect.Top ||
             visible.Right != rect.Right || visible.Bottom != rect.Bottom)
             return false; // geometry changed during this capture: retry next frame
-        int cropX = rect.Left - outer.Left;
-        int cropY = rect.Top - outer.Top;
+        int cropX, cropY;
         int sourceWidth = rect.Width, sourceHeight = rect.Height;
         int outerWidth = outer.Width, outerHeight = outer.Height;
         if (sourceWidth < 1 || sourceHeight < 1 || outerWidth < 1 ||
@@ -1447,11 +1501,7 @@ internal static class PalmTTYRemoteAppHost
         }
         // Only small differences are valid DWM frame margins; a totally
         // inconsistent rectangle must not be projected onto a live target.
-        if (cropX < 0 || cropY < 0 || cropX > 64 || cropY > 64 ||
-            cropX + sourceWidth > outerWidth ||
-            cropY + sourceHeight > outerHeight ||
-            outerWidth - cropX - sourceWidth > 64 ||
-            outerHeight - cropY - sourceHeight > 64)
+        if (!TryGetVisibleCrop(outer, rect, out cropX, out cropY))
         {
             PublishCaptureReason("window-resize-rejected");
             return false;
