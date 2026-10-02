@@ -68,3 +68,6 @@ jobs:
           if ($result.endToEndCertified -ne $false) {
             throw 'The readiness probe must never certify browser RDP without real-device tests'
           }
+          # A missing native Gateway is the expected negative-runner fixture (exit 1).
+          # GitHub's pwsh wrapper propagates LASTEXITCODE unless explicitly cleared.
+          exit 0
