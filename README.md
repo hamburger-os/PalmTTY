@@ -22,6 +22,10 @@ PalmTTY is a mobile-first, self-hosted remote development workbench centered on 
 
 PalmTTY 是一个面向手机、自托管的远程开发工作台，核心是工作站上可持久的 Activity。Terminal Session 继续覆盖 Windows Host、WSL 和 Linux Host；Windows x64 额外加入 **Unreleased Remote Apps alpha**：按持久 Workspace Profile 启动桌面应用，并通过独立 AppWorker/WebRTC 数据面只呈现 PalmTTY 自己启动的应用窗口。Git/Files 仍是有界 Workspace Tool，Artifacts 仍属于 Terminal Session；Codex/Claude/OpenCode 等继续作为 vendor-neutral workload，不把厂商私有协议写进 PalmTTY 核心。
 
+## Unattended browser RDP / 无人值守浏览器 RDP（规划中）
+
+Windows 11 Pro + iPhone Safari 的完整浏览器 RDP 是 v0.3.0 目标，**尚未实现**。已添加只读的 Windows/RDP/NLA/Hyper-V 就绪检查：`pnpm unattended:check -- --vm PalmTTY-Gateway`。它不会启动登录前服务、安装 Guacamole、启用 RDP 或宣称已经通过无人值守验收。详细请见 [部署指南](docs/community/unattended-rdp.md) 和 [架构设计](docs/owner/unattended-rdp.md)。
+
 ## Status / 当前状态
 
 PalmTTY is **alpha**. **0.2.0** is the current release baseline; this source line carries Unreleased Remote Apps work. Each terminal runs in an independent durable Session Worker, so restarting only the HTTP/API Agent does not terminate the live PTY. Windows and Ubuntu CI cover authenticated Worker IPC, Agent restart rediscovery, replay/snapshot recovery and detached-process survival; Windows CI also uses real node-pty + PowerShell 7 / ConPTY for Unicode and resize smoke coverage. Release publication is guarded by pinned-SHA CI/security/license/CodeQL gates. Real phone + real workstation + long-running Codex checks remain recommended release evidence, but are not represented by a manual publication checkbox.

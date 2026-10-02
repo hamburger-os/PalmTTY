@@ -12,3 +12,5 @@ Read in this order:
 Also read the relevant Chinese owner module under [../owner/README.md](../owner/README.md).
 
 Do not treat roadmap items as implemented behavior. Do not silently change an invariant; architecture-changing work must update both the invariant and the relevant owner/community documentation.
+
+- [Unattended browser RDP / 无人值守浏览器 RDP](unattended-rdp-plan.md) — Proposed security and acceptance contract; not yet implemented.

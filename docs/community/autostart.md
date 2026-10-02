@@ -145,3 +145,9 @@ pnpm autostart uninstall
 Windows PalmTTY autostart uses `InteractiveToken` at the real user's logon. It is not a LocalSystem service and cannot create, unlock or switch to a login desktop. Running the Agent after boot does not establish an unlocked interactive Windows session, and a successful window-only video capture is not proof of usable remote input. Remote App surfaces typed session/desktop/display/foreground failures and refuses input on secure or disconnected desktops. A virtual display or HDMI EDID adapter can solve *missing output* only; it cannot log in, unlock, elevate or reconnect a disconnected RDP session.
 
 Windows 登录触发的当前用户 Agent 与系统启动前服务不是一回事。无显示器机器必须有可用的已登录交互桌面，锁屏／安全桌面和断开的 RDP 会话不能通过 PalmTTY 输入桥解锁。虚拟显示输出只用于解决缺少显示目标的问题；诊断会区分会话、桌面和显示输出，不会自动修改 Windows 安全设置。
+
+### Planned v0.3.0 unattended Windows entry / 规划中的 v0.3.0 无人值守入口
+
+The existing InteractiveToken login task is unchanged. A distinct opt-in pre-login Machine Service and authenticated browser RDP gateway are planned, **not shipped**. See [unattended RDP](unattended-rdp.md); the read-only `pnpm unattended:check` does not enable remote access.
+
+现有 InteractiveToken 登录任务没有改变。独立登录前机器服务和浏览器 RDP 网关处于规划阶段，**尚未发布**。详见[无人值守浏览器 RDP](unattended-rdp.md)；只读的 `pnpm unattended:check` 不会开启远程访问。

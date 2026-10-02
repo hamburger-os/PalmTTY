@@ -25,3 +25,5 @@ For external technical sources, use [../standards/README.md](../standards/README
 - [remote-apps.md](remote-apps.md) — Windows Remote Apps 架构、安全边界与手机操作
 
 外部权威技术依据请查看 [../standards/README.md](../standards/README.md)。
+
+- [Unattended browser RDP / 无人值守浏览器 RDP](unattended-rdp.md) — Bilingual deployment plan and currently available readiness probe.

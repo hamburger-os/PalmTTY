@@ -27,3 +27,5 @@
 5. GitHub 工作流、依赖策略、社区治理或发布流程修改必须检查 [github-governance.md](github-governance.md)。
 
 如果 Owner 文档与代码事实冲突，应视为任务未完成。
+
+- [Unattended browser RDP / 无人值守浏览器 RDP](unattended-rdp.md) — v0.3.0 架构与交付门槛。

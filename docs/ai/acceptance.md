@@ -2,6 +2,10 @@
 
 A coding agent should not declare a repository-wide task complete before the relevant gates pass.
 
+## Planned unattended RDP qualification (not satisfied by current CI)
+
+Before declaring v0.3.0 unattended RDP complete, meet every gate in [unattended-rdp-plan.md](unattended-rdp-plan.md): real Windows 11 Pro monitor-free cold boot, signed-in pre-login browser entrypoint, authenticated interactive NLA Windows login in iPhone Safari, RDP-active Remote App input, lock/RDP-disconnect fail-closed input, separate Machine/User identities, isolated and version-pinned Guacamole gateway, HTTPS/WS, credentials/ACL isolation, installed-runtime/upgrade rollback, Windows/Linux CI/Distribution/CodeQL/Audit. `pnpm unattended:check` is a diagnostic only and does not satisfy these gates.
+
 ## Static/documentation
 
 ~~~text
