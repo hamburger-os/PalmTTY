@@ -1418,32 +1418,49 @@ internal static class PalmTTYRemoteAppHost
 
     private static bool CaptureWindow(IntPtr hwnd, RECT rect, int maxWidth, int maxHeight)
     {
-        // Ownership is revalidated immediately before capture, not merely
-        // during an earlier EnumWindows callback (HWND may be recycled).
         if (!IsOwnedWindow(hwnd))
         {
             PublishCaptureReason("window-not-found");
             return false;
         }
-        int sourceWidth = rect.Width;
-        int sourceHeight = rect.Height;
-        if (
-            sourceWidth <= 0 ||
-            sourceHeight <= 0 ||
-            sourceWidth > 4096 ||
-            sourceHeight > 4096 ||
-            (long)sourceWidth * (long)sourceHeight > 12000000L)
+
+        // PrintWindow paints the *outer* HWND from pixel (0,0), whereas all
+        // pointer/cursor coordinates use DWM visible-frame screen bounds.
+        // Capturing into a DWM-sized bitmap shifted content by the invisible
+        // resize border. Crop the full HWND bitmap to that same DWM rectangle.
+        RECT outer, visible;
+        if (!GetWindowRect(hwnd, out outer) ||
+            !TryGetWindowBounds(hwnd, out visible)) return false;
+        if (visible.Left != rect.Left || visible.Top != rect.Top ||
+            visible.Right != rect.Right || visible.Bottom != rect.Bottom)
+            return false; // geometry changed during this capture: retry next frame
+        int cropX = rect.Left - outer.Left;
+        int cropY = rect.Top - outer.Top;
+        int sourceWidth = rect.Width, sourceHeight = rect.Height;
+        int outerWidth = outer.Width, outerHeight = outer.Height;
+        if (sourceWidth < 1 || sourceHeight < 1 || outerWidth < 1 ||
+            outerHeight < 1 || outerWidth > 4096 || outerHeight > 4096 ||
+            (long)outerWidth * outerHeight > 12000000L)
         {
             PublishCaptureReason("window-too-large");
             return false;
         }
+        // Only small differences are valid DWM frame margins; a totally
+        // inconsistent rectangle must not be projected onto a live target.
+        if (cropX < 0 || cropY < 0 || cropX > 64 || cropY > 64 ||
+            cropX + sourceWidth > outerWidth ||
+            cropY + sourceHeight > outerHeight ||
+            outerWidth - cropX - sourceWidth > 64 ||
+            outerHeight - cropY - sourceHeight > 64)
+        {
+            PublishCaptureReason("window-resize-rejected");
+            return false;
+        }
 
-        using (Bitmap source = new Bitmap(sourceWidth, sourceHeight, PixelFormat.Format32bppArgb))
+        using (Bitmap source = new Bitmap(outerWidth, outerHeight,
+            PixelFormat.Format32bppArgb))
         {
             bool ok = PrintOwnedWindow(hwnd, source, PW_RENDERFULLCONTENT);
-            // PW_RENDERFULLCONTENT can return TRUE while leaving a blank
-            // bitmap. Retry only the same owned HWND with standard PrintWindow;
-            // never read the desktop/window DC or include occluding windows.
             if (!ok || !HasVisiblePixels(source))
             {
                 if (!IsOwnedWindow(hwnd))
@@ -1460,23 +1477,15 @@ internal static class PalmTTYRemoteAppHost
                 PublishCaptureReason("printwindow-failed");
                 return false;
             }
-            // Uniform near-black desktop themes and splash screens may be
-            // legitimate. Keep forwarding a successful PrintWindow frame, but
-            // report the ambiguity instead of declaring video unavailable.
             PublishCaptureReason(HasVisiblePixels(source) ? "none" : "blank-window");
-
-            double scale = Math.Min(
-                1.0,
-                Math.Min((double)maxWidth / sourceWidth, (double)maxHeight / sourceHeight));
-            int width = Math.Max(2, (int)Math.Round(sourceWidth * scale));
-            int height = Math.Max(2, (int)Math.Round(sourceHeight * scale));
-            width &= ~1;
-            height &= ~1;
-
-            if (width == sourceWidth && height == sourceHeight)
-            {
+            double scale = Math.Min(1.0,
+                Math.Min((double)maxWidth / sourceWidth,
+                         (double)maxHeight / sourceHeight));
+            int width = Math.Max(2, (int)Math.Round(sourceWidth * scale)) & ~1;
+            int height = Math.Max(2, (int)Math.Round(sourceHeight * scale)) & ~1;
+            if (cropX == 0 && cropY == 0 &&
+                width == outerWidth && height == outerHeight)
                 return WriteBitmap(source);
-            }
 
             using (Bitmap scaled = new Bitmap(width, height, PixelFormat.Format32bppArgb))
             using (Graphics graphics = Graphics.FromImage(scaled))
@@ -1484,13 +1493,9 @@ internal static class PalmTTYRemoteAppHost
                 graphics.CompositingMode = CompositingMode.SourceCopy;
                 graphics.InterpolationMode = InterpolationMode.HighQualityBilinear;
                 graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                graphics.DrawImage(
-                    source,
+                graphics.DrawImage(source,
                     new Rectangle(0, 0, width, height),
-                    0,
-                    0,
-                    sourceWidth,
-                    sourceHeight,
+                    new Rectangle(cropX, cropY, sourceWidth, sourceHeight),
                     GraphicsUnit.Pixel);
                 return WriteBitmap(scaled);
             }
