@@ -1376,7 +1376,14 @@ internal static class PalmTTYRemoteAppHost
         if (TryGetVisibleCrop(TestRect(0, 0, 400, 800),
                 TestRect(-10, 0, 390, 800), out x, out y))
             return 6; // inconsistent DWM frame must fail closed
-        Console.WriteLine("Remote App work-area and DWM crop geometry: passed");
+        // This helper is built as WindowsApplication (no attached console).
+        // The installed-runtime smoke pipes the native STD_OUTPUT_HANDLE.
+        using (Stream stdout = OpenStandardStream(STD_OUTPUT_HANDLE, FileAccess.Write))
+        using (StreamWriter writer = new StreamWriter(stdout, new UTF8Encoding(false)))
+        {
+            writer.WriteLine("Remote App work-area and DWM crop geometry: passed");
+            writer.Flush();
+        }
         return 0;
     }
 
