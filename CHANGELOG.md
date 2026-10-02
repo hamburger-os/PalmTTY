@@ -8,7 +8,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Unattended browser RDP foundation
 
-- Add a read-only Windows 11 Pro/RDP/NLA/Hyper-V gateway-VM readiness diagnostic (`pnpm unattended:check`) with cross-platform pure-function tests; document the v0.3.0 security architecture and genuine iPhone/cold-boot release gates. The Machine Service, Guacamole browser desktop and unattended login remain unimplemented and are not advertised as available.
+- Switch the read-only Windows 11 Pro/RDP/NLA diagnostic to the native Windows Devolutions Gateway service, Custom standalone authentication and loopback-only configuration; remove the Hyper-V VM requirement. Document the revised IronRDP/RDCleanPath architecture. Machine Service, integrated browser desktop and unattended login remain unimplemented.
 
 
 ### Windows headless Remote App input and desktop-safe geometry

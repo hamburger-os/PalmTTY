@@ -148,6 +148,6 @@ Windows 登录触发的当前用户 Agent 与系统启动前服务不是一回�
 
 ### Planned v0.3.0 unattended Windows entry / 规划中的 v0.3.0 无人值守入口
 
-The existing InteractiveToken login task is unchanged. A distinct opt-in pre-login Machine Service and authenticated browser RDP gateway are planned, **not shipped**. See [unattended RDP](unattended-rdp.md); the read-only `pnpm unattended:check` does not enable remote access.
+The existing InteractiveToken login task is unchanged. A distinct opt-in pre-login Machine Service and native Windows Devolutions Gateway/IronRDP browser path are planned, **not shipped**. See [unattended RDP](unattended-rdp.md); the read-only `pnpm unattended:check` does not enable remote access.
 
-现有 InteractiveToken 登录任务没有改变。独立登录前机器服务和浏览器 RDP 网关处于规划阶段，**尚未发布**。详见[无人值守浏览器 RDP](unattended-rdp.md)；只读的 `pnpm unattended:check` 不会开启远程访问。
+现有 InteractiveToken 登录任务没有改变。独立登录前机器服务和 Windows 原生 Devolutions Gateway/IronRDP 浏览器路径处于规划阶段，**尚未发布**。详见[无人值守浏览器 RDP](unattended-rdp.md)；只读的 `pnpm unattended:check` 不会开启远程访问。

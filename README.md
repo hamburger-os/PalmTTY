@@ -24,7 +24,7 @@ PalmTTY 是一个面向手机、自托管的远程开发工作台，核心是工
 
 ## Unattended browser RDP / 无人值守浏览器 RDP（规划中）
 
-Windows 11 Pro + iPhone Safari 的完整浏览器 RDP 是 v0.3.0 目标，**尚未实现**。已添加只读的 Windows/RDP/NLA/Hyper-V 就绪检查：`pnpm unattended:check -- --vm PalmTTY-Gateway`。它不会启动登录前服务、安装 Guacamole、启用 RDP 或宣称已经通过无人值守验收。详细请见 [部署指南](docs/community/unattended-rdp.md) 和 [架构设计](docs/owner/unattended-rdp.md)。
+Windows 11 Pro + iPhone Safari 的完整浏览器 RDP 是 v0.3.0 目标，**尚未实现**。已将单机部署调整为原生 Windows Devolutions Gateway + IronRDP，不需要 Hyper-V/WSL2/Docker。只读诊断 `pnpm unattended:check -- --json` 检查 Windows/RDP/NLA 和 Gateway 服务及配置；它不会安装软件、修改登录/防火墙设置或替代真实 iPhone 验收。详细请见 [部署指南](docs/community/unattended-rdp.md) 和 [架构设计](docs/owner/unattended-rdp.md)。
 
 ## Status / 当前状态
 
