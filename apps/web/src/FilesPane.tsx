@@ -459,7 +459,7 @@ export function FilesPane({
         ) : selected ? (
           <>
             {speechText !== null ? (
-              <SpeechReader text={speechText} onClose={() => setSpeechText(null)} />
+              <SpeechReader text={speechText} sourceId={`${workspaceId}:${selectedPath}`} onClose={() => setSpeechText(null)} />
             ) : (
               <pre className="file-preview-content" tabIndex={0}>{selected.content}</pre>
             )}

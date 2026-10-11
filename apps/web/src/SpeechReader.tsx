@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "./i18n.js";
+import { readerChapters, readerProgressKey, readerTextSignature, savedReaderParagraph } from "./reader-progress.js";
 import {
   READER_PAGE_SIZE,
   localSpeechVoices,
@@ -15,18 +16,28 @@ function storedRate(): number {
   return 1;
 }
 
-export function SpeechReader({ text, onClose }: {
+export function SpeechReader({ text, sourceId, onClose }: {
   text: string;
+  sourceId: string;
   onClose(): void;
 }) {
   const { t } = useI18n();
   const parsed = useMemo(() => speechParagraphs(text), [text]);
   const paragraphs = parsed.paragraphs;
+  const chapters = useMemo(() => readerChapters(paragraphs), [paragraphs]);
+  const signature = useMemo(() => readerTextSignature(text), [text]);
+  const progressKey = useMemo(() => readerProgressKey(sourceId), [sourceId]);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceUri, setVoiceUri] = useState("");
   const [rate, setRate] = useState(storedRate);
   const [pageStart, setPageStart] = useState(0);
-  const [activeParagraph, setActiveParagraph] = useState<number | null>(null);
+  const [activeParagraph, setActiveParagraph] = useState<number | null>(() => {
+    try {
+      return savedReaderParagraph(
+        window.localStorage.getItem(progressKey), signature, paragraphs.length
+      );
+    } catch { return null; }
+  });
   const [speaking, setSpeaking] = useState(false);
   const [paused, setPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +69,15 @@ export function SpeechReader({ text, onClose }: {
       synth.cancel();
     };
   }, [available]);
+
+  useEffect(() => {
+    if (activeParagraph === null) return;
+    try {
+      window.localStorage.setItem(progressKey, JSON.stringify({
+        signature, paragraph: activeParagraph
+      }));
+    } catch { /* progress is optional if private browsing blocks storage */ }
+  }, [activeParagraph, progressKey, signature]);
 
   useEffect(() => {
     if (activeParagraph === null) return;
@@ -122,7 +142,10 @@ export function SpeechReader({ text, onClose }: {
   };
 
   const startAtParagraph = (paragraph: number) => {
-    if (!canPlay) return;
+    if (!canPlay) {
+      setActiveParagraph(paragraph);
+      return;
+    }
     stop();
     setError(null);
     cursorParagraphRef.current = paragraph;
@@ -148,6 +171,11 @@ export function SpeechReader({ text, onClose }: {
   const chineseVoices = voices.filter((voice) => /^zh(?:-|_)/i.test(voice.lang));
   const displayVoices = chineseVoices.length > 0 ? chineseVoices : voices;
   const shown = paragraphs.slice(pageStart, pageStart + READER_PAGE_SIZE);
+  const selectedChapter = chapters.reduce(
+    (last, chapter) => activeParagraph !== null && chapter.paragraph <= activeParagraph
+      ? chapter.paragraph : last,
+    0
+  );
 
   return (
     <div className="speech-reader">
@@ -171,6 +199,18 @@ export function SpeechReader({ text, onClose }: {
           </button>
         </div>
         <div className="speech-reader-options">
+          {chapters.length > 1 && (
+            <label>{t("reader.chapter")}
+              <select className="glass-input glass-select" value={selectedChapter}
+                onChange={(event) => startAtParagraph(Number(event.target.value))}>
+                {chapters.map((chapter) => (
+                  <option key={chapter.paragraph} value={chapter.paragraph}>
+                    {chapter.title || t("reader.beginning")}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>{t("reader.voice")}
             <select className="glass-input glass-select" value={voiceUri} onChange={(event) => {
               stop();
@@ -205,6 +245,7 @@ export function SpeechReader({ text, onClose }: {
         {parsed.tooMany && <p role="alert" className="tool-inline-error">{t("reader.tooMany")}</p>}
         {error && <p role="alert" className="tool-inline-error">{error}</p>}
         <p className="tool-hint">{t("reader.hint")}</p>
+        {activeParagraph !== null && <p className="tool-hint">{t("reader.savedPosition", { paragraph: activeParagraph + 1 })}</p>}
       </div>
       <div className="speech-reader-text">
         {!parsed.tooMany && paragraphs.length > READER_PAGE_SIZE && (
@@ -230,7 +271,6 @@ export function SpeechReader({ text, onClose }: {
           return (
             <button type="button" key={paragraphIndex}
               ref={(node) => { paragraphRefs.current[paragraphIndex] = node; }}
-              disabled={!canPlay}
               className={`speech-reader-paragraph${paragraphIndex === activeParagraph ? " is-reading" : ""}`}
               aria-current={paragraphIndex === activeParagraph ? "true" : undefined}
               onClick={() => startAtParagraph(paragraphIndex)}>
