@@ -157,3 +157,7 @@ Files supports a read-only novel reader using the device's Web Speech API (Speec
 手机应用进入后台时，终端 Worker 继续独立维护 PTY 与终端镜像。返回前台只重新创建浏览器终端视图，直接获取最新快照，避免大量历史输出逐帧快放；短暂断线仍允许有界 Replay，不会重启 CLI。
 
 文件页新增只读小说朗读视图，通过浏览器 Web Speech API 使用设备可用音色，支持段落导航与语速调节。完整文本沿用现有工作区文件 API，限制 8 MiB；超过上限不会只朗读预览片段。声音品质与后台表现取决于浏览器/系统，不增加云端语音服务和上传权限。
+
+**Privacy/resource limits:** Web Speech defaults may be remote. PalmTTY plays only with voices the browser marks as localService=true, never with an implicit default; if none exists, read-aloud is unavailable. The reader scans up to 20,000 paragraphs, renders 120 at a time, and prepares speech chunks on demand. A very large number of paragraphs is rejected with a clear message instead of freezing a mobile browser.
+
+**隐私与资源限制：**浏览器默认语音可能依赖远程服务。PalmTTY 只使用浏览器报告 localService=true 的音色；无本地音色时禁用朗读。最多解析 20,000 段，单页渲染 120 段，语音片段按需生成；超限会明确提示而不是卡死手机页面。
