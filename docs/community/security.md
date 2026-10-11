@@ -137,3 +137,11 @@ Windows Remote Apps 有意保持比完整远程桌面更窄的权限。
 - `remoteApps.webrtc.iceServers` 可以配置 operator-owned STUN/TURN，但只对已认证客户端返回；PalmTTY 不运营云中继，TURN credential 应按敏感部署配置处理；
 - 当前没有剪贴板、音频、摄像头、麦克风或文件拖放通道。
 
+
+### Single terminal controller (October 2026)
+
+Each terminal WebSocket still requires authentication and exact Origin. Within an authorized Session, a single ephemeral Agent-managed client controls PTY input and geometry. Others may only watch until the active controller leaves and they explicitly request takeover. This is concurrency control, not an additional account/authorization boundary.
+
+### 终端唯一控制者（2026 年 10 月）
+
+每个终端 WebSocket 仍需认证并通过精确 Origin 校验。单个 Session 同时只授予一位客户端 PTY 输入与尺寸控制权，其他客户端只读，当前控制者断开后可显式请求接管。这属于并发控制，不是新增账号或授权边界。
