@@ -37,7 +37,7 @@ type ManagedWorker = {
   worker: WorkerClient;
   session: SessionPublic;
   clients: Map<string, WebSocket>;
-  controllerId?: string;
+  controllerId?: string | undefined;
   reconnecting: boolean;
 };
 
@@ -356,8 +356,8 @@ export class SessionManager {
     return managed;
   }
 
-  async write(id: string, data: string, socket: WebSocket): Promise<void> {
-    await this.controllerFor(id, socket).worker.write(data);
+  async write(id: string, data: string, socket?: WebSocket): Promise<void> {
+    await (socket ? this.controllerFor(id, socket) : this.requireManaged(id)).worker.write(data);
   }
 
   async resize(id: string, cols: number, rows: number, socket: WebSocket): Promise<void> {
