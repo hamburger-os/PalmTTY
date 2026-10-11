@@ -132,7 +132,7 @@ export class SessionRuntime {
         await writeMirror(this.mirror, data);
         this.seq += 1;
         this.history.push(this.seq, data);
-        this.emitMessage({ type: "output", seq: frame.seq, data: frame.data });
+        this.emitMessage({ type: "output", seq: this.seq, data });
       });
     });
 
