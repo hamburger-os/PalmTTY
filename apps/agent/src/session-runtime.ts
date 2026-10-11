@@ -15,6 +15,8 @@ import { buildPtyEnvironment, type RuntimeWorkspace } from "./workspace-runtime.
 const require = createRequire(import.meta.url);
 // One recovery frame must fit in the local IPC budget and the mobile renderer.
 export const MAX_TERMINAL_SNAPSHOT_BYTES = 4 * 1024 * 1024;
+export const HIGH_WATER_OUTPUT_BYTES = 512 * 1024;
+export const LOW_WATER_OUTPUT_BYTES = 128 * 1024;
 const { Terminal: HeadlessTerminal } = require("@xterm/headless") as typeof import("@xterm/headless");
 const { SerializeAddon } = require("@xterm/addon-serialize") as typeof import("@xterm/addon-serialize");
 
@@ -23,6 +25,8 @@ export type PtyHandle = {
   write(data: string): void;
   resize(cols: number, rows: number): void;
   kill(signal?: string): void;
+  pause?(): void;
+  resume?(): void;
   onData(listener: (data: string) => void): { dispose(): void };
   onExit(listener: (event: { exitCode: number; signal?: number }) => void): { dispose(): void };
 };
@@ -89,6 +93,10 @@ export class SessionRuntime {
   private seq = 0;
   private readonly history: ReplayHistory;
   private pipeline: Promise<void> = Promise.resolve();
+  private pendingOutput: string[] = [];
+  private pendingOutputBytes = 0;
+  private outputDrainScheduled = false;
+  private outputPaused = false;
   private cleanupTimer: NodeJS.Timeout | undefined;
   private readonly messageListeners = new Set<MessageListener>();
   private readonly retireListeners = new Set<RetireListener>();
@@ -127,18 +135,24 @@ export class SessionRuntime {
     this.mirror.loadAddon(this.serializer);
 
     this.child.onData((data) => {
-      void this.enqueue(async () => {
-        if (this.disposed) return;
-        await writeMirror(this.mirror, data);
-        this.seq += 1;
-        this.history.push(this.seq, data);
-        this.emitMessage({ type: "output", seq: this.seq, data });
-      });
+      if (this.disposed) return;
+      this.pendingOutput.push(data);
+      this.pendingOutputBytes += Buffer.byteLength(data, "utf8");
+      if (!this.outputPaused && this.pendingOutputBytes >= HIGH_WATER_OUTPUT_BYTES) {
+        // node-pty's pause() stops reading its underlying PTY socket.
+        // Unlike dropping output, this preserves canonical screen state.
+        this.child.pause?.();
+        this.outputPaused = true;
+      }
+      this.scheduleOutputDrain();
     });
 
     this.child.onExit(({ exitCode }) => {
-      void this.enqueue(() => {
+      void this.enqueue(async () => {
         if (this.disposed || this.state === "exited") return;
+        // The exit event may race with PTY chunks received during a prior
+        // headless write. Drain all accepted output before the exit marker.
+        while (this.pendingOutput.length) await this.drainPendingOutput();
         this.state = "exited";
         this.exitCode = exitCode;
         this.emitMessage({ type: "exit", exitCode });
@@ -303,7 +317,43 @@ export class SessionRuntime {
     this.messageListeners.clear();
     this.retireListeners.clear();
     this.history.clear();
+    this.pendingOutput = [];
+    this.pendingOutputBytes = 0;
     this.mirror.dispose();
+  }
+
+  private scheduleOutputDrain(): void {
+    if (this.disposed || this.outputDrainScheduled || this.pendingOutput.length === 0) return;
+    this.outputDrainScheduled = true;
+    void this.enqueue(async () => {
+      try {
+        await this.drainPendingOutput();
+      } finally {
+        this.outputDrainScheduled = false;
+        if (this.pendingOutput.length) this.scheduleOutputDrain();
+      }
+    });
+  }
+
+  private async drainPendingOutput(): Promise<void> {
+    if (this.disposed || this.pendingOutput.length === 0) return;
+    const chunks = this.pendingOutput;
+    this.pendingOutput = [];
+    // Process as one xterm parse operation, but keep original output
+    // sequence semantics so short replay/overflow policy stays stable.
+    await writeMirror(this.mirror, chunks.join(""));
+    for (const data of chunks) {
+      this.seq += 1;
+      this.history.push(this.seq, data);
+      this.emitMessage({ type: "output", seq: this.seq, data });
+    }
+    this.pendingOutputBytes -= chunks.reduce(
+      (total, part) => total + Buffer.byteLength(part, "utf8"), 0
+    );
+    if (this.outputPaused && this.pendingOutputBytes <= LOW_WATER_OUTPUT_BYTES) {
+      this.outputPaused = false;
+      this.child.resume?.();
+    }
   }
 
   private requireRunning(): void {
