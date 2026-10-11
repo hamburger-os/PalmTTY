@@ -2,7 +2,7 @@ export const MAX_SPEECH_SEGMENT_LENGTH = 180;
 export const MAX_READER_PARAGRAPHS = 20_000;
 export const READER_PAGE_SIZE = 120;
 
-export function localSpeechVoices<T extends { localService: boolean }>(
+export function localSpeechVoices<T extends { localService?: boolean }>(
   voices: readonly T[]
 ): T[] {
   return voices.filter((voice) => voice.localService === true);
