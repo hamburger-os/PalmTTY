@@ -677,7 +677,7 @@ describe("terminal WebSocket integration", () => {
     await waitForOpen(firstSocket);
     firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0, cols: 80, rows: 24 }));
     await firstInbox.next((message) => message.type === "hello");
-    harness.pty.latest().emitData("BEFORE_SUSPENSION\\r\\n");
+    harness.pty.latest().emitData("BEFORE_SUSPENSION\r\n");
     await firstInbox.waitForText("BEFORE_SUSPENSION");
     const lastSeq = firstInbox.latestSeq;
 
@@ -685,7 +685,7 @@ describe("terminal WebSocket integration", () => {
     firstSocket.close(1000, "background the browser");
     await closed;
     for (let index = 0; index < 80; index += 1) {
-      harness.pty.latest().emitData(`CHAPTER_STEP_${index}\\r\\n`);
+      harness.pty.latest().emitData(`CHAPTER_STEP_${index}\r\n`);
     }
     const secondSocket = socketFor(harness, session.id, cookie);
     const secondInbox = new MessageInbox(secondSocket);
