@@ -41,7 +41,7 @@ describe("novel speech segmentation", () => {
       { voiceURI: "remote", localService: false },
       { voiceURI: "local", localService: true },
       { voiceURI: "unknown" }
-    ] as Array<{ voiceURI: string; localService: boolean }>;
+    ] ;
     expect(localSpeechVoices(voices).map((voice) => voice.voiceURI)).toEqual(["local"]);
   });
 
