@@ -242,3 +242,5 @@ The task summary should identify:
 - Real-device iOS/Android background, high-output and geometry transitions remain acceptance gaps; CI alone cannot close them.
 
 - Burst-output flow control: inject >512 KiB before headless can drain; verify node-pty pause() is triggered, buffered output is parsed in order, resume() follows below 128 KiB, and output congestion never terminates PTY.
+
+- Workspace Files must deny symlink paths escaping the workspace for both preview and whole-file export. Host file handles are checked post-open; WSL read scripts use the same validated file descriptor for stat and content. Race-sensitive directory enumeration and non-Linux paths still need platform-targeted adversarial tests.

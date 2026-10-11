@@ -145,3 +145,11 @@ Each terminal WebSocket still requires authentication and exact Origin. Within a
 ### 终端唯一控制者（2026 年 10 月）
 
 每个终端 WebSocket 仍需认证并通过精确 Origin 校验。单个 Session 同时只授予一位客户端 PTY 输入与尺寸控制权，其他客户端只读，当前控制者断开后可显式请求接管。这属于并发控制，不是新增账号或授权边界。
+
+### File handle containment checks (October 2026)
+
+Workspace preview, whole-file export and image reads validate a file descriptor after opening a canonical path. Linux additionally checks `/proc/self/fd` for the actual opened target, and WSL scripts operate on an opened descriptor rather than reopening a previously checked name. The other host platforms use post-open file identity verification. These changes narrow symlink races but are not a claim of fully atomic containment for directory enumeration or every platform.
+
+### 文件句柄检查（2026 年 10 月）
+
+工作区文本预览、完整文件导出和图片读取在规范路径打开后，会再次校验文件句柄。Linux 使用 `/proc/self/fd` 检查已打开的目标，WSL 读取脚本从同一文件描述符读取数据；其他平台再次比对文件身份。此措施减少符号链接竞态，但不等于所有平台目录枚举都具备原子路径隔离。
