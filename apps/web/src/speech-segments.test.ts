@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_READER_PARAGRAPHS,
   MAX_SPEECH_SEGMENT_LENGTH,
+  localSpeechVoices,
   nextSpeechChunk,
   speechParagraphs
 } from "./speech-segments.js";
@@ -33,6 +34,20 @@ describe("novel speech segmentation", () => {
     const result = speechParagraphs(source);
     expect(result.tooMany).toBe(true);
     expect(result.paragraphs).toHaveLength(0);
+  });
+
+  it("never exposes remote or unknown speech services", () => {
+    const voices = [
+      { voiceURI: "remote", localService: false },
+      { voiceURI: "local", localService: true },
+      { voiceURI: "unknown" }
+    ] as Array<{ voiceURI: string; localService: boolean }>;
+    expect(localSpeechVoices(voices).map((voice) => voice.voiceURI)).toEqual(["local"]);
+  });
+
+  it("bounds scanning whitespace-only lines", () => {
+    const source = " \n".repeat(MAX_READER_PARAGRAPHS * 2 + 10);
+    expect(speechParagraphs(source).tooMany).toBe(true);
   });
 
   it("has no segments for empty text", () => {
