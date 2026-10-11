@@ -13,7 +13,7 @@ import {
 } from "@palmtty/protocol";
 
 export const WORKER_PROTOCOL_VERSION = 5 as const;
-export const MAX_WORKER_FRAME_BYTES = 64 * 1024 * 1024;
+export const MAX_WORKER_FRAME_BYTES = 8 * 1024 * 1024;
 
 const SessionWorkerConfigSchema = z.object({
   exitedRetentionMinutes: z.number().positive().max(1440),
@@ -123,7 +123,10 @@ type FrameListener = (value: unknown) => void;
 type CloseListener = () => void;
 
 export class FramedJsonSocket {
-  private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  private readonly header = Buffer.alloc(4);
+  private headerBytes = 0;
+  private frame: Buffer | undefined;
+  private frameBytes = 0;
   private readonly frameListeners = new Set<FrameListener>();
   private readonly closeListeners = new Set<CloseListener>();
   private closed = false;
@@ -166,30 +169,44 @@ export class FramedJsonSocket {
 
   private consume(chunk: Buffer<ArrayBufferLike>): void {
     if (this.closed) return;
-    this.buffer = this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk]);
-    if (this.buffer.byteLength > MAX_WORKER_FRAME_BYTES + 4) {
-      this.destroy();
-      return;
-    }
-
-    while (this.buffer.byteLength >= 4) {
-      const length = this.buffer.readUInt32BE(0);
-      if (length === 0 || length > MAX_WORKER_FRAME_BYTES) {
-        this.destroy();
-        return;
+    let offset = 0;
+    // Each frame is allocated once and filled linearly, even when the OS
+    // delivers a multi-megabyte snapshot as thousands of small chunks.
+    while (offset < chunk.length) {
+      if (!this.frame) {
+        const take = Math.min(4 - this.headerBytes, chunk.length - offset);
+        chunk.copy(this.header, this.headerBytes, offset, offset + take);
+        this.headerBytes += take;
+        offset += take;
+        if (this.headerBytes < 4) return;
+        const length = this.header.readUInt32BE(0);
+        this.headerBytes = 0;
+        if (length === 0 || length > MAX_WORKER_FRAME_BYTES) {
+          this.destroy();
+          return;
+        }
+        this.frame = Buffer.allocUnsafe(length);
+        this.frameBytes = 0;
       }
-      if (this.buffer.byteLength < 4 + length) return;
 
-      const payload = this.buffer.subarray(4, 4 + length);
-      this.buffer = this.buffer.subarray(4 + length);
+      const frame = this.frame;
+      const take = Math.min(frame.length - this.frameBytes, chunk.length - offset);
+      chunk.copy(frame, this.frameBytes, offset, offset + take);
+      this.frameBytes += take;
+      offset += take;
+      if (this.frameBytes !== frame.length) continue;
+
+      this.frame = undefined;
+      this.frameBytes = 0;
       let parsed: unknown;
       try {
-        parsed = JSON.parse(payload.toString("utf8"));
+        parsed = JSON.parse(frame.toString("utf8"));
       } catch {
         this.destroy();
         return;
       }
       for (const listener of [...this.frameListeners]) listener(parsed);
+      if (this.closed) return;
     }
   }
 

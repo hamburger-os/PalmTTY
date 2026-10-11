@@ -405,11 +405,13 @@ export function TerminalView({
     let lastSentCols = terminal.cols;
     let lastSentRows = terminal.rows;
     let terminalWritePipeline = Promise.resolve();
+    let disposed = false;
 
     const enqueueTerminalWrite = (data: string, reset = false): Promise<void> => {
       pendingWrites += 1;
       pendingCharacters += data.length;
       const run = terminalWritePipeline.then(() => {
+        if (disposed) return;
         if (reset) terminal.reset();
         if (data.length === 0) return;
         return new Promise<void>((resolve) => terminal.write(data, resolve));
@@ -462,7 +464,7 @@ export function TerminalView({
         lastPongAt = Date.now();
         socket.send(JSON.stringify({
           type: "resume",
-          lastSeq: 0,
+          lastSeq: lastSeqRef.current,
           cols: terminal.cols,
           rows: terminal.rows
         }));
@@ -578,9 +580,17 @@ export function TerminalView({
         setConnection("reconnecting");
         reconnectAttemptRef.current += 1;
         const delay = Math.min(5000, 400 * 2 ** Math.min(reconnectAttemptRef.current, 4));
+        // Reuse a valid renderer/sequence after a brief socket interruption.
+        // A corrupt or overloaded renderer requires a fresh canonical snapshot.
+        const remount = event.code === 1012 && (
+          event.reason === "Output gap; requesting snapshot" ||
+          event.reason === "Renderer backlog; requesting snapshot" ||
+          event.reason === "Recovery geometry mismatch"
+        );
         reconnectTimer = window.setTimeout(() => {
-          setTerminalGeneration((previous) => previous + 1);
-        }, delay);
+          if (remount) setTerminalGeneration((previous) => previous + 1);
+          else connect();
+        }, remount ? Math.min(delay, 400) : delay);
       });
     };
 
@@ -602,6 +612,7 @@ export function TerminalView({
     }, 15_000);
 
     return () => {
+      disposed = true;
       intentionalCloseRef.current = true;
       inputReadyRef.current = false;
       refitRef.current = null;

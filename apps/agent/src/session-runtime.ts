@@ -9,9 +9,12 @@ import type { SerializeAddon as SerializeAddonType } from "@xterm/addon-serializ
 import type { Terminal as HeadlessTerminalType } from "@xterm/headless";
 import * as pty from "node-pty";
 import { canReplayFrom } from "./reconnect-policy.js";
+import { ReplayHistory } from "./replay-history.js";
 import { buildPtyEnvironment, type RuntimeWorkspace } from "./workspace-runtime.js";
 
 const require = createRequire(import.meta.url);
+// One recovery frame must fit in the local IPC budget and the mobile renderer.
+export const MAX_TERMINAL_SNAPSHOT_BYTES = 4 * 1024 * 1024;
 const { Terminal: HeadlessTerminal } = require("@xterm/headless") as typeof import("@xterm/headless");
 const { SerializeAddon } = require("@xterm/addon-serialize") as typeof import("@xterm/addon-serialize");
 
@@ -45,12 +48,6 @@ export const defaultPtyFactory: PtyFactory = (file, args, options) => pty.spawn(
     ? { ...options, useConptyDll: true }
     : options
 );
-
-type OutputFrame = {
-  seq: number;
-  data: string;
-  bytes: number;
-};
 
 export type SessionRuntimeConfig = {
   exitedRetentionMinutes: number;
@@ -90,8 +87,7 @@ export class SessionRuntime {
   private readonly mirror: HeadlessTerminalType;
   private readonly serializer: SerializeAddonType;
   private seq = 0;
-  private history: OutputFrame[] = [];
-  private historyBytes = 0;
+  private readonly history: ReplayHistory;
   private pipeline: Promise<void> = Promise.resolve();
   private cleanupTimer: NodeJS.Timeout | undefined;
   private readonly messageListeners = new Set<MessageListener>();
@@ -104,6 +100,7 @@ export class SessionRuntime {
     this.createdAt = options.createdAt;
     this.cols = options.cols;
     this.rows = options.rows;
+    this.history = new ReplayHistory(options.config.replayBytes);
 
     const environment = buildPtyEnvironment(
       options.workspace,
@@ -134,14 +131,7 @@ export class SessionRuntime {
         if (this.disposed) return;
         await writeMirror(this.mirror, data);
         this.seq += 1;
-        const frame: OutputFrame = {
-          seq: this.seq,
-          data,
-          bytes: Buffer.byteLength(data, "utf8")
-        };
-        this.history.push(frame);
-        this.historyBytes += frame.bytes;
-        this.trimHistory();
+        this.history.push(this.seq, data);
         this.emitMessage({ type: "output", seq: frame.seq, data: frame.data });
       });
     });
@@ -212,8 +202,8 @@ export class SessionRuntime {
       }
 
       const messages: ServerMessage[] = [];
-      const firstSeq = this.history[0]?.seq;
-      const pending = this.history.filter((frame) => frame.seq > lastSeq);
+      const firstSeq = this.history.firstSeq;
+      const pending = this.history.after(lastSeq);
       const pendingBytes = pending.reduce((sum, frame) => sum + frame.bytes, 0);
       if (!geometryChanged && canReplayFrom(
         lastSeq, this.seq, firstSeq, pending.length, pendingBytes
@@ -229,7 +219,7 @@ export class SessionRuntime {
         messages.push({
           type: "snapshot",
           seq: this.seq,
-          data: this.seq === 0 ? "" : this.serializer.serialize()
+          data: this.seq === 0 ? "" : this.boundedSnapshot()
         });
       }
 
@@ -310,8 +300,7 @@ export class SessionRuntime {
     await this.pipeline.catch(() => undefined);
     this.messageListeners.clear();
     this.retireListeners.clear();
-    this.history = [];
-    this.historyBytes = 0;
+    this.history.clear();
     this.mirror.dispose();
   }
 
@@ -325,13 +314,19 @@ export class SessionRuntime {
     return run;
   }
 
-  private trimHistory(): void {
-    while (
-      this.history.length > 0 &&
-      this.historyBytes > this.options.config.replayBytes
-    ) {
-      const removed = this.history.shift();
-      if (removed) this.historyBytes -= removed.bytes;
+  private boundedSnapshot(): string {
+    // Preserve the visible screen and active terminal modes. Reduce old
+    // scrollback first rather than sending an unbounded serialized history.
+    let scrollback = this.options.config.scrollbackLines;
+    while (true) {
+      const snapshot = this.serializer.serialize({ scrollback });
+      if (Buffer.byteLength(snapshot, "utf8") <= MAX_TERMINAL_SNAPSHOT_BYTES) {
+        return snapshot;
+      }
+      if (scrollback === 0) {
+        throw new Error("Visible terminal state exceeds snapshot budget");
+      }
+      scrollback = Math.floor(scrollback / 2);
     }
   }
 
