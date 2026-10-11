@@ -393,6 +393,60 @@ class MessageInbox {
 }
 
 describe("terminal WebSocket integration", () => {
+  it("permits one input owner while observers remain read-only until takeover", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    const session = await createSession(harness, cookie);
+
+    const owner = socketFor(harness, session.id, cookie);
+    const ownerInbox = new MessageInbox(owner);
+    await waitForOpen(owner);
+    owner.send(JSON.stringify({ type: "resume", lastSeq: 0, cols: 80, rows: 24 }));
+    expect(await ownerInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner", cols: 80, rows: 24 });
+
+    const observer = socketFor(harness, session.id, cookie);
+    const observerInbox = new MessageInbox(observer);
+    await waitForOpen(observer);
+    observer.send(JSON.stringify({ type: "resume", lastSeq: 0, cols: 120, rows: 40 }));
+    expect(await observerInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "viewer", cols: 80, rows: 24 });
+
+    observer.send(JSON.stringify({ type: "input", data: "NOT_ALLOWED" }));
+    expect(await observerInbox.next((message) => message.type === "error"))
+      .toMatchObject({ code: "INVALID_MESSAGE" });
+    observer.send(JSON.stringify({ type: "resize", cols: 120, rows: 40 }));
+    await observerInbox.next((message) => message.type === "error");
+    expect(harness.pty.latest().events).not.toContainEqual({
+      type: "write", data: "NOT_ALLOWED"
+    });
+    expect(harness.pty.latest().events).not.toContainEqual({
+      type: "resize", cols: 120, rows: 40
+    });
+
+    const closed = waitForClose(owner);
+    owner.close(1000, "disconnect controlling device");
+    await closed;
+    await waitUntil(async () => {
+      const response = await getSession(harness, cookie, session.id);
+      if (response.status !== 200) return false;
+      const body = await response.json() as { session: SessionPublic };
+      return body.session.connections === 1;
+    });
+
+    observer.send(JSON.stringify({ type: "takeControl", cols: 100, rows: 30 }));
+    expect(await observerInbox.next((message) => message.type === "control"))
+      .toMatchObject({ role: "owner" });
+    observer.send(JSON.stringify({ type: "input", data: "NEW_OWNER" }));
+    await waitUntil(() => harness.pty.latest().events.some((event) =>
+      event.type === "write" && event.data === "NEW_OWNER"
+    ));
+    expect(harness.pty.latest().events).toContainEqual({
+      type: "resize", cols: 100, rows: 30
+    });
+    observer.close(1000, "test complete");
+  });
+
   it("enforces maxSessions across concurrent creates", async () => {
     const harness = await startHarness((config) => {
       config.sessions.maxSessions = 1;
