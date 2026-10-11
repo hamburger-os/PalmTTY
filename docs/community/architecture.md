@@ -145,3 +145,19 @@ Windows helper cursor telemetry stays inside the verified Job-owned application 
 Terminal and Remote App docks render the same shared Keyboard → Long Text primary actions before their mode-specific shortcuts. The Terminal keyboard focuses xterm’s own input; Remote App Keyboard synchronously focuses a dedicated mobile-safe textarea in the originating iPhone tap, sends committed Unicode on its existing authenticated bounded WebRTC control channel and routes only allowlisted navigation keys via typed key messages. Long Text remains an explicitly submitted composer, with unsent live input preserved when switching. No shared PTY or additional input authority is created.
 
 Terminal 和 Remote App 共用「键盘 → 长文本」两项主按钮，其他功能键后置。Terminal 继续由 xterm 接管软键盘；Remote App 在用户点击当下聚焦独立输入框，输入法完成组合后使用现有 WebRTC 有界文字通道即时发送，特殊键仍走白名单。长文本由用户明确发送，切换时保留即时输入中未发送的草稿，不增加 PTY 通道或桌面控制权限。
+
+### Mobile recovery and browser read-aloud (October 2026)
+
+Terminal Worker PTY/headless state stays authoritative while a mobile page is suspended. Resuming the page recreates its terminal renderer and obtains a fresh snapshot rather than animating a large backlog; small uninterrupted reconnect gaps may still use bounded replay. This never relaunches the CLI.
+
+Files supports a read-only novel reader using the device's Web Speech API (SpeechSynthesis), with paragraph controls, installed voices, and playback speed. The existing workspace file-content endpoint provides complete text up to 8 MiB; larger files cannot be read aloud through this feature. Audio quality and playback while backgrounded depend on the browser and OS. No novel text is sent to a new cloud speech provider.
+
+### 手机恢复与浏览器朗读（2026 年 10 月）
+
+手机应用进入后台时，终端 Worker 继续独立维护 PTY 与终端镜像。返回前台只重新创建浏览器终端视图，直接获取最新快照，避免大量历史输出逐帧快放；短暂断线仍允许有界 Replay，不会重启 CLI。
+
+文件页新增只读小说朗读视图，通过浏览器 Web Speech API 使用设备可用音色，支持段落导航与语速调节。完整文本沿用现有工作区文件 API，限制 8 MiB；超过上限不会只朗读预览片段。声音品质与后台表现取决于浏览器/系统，不增加云端语音服务和上传权限。
+
+**Privacy/resource limits:** Web Speech defaults may be remote. PalmTTY plays only with voices the browser marks as localService=true, never with an implicit default; if none exists, read-aloud is unavailable. The reader scans up to 20,000 paragraphs, renders 120 at a time, and prepares speech chunks on demand. A very large number of paragraphs is rejected with a clear message instead of freezing a mobile browser.
+
+**隐私与资源限制：**浏览器默认语音可能依赖远程服务。PalmTTY 只使用浏览器报告 localService=true 的音色；无本地音色时禁用朗读。最多解析 20,000 段，单页渲染 120 段，语音片段按需生成；超限会明确提示而不是卡死手机页面。

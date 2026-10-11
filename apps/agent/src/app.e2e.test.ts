@@ -667,6 +667,42 @@ describe("terminal WebSocket integration", () => {
     secondSocket.close(1000, "test complete");
   });
 
+  it("restores latest terminal state instead of replaying a large retained backlog", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    const session = await createSession(harness, cookie);
+
+    const firstSocket = socketFor(harness, session.id, cookie);
+    const firstInbox = new MessageInbox(firstSocket);
+    await waitForOpen(firstSocket);
+    firstSocket.send(JSON.stringify({ type: "resume", lastSeq: 0, cols: 80, rows: 24 }));
+    await firstInbox.next((message) => message.type === "hello");
+    harness.pty.latest().emitData("BEFORE_SUSPENSION\r\n");
+    await firstInbox.waitForText("BEFORE_SUSPENSION");
+    const lastSeq = firstInbox.latestSeq;
+
+    const closed = waitForClose(firstSocket);
+    firstSocket.close(1000, "background the browser");
+    await closed;
+    for (let index = 0; index < 80; index += 1) {
+      harness.pty.latest().emitData(`CHAPTER_STEP_${index}\r\n`);
+    }
+    const secondSocket = socketFor(harness, session.id, cookie);
+    const secondInbox = new MessageInbox(secondSocket);
+    await waitForOpen(secondSocket);
+    secondSocket.send(JSON.stringify({ type: "resume", lastSeq, cols: 80, rows: 24 }));
+    await secondInbox.next((message) => message.type === "hello");
+    const recovery = await secondInbox.next(
+      (message) => message.type === "snapshot" || message.type === "output"
+    );
+    expect(recovery.type).toBe("snapshot");
+    if (recovery.type === "snapshot") {
+      expect(recovery.data).toContain("CHAPTER_STEP_79");
+    }
+    expect(harness.pty.latest().events.some((event) => event.type === "kill")).toBe(false);
+    secondSocket.close(1000, "test complete");
+  });
+
   it("falls back to a snapshot when replay history is stale", async () => {
     const harness = await startHarness((config) => {
       // Below the user-configurable minimum on purpose: this makes history eviction

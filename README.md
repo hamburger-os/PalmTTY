@@ -40,11 +40,12 @@ PalmTTY is **alpha**. **0.2.0** is the current release baseline; this source lin
 | UI languages | English and Simplified Chinese |
 | Visual themes | Spectrum / Obsidian / Frosted with Quality / Performance rendering modes |
 | Browser or network disconnect | PTY survives while the Agent stays alive |
-| Reconnect | Sequence replay + server-side terminal snapshot fallback |
+| Reconnect | Latest snapshot after mobile background return or renderer congestion; bounded replay for short interruptions (PTY survives) |
 | Session lifecycle | Explicit terminate / restart-as-replacement / retained clear; no ambiguous close/kill control |
 | Workspace workbench | Activity-aware Terminal / Remote App surface plus shared Git / Files; direct switching among live Activities for the same Workspace; switching tools keeps active xterm/WebRTC mounted; Artifacts remain Terminal Session-scoped |
 | Windows Remote Apps | **Unreleased alpha:** detected/.exe-selected saved profiles → detached AppWorker → single owned app window → WebRTC video + bounded typed input; auto capture size; optional operator STUN/TURN; no full desktop/UAC/clipboard/audio; real-app validation still required |
 | Mobile terminal | xterm.js PWA, touch special-key bar, on-demand long-text input |
+| Novel reading / 小说朗读 | Read-only browser speech using explicitly local voices, Chinese paragraphs, bounded paging and adjustable speed (up to 8 MiB / 20,000 paragraphs; voice availability depends on device) |
 | Mobile Remote App | View / direct-touch / trackpad modes, two-finger scroll, special keys and bounded Unicode text/IME input; auto viewport/DPR capture sizing plus explicit capture/network diagnostics |
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
 | Network exposure | Explicit `local` / `lan` / `reverseProxy` / direct `https` profiles; HTTPS/private entry is recommended |

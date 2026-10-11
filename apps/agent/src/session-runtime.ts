@@ -213,11 +213,13 @@ export class SessionRuntime {
 
       const messages: ServerMessage[] = [];
       const firstSeq = this.history[0]?.seq;
-      if (!geometryChanged && canReplayFrom(lastSeq, this.seq, firstSeq)) {
-        for (const frame of this.history) {
-          if (frame.seq > lastSeq) {
-            messages.push({ type: "output", seq: frame.seq, data: frame.data });
-          }
+      const pending = this.history.filter((frame) => frame.seq > lastSeq);
+      const pendingBytes = pending.reduce((sum, frame) => sum + frame.bytes, 0);
+      if (!geometryChanged && canReplayFrom(
+        lastSeq, this.seq, firstSeq, pending.length, pendingBytes
+      )) {
+        for (const frame of pending) {
+          messages.push({ type: "output", seq: frame.seq, data: frame.data });
         }
       } else {
         // Serialized terminal state is geometry-sensitive. When the attaching

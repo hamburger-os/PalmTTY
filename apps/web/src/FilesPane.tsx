@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { SpeechReader } from "./SpeechReader.js";
 import type {
   WorkspaceFileListResponse,
   WorkspaceFileReadResponse
@@ -75,6 +76,10 @@ export function FilesPane({
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reading, setReading] = useState(false);
+  const [speechText, setSpeechText] = useState<string | null>(null);
+  const [speechLoading, setSpeechLoading] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const speechRequestRef = useRef(0);
   const [imageLoading, setImageLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -107,6 +112,34 @@ export function FilesPane({
   }, [workspaceId, path, refreshVersion, translateError]);
 
   const currentLabel = useMemo(() => path || t("files.root"), [path, t]);
+
+  useEffect(() => {
+    speechRequestRef.current += 1;
+    setSpeechText(null);
+    setSpeechLoading(false);
+    setSpeechError(null);
+  }, [workspaceId, selectedPath, refreshVersion]);
+
+  const openSpeechReader = async () => {
+    if (!selectedPath || !selected || selected.binary || speechLoading) return;
+    const requestId = ++speechRequestRef.current;
+    setSpeechLoading(true);
+    setSpeechError(null);
+    try {
+      // The ordinary preview is capped at 512 KiB. Never silently read only
+      // that prefix as if it were the full chapter.
+      let fullText = selected.content;
+      if (selected.truncated) {
+        const blob = await readWorkspaceFileContent(workspaceId, selectedPath);
+        fullText = new TextDecoder("utf-8", { fatal: true }).decode(await blob.arrayBuffer());
+      }
+      if (requestId === speechRequestRef.current) setSpeechText(fullText);
+    } catch {
+      if (requestId === speechRequestRef.current) setSpeechError(t("reader.readFailed"));
+    } finally {
+      if (requestId === speechRequestRef.current) setSpeechLoading(false);
+    }
+  };
 
   useEffect(() => {
     setFileActionError(null);
@@ -365,6 +398,13 @@ export function FilesPane({
               </span>
             </div>
             <div className="file-preview-actions">
+              {selected && !selected.binary && speechText === null && (
+                <button type="button" className="ghost compact"
+                  disabled={fileAction !== null || speechLoading}
+                  onClick={() => void openSpeechReader()}>
+                  {speechLoading ? t("reader.loading") : t("reader.open")}
+                </button>
+              )}
               {selected && !selected.binary && (
                 <button
                   type="button"
@@ -418,12 +458,17 @@ export function FilesPane({
           <div className="tool-empty">{t("files.binary")}</div>
         ) : selected ? (
           <>
-            <pre className="file-preview-content" tabIndex={0}>{selected.content}</pre>
-            {selected.truncated && (
+            {speechText !== null ? (
+              <SpeechReader text={speechText} onClose={() => setSpeechText(null)} />
+            ) : (
+              <pre className="file-preview-content" tabIndex={0}>{selected.content}</pre>
+            )}
+            {selected.truncated && speechText === null && (
               <div className="tool-hint">{t("files.previewTruncated")}</div>
             )}
           </>
         ) : null}
+        {speechError && <div className="tool-inline-error" role="alert">{speechError}</div>}
         {fileActionError && <div className="tool-inline-error">{fileActionError}</div>}
         {fileActionStatus && <div className="tool-hint file-action-status">{fileActionStatus}</div>}
       </div>
