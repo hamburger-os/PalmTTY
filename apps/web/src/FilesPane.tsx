@@ -398,18 +398,11 @@ export function FilesPane({
               </span>
             </div>
             <div className="file-preview-actions">
-              {selected && !selected.binary && (
+              {selected && !selected.binary && speechText === null && (
                 <button type="button" className="ghost compact"
                   disabled={fileAction !== null || speechLoading}
-                  onClick={() => {
-                    if (speechText !== null) {
-                      setSpeechText(null);
-                    } else {
-                      void openSpeechReader();
-                    }
-                  }}>
-                  {speechLoading ? t("reader.loading") :
-                    speechText !== null ? t("reader.back") : t("reader.open")}
+                  onClick={() => void openSpeechReader()}>
+                  {speechLoading ? t("reader.loading") : t("reader.open")}
                 </button>
               )}
               {selected && !selected.binary && (
