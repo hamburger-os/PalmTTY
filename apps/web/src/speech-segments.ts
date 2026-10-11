@@ -1,32 +1,44 @@
-export type SpeechSegment = { paragraph: number; text: string };
 export const MAX_SPEECH_SEGMENT_LENGTH = 180;
+export const MAX_READER_PARAGRAPHS = 20_000;
+export const READER_PAGE_SIZE = 120;
 
-export function speechParagraphs(text: string): string[] {
-  return text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n")
-    .split(/\n+/).map((line) => line.trimEnd()).filter((line) => line.trim().length > 0);
+export function speechParagraphs(text: string): {
+  paragraphs: string[];
+  tooMany: boolean;
+} {
+  const paragraphs: string[] = [];
+  // Stop scanning once the safe paragraph bound is reached; split() would
+  // eagerly allocate millions of strings for a valid but hostile 8 MiB file.
+  const pattern = /[^\r\n]+/gu;
+  for (const match of text.replace(/^\uFEFF/, "").matchAll(pattern)) {
+    const value = match[0].trimEnd();
+    if (!value.trim()) continue;
+    if (paragraphs.length === MAX_READER_PARAGRAPHS) {
+      return { paragraphs: [], tooMany: true };
+    }
+    paragraphs.push(value);
+  }
+  return { paragraphs, tooMany: false };
 }
 
-// Keep punctuation with the preceding phrase while bounding every browser
-// utterance. Split only for playback: the reader still shows whole paragraphs.
-export function speechSegments(paragraphs: readonly string[]): SpeechSegment[] {
-  const result: SpeechSegment[] = [];
-  for (let paragraph = 0; paragraph < paragraphs.length; paragraph += 1) {
-    const chars = Array.from(paragraphs[paragraph] ?? "");
-    let start = 0;
-    while (start < chars.length) {
-      let end = Math.min(start + MAX_SPEECH_SEGMENT_LENGTH, chars.length);
-      if (end < chars.length) {
-        for (let index = end - 1; index >= start + 40; index -= 1) {
-          if (/[。！？!?；;，,、\s]/u.test(chars[index] ?? "")) {
-            end = index + 1;
-            break;
-          }
-        }
+// A single bounded utterance at a time, using UTF-16 offsets to avoid
+// allocating the entire speech queue for a large chapter.
+export function nextSpeechChunk(paragraph: string, offset: number): {
+  text: string;
+  nextOffset: number;
+} | null {
+  if (offset < 0 || offset >= paragraph.length) return null;
+  let end = Math.min(offset + MAX_SPEECH_SEGMENT_LENGTH, paragraph.length);
+  // Do not cut a surrogate pair at a chunk boundary.
+  if (end < paragraph.length) {
+    const code = paragraph.charCodeAt(end - 1);
+    if (code >= 0xd800 && code <= 0xdbff) end -= 1;
+    for (let index = end - 1; index >= offset + 40; index -= 1) {
+      if (/[。！？!?；;，,、\s]/u.test(paragraph[index] ?? "")) {
+        end = index + 1;
+        break;
       }
-      const text = chars.slice(start, end).join("").trim();
-      if (text) result.push({ paragraph, text });
-      start = end;
     }
   }
-  return result;
+  return { text: paragraph.slice(offset, end).trim(), nextOffset: end };
 }
