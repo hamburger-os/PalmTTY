@@ -1355,6 +1355,24 @@ button.directory-choose {
   -webkit-overflow-scrolling: touch;
 }
 
+
+.speech-reader-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .speech-reader-controls > .tool-hint:last-child {
+    display: none;
+  }
+}
+
 .speech-reader-paragraph {
   display: block;
   width: 100%;
@@ -1388,8 +1406,8 @@ button.directory-choose {
 
 @media (max-width: 760px) {
   .speech-reader-controls {
-    max-height: 42dvh;
-    overflow: auto;
+    gap: var(--space-1);
+    padding: var(--space-2);
   }
 
   .speech-reader-options label {
