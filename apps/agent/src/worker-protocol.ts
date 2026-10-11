@@ -213,7 +213,9 @@ export class FramedJsonSocket {
   private finish(): void {
     if (this.closed) return;
     this.closed = true;
-    this.buffer = Buffer.alloc(0);
+    this.frame = undefined;
+    this.frameBytes = 0;
+    this.headerBytes = 0;
     for (const listener of [...this.closeListeners]) listener();
     this.frameListeners.clear();
     this.closeListeners.clear();
