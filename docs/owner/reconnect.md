@@ -112,3 +112,9 @@ Agent 启动时对已有 Worker 的 rediscovery 仍使用约 8 秒的有限重�
 每个 Terminal Session 的输入与 resize 仅由一位已认证连接控制；额外连接以 Worker 规范尺寸的快照进入只读模式，当前控制者离线后才允许显式接管。控制租约是 Agent 内存态，不能当成多用户认证。控制权变化不会创建新的 PTY，几何变更可要求观察者重新连接。
 
 浏览器短断线保留 xterm/seq，后台挂起与渲染过载重建视图。重放缓存有独立帧数和字节预算，Worker IPC 使用增量解析，序列化快照最多 4 MiB并优先削减旧 scrollback。可见屏幕仍超过预算时恢复失败，但不会杀 CLI。Worker 在 PTY→headless 待处理输出超过 512 KiB 时 pause 原生 PTY 读取，低于 128 KiB 时恢复。批次合并解析但保留逐帧 seq。真实 Windows/WSL/手机压力测试仍待验证。
+
+## 协议升级后的已有会话恢复（2026-10-11）
+
+浏览器与 Agent 的终端 WebSocket 协议同时为 `palmtty.v4`；更新网页而没有重启旧 Agent，可能收到 1002 协议错误，手机端现在直接给出重启 Agent + 完整刷新网页的提示，而不是无限次重连。
+
+Session Worker 独立于 Agent 存活。#100 升级浏览器协议时没有改变 Worker IPC v5，因此旧 Worker 可以认证却会发出 `hello.protocol=3`；新版 Agent 如直接使用 v4 浏览器消息 schema 校验，就会主动断开旧 Worker IPC 并循环重连。现在只在**经过 secret 认证的本地 Worker 通道**对这一种旧 `hello` 进行 v4 投影，不改变 PTY/Worker 寿命，也不向浏览器开放旧协议。不得为解决升级重连而自动终止 Session Worker。

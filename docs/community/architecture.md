@@ -169,3 +169,11 @@ The `palmtty.v4` browser terminal wire protocol admits exactly one input/resize 
 ### 终端控制租约与小说进度（2026 年 10 月）
 
 终端浏览器协议更新为 `palmtty.v4`，每个 Session 仅一个输入/窗口尺寸控制者。额外连接经身份校验后以 Worker 规范尺寸只读附着，不会改变 PTY；控制者断开后才可显式接管。短网络中断沿用浏览器 xterm 和序号进行有限增量恢复，手机长期后台或渲染堆积则使用不超过 4 MiB 的最新快照。重放缓存按字节及帧数限额，IPC 使用增量解析。小说阅读器识别最多 256 个章节导航项，本地仅保存散列文件身份、抽样内容签名和段落序号，不保存正文。
+
+### Terminal v4 deployment and durable Worker upgrade (October 2026)
+
+Terminal browser clients and the Agent must use `palmtty.v4` together. If a v4 browser meets a still-running v3 Agent, a protocol 1002 close gives an explicit restart-Agent-and-refresh instruction instead of an endless reconnect. Session Workers are independent and may survive the Agent upgrade: an authenticated old Worker IPC v5 still emits a v3 terminal hello. Only at the trusted local IPC ingress does the Agent normalize that precise hello to the current browser v4 shape, preserving the PTY and rejecting unknown versions.
+
+### 终端 v4 部署与独立 Worker 升级（2026 年 10 月）
+
+网页与 Agent 的终端协议必须同时为 `palmtty.v4`。如果更新网页却仍运行旧 Agent，浏览器遇到 1002 版本错误时会提示重启 Agent 并完整刷新。Session Worker 能跨 Agent 重启存活：旧 Worker IPC v5 可能发送 v3 的 `hello`，Agent 仅在已认证的本地 IPC 入口把这一消息精确归一化为浏览器 v4 结构；不重启 PTY，不允许未知版本或旧浏览器入口。
