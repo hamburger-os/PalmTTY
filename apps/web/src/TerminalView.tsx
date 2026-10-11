@@ -147,6 +147,7 @@ export function TerminalView({
   const inputReadyRef = useRef(false);
   const controlRef = useRef<"owner" | "viewer">("viewer");
   const [controlRole, setControlRole] = useState<"owner" | "viewer">("viewer");
+  const [protocolError, setProtocolError] = useState(false);
   const ctrlRef = useRef(false);
   const altRef = useRef(false);
   const handledInsertRef = useRef<number | null>(null);
@@ -260,6 +261,7 @@ export function TerminalView({
     inputReadyRef.current = false;
     controlRef.current = "viewer";
     setControlRole("viewer");
+    setProtocolError(false);
     lastSeqRef.current = 0;
 
     // xterm.dispose does not promise to remove the mount's DOM nodes.
@@ -587,6 +589,13 @@ export function TerminalView({
           setConnection("closed");
           return;
         }
+        // A 1002 protocol close means this browser bundle and the running
+        // Agent disagree about WS_SUBPROTOCOL. Retrying cannot repair it.
+        if (event.code === 1002) {
+          setProtocolError(true);
+          setConnection("closed");
+          return;
+        }
         if (event.code === 1008) {
           if (event.reason === "Authentication expired") {
             window.location.reload();
@@ -722,6 +731,9 @@ export function TerminalView({
             }
           }}>{t("terminal.takeControl")}</button>
         </div>
+      )}
+      {protocolError && (
+        <p className="tool-inline-error" role="alert">{t("terminal.protocolMismatch")}</p>
       )}
       <TerminalKeyBar
         connected={connection === "connected" && controlRole === "owner"}

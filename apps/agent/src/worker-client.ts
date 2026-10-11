@@ -4,6 +4,7 @@ import { SessionPublicSchema, type ServerMessage, type SessionPublic } from "@pa
 import {
   FramedJsonSocket,
   WORKER_PROTOCOL_VERSION,
+  normalizeWorkerDelivery,
   WorkerEventSchema
 } from "./worker-protocol.js";
 import { workerEndpoint } from "./worker-storage.js";
@@ -193,7 +194,7 @@ export class WorkerClient {
 
     if (event.type === "deliver") {
       for (const listener of [...this.deliverListeners]) {
-        listener(event.clientId, event.message);
+        listener(event.clientId, normalizeWorkerDelivery(event.message));
       }
       return;
     }

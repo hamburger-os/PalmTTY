@@ -244,3 +244,9 @@ The task summary should identify:
 - Burst-output flow control: inject >512 KiB before headless can drain; verify node-pty pause() is triggered, buffered output is parsed in order, resume() follows below 128 KiB, and output congestion never terminates PTY.
 
 - Workspace Files must deny symlink paths escaping the workspace for both preview and whole-file export. Host file handles are checked post-open; WSL read scripts use the same validated file descriptor for stat and content. Race-sensitive directory enumeration and non-Linux paths still need platform-targeted adversarial tests.
+
+## Browser/Agent versus independent Worker rolling upgrade
+
+- Existing v3-hello Workers must reconnect through authenticated Worker IPC v5 and deliver the current v4 browser hello; never terminate a running PTY merely due to a browser/Agent deployment.
+- Worker deliver-schema unit regression accepts exactly retained v3 hello and current v4 hello, converts only legacy hello, rejects unknown versions/malformed messages; browser wire v4 schema still rejects v3.
+- A v4 browser connecting to an old Agent that closes WS 1002 must show a version-specific error and stop retrying; operators restart Agent and hard-refresh the PWA. Network 1012/1013 interruptions still use bounded backoff.

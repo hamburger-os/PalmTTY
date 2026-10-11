@@ -153,3 +153,11 @@ Workspace preview, whole-file export and image reads validate a file descriptor 
 ### 文件句柄检查（2026 年 10 月）
 
 工作区文本预览、完整文件导出和图片读取在规范路径打开后，会再次校验文件句柄。Linux 使用 `/proc/self/fd` 检查已打开的目标，WSL 读取脚本从同一文件描述符读取数据；其他平台再次比对文件身份。此措施减少符号链接竞态，但不等于所有平台目录枚举都具备原子路径隔离。
+
+### Durable Worker version boundary (October 2026)
+
+PalmTTY does not downgrade browser terminal protocol v4. To protect already-running CLI sessions through an Agent update, the authenticated private Worker IPC accepts a narrowly-defined v3 hello delivery and re-emits it as v4 on the browser side. Unauthenticated IPC clients, unknown versions and public v3 browser traffic remain rejected. Restart the Agent and refresh the browser after deployment rather than killing Session Workers.
+
+### 存活 Worker 的协议边界（2026 年 10 月）
+
+浏览器终端仍严格使用 v4，不允许降级。为在 Agent 更新后保住既有 CLI 会话，经过私有 secret 认证的 Worker IPC 只接收一个明确的旧版 hello 形状并转换为 v4；未认证 IPC、未知版本及公开浏览器 v3 继续拒绝。更新时应重启 Agent、刷新网页，而不是终止 Session Worker。
