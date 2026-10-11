@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "./i18n.js";
 import {
   READER_PAGE_SIZE,
+  localSpeechVoices,
   nextSpeechChunk,
   speechParagraphs
 } from "./speech-segments.js";
@@ -42,7 +43,7 @@ export function SpeechReader({ text, onClose }: {
     const updateVoices = () => {
       // The Web Speech API can expose remote voices, even as the OS default.
       // Only explicitly selected localService voices receive workspace text.
-      const local = synth.getVoices().filter((voice) => voice.localService === true);
+      const local = localSpeechVoices(synth.getVoices());
       setVoices(local);
       setVoiceUri((previous) => {
         if (local.some((voice) => voice.voiceURI === previous)) return previous;
