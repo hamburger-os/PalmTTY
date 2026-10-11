@@ -24,6 +24,10 @@ class DeterministicPty implements PtyHandle {
   private readonly dataListeners = new Set<(data: string) => void>();
   private readonly exitListeners = new Set<(event: { exitCode: number; signal?: number }) => void>();
   private exited = false;
+  pauseCalls = 0;
+  resumeCalls = 0;
+  pause(): void { this.pauseCalls++; }
+  resume(): void { this.resumeCalls++; }
   readonly events: Array<
     | { type: "write"; data: string }
     | { type: "resize"; cols: number; rows: number }
@@ -393,6 +397,18 @@ class MessageInbox {
 }
 
 describe("terminal WebSocket integration", () => {
+  it("pauses and resumes PTY output under a synchronous headless backlog", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    await createSession(harness, cookie);
+    const pty = harness.pty.latest();
+    for (let i = 0; i < 600; i++) pty.emitData("X".repeat(1024));
+    expect(pty.pauseCalls).toBeGreaterThan(0);
+    await waitUntil(() => pty.resumeCalls > 0, 10_000);
+    expect(pty.resumeCalls).toBeGreaterThan(0);
+    expect(pty.events.some((event) => event.type === "kill")).toBe(false);
+  });
+
   it("permits one input owner while observers remain read-only until takeover", async () => {
     const harness = await startHarness();
     const cookie = await login(harness);
