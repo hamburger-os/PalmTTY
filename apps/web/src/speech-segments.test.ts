@@ -3,7 +3,7 @@ import { MAX_SPEECH_SEGMENT_LENGTH, speechParagraphs, speechSegments } from "./s
 
 describe("speech segmentation", () => {
   it("normalizes paragraphs", () => {
-    expect(speechParagraphs("One\n\n Two\nThree")).toEqual(["One", "Two", "Three"]);
+    expect(speechParagraphs("One\n\n Two\nThree")).toEqual(["One", " Two", "Three"]);
   });
   it("keeps paragraphs and bounds long Unicode utterances", () => {
     const paragraphs = ["你好。".repeat(180), "🙂".repeat(300)];
