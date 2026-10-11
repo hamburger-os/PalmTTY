@@ -120,3 +120,7 @@ Remote Apps 的风险等级按“当前 OS 用户可执行能力”处理，但�
 3. 是否破坏 exposure profile 的认证 + Origin + HTTPS 边界？尤其检查 `lan` 是否仍强制认证、拒绝非私有来源地址且只接受动态检测到的精确私有 Origin，`reverseProxy`/`https` 是否仍只接受显式 HTTPS Origin，以及 `pnpm dev` 是否只注入运行时 5173 Origin。
 4. 是否允许未认证本地 IPC 控制 Worker？
 5. 是否把 persisted PID 当成 kill authority？
+
+## Terminal 控制租约（2026-10）
+
+所有浏览器终端连接仍必须通过独立的认证、精确 Origin 检查。Agent 在单个 Session 上授予唯一临时输入与 resize 租约，其他连接只能观察；原控制者仍连接时拒绝接管。控制者离线后其他连接可明确请求接管。未获租约的输入/resize 均在 Agent 阻断，不进入 Worker。本机制只保证同一用户多端并发一致性，不建立新的身份权限域。
