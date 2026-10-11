@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -35,6 +35,19 @@ afterEach(async () => {
 });
 
 describe("workspace file access", () => {
+  it("refuses to read symlinks pointing outside the workspace root", async () => {
+    const definition = await workspace();
+    const outside = await mkdtemp(path.join(os.tmpdir(), "palmtty-files-outside-"));
+    roots.add(outside);
+    const outsideFile = path.join(outside, "secret.txt");
+    await writeFile(outsideFile, "outside-private", "utf8");
+    const link = path.join(definition.cwd, "escape.txt");
+    await symlink(outsideFile, link, "file");
+    await expect(readWorkspaceFile(definition, "escape.txt")).rejects.toThrow();
+    await expect(readWorkspaceFileContent(definition, "escape.txt")).rejects.toThrow();
+  });
+
+
   it("lists directories before files and reads UTF-8 text", async () => {
     const definition = await workspace();
     await mkdir(path.join(definition.cwd, "src"));

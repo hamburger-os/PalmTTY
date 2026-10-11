@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { RemoteAppProfilesSchema } from "./remote-app.js";
 
-export const PROTOCOL_VERSION = 3 as const;
-export const WS_SUBPROTOCOL = "palmtty.v3";
+export const PROTOCOL_VERSION = 4 as const;
+export const WS_SUBPROTOCOL = "palmtty.v4";
 export const MAX_INPUT_BYTES = 64 * 1024;
 export const MAX_MESSAGE_BYTES = 80 * 1024;
 
@@ -584,6 +584,11 @@ export const ResizeMessageSchema = z.object({
   rows: TerminalRowsSchema
 });
 
+export const TakeControlMessageSchema = z.object({
+  type: z.literal("takeControl"),
+  cols: TerminalColumnsSchema,
+  rows: TerminalRowsSchema
+});
 export const PingMessageSchema = z.object({
   type: z.literal("ping"),
   id: z.string().min(1).max(128)
@@ -593,6 +598,7 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   ResumeMessageSchema,
   InputMessageSchema,
   ResizeMessageSchema,
+  TakeControlMessageSchema,
   PingMessageSchema
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
@@ -604,12 +610,15 @@ export const HelloMessageSchema = z.object({
   state: SessionStateSchema,
   cols: TerminalColumnsSchema,
   rows: TerminalRowsSchema,
-  latestSeq: z.number().int().nonnegative()
+  latestSeq: z.number().int().nonnegative(),
+  role: z.enum(["owner", "viewer"]).optional()
 });
 
 export const SnapshotMessageSchema = z.object({
   type: z.literal("snapshot"),
   seq: z.number().int().nonnegative(),
+  cols: TerminalColumnsSchema.optional(),
+  rows: TerminalRowsSchema.optional(),
   data: z.string()
 });
 
@@ -630,6 +639,10 @@ export const ErrorMessageSchema = z.object({
   message: z.string()
 });
 
+export const ControlMessageSchema = z.object({
+  type: z.literal("control"),
+  role: z.enum(["owner", "viewer"])
+});
 export const PongMessageSchema = z.object({
   type: z.literal("pong"),
   id: z.string()
@@ -641,6 +654,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   OutputMessageSchema,
   ExitMessageSchema,
   ErrorMessageSchema,
+  ControlMessageSchema,
   PongMessageSchema
 ]);
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;

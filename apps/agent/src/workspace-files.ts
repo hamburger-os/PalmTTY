@@ -1,4 +1,5 @@
-import { lstat, open, opendir, realpath, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, opendir, realpath, stat, type FileHandle } from "node:fs/promises";
 import path from "node:path";
 import {
   MAX_SESSION_ARTIFACT_BYTES,
@@ -67,6 +68,35 @@ async function resolveHostTarget(
     throw new Error("Workspace path escapes the workspace root");
   }
   return { root, target };
+}
+
+// Open the resolved pathname without following a last-component symlink,
+ // then validate the opened descriptor before reading any bytes. Linux can
+ // inspect the actual descriptor target; other hosts compare its identity
+ // against the checked canonical pathname as a narrower race mitigation.
+async function openContainedHostFile(
+  workspace: WorkspaceDefinition, relativePath: string
+): Promise<FileHandle> {
+  const { root, target } = await resolveHostTarget(workspace, relativePath);
+  const handle = await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const descriptor = await handle.stat();
+    if (!descriptor.isFile()) throw new Error("Workspace path is not a file");
+    const openedPath = process.platform === "linux"
+      ? await realpath(`/proc/self/fd/${handle.fd}`)
+      : await realpath(target);
+    if (!isWithin(root, openedPath)) throw new Error("Workspace path escapes the workspace root");
+    if (process.platform !== "linux") {
+      const current = await stat(target);
+      if (descriptor.dev !== current.dev || descriptor.ino !== current.ino) {
+        throw new Error("Workspace file changed during secure open");
+      }
+    }
+    return handle;
+  } catch (error) {
+    await handle.close();
+    throw error;
+  }
 }
 
 async function listHostFiles(
@@ -164,12 +194,9 @@ async function readHostFile(
   workspace: WorkspaceDefinition,
   relativePath: string
 ): Promise<WorkspaceFileReadResponse> {
-  const { target } = await resolveHostTarget(workspace, relativePath);
-  const info = await stat(target);
-  if (!info.isFile()) throw new Error("Workspace path is not a file");
-
-  const handle = await open(target, "r");
+  const handle = await openContainedHostFile(workspace, relativePath);
   try {
+    const info = await handle.stat();
     const requested = Math.min(info.size, MAX_FILE_BYTES + 1);
     const buffer = Buffer.alloc(requested);
     const { bytesRead } = await handle.read(buffer, 0, requested, 0);
@@ -323,9 +350,12 @@ const WSL_READ_SCRIPT = [
   '[ -n "$resolved" ] || exit 21',
   'case "$resolved" in "$root_physical"|"$root_physical"/*) ;; *) exit 22 ;; esac',
   '[ -f "$resolved" ] || exit 23',
-  'size="$(stat -c %s -- "$resolved" 2>/dev/null)" || exit 24',
+  'exec 3< "$resolved" || exit 24',
+  'opened="$(readlink -f -- /proc/self/fd/3 2>/dev/null || true)"',
+  'case "$opened" in "$root_physical"|"$root_physical"/*) ;; *) exit 22 ;; esac',
+  'size="$(stat -c %s -- /proc/self/fd/3 2>/dev/null)" || exit 24',
   'printf "%s\\0" "$size"',
-  `head -c ${MAX_FILE_BYTES + 1} -- "$resolved"`
+  `head -c ${MAX_FILE_BYTES + 1} <&3`
 ].join("\n");
 
 async function readWslFile(
@@ -397,8 +427,7 @@ async function readHostFileContent(
   workspace: WorkspaceDefinition,
   relativePath: string
 ): Promise<WorkspaceFileContentReadResult> {
-  const { target } = await resolveHostTarget(workspace, relativePath);
-  const handle = await open(target, "r");
+  const handle = await openContainedHostFile(workspace, relativePath);
   try {
     const info = await handle.stat();
     if (!info.isFile()) throw new Error("Workspace path is not a file");
@@ -427,10 +456,13 @@ const WSL_CONTENT_READ_SCRIPT = [
   '[ -n "$resolved" ] || exit 21',
   'case "$resolved" in "$root_physical"|"$root_physical"/*) ;; *) exit 22 ;; esac',
   '[ -f "$resolved" ] || exit 23',
-  'size="$(stat -c %s -- "$resolved" 2>/dev/null)" || exit 24',
+  'exec 3< "$resolved" || exit 24',
+  'opened="$(readlink -f -- /proc/self/fd/3 2>/dev/null || true)"',
+  'case "$opened" in "$root_physical"|"$root_physical"/*) ;; *) exit 22 ;; esac',
+  'size="$(stat -c %s -- /proc/self/fd/3 2>/dev/null)" || exit 24',
   'printf "%s\\0" "$size"',
   `[ "$size" -le ${MAX_WORKSPACE_FILE_CONTENT_BYTES} ] || exit 25`,
-  'cat -- "$resolved"'
+  'cat <&3'
 ].join("\n");
 
 async function readWslFileContent(
@@ -487,8 +519,7 @@ async function readHostImage(
   workspace: WorkspaceDefinition,
   relativePath: string
 ): Promise<WorkspaceImageReadResult> {
-  const { target } = await resolveHostTarget(workspace, relativePath);
-  const handle = await open(target, "r");
+  const handle = await openContainedHostFile(workspace, relativePath);
   try {
     const info = await handle.stat();
     if (!info.isFile()) throw new Error("Workspace path is not a file");
@@ -519,10 +550,13 @@ const WSL_IMAGE_READ_SCRIPT = [
   '[ -n "$resolved" ] || exit 21',
   'case "$resolved" in "$root_physical"|"$root_physical"/*) ;; *) exit 22 ;; esac',
   '[ -f "$resolved" ] || exit 23',
-  'size="$(stat -c %s -- "$resolved" 2>/dev/null)" || exit 24',
+  'exec 3< "$resolved" || exit 24',
+  'opened="$(readlink -f -- /proc/self/fd/3 2>/dev/null || true)"',
+  'case "$opened" in "$root_physical"|"$root_physical"/*) ;; *) exit 22 ;; esac',
+  'size="$(stat -c %s -- /proc/self/fd/3 2>/dev/null)" || exit 24',
   'printf "%s\\0" "$size"',
   `[ "$size" -le ${MAX_SESSION_ARTIFACT_BYTES} ] || exit 25`,
-  'cat -- "$resolved"'
+  'cat <&3'
 ].join("\n");
 
 async function readWslImage(

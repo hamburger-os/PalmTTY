@@ -232,3 +232,15 @@ The task summary should identify:
 - whether Windows and Ubuntu CI passed;
 - any acceptance step not executed;
 - any newly introduced gap or deferred item.
+
+## Terminal control and novel reader regressions (October 2026)
+
+- A brief socket interruption preserves the xterm renderer and seq for bounded replay; extended mobile suspension or renderer overload requests a canonical snapshot without restarting the Worker/PTY.
+- E2E: two authenticated WebSocket connections have exactly one input/resize owner. The observer receives canonical dimensions and can take control after owner disconnect; unauthorized input and resize do not reach PTY.
+- Unit: replay history honors independent frame/byte limits; IPC receives fragmented and coalesced frames without quadratic reallocation; snapshots decrease scrollback within a 4 MiB size budget.
+- Unit: reader chapter extraction stays bounded at 256 headings; local progress validation rejects stale/invalid data, never persisting plaintext paths or prose.
+- Real-device iOS/Android background, high-output and geometry transitions remain acceptance gaps; CI alone cannot close them.
+
+- Burst-output flow control: inject >512 KiB before headless can drain; verify node-pty pause() is triggered, buffered output is parsed in order, resume() follows below 128 KiB, and output congestion never terminates PTY.
+
+- Workspace Files must deny symlink paths escaping the workspace for both preview and whole-file export. Host file handles are checked post-open; WSL read scripts use the same validated file descriptor for stat and content. Race-sensitive directory enumeration and non-Linux paths still need platform-targeted adversarial tests.

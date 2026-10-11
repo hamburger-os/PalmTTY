@@ -534,9 +534,14 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
             }
 
             if (message.type === "input") {
-              await sessions.write(id, message.data);
+              await sessions.write(id, message.data, socket);
             } else if (message.type === "resize") {
-              await sessions.resize(id, message.cols, message.rows);
+              await sessions.resize(id, message.cols, message.rows, socket);
+            } else if (message.type === "takeControl") {
+              const granted = await sessions.takeControl(id, socket, message.cols, message.rows);
+              socket.send(encodeServerMessage({
+                type: "control", role: granted ? "owner" : "viewer"
+              }));
             }
           } catch (error) {
             request.log.debug({ err: error }, "Rejected terminal protocol frame");
