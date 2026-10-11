@@ -6,7 +6,10 @@ import {
 } from "./workspace-runtime.js";
 import {
   MAX_INPUT_BYTES,
+  PROTOCOL_VERSION,
+  HelloMessageSchema,
   ServerMessageSchema,
+  type ServerMessage,
   SessionPublicSchema,
   TerminalColumnsSchema,
   TerminalRowsSchema
@@ -101,11 +104,28 @@ export const WorkerResponseSchema = z.object({
   error: z.string().max(512).optional()
 });
 
+// Workers are independently durable: an Agent upgraded from browser wire v3
+// to v4 may reconnect to a still-running Worker emitting v3 hello frames.
+// Only the authenticated local Worker IPC accepts this precise older hello;
+// browsers never accept a second wire protocol.
+const RetainedWorkerHelloSchema = HelloMessageSchema.extend({
+  protocol: z.literal(3)
+});
+
 export const WorkerDeliverSchema = z.object({
   type: z.literal("deliver"),
   clientId: z.string().min(1).max(128),
-  message: ServerMessageSchema
+  message: z.union([ServerMessageSchema, RetainedWorkerHelloSchema])
 });
+
+export function normalizeWorkerDelivery(
+  message: z.infer<typeof WorkerDeliverSchema>["message"]
+): ServerMessage {
+  if (message.type === "hello" && message.protocol === 3) {
+    return { ...message, protocol: PROTOCOL_VERSION };
+  }
+  return message;
+}
 
 export const WorkerStatusSchema = z.object({
   type: z.literal("status"),
