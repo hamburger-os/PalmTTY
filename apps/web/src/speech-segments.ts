@@ -3,7 +3,7 @@ export const MAX_SPEECH_SEGMENT_LENGTH = 180;
 
 export function speechParagraphs(text: string): string[] {
   return text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n")
-    .split(/\n+/).map((line) => line.trim()).filter(Boolean);
+    .split(/\n+/).map((line) => line.trimEnd()).filter((line) => line.trim().length > 0);
 }
 
 // Keep punctuation with the preceding phrase while bounding every browser
