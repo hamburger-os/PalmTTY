@@ -495,7 +495,7 @@ export function TerminalView({
           // A slow/mobile renderer must never animate minutes of output.
           // Closing the socket remounts a fresh xterm and fetches the current
           // canonical snapshot without interrupting the running PTY.
-          if (pendingWrites > 64 || pendingCharacters > 128 * 1024) {
+          if (ready && (pendingWrites > 64 || pendingCharacters > 128 * 1024)) {
             socket.close(1012, "Renderer backlog; requesting snapshot");
           }
           return;
