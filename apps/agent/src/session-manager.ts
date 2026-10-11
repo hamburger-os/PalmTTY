@@ -37,6 +37,7 @@ type ManagedWorker = {
   worker: WorkerClient;
   session: SessionPublic;
   clients: Map<string, WebSocket>;
+  controllerId?: string;
   reconnecting: boolean;
 };
 
@@ -318,11 +319,19 @@ export class SessionManager {
   ): Promise<void> {
     const managed = this.requireManaged(id);
     const clientId = randomBytes(12).toString("base64url");
+    const owner = !managed.controllerId;
+    if (owner) managed.controllerId = clientId;
     managed.clients.set(clientId, socket);
     try {
-      await managed.worker.attach(clientId, lastSeq, cols, rows);
+      // A viewer must not resize the one canonical PTY during attachment.
+      await managed.worker.attach(
+        clientId, owner ? lastSeq : 0,
+        owner ? cols : managed.session.cols,
+        owner ? rows : managed.session.rows
+      );
     } catch (error) {
       managed.clients.delete(clientId);
+      if (managed.controllerId === clientId) managed.controllerId = undefined;
       throw error;
     }
   }
@@ -333,17 +342,47 @@ export class SessionManager {
     for (const [clientId, candidate] of managed.clients) {
       if (candidate !== socket) continue;
       managed.clients.delete(clientId);
+      if (managed.controllerId === clientId) managed.controllerId = undefined;
       void managed.worker.detach(clientId).catch(() => undefined);
       break;
     }
   }
 
-  async write(id: string, data: string): Promise<void> {
-    await this.requireManaged(id).worker.write(data);
+  private controllerFor(id: string, socket: WebSocket): ManagedWorker {
+    const managed = this.requireManaged(id);
+    if (![...managed.clients].some(([key, value]) =>
+      key === managed.controllerId && value === socket
+    )) throw new Error("This terminal is in read-only viewer mode");
+    return managed;
   }
 
-  async resize(id: string, cols: number, rows: number): Promise<void> {
-    await this.requireManaged(id).worker.resize(cols, rows);
+  async write(id: string, data: string, socket: WebSocket): Promise<void> {
+    await this.controllerFor(id, socket).worker.write(data);
+  }
+
+  async resize(id: string, cols: number, rows: number, socket: WebSocket): Promise<void> {
+    await this.controllerFor(id, socket).worker.resize(cols, rows);
+  }
+
+  async takeControl(id: string, socket: WebSocket, cols: number, rows: number): Promise<boolean> {
+    const managed = this.requireManaged(id);
+    const entry = [...managed.clients].find(([, value]) => value === socket);
+    if (!entry) return false;
+    if (managed.controllerId && managed.clients.has(managed.controllerId)) {
+      return managed.controllerId === entry[0];
+    }
+    managed.controllerId = entry[0];
+    try {
+      await managed.worker.resize(cols, rows);
+      // Existing observers must reattach to the changed canonical geometry.
+      for (const [clientId, peer] of managed.clients) {
+        if (clientId !== entry[0]) peer.close(1012, "Control geometry changed");
+      }
+      return true;
+    } catch (error) {
+      managed.controllerId = undefined;
+      throw error;
+    }
   }
 
   async terminate(id: string): Promise<SessionPublic | undefined> {
@@ -499,6 +538,7 @@ export class SessionManager {
         }
       }
       managed.clients.clear();
+      managed.controllerId = undefined;
       void this.reconnect(managed);
     });
   }
@@ -513,12 +553,14 @@ export class SessionManager {
 
     if (socket.readyState !== 1) {
       managed.clients.delete(clientId);
+      if (managed.controllerId === clientId) managed.controllerId = undefined;
       void managed.worker.detach(clientId).catch(() => undefined);
       return;
     }
 
     if (socket.bufferedAmount > this.config.sessions.maxSocketBufferedBytes) {
       managed.clients.delete(clientId);
+      if (managed.controllerId === clientId) managed.controllerId = undefined;
       void managed.worker.detach(clientId).catch(() => undefined);
       try {
         socket.close(1013, "Client is too slow; reconnect to resume");
@@ -528,7 +570,9 @@ export class SessionManager {
       return;
     }
 
-    socket.send(encodeServerMessage(message));
+    socket.send(encodeServerMessage(message.type === "hello"
+      ? { ...message, role: managed.controllerId === clientId ? "owner" : "viewer" }
+      : message));
   }
 
   private async reconnect(managed: ManagedWorker): Promise<void> {

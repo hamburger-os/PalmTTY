@@ -219,6 +219,8 @@ export class SessionRuntime {
         messages.push({
           type: "snapshot",
           seq: this.seq,
+          cols: this.cols,
+          rows: this.rows,
           data: this.seq === 0 ? "" : this.boundedSnapshot()
         });
       }
