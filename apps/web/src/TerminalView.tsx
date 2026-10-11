@@ -258,6 +258,9 @@ export function TerminalView({
     inputReadyRef.current = false;
     lastSeqRef.current = 0;
 
+    // xterm.dispose does not promise to remove the mount's DOM nodes.
+    // A renderer-only resume must never leave a second screen/textarea behind.
+    mount.replaceChildren();
     const terminal = new Terminal({
       cursorBlink: true,
       fontSize: fontSizeRef.current,
