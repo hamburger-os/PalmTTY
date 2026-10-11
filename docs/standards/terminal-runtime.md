@@ -116,3 +116,7 @@ Authoritative sources:
 - https://learn.microsoft.com/troubleshoot/windows-server/networking/error-10013-wsaeacces-is-returned
 
 Windows exposes TCP excluded-port ranges through `netsh interface ipv4/ipv6 show excludedportrange`. Microsoft documents WSAEACCES/10013 as a possible bind failure for excluded ports. PalmTTY does not assume every Windows `EACCES` has that single cause: preflight probes the configured Agent endpoint and reports excluded/reserved ranges, exclusive listeners, and local policy as diagnostic possibilities.
+
+## node-pty flow control API (2026-10)
+
+`node-pty` 1.1.0 exposes `IPty.pause()` / `IPty.resume()` for controlling its underlying PTY socket. PalmTTY now invokes them at independent canonical-headless output-queue high/low watermarks (512 KiB/128 KiB); this is different from optional XON/XOFF `handleFlowControl` on user input. References: [node-pty typings](https://github.com/microsoft/node-pty/blob/main/typings/node-pty.d.ts), [flow control documentation](https://github.com/microsoft/node-pty#flow-control). Validate ConPTY and WSL behavior on real hosts before claiming complete stress-test certification.

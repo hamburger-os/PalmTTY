@@ -240,3 +240,5 @@ The task summary should identify:
 - Unit: replay history honors independent frame/byte limits; IPC receives fragmented and coalesced frames without quadratic reallocation; snapshots decrease scrollback within a 4 MiB size budget.
 - Unit: reader chapter extraction stays bounded at 256 headings; local progress validation rejects stale/invalid data, never persisting plaintext paths or prose.
 - Real-device iOS/Android background, high-output and geometry transitions remain acceptance gaps; CI alone cannot close them.
+
+- Burst-output flow control: inject >512 KiB before headless can drain; verify node-pty pause() is triggered, buffered output is parsed in order, resume() follows below 128 KiB, and output congestion never terminates PTY.
