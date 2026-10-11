@@ -140,6 +140,8 @@ export function TerminalView({
   const terminalRef = useRef<Terminal | null>(null);
   const refitRef = useRef<(() => void) | null>(null);
   const lastSeqRef = useRef(0);
+  const reconnectAttemptRef = useRef(0);
+  const [terminalGeneration, setTerminalGeneration] = useState(0);
   const intentionalCloseRef = useRef(false);
   const sessionExitedRef = useRef(false);
   const inputReadyRef = useRef(false);
@@ -155,6 +157,33 @@ export function TerminalView({
   useEffect(() => {
     translateRef.current = t;
   }, [t]);
+
+  // Mobile browsers can suspend an OPEN socket and its JS event queue while
+  // backgrounded. Discard stale rendering work on return and attach a new xterm
+  // instance to the still-running Worker, just as a page refresh would do.
+  useEffect(() => {
+    let hiddenAt: number | null =
+      document.visibilityState === "hidden" ? Date.now() : null;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+        return;
+      }
+      if (hiddenAt !== null && Date.now() - hiddenAt >= 1500) {
+        setTerminalGeneration((previous) => previous + 1);
+      }
+      hiddenAt = null;
+    };
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setTerminalGeneration((previous) => previous + 1);
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, [sessionId]);
 
   useEffect(() => {
     onConnectionChange(connection);
@@ -227,6 +256,7 @@ export function TerminalView({
     intentionalCloseRef.current = false;
     sessionExitedRef.current = false;
     inputReadyRef.current = false;
+    lastSeqRef.current = 0;
 
     const terminal = new Terminal({
       cursorBlink: true,
@@ -365,18 +395,24 @@ export function TerminalView({
     let reconnectTimer: number | undefined;
     let heartbeatTimer: number | undefined;
     let resizeFrame: number | undefined;
-    let attempt = 0;
     let ready = false;
+    let pendingWrites = 0;
+    let pendingCharacters = 0;
     let lastPongAt = Date.now();
     let lastSentCols = terminal.cols;
     let lastSentRows = terminal.rows;
     let terminalWritePipeline = Promise.resolve();
 
     const enqueueTerminalWrite = (data: string, reset = false): Promise<void> => {
+      pendingWrites += 1;
+      pendingCharacters += data.length;
       const run = terminalWritePipeline.then(() => {
         if (reset) terminal.reset();
         if (data.length === 0) return;
         return new Promise<void>((resolve) => terminal.write(data, resolve));
+      }).finally(() => {
+        pendingWrites -= 1;
+        pendingCharacters -= data.length;
       });
       terminalWritePipeline = run.catch(() => undefined);
       return run;
@@ -410,7 +446,7 @@ export function TerminalView({
       if (intentionalCloseRef.current) return;
       ready = false;
       inputReadyRef.current = false;
-      setConnection(attempt === 0 ? "connecting" : "reconnecting");
+      setConnection(reconnectAttemptRef.current === 0 ? "connecting" : "reconnecting");
 
       const socket = new WebSocket(websocketUrl(sessionId), WS_SUBPROTOCOL);
       socketRef.current = socket;
@@ -423,13 +459,14 @@ export function TerminalView({
         lastPongAt = Date.now();
         socket.send(JSON.stringify({
           type: "resume",
-          lastSeq: lastSeqRef.current,
+          lastSeq: 0,
           cols: terminal.cols,
           rows: terminal.rows
         }));
       });
 
       socket.addEventListener("message", (event) => {
+        if (socketRef.current !== socket || socket.readyState !== WebSocket.OPEN) return;
         let message: ServerMessage;
         try {
           message = ServerMessageSchema.parse(JSON.parse(String(event.data)));
@@ -452,6 +489,12 @@ export function TerminalView({
           }
           lastSeqRef.current = message.seq;
           void enqueueTerminalWrite(message.data);
+          // A slow/mobile renderer must never animate minutes of output.
+          // Closing the socket remounts a fresh xterm and fetches the current
+          // canonical snapshot without interrupting the running PTY.
+          if (pendingWrites > 64 || pendingCharacters > 128 * 1024) {
+            socket.close(1012, "Renderer backlog; requesting snapshot");
+          }
           return;
         }
 
@@ -469,7 +512,7 @@ export function TerminalView({
               intentionalCloseRef.current ||
               sessionExitedRef.current
             ) return;
-            attempt = 0;
+            reconnectAttemptRef.current = 0;
             ready = message.state === "running";
             inputReadyRef.current = ready;
             lastPongAt = Date.now();
@@ -513,7 +556,8 @@ export function TerminalView({
       });
 
       socket.addEventListener("close", (event) => {
-        if (socketRef.current === socket) socketRef.current = null;
+        if (socketRef.current !== socket) return;
+        socketRef.current = null;
         ready = false;
         inputReadyRef.current = false;
         if (intentionalCloseRef.current || sessionExitedRef.current) {
@@ -529,9 +573,11 @@ export function TerminalView({
           return;
         }
         setConnection("reconnecting");
-        attempt += 1;
-        const delay = Math.min(5000, 400 * 2 ** Math.min(attempt, 4));
-        reconnectTimer = window.setTimeout(connect, delay);
+        reconnectAttemptRef.current += 1;
+        const delay = Math.min(5000, 400 * 2 ** Math.min(reconnectAttemptRef.current, 4));
+        reconnectTimer = window.setTimeout(() => {
+          setTerminalGeneration((previous) => previous + 1);
+        }, delay);
       });
     };
 
@@ -571,7 +617,7 @@ export function TerminalView({
       terminal.dispose();
       terminalRef.current = null;
     };
-  }, [sessionId]);
+  }, [sessionId, terminalGeneration]);
 
   const toggleCtrl = () => {
     if (connection !== "connected") return;
