@@ -100,3 +100,9 @@ Agent 启动时对已有 Worker 的 rediscovery 仍使用约 8 秒的有限重�
 - Agent 关闭是否只断控制面；
 - stale/orphan cleanup 是否避免 PID reuse 风险；
 - browser 和 Worker 两层 backpressure 是否都存在。
+
+## 手机返回前台：最新状态优先（2026-10）
+
+断线恢复分为两个层次：Worker 在保留 PTY 的前提下继续维护 canonical headless terminal；浏览器在重连或长时间后台恢复时重新创建 xterm 视图，并以 lastSeq=0 请求同一 Worker 的最新 Snapshot，不把积压的旧渲染队列带到新视图。WebSocket 断开有退避重试；可见性恢复不会重启 Shell/CLI。Worker 仅在缺失数据不超过 64 帧、64 KiB 且几何一致时使用 Replay，超限直接 Snapshot。即使 WebSocket 尚未断开，浏览器端输出渲染队列超过预算也会主动重新附着。
+
+与“刷新整个页面”不同，新恢复仅作用于 TerminalView，不销毁 WorkspaceWorkbench/Agent/PTY。输入在恢复边界完成后才重新放行。网页后台暂停和 iOS/Android 真机效果仍需设备实测；不能承诺所有平台在系统挂起后实时保活。
