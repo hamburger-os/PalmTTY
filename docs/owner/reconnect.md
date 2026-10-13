@@ -103,6 +103,18 @@ Agent 启动时对已有 Worker 的 rediscovery 仍使用约 8 秒的有限重�
 
 ## 手机返回前台：最新状态优先（2026-10）
 
-断线恢复分为两个层次：Worker 在保留 PTY 的前提下继续维护 canonical headless terminal；浏览器在重连或长时间后台恢复时重新创建 xterm 视图，并以 lastSeq=0 请求同一 Worker 的最新 Snapshot，不把积压的旧渲染队列带到新视图。WebSocket 断开有退避重试；可见性恢复不会重启 Shell/CLI。Worker 仅在缺失数据不超过 64 帧、64 KiB 且几何一致时使用 Replay，超限直接 Snapshot。即使 WebSocket 尚未断开，浏览器端输出渲染队列超过预算也会主动重新附着。
+终端恢复分为两条路径：短暂网络断线保留原 xterm 和最近序号，让 Worker 有界增量重放；后台超过 1.5 秒、浏览器渲染超载或序号/几何错误时才重建视图，以 lastSeq=0 从同一 Worker 获取最新 Snapshot，不快放旧渲染队列。WebSocket 断开有退避重试；可见性恢复不会重启 Shell/CLI。Worker 仅在缺失数据不超过 64 帧、64 KiB 且几何一致时使用 Replay，超限直接 Snapshot。即使 WebSocket 尚未断开，浏览器端输出渲染队列超过预算也会主动重新附着。
 
 与“刷新整个页面”不同，新恢复仅作用于 TerminalView，不销毁 WorkspaceWorkbench/Agent/PTY。输入在恢复边界完成后才重新放行。网页后台暂停和 iOS/Android 真机效果仍需设备实测；不能承诺所有平台在系统挂起后实时保活。
+
+## 2026-10 有界恢复与单一控制者
+
+每个 Terminal Session 的输入与 resize 仅由一位已认证连接控制；额外连接以 Worker 规范尺寸的快照进入只读模式，当前控制者离线后才允许显式接管。控制租约是 Agent 内存态，不能当成多用户认证。控制权变化不会创建新的 PTY，几何变更可要求观察者重新连接。
+
+浏览器短断线保留 xterm/seq，后台挂起与渲染过载重建视图。重放缓存有独立帧数和字节预算，Worker IPC 使用增量解析，序列化快照最多 4 MiB并优先削减旧 scrollback。可见屏幕仍超过预算时恢复失败，但不会杀 CLI。Worker 在 PTY→headless 待处理输出超过 512 KiB 时 pause 原生 PTY 读取，低于 128 KiB 时恢复。批次合并解析但保留逐帧 seq。真实 Windows/WSL/手机压力测试仍待验证。
+
+## 协议升级后的已有会话恢复（2026-10-11）
+
+浏览器与 Agent 的终端 WebSocket 协议同时为 `palmtty.v4`；更新网页而没有重启旧 Agent，可能收到 1002 协议错误，手机端现在直接给出重启 Agent + 完整刷新网页的提示，而不是无限次重连。
+
+Session Worker 独立于 Agent 存活。#100 升级浏览器协议时没有改变 Worker IPC v5，因此旧 Worker 可以认证却会发出 `hello.protocol=3`；新版 Agent 如直接使用 v4 浏览器消息 schema 校验，就会主动断开旧 Worker IPC 并循环重连。现在只在**经过 secret 认证的本地 Worker 通道**对这一种旧 `hello` 进行 v4 投影，不改变 PTY/Worker 寿命，也不向浏览器开放旧协议。不得为解决升级重连而自动终止 Session Worker。

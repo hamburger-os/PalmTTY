@@ -124,3 +124,11 @@ Release PR 还必须执行 `pnpm license:check` 与 `pnpm release:check -- X.Y.Z
 - Workspace environment 已作为有界持久化配置开放；如果要继续扩大到任意进程执行或密钥管理，必须先进行架构与安全审查。
 - Session Workbench 工具必须与终端 transport 分离。Files 保持 Workspace 根目录范围内的只读能力：preview 与完整文件导出是两个独立 contract，完整导出必须复用 canonical/symlink containment 与稳定有界读取，UI copy/share/download 不能把截断 preview 标成完整内容。Session 图片附件必须继续使用独立私有 runtime store、按真实 bytes/解码资源边界校验并使用稳定有界读取、跟随 Session 清理，只向终端提供本地路径/文本插入原语；不要把 Codex/Antigravity 私有图片消息协议写入终端核心。Git 只读 history 要保持固定 snapshot、cursor 有界、path 校验与按需加载，commit/file diff 检查不应要求 Git 写信任确认。Git 写操作仍只通过 typed operation contract：必须保留 expected-state 校验、truncated/不完整 status fail closed、按已解析仓库而不是 Workspace ID 串行、rename-aware pathset、显式仓库级 stage-all/unstage-all、破坏性 restore 的 diff-snapshot 校验、可信仓库显式确认、hooks/交互提示禁用、有界子进程，以及“禁止浏览器传任意 Git argv”的边界。正常 Git filter 仍属于可信仓库代码执行，不能把当前设计描述成沙箱。
 - 必须区分“已经实现的平台适配器”与“已进入 CI 实机路径的平台”。
+
+### Terminal ownership and reader regression tests (October 2026)
+
+When editing terminal recovery, test the single input owner, rejected read-only input and resize, takeover after disconnect, replay budgets and fragmented IPC. Changing novel reading must preserve the local-voice-only policy, bounded chapter/paragraph counts, and non-prose browser progress. Windows/Ubuntu CI cannot certify real iOS background behavior; retain separate device-level acceptance.
+
+### 终端控制与阅读器回归测试（2026 年 10 月）
+
+修改终端恢复逻辑时，必须覆盖唯一输入控制者、只读连接拒绝写入/resize、断开后接管、重放容量预算以及 IPC 分片。修改小说阅读时必须保留本地音色策略、章节/段落预算，不允许进度存储正文。Windows/Ubuntu 自动化无法替代真实 iPhone 后台恢复验收。

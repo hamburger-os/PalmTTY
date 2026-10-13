@@ -137,3 +137,27 @@ Windows Remote Apps 有意保持比完整远程桌面更窄的权限。
 - `remoteApps.webrtc.iceServers` 可以配置 operator-owned STUN/TURN，但只对已认证客户端返回；PalmTTY 不运营云中继，TURN credential 应按敏感部署配置处理；
 - 当前没有剪贴板、音频、摄像头、麦克风或文件拖放通道。
 
+
+### Single terminal controller (October 2026)
+
+Each terminal WebSocket still requires authentication and exact Origin. Within an authorized Session, a single ephemeral Agent-managed client controls PTY input and geometry. Others may only watch until the active controller leaves and they explicitly request takeover. This is concurrency control, not an additional account/authorization boundary.
+
+### 终端唯一控制者（2026 年 10 月）
+
+每个终端 WebSocket 仍需认证并通过精确 Origin 校验。单个 Session 同时只授予一位客户端 PTY 输入与尺寸控制权，其他客户端只读，当前控制者断开后可显式请求接管。这属于并发控制，不是新增账号或授权边界。
+
+### File handle containment checks (October 2026)
+
+Workspace preview, whole-file export and image reads validate a file descriptor after opening a canonical path. Linux additionally checks `/proc/self/fd` for the actual opened target, and WSL scripts operate on an opened descriptor rather than reopening a previously checked name. The other host platforms use post-open file identity verification. These changes narrow symlink races but are not a claim of fully atomic containment for directory enumeration or every platform.
+
+### 文件句柄检查（2026 年 10 月）
+
+工作区文本预览、完整文件导出和图片读取在规范路径打开后，会再次校验文件句柄。Linux 使用 `/proc/self/fd` 检查已打开的目标，WSL 读取脚本从同一文件描述符读取数据；其他平台再次比对文件身份。此措施减少符号链接竞态，但不等于所有平台目录枚举都具备原子路径隔离。
+
+### Durable Worker version boundary (October 2026)
+
+PalmTTY does not downgrade browser terminal protocol v4. To protect already-running CLI sessions through an Agent update, the authenticated private Worker IPC accepts a narrowly-defined v3 hello delivery and re-emits it as v4 on the browser side. Unauthenticated IPC clients, unknown versions and public v3 browser traffic remain rejected. Restart the Agent and refresh the browser after deployment rather than killing Session Workers.
+
+### 存活 Worker 的协议边界（2026 年 10 月）
+
+浏览器终端仍严格使用 v4，不允许降级。为在 Agent 更新后保住既有 CLI 会话，经过私有 secret 认证的 Worker IPC 只接收一个明确的旧版 hello 形状并转换为 v4；未认证 IPC、未知版本及公开浏览器 v3 继续拒绝。更新时应重启 Agent、刷新网页，而不是终止 Session Worker。
