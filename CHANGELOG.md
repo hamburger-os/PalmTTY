@@ -6,6 +6,12 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+### Compact mobile terminal scrollbar
+
+- Use xterm's own scrollbar width as the shared scrollable-area/FitAddon geometry source (4 CSS px for coarse pointers, 8 CSS px for precise pointers) instead of reserving a second CSS gutter.
+- Tighten mobile terminal-frame padding without changing the padding-free FitAddon mount, scroll physics, mouse modes, or Session transport; add targeted policy tests and iOS/Android visual acceptance criteria.
+
+
 ### Pi CLI and deterministic terminal startup
 
 - Add Pi to startup presets and provide generic Shift+Enter, Alt+Enter, Ctrl+Q mobile shortcuts plus the xterm Kitty keyboard extension.

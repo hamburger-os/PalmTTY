@@ -32,6 +32,7 @@ import {
   utf8InputBytes
 } from "./terminal-input-transport.js";
 import { TerminalMouseReportGuard } from "./terminal-mouse-report.js";
+import { terminalScrollbarWidth } from "./terminal-scrollbar.js";
 
 export type ConnectionState =
   | "connecting"
@@ -286,6 +287,10 @@ export function TerminalView({
       lineHeight: 1.15,
       fontFamily: '"Cascadia Mono", "SFMono-Regular", Consolas, monospace',
       scrollback: 10000,
+      scrollbar: {
+        showScrollbar: true,
+        width: terminalScrollbarWidth(window.matchMedia("(pointer: coarse)").matches)
+      },
       allowProposedApi: false,
       vtExtensions: { kittyKeyboard: true },
       theme: terminalThemeRef.current
