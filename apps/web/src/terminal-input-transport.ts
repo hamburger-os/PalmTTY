@@ -50,10 +50,6 @@ export function asciiBinaryInput(value: string): string | undefined {
   return value;
 }
 
-export function isSgrMouseReport(value: string): boolean {
-  return /^\x1b\[<\d+;\d+;\d+[Mm]$/.test(value);
-}
-
 export class TerminalInputQueue {
   private readonly pending: { data: string; bytes: number }[] = [];
   private pendingBytes = 0;
