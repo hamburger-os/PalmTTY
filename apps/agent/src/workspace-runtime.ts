@@ -18,7 +18,6 @@ export const RuntimeWorkspaceSchema = z.object({
   cwd: z.string().min(1).refine(path.isAbsolute, "runtime cwd must be absolute"),
   executable: z.string().min(1).refine(path.isAbsolute, "runtime executable must be absolute"),
   args: z.array(z.string()).max(64),
-  command: z.string().max(8192).optional(),
   env: z.record(z.string(), z.string())
 });
 export type RuntimeWorkspace = z.infer<typeof RuntimeWorkspaceSchema>;
@@ -210,12 +209,61 @@ function wslPrefix(workspace: WorkspaceDefinition): string[] {
     : [];
 }
 
+function posixQuote(value: string): string {
+  return "'" + value.replaceAll("'", "'\\''") + "'";
+}
+
+// A persisted startup command is a shell launch argument, never simulated PTY
+// input racing the shell profile/rc initialization. argv prevents another
+// escaping layer. The user retains an interactive shell once the command exits.
+export function buildHostStartupArgs(
+  shell: string,
+  args: string[],
+  command: string
+): string[] {
+  if (!command.trim()) return args;
+  const name = path.basename(shell).replace(/\.exe$/i, "").toLowerCase();
+  if (name === "pwsh" || name === "powershell") {
+    return [...args, "-NoExit", "-Command", command];
+  }
+  if (name === "cmd") return [...args, "/K", command];
+  if (["bash", "zsh", "fish", "sh", "dash", "ksh"].includes(name)) {
+    return [...args, "-i", "-c", command + "\nexec " + posixQuote(shell) + " -i"];
+  }
+  if (name === "nu") {
+    // nu -i loads the interactive startup config before running the CLI.
+    return [...args, "-i", "-c", command + "\nnu"];
+  }
+  throw new Error("Startup command is not supported by shell " + name);
+}
+
 export function buildWslLaunchArgs(workspace: WorkspaceDefinition): string[] {
   if (workspace.terminal.runtime.kind !== "wsl") {
     throw new Error("Workspace is not a WSL runtime");
   }
   const args = [...wslPrefix(workspace), "--cd", workspace.cwd];
-  if (workspace.terminal.runtime.shell) {
+  const command = workspace.terminal.startupCommand;
+  if (command) {
+    if (workspace.terminal.runtime.shell) {
+      args.push(
+        "--exec", workspace.terminal.runtime.shell,
+        ...buildHostStartupArgs(
+          workspace.terminal.runtime.shell,
+          workspace.terminal.runtime.args,
+          command
+        )
+      );
+    } else {
+      // WSL --exec does not initialize its default shell. Ask the distro shell
+      // to perform this work after its normal rc/profile processing.
+      args.push(
+        "--exec", "/bin/sh", "-c",
+        'shell="${SHELL:-/bin/sh}"; exec "$shell" -ic "$1"',
+        "palmtty-startup",
+        command + '\nexec "${SHELL:-/bin/sh}" -i'
+      );
+    }
+  } else if (workspace.terminal.runtime.shell) {
     args.push("--exec", workspace.terminal.runtime.shell, ...workspace.terminal.runtime.args);
   }
   return args;
@@ -309,8 +357,10 @@ async function resolveHostWorkspace(
     id: workspace.id,
     cwd,
     executable,
-    args: workspace.terminal.runtime.args,
-    ...(workspace.terminal.startupCommand ? { command: workspace.terminal.startupCommand } : {}),
+    args: buildHostStartupArgs(
+      executable, workspace.terminal.runtime.args,
+      workspace.terminal.startupCommand ?? ""
+    ),
     env: environment
   });
 }
@@ -371,7 +421,6 @@ async function resolveWslWorkspace(
     cwd: process.cwd(),
     executable,
     args: buildWslLaunchArgs(workspace),
-    ...(workspace.terminal.startupCommand ? { command: workspace.terminal.startupCommand } : {}),
     env: environment
   });
 }
