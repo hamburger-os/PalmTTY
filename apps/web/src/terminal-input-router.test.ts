@@ -4,7 +4,6 @@ import { TerminalInputRouter } from "./terminal-input-router.js";
 describe("terminal mouse / keyboard input routing", () => {
   const router = new TerminalInputRouter();
   const UP = "\u001b[<64;4;5M";
-  const DOWN = "\u001b[<65;4;5M";
 
   it("keeps normal input and IME characters intact in both modes", () => {
     for (const touchMode of ["browse", "interact"] as const) {
@@ -15,11 +14,11 @@ describe("terminal mouse / keyboard input routing", () => {
     }
   });
 
-  it("scrolls local history without emitting CLI mouse events in browse mode", () => {
+  it("does not emit CLI mouse events in browse mode", () => {
     expect(router.route(UP, "vt200", "browse"))
-      .toEqual({ kind: "scroll", lines: -1 });
-    expect(router.route(DOWN, "vt200", "browse"))
-      .toEqual({ kind: "scroll", lines: 1 });
+      .toEqual({ kind: "drop" });
+    expect(router.route("\u001b[<65;4;5M", "vt200", "browse"))
+      .toEqual({ kind: "drop" });
     expect(router.route("\u001b[<0;4;5M", "vt200", "browse"))
       .toEqual({ kind: "drop" });
     expect(router.route(UP, "none", "browse"))

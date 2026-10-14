@@ -24,9 +24,9 @@ PalmTTY 是一个面向手机、自托管的远程开发工作台，核心是工
 
 ## Terminal touch controls / 手机终端触摸控制
 
-On touch devices, the terminal starts in **Browse** mode: swipe to review local terminal history without sending mouse events to CLI apps. Switch to **Interact** from the keybar to send valid SGR mouse actions to a full-screen TUI. Alternate-screen apps have no local scrollback, so use Interact or app-specific keyboard navigation to scroll inside them. Legacy X10 binary mouse input is intentionally unsupported and malformed reports are dropped.
+On touch devices, the terminal starts in **Browse** mode: swipe to review local history when mouse tracking is off, without sending mouse events to CLI apps. Switch to **Interact** from the keybar to send valid SGR mouse actions to a full-screen TUI. Alternate-screen apps have no local scrollback, so use Interact or app-specific keyboard navigation to scroll inside them. Legacy X10 binary mouse input is intentionally unsupported and malformed reports are dropped.
 
-手机终端默认“浏览”：手指滑动查看本地终端历史，不会将鼠标事件误发给 CLI；如需操作 TUI 内部的滚动和点击，使用快捷键栏中的“交互”。备用屏幕无本地滚动历史，请使用交互模式或应用快捷键。旧式 X10 二进制鼠标协议明确不支持，异常鼠标报告直接丢弃。
+手机终端默认“浏览”：未启用鼠标跟踪时可以原生滑动查看终端历史，且不会将鼠标事件误发给 CLI；如需操作 TUI 内部的滚动和点击，使用快捷键栏中的“交互”。备用屏幕无本地滚动历史，请使用交互模式或应用快捷键。旧式 X10 二进制鼠标协议明确不支持，异常鼠标报告直接丢弃。
 
 ## Unattended browser RDP / 无人值守浏览器 RDP（规划中）
 

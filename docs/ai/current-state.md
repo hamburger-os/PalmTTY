@@ -10,7 +10,7 @@ The browser-integrated native Devolutions Gateway/IronRDP NLA path and pre-login
 
 ### Mobile terminal pointer routing (2026-10-15)
 
-- Touch clients start in Browse mode; the fixed keybar switches to Interact. Browse redirects valid tracked SGR wheel reports to xterm local scrollback and blocks mouse events from PTY input. Interact forwards only validated complete SGR reports. NaN/malformed SGR and X10 prefixes are discarded; xterm.onBinary legacy packets are never forwarded over the UTF-8 PTY string boundary. No independent touch gesture owner is installed. Alternate-screen TUI internal scrolling requires Interact or keyboard navigation. These controls are browser-local and do not alter Worker replay, lease, or reconnection. Real iOS/Android testing remains necessary.
+- Touch clients start in Browse mode; the fixed keybar switches to Interact. Browse blocks mouse events from PTY input, and xterm alone handles native scrollback when mouse tracking is disabled. Interact forwards only validated complete SGR reports. NaN/malformed SGR and X10 prefixes are discarded; xterm.onBinary legacy packets are never forwarded over the UTF-8 PTY string boundary. No independent touch gesture owner is installed. Alternate-screen TUI internal scrolling requires Interact or keyboard navigation. These controls are browser-local and do not alter Worker replay, lease, or reconnection. Real iOS/Android testing remains necessary.
 
 
 ### Repository and governance

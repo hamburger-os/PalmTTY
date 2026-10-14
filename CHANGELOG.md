@@ -8,7 +8,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Safe mobile terminal touch input
 
-- Introduce Browse / Interact modes on touch clients. Browse consumes mouse events and maps tracked SGR wheel reports to local history; Interact sends only valid complete SGR mouse reports.
+- Introduce Browse / Interact modes on touch clients. Browse drops mouse reports and retains xterm-native scrolling when tracking is off; Interact sends only valid complete SGR mouse reports.
 - Fail closed for malformed/NaN mouse reports and X10 prefixes. Disable legacy xterm.onBinary forwarding over the UTF-8 PTY string boundary. Preserve xterm's native gesture ownership, terminal IME, bounded paste queue, Session Worker and reconnect pipeline; expand focused protocol tests.
 
 

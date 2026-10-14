@@ -425,10 +425,6 @@ export function TerminalView({
         raw, terminal.modes.mouseTrackingMode, touchModeRef.current
       );
       if (action.kind === "drop") return;
-      if (action.kind === "scroll") {
-        terminal.scrollLines(action.lines);
-        return;
-      }
       if (action.kind === "mouse") {
         forwardTerminalData(action.data);
         return;

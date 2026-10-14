@@ -136,7 +136,7 @@ A single input router classifies `onData` before the IME/key handling path:
 
 - Normal keyboard, IME and paste data continue unchanged.
 - SGR mouse reports must be complete and contain finite, safe integer button/coordinates. Malformed reports, including inertia `NaN`, and legacy X10 `ESC[M...` prefixes are dropped without stale-coordinate reconstruction.
-- Coarse-pointer clients start in **Browse** mode: clicks/drags are not sent to the CLI; an SGR wheel report in an active mouse tracking mode scrolls xterm's *local* history only. With no active tracking, xterm continues using its native touch history scroll behavior.
+- Coarse-pointer clients start in **Browse** mode: mouse reports are dropped entirely. With no active tracking, xterm retains its native touch history scrolling. With tracking enabled, Browse does not manufacture alternate scrolling or forward the event; switch to Interact to operate the application's mouse-controlled viewport.
 - **Interact** mode forwards complete valid SGR mouse reports to the current PTY. The toggle is browser-local state, not Session authority.
 - When a full-screen TUI uses an alternate buffer, no local scrollback exists; Browse cannot simulate app-specific internal scrolling. Switch to Interact or use app keyboard navigation instead.
 
