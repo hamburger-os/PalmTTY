@@ -50,7 +50,7 @@ describe("terminal SGR mouse report guard", () => {
       "\u001b[<64;Infinity;NaNM",
       "\u001b[<NaN;12;8M",
       "\u001b[<65;-1;NaNM",
-      "\u001b[<65;NaN;0M",
+      "\u001b[<65;NaN;-1M",
       "\u001b[<999999999999999999999;NaN;NaNM"
     ]) {
       expect(guard.handle(data, "vt200")).toEqual({ kind: "mouse" });
@@ -67,5 +67,10 @@ describe("terminal SGR mouse report guard", () => {
       .toEqual({ kind: "mouse", data: "\u001b[<64;900;1600M" });
     expect(guard.handle(BAD_UP, "drag"))
       .toEqual({ kind: "mouse", data: "\u001b[<64;900;1600M" });
+    // SGR pixel mode may report a legitimate zero-based edge position.
+    expect(guard.handle("\u001b[<64;0;0M", "drag"))
+      .toEqual({ kind: "mouse", data: "\u001b[<64;0;0M" });
+    expect(guard.handle(BAD_DOWN, "drag"))
+      .toEqual({ kind: "mouse", data: "\u001b[<65;0;0M" });
   });
 });

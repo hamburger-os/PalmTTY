@@ -32,8 +32,8 @@ export class TerminalMouseReportGuard {
     if (!fields) return { kind: "input", data };
 
     const button = validInteger(fields[1]!, 0);
-    const x = validInteger(fields[2]!, 1);
-    const y = validInteger(fields[3]!, 1);
+    const x = validInteger(fields[2]!, 0);
+    const y = validInteger(fields[3]!, 0);
     const terminator = fields[4]!;
     if (button !== undefined && x !== undefined && y !== undefined) {
       if (mode === "none") return { kind: "mouse" };
