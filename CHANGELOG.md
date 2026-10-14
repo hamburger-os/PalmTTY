@@ -6,6 +6,13 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+### Pi CLI and deterministic terminal startup
+
+- Add Pi to startup presets and provide generic Shift+Enter, Alt+Enter, Ctrl+Q mobile shortcuts plus the xterm Kitty keyboard extension.
+- Run persisted CLI startup commands through supported interactive shell argv, not fixed-delay simulated PTY typing; cover host and WSL launch assembly with tests.
+- Synchronize setup, architecture and AI documentation, workspace-store generation and invariant numbering.
+
+
 
 ### Mobile TUI touch wheel integrity (unreleased)
 

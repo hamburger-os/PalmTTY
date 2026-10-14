@@ -39,6 +39,9 @@ describe("mobile CLI keybar", () => {
     expect(html).toContain('id="terminal-keybar-more"');
     expect(html).toContain("收起");
     expect(html).toContain("Ctrl+C");
+    expect(html).toContain("Shift+Enter");
+    expect(html).toContain("Alt+Enter");
+    expect(html).toContain("Ctrl+Q");
     expect(html).toContain("A−");
   });
 });

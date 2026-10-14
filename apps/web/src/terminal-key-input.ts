@@ -12,6 +12,8 @@ export type TerminalKey =
   | "tab"
   | "backTab"
   | "enter"
+  | "shiftEnter"
+  | "altEnter"
   | "arrowUp"
   | "arrowDown"
   | "arrowLeft"
@@ -32,6 +34,8 @@ const BASE_KEY_SEQUENCES: Record<TerminalKey, string> = {
   tab: "\t",
   backTab: `${ESC}[Z`,
   enter: "\r",
+  shiftEnter: ESC + "[13;2u",
+  altEnter: ESC + "[13;3u",
   arrowUp: `${ESC}[A`,
   arrowDown: `${ESC}[B`,
   arrowLeft: `${ESC}[D`,
@@ -53,7 +57,9 @@ const APPLICATION_CURSOR_SEQUENCES: Partial<Record<TerminalKey, string>> = {
 
 const KEY_BY_SEQUENCE = new Map<string, TerminalKey>();
 for (const [key, sequence] of Object.entries(BASE_KEY_SEQUENCES)) {
-  KEY_BY_SEQUENCE.set(sequence, key as TerminalKey);
+  if (key !== "shiftEnter" && key !== "altEnter") {
+    KEY_BY_SEQUENCE.set(sequence, key as TerminalKey);
+  }
 }
 for (const [key, sequence] of Object.entries(APPLICATION_CURSOR_SEQUENCES)) {
   if (sequence) KEY_BY_SEQUENCE.set(sequence, key as TerminalKey);
@@ -113,6 +119,12 @@ export function encodeTerminalKey(
   modifiers: TerminalModifierState = NO_MODIFIERS,
   context: TerminalKeyEncodingContext = NO_CONTEXT
 ): string {
+  if (key === "shiftEnter" || key === "altEnter") {
+    const parameter = 1 + (key === "shiftEnter" ? 1 : 2) +
+      (modifiers.ctrl ? 4 : 0) +
+      (modifiers.alt && key !== "altEnter" ? 2 : 0);
+    return ESC + "[13;" + parameter + "u";
+  }
   const modifiedNavigation = modifiedNavigationSequence(key, modifiers);
   if (modifiedNavigation) return modifiedNavigation;
 

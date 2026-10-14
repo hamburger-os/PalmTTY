@@ -6,6 +6,12 @@
 
 会话内可以运行宿主 Shell 或 Windows 上的 WSL Shell，也可以由 workspace 自动启动 Codex 等 CLI。Windows 仍以 PowerShell 7/ConPTY 为首要路径；Ubuntu CI 同时覆盖 Unix host runtime。
 
+## Shell 启动命令
+
+可选的 `workspace.terminal.startupCommand` 仍是持久 Workspace 权限，不允许通过 Session create 临时注入。Agent 在创建 Worker 前将用户编写的命令编译成所选 Shell 的结构化启动参数：PowerShell `-NoExit -Command`、cmd `/K`、bash/zsh/fish/sh/dash/ksh 的交互式 `-c`、Nushell 交互式命令模式；CLI 退出后回到交互 Shell。WSL 显式 Shell 使用同一规则，默认 Shell 借助 `/bin/sh` trampoline 选择发行版 `$SHELL`。不支持的 Shell 直接报错，不再回退到固定 75ms 的 PTY 输入。
+
+不通过解析 Shell 提示符判断就绪，也不将 CLI 运行生命周期绑定到浏览器连接。Shell 启动参数可能在本机进程列表中可见，不应直接在启动命令内嵌入 API 密钥；Workspace environment 同样不是密钥保险箱。Windows/WSL/macOS、真实 Pi 和多行命令退出后的交互行为仍需要目标环境验证。
+
 ## 进程模型
 
 ~~~text

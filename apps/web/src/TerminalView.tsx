@@ -287,6 +287,7 @@ export function TerminalView({
       fontFamily: '"Cascadia Mono", "SFMono-Regular", Consolas, monospace',
       scrollback: 10000,
       allowProposedApi: false,
+      vtExtensions: { kittyKeyboard: true },
       theme: terminalThemeRef.current
     });
     const fit = new FitAddon();

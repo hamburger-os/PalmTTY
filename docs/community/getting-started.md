@@ -55,7 +55,8 @@ Open the configured Agent URL, sign in, and create the first workspace in the We
 - WSL profile discovery uses `wsl.exe --list --quiet`; it does not start distributions merely to populate the selector. A selected WSL profile uses that distribution's default shell unless Custom overrides it, and its working directory remains a Linux path.
 - Workspace creation/update validates the working directory, nested Terminal runtime/shell and supported saved Remote App executables before persistence. Terminal Session creation/restart and Remote App creation each revalidate their own persisted launch authority before Worker bootstrap.
 - Workspace environment uses one `NAME=value` entry per line and is applied before the shell starts. Balanced outer single/double quotes are accepted and removed, so both `HTTP_PROXY=http://127.0.0.1:10808` and `HTTP_PROXY="http://127.0.0.1:10808"` persist the same URL; unmatched outer quotes are rejected. On Windows, each new/restarted terminal also refreshes the current Machine/User environment and PATH, so CLIs installed after the PalmTTY Agent started can be discovered by a new PTY. WSL workspace variables are forwarded through `WSLENV`.
-- Shell arguments remain explicit argv values. Startup command is optional multiline Terminal input stored under `workspace.terminal`. Workspace environment is persistent local configuration, not a secret vault.
+- Shell arguments remain explicit argv values. Startup command is a persisted shell-launch command in `workspace.terminal` and now runs via shell argv rather than fixed-delay PTY typing. Supported shells: PowerShell, cmd, bash, zsh, fish, sh, dash, ksh, Nu. Explicit WSL shells use the same model; the default WSL profile chooses `$SHELL` through `/bin/sh`. Unknown shell launch configurations with a startup command are rejected. Startup commands may appear in OS process arguments: never embed passwords or API keys. Workspace environment is persistent local configuration, not a secret vault.
+- In **Terminal → Startup command**, choose **Pi** to fill `pi` (alongside Codex, Claude Code and other CLI presets). Install Pi in the selected Host/WSL environment first (`npm install -g --ignore-scripts @earendil-works/pi-coding-agent`), (npm install requires Node.js 22.19+) and ensure the `pi` command is available on that shell's PATH. A preset only fills the field; it does not install the CLI. The mobile keybar offers Shift+Enter, Alt+Enter and Ctrl+Q, and xterm explicitly enables Kitty keyboard support. Real mobile/browser/IME compatibility must still be validated.
 
 ### Windows source dependency check
 
@@ -196,7 +197,9 @@ pnpm start
 - WSL Profile 通过 `wsl.exe --list --quiet` 枚举，不会为了填下拉框而启动发行版；选中后默认使用该发行版自己的默认 Shell，工作目录仍必须是 Linux 路径。
 - 新建/修改工作区时会验证目录、运行环境和 Shell；创建 Session 与显式“重启终端”前还会再次验证。
 - 工作区环境变量使用每行一个 `NAME=value`，在 Shell 启动前应用。最外层成对单引号/双引号会自动去除，因此 `HTTP_PROXY=http://127.0.0.1:10808` 与 `HTTP_PROXY="http://127.0.0.1:10808"` 会保存成同一个 URL；不成对引号会直接拒绝。Windows 每次新建/重启终端还会重新读取当前 Machine/User 环境与 PATH，因此 Agent 启动后新安装到用户 PATH 的 CLI 可被新 PTY 看见；WSL 通过 `WSLENV` 转发配置变量。
-- Shell 参数继续按独立 argv 传递；启动命令支持多行，在 Shell 启动后发送。Workspace environment 是本机持久化配置，不是密钥保险箱。
+- Shell 参数继续按独立 argv 传递；启动命令支持多行，通过 Shell 启动参数运行，而不是固定延时的键盘模拟输入。支持 PowerShell、cmd、bash、zsh、fish、sh、dash、ksh 和 Nu；WSL 默认配置使用发行版 `$SHELL`。未知 Shell 对启动命令会明确报错；命令可能在本机进程参数中可见，不要包含密码或 API 密钥。Workspace environment 是本机持久化配置，不是密钥保险箱。
+
+在 **Terminal → 启动命令** 中点击 **Pi**，即可快捷填写 `pi`，与 Codex、Claude Code 等工具共用预设入口。请先在所选 Host/WSL 环境中安装 `npm install -g --ignore-scripts @earendil-works/pi-coding-agent`，npm 安装要求 Node.js 22.19 或以上版本；确认该 Shell 的 PATH 能找到 `pi`。预设仅填写命令，不负责安装。手机快捷栏支持 Shift+Enter、Alt+Enter 和 Ctrl+Q，xterm 已启用 Kitty 键盘协议；实际 CLI 与移动浏览器的中文 IME、快捷键仍需真机验证。
 
 如果 Windows 在探测 Agent 端口时报告 `EACCES/WSAEACCES`，先区分普通监听进程与 Windows 排除/保留端口：
 

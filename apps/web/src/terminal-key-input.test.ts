@@ -9,11 +9,22 @@ import {
 describe("terminal key input", () => {
   it("encodes the mobile keybar base keys", () => {
     expect(encodeTerminalKey("enter")).toBe("\r");
+    expect(encodeTerminalKey("shiftEnter")).toBe("\u001b[13;2u");
+    expect(encodeTerminalKey("altEnter")).toBe("\u001b[13;3u");
     expect(encodeTerminalKey("backTab")).toBe("\u001b[Z");
     expect(encodeTerminalKey("pageUp")).toBe("\u001b[5~");
     expect(encodeTerminalKey("pageDown")).toBe("\u001b[6~");
     expect(encodeTerminalKey("backspace")).toBe("\u007f");
     expect(encodeTerminalKey("delete")).toBe("\u001b[3~");
+  });
+
+  it("preserves extended enter chords and never rewrites xterm CSI-u reports", () => {
+    expect(encodeTerminalKey("shiftEnter", { ctrl: true, alt: false }))
+      .toBe("\u001b[13;6u");
+    expect(encodeTerminalKey("altEnter", { ctrl: true, alt: true }))
+      .toBe("\u001b[13;7u");
+    expect(applyTerminalModifiers("\u001b[13;2u", { ctrl: true, alt: true }))
+      .toBe("\u001b[13;2u");
   });
 
   it("encodes Ctrl shortcuts as terminal control characters", () => {
