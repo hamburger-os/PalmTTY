@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { WorkspaceDefinition } from "@palmtty/protocol";
 import {
+  buildHostStartupArgs,
   buildPtyEnvironment,
   buildWslLaunchArgs,
   resolveExecutable,
@@ -42,6 +43,45 @@ function hostWorkspace(
     remoteApps: []
   };
 }
+
+describe("deterministic terminal startup", () => {
+  it("launches using PowerShell and cmd arguments, not PTY keystrokes", () => {
+    expect(buildHostStartupArgs("pwsh.exe", ["-NoLogo"], "pi"))
+      .toEqual(["-NoLogo", "-NoExit", "-Command", "pi"]);
+    expect(buildHostStartupArgs("cmd.exe", [], "pi -c")).toEqual(["/K", "pi -c"]);
+    expect(buildHostStartupArgs("pwsh.exe", ["-NoLogo"], "")).toEqual(["-NoLogo"]);
+  });
+
+  it("uses interactive Unix shell rc and returns to a shell after the CLI", () => {
+    expect(buildHostStartupArgs("/bin/bash", ["-l"], "pi"))
+      .toEqual(["-l", "-i", "-c", "pi\nexec '/bin/bash' -i"]);
+    expect(buildHostStartupArgs("/bin/fish", [], "pi"))
+      .toEqual(["-i", "-c", "pi\nexec '/bin/fish' -i"]);
+    expect(buildHostStartupArgs("/usr/bin/nu", [], "pi"))
+      .toEqual(["-i", "-c", "pi\nnu"]);
+  });
+
+  it("rejects unsupported shell types instead of guessing their semantics", () => {
+    expect(() => buildHostStartupArgs("/usr/local/bin/node", [], "pi"))
+      .toThrow("Startup command is not supported");
+  });
+
+  it("builds WSL startup with argv-safe command delivery", () => {
+    const base: WorkspaceDefinition = {
+      id: "wsl-launch", name: "WSL", cwd: "/home/dev/my project",
+      terminal: { runtime: { kind: "wsl", distribution: "Ubuntu", args: [] }, startupCommand: "pi" },
+      remoteApps: []
+    };
+    const defaultArgs = buildWslLaunchArgs(base);
+    expect(defaultArgs.slice(0, 4)).toEqual(["--distribution", "Ubuntu", "--cd", "/home/dev/my project"]);
+    expect(defaultArgs.slice(4, 7)).toEqual(["--exec", "/bin/sh", "-c"]);
+    expect(defaultArgs.at(-1)).toContain("pi\nexec");
+    expect(buildWslLaunchArgs({
+      ...base, terminal: { runtime: { kind: "wsl", shell: "/bin/bash", args: ["-l"] }, startupCommand: "pi" }
+    })).toEqual(["--cd", "/home/dev/my project", "--exec", "/bin/bash",
+      "-l", "-i", "-c", "pi\nexec '/bin/bash' -i"]);
+  });
+});
 
 describe("workspace runtime resolution", () => {
   it("resolves a bare executable from the final PATH entry", async () => {
