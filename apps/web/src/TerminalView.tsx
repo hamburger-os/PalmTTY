@@ -52,10 +52,12 @@ function websocketUrl(sessionId: string) {
 
 function LongInputDialog({
   connected,
+  error,
   onCancel,
   onPaste
 }: {
   connected: boolean;
+  error: string | null;
   onCancel(): void;
   onPaste(data: string, submit: boolean): void;
 }) {
@@ -92,6 +94,7 @@ function LongInputDialog({
           placeholder={t("terminal.composer")}
           rows={8}
         />
+        {error && <p className="tool-inline-error" role="alert">{error}</p>}
       </div>
       <div className="long-input-actions">
         <button type="button" className="ghost" onClick={onCancel}>
@@ -789,6 +792,7 @@ export function TerminalView({
         onSendData={sendKeyData}
         onLongInput={() => {
           clearModifiers();
+          setInputError(null);
           setLongInputOpen(true);
         }}
         fontSize={fontSize}
@@ -799,6 +803,7 @@ export function TerminalView({
       {longInputOpen && (
         <LongInputDialog
           connected={connection === "connected" && controlRole === "owner"}
+          error={inputError}
           onCancel={() => setLongInputOpen(false)}
           onPaste={(data, submit) => {
             const terminal = terminalRef.current;
