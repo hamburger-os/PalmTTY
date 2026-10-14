@@ -125,3 +125,8 @@ Windows exposes TCP excluded-port ranges through `netsh interface ipv4/ipv6 show
 ## Browser-to-PTY input encoding boundary (2026-10-14)
 
 Current node-pty's public IPty.write(data: string) API is a UTF-8 string input boundary, not a raw Uint8Array sink. xterm's onData emits terminal input strings, including modern SGR mouse reports, while onBinary emits a byte-string form used by some legacy protocols. PalmTTY splits UTF-8 input strings at Unicode scalar boundaries and forwards ASCII-only onBinary payloads; it rejects legacy onBinary values containing high-bit bytes rather than pretending UTF-8 string conversion preserves the original byte stream. This capability is a deliberate limitation, not an upgrade or alternate raw-PTY write path. Requalify on both Linux PTY and Windows ConPTY before expanding the byte-level contract.
+
+
+## SGR mouse reports during browser touch inertia (2026-10-14)
+
+In xterm's browser Gesture/MouseService path, real touchmove events carry pointer client coordinates but synthetic inertia CHANGE events may not. Mouse-report coordinate arithmetic can therefore produce NaN in an SGR wheel report. Terminal applications are not required to accept invalid CSI fields, and a rejected control sequence can leak trailing printable fragments into the input editor. PalmTTY applies a narrow browser output guard to complete SGR mouse reports: forward valid coordinates unmodified, substitute a bounded recent verified wheel location only for NaN inertia coordinates, and otherwise fail closed. This guard does not emulate scrolling, intercept touch gestures, or imply support for raw 8-bit legacy mouse bytes; xterm stays the gesture/viewport owner.

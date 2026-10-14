@@ -7,6 +7,12 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 ## [Unreleased]
 
 
+### Mobile TUI touch wheel integrity (unreleased)
+
+- Protect xterm-to-PTY input from malformed SGR mouse wheel reports created by touch inertia without pointer coordinates. Reuse only a recent verified wheel location for NaN inertia coordinates; reject the remaining malformed reports rather than leaking NaNM into OpenCode/TUI input. Keep normal swipe momentum, IME, keyboard and the existing single xterm gesture owner unchanged.
+
+
+
 ### Terminal TUI input and long-paste reliability (unreleased)
 
 - Preserve SGR mouse/terminal control reports across virtual Ctrl/Alt and IME handling; handle ASCII-only legacy mouse binary notifications while warning for raw 8-bit reports that cannot be represented losslessly by node-pty UTF-8 string writes.

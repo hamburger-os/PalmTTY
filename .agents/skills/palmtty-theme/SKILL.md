@@ -209,3 +209,8 @@ Both Terminal and Remote App key docks render the same shared Keyboard then Long
 ## 10. Headless Windows Remote App state belongs outside the video
 
 A decoded single-app video frame is not proof of a usable Windows user session, active input desktop or display output. The existing compact, outside-video dock must show a precise actionable input diagnostic for disconnected WTS sessions, locked/secure desktops, missing active physical/virtual display output, lost window, denied foreground, occluded screen pixels and rejected native input. It must remain readable in View/Trackpad/Direct and in all three themes and performance modes, without a permanent overlay that covers remote app controls. Do not imply that elevated execution, a dummy display or WebRTC connection bypasses Windows lock/UAC. Phone window adaptation must fit the active monitor work area excluding taskbars and use the same DWM-visible crop as cursor/touch mapping.
+
+
+### TUI touch wheel report integrity (2026-10-14)
+
+In the xterm onData-to-PTY adapter, complete SGR mouse reports must be syntactically validated before IME or key-modifier processing. xterm Gesture may produce inertia CHANGE reports without client coordinates, generating NaN wheel fields and printable NaNM remnants in full-screen TUI input. Normal wheel reports pass without alteration; only missing NaN wheel positions may reuse the last recently verified wheel coordinates. Other malformed reports are dropped. This validation does not implement a new gesture recognizer, alter touch-action, add a second scroll viewport, or parse TUI vendors. Real-device swipe/inertia and no-prompt-contamination regression tests remain mandatory.

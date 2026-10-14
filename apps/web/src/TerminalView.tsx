@@ -29,9 +29,9 @@ import { useTheme } from "./theme.js";
 import {
   TerminalInputQueue,
   asciiBinaryInput,
-  isSgrMouseReport,
   utf8InputBytes
 } from "./terminal-input-transport.js";
+import { TerminalMouseReportGuard } from "./terminal-mouse-report.js";
 
 export type ConnectionState =
   | "connecting"
@@ -410,9 +410,17 @@ export function TerminalView({
       }
     };
 
+    const mouseReportGuard = new TerminalMouseReportGuard();
     const dataDisposable = terminal.onData((raw) => {
-      // Mouse reports are not IME text, even during keyCode-229 fallback.
-      const data = isSgrMouseReport(raw) ? raw : imeInput.captureTerminalData(raw);
+      // xterm touch inertia can emit SGR wheel reports with NaN coordinates.
+      // Repair only wheel inertia with a recent known-safe position or drop it;
+      // never leak malformed CSI text into a TUI input field or IME fallback.
+      const report = mouseReportGuard.handle(raw, terminal.modes.mouseTrackingMode);
+      if (report.kind === "mouse") {
+        if (report.data !== undefined) forwardTerminalData(report.data);
+        return;
+      }
+      const data = imeInput.captureTerminalData(report.data);
       if (data !== undefined) forwardTerminalData(data);
     });
     const binaryDisposable = terminal.onBinary((raw) => {
@@ -683,6 +691,7 @@ export function TerminalView({
       observer.disconnect();
       clearImeTimers();
       imeInput.cancel();
+      mouseReportGuard.reset();
       terminalTextarea?.removeEventListener("compositionstart", onCompositionStart);
       terminalTextarea?.removeEventListener("compositionend", onCompositionEnd);
       mount.removeEventListener("click", focusTerminal);

@@ -3,7 +3,6 @@ import {
   MAX_QUEUED_TERMINAL_INPUT_BYTES,
   TerminalInputQueue,
   asciiBinaryInput,
-  isSgrMouseReport,
   splitUtf8Input,
   utf8InputBytes
 } from "./terminal-input-transport.js";
@@ -94,8 +93,5 @@ describe("terminal input transport", () => {
   it("passes ASCII binary reports but does not corrupt high-bit legacy mouse bytes", () => {
     expect(asciiBinaryInput("\u001b[M !!")).toBe("\u001b[M !!");
     expect(asciiBinaryInput("\u001b[M \u0080!")).toBeUndefined();
-    expect(isSgrMouseReport("\u001b[<0;12;6M")).toBe(true);
-    expect(isSgrMouseReport("\u001b[<0;12;6m")).toBe(true);
-    expect(isSgrMouseReport("\u001b[A")).toBe(false);
   });
 });
