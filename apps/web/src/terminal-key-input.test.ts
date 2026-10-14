@@ -59,6 +59,13 @@ describe("terminal key input", () => {
     ).toBe("\u001b[1;5A");
   });
 
+  it("never rewrites SGR mouse reports or pasted multi-character input", () => {
+    const mouse = "\u001b[<0;12;4M";
+    expect(applyTerminalModifiers(mouse, { ctrl: true, alt: true })).toBe(mouse);
+    expect(applyTerminalModifiers("长文本", { ctrl: true, alt: true })).toBe("长文本");
+    expect(applyTerminalModifiers("📖", { ctrl: false, alt: true })).toBe("\u001b📖");
+  });
+
   it("uses DECCKM application cursor sequences when requested", () => {
     expect(
       encodeTerminalKey(

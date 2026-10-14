@@ -120,11 +120,17 @@ export function encodeTerminalKey(
   return modifiers.alt ? ESC + base : base;
 }
 
+export function isKeyboardTerminalData(raw: string): boolean {
+  if (KEY_BY_SEQUENCE.has(raw)) return true;
+  // Mouse/device reports and multi-character pastes are not keyboard keys.
+  return raw.length > 0 && [...raw].length === 1;
+}
+
 export function applyTerminalModifiers(
   raw: string,
   modifiers: TerminalModifierState
 ): string {
-  if (!modifiers.ctrl && !modifiers.alt) return raw;
+  if ((!modifiers.ctrl && !modifiers.alt) || !isKeyboardTerminalData(raw)) return raw;
 
   const knownKey = KEY_BY_SEQUENCE.get(raw);
   if (knownKey) return encodeTerminalKey(knownKey, modifiers);
