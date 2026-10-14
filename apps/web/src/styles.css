@@ -687,9 +687,8 @@ button.directory-choose {
   touch-action: none;
 }
 
-.terminal-mount .xterm-viewport {
-  scrollbar-gutter: stable;
-}
+/* xterm's scrollbar.width owns the reserved width and FitAddon column math.
+   Do not reserve a second CSS gutter around its viewport. */
 
 .keybar {
   display: grid;
@@ -2587,6 +2586,11 @@ body.remote-app-active { overflow: hidden; }
 }
 
 @media (max-width: 760px) {
+  /* Keep the mobile terminal canvas close to the edge, without changing
+     the padding-free mount used by xterm's FitAddon. */
+  .workbench-page.is-terminal .terminal-frame {
+    padding: 6px 2px 7px 3px;
+  }
   .workbench-page.is-remote-app,
   .workbench-page.is-terminal {
     gap: 4px;
