@@ -8,7 +8,7 @@ describe("workspace runtime view helpers", () => {
     expect(runtimeKey("wsl", "")).toBe("wsl:<default>");
   });
   it("resolves profiles only when argv and shell identity match", () => {
-    const profile = { id: "wsl", label: "Ubuntu", runtime: {
+    const profile = { id: "wsl", label: "Ubuntu", recommended: false, runtime: {
       kind: "wsl" as const, distribution: "Ubuntu", shell: "/bin/bash", args: ["-l"]
     } };
     expect(profileMatches(profile, "wsl", "ubuntu", "/bin/bash", ["-l"])).toBe(true);
