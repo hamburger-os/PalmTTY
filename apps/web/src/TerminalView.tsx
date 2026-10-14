@@ -685,7 +685,7 @@ export function TerminalView({
       mount.removeEventListener("click", focusTerminal);
       dataDisposable.dispose();
       binaryDisposable.dispose();
-      inputQueueRef.current?.abort();
+      inputQueueRef.current?.abort(true);
       inputQueueRef.current = null;
       socketRef.current?.close(1000, "Leaving terminal view");
       socketRef.current = null;

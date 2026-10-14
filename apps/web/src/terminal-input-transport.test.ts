@@ -11,7 +11,7 @@ import {
 function fakeSocket() {
   const sent: string[] = [];
   const socket = {
-    readyState: 1,
+    readyState: 1 as WebSocket["readyState"],
     bufferedAmount: 0,
     send(data: string) {
       sent.push(JSON.parse(data).data as string);
