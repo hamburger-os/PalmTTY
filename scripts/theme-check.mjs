@@ -214,6 +214,17 @@ for (const [selector, marker] of [
   }
 }
 
+// The scrollbar option, not CSS, must own both the visible indicator
+// and FitAddon's reserved column width. The second CSS gutter caused a
+// persistent blank strip in mobile Safari.
+if (
+  !terminalView.includes('scrollbar: {') ||
+  !terminalView.includes('width: terminalScrollbarWidth(window.matchMedia("(pointer: coarse)").matches)') ||
+  /\.terminal-mount \.xterm-viewport\s*\{[^}]*scrollbar-gutter\s*:/s.test(styles)
+) {
+  failures.push("apps/web [terminal-scrollbar-geometry] xterm and FitAddon must own the only scrollbar gutter");
+}
+
 for (const forbidden of [
   'terminal-frame glass-content',
   'terminal-touch-scroll',
