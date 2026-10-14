@@ -6,6 +6,12 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+### Safe mobile terminal touch input
+
+- Introduce Browse / Interact modes on touch clients. Browse consumes mouse events and maps tracked SGR wheel reports to local history; Interact sends only valid complete SGR mouse reports.
+- Fail closed for malformed/NaN mouse reports and X10 prefixes. Disable legacy xterm.onBinary forwarding over the UTF-8 PTY string boundary. Preserve xterm's native gesture ownership, terminal IME, bounded paste queue, Session Worker and reconnect pipeline; expand focused protocol tests.
+
+
 ### Compact mobile terminal scrollbar
 
 - Use xterm's own scrollbar width as the shared scrollable-area/FitAddon geometry source (4 CSS px for coarse pointers, 8 CSS px for precise pointers) instead of reserving a second CSS gutter.
@@ -22,13 +28,13 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Mobile TUI touch wheel integrity (unreleased)
 
-- Protect xterm-to-PTY input from malformed SGR mouse wheel reports created by touch inertia without pointer coordinates. Reuse only a recent verified wheel location for NaN inertia coordinates; reject the remaining malformed reports rather than leaking NaNM into OpenCode/TUI input. Keep normal swipe momentum, IME, keyboard and the existing single xterm gesture owner unchanged.
+- Initial fix for malformed SGR touch-inertia wheel reports; superseded in this unreleased cycle by strict fail-closed routing and explicit Browse / Interact semantics above.
 
 
 
 ### Terminal TUI input and long-paste reliability (unreleased)
 
-- Preserve SGR mouse/terminal control reports across virtual Ctrl/Alt and IME handling; handle ASCII-only legacy mouse binary notifications while warning for raw 8-bit reports that cannot be represented losslessly by node-pty UTF-8 string writes.
+- Preserve SGR mouse/terminal control reports across virtual Ctrl/Alt and IME handling; legacy binary mouse forwarding has been removed in favor of validated SGR-only input.
 - Stream large xterm bracketed pastes via an ordered, <=12 KiB UTF-8 framed, 8 MiB-bounded browser input queue with WebSocket backpressure, explicit interruption/overflow feedback and no unsent-input replay after disconnect.
 
 

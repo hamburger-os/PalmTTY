@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   MAX_QUEUED_TERMINAL_INPUT_BYTES,
   TerminalInputQueue,
-  asciiBinaryInput,
   splitUtf8Input,
   utf8InputBytes
 } from "./terminal-input-transport.js";
@@ -90,8 +89,4 @@ describe("terminal input transport", () => {
     expect(queue.enqueue("again")).toBe(false);
   });
 
-  it("passes ASCII binary reports but does not corrupt high-bit legacy mouse bytes", () => {
-    expect(asciiBinaryInput("\u001b[M !!")).toBe("\u001b[M !!");
-    expect(asciiBinaryInput("\u001b[M \u0080!")).toBeUndefined();
-  });
 });

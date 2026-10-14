@@ -40,16 +40,6 @@ export function splitUtf8Input(value: string, maxBytes = TERMINAL_INPUT_CHUNK_BY
   return chunks;
 }
 
-// xterm's onBinary is an 8-bit byte string. node-pty.write only accepts UTF-8
-// strings, so 0x80..0xff cannot be forwarded byte-for-byte over this transport.
-// ASCII-only legacy reports are safe; reject the rest instead of corrupting them.
-export function asciiBinaryInput(value: string): string | undefined {
-  for (let index = 0; index < value.length; index++) {
-    if (value.charCodeAt(index) > 0x7f) return undefined;
-  }
-  return value;
-}
-
 export class TerminalInputQueue {
   private readonly pending: { data: string; bytes: number }[] = [];
   private pendingBytes = 0;

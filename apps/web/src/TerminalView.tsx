@@ -28,10 +28,9 @@ import {
 import { useTheme } from "./theme.js";
 import {
   TerminalInputQueue,
-  asciiBinaryInput,
   utf8InputBytes
 } from "./terminal-input-transport.js";
-import { TerminalMouseReportGuard } from "./terminal-mouse-report.js";
+import { TerminalInputRouter, type TouchInputMode } from "./terminal-input-router.js";
 import { terminalScrollbarWidth } from "./terminal-scrollbar.js";
 
 export type ConnectionState =
@@ -169,6 +168,10 @@ export function TerminalView({
   const [alt, setAlt] = useState(false);
   const [moreKeysOpen, setMoreKeysOpen] = useState(false);
   const [longInputOpen, setLongInputOpen] = useState(false);
+  const [touchMode, setTouchMode] = useState<TouchInputMode>(() =>
+    window.matchMedia("(pointer: coarse)").matches ? "browse" : "interact"
+  );
+  const touchModeRef = useRef(touchMode);
 
   useEffect(() => {
     translateRef.current = t;
@@ -416,27 +419,26 @@ export function TerminalView({
       }
     };
 
-    const mouseReportGuard = new TerminalMouseReportGuard();
+    const inputRouter = new TerminalInputRouter();
     const dataDisposable = terminal.onData((raw) => {
-      // xterm touch inertia can emit SGR wheel reports with NaN coordinates.
-      // Repair only wheel inertia with a recent known-safe position or drop it;
-      // never leak malformed CSI text into a TUI input field or IME fallback.
-      const report = mouseReportGuard.handle(raw, terminal.modes.mouseTrackingMode);
-      if (report.kind === "mouse") {
-        if (report.data !== undefined) forwardTerminalData(report.data);
+      const action = inputRouter.route(
+        raw, terminal.modes.mouseTrackingMode, touchModeRef.current
+      );
+      if (action.kind === "drop") return;
+      if (action.kind === "scroll") {
+        terminal.scrollLines(action.lines);
         return;
       }
-      const data = imeInput.captureTerminalData(report.data);
+      if (action.kind === "mouse") {
+        forwardTerminalData(action.data);
+        return;
+      }
+      const data = imeInput.captureTerminalData(action.data);
       if (data !== undefined) forwardTerminalData(data);
     });
-    const binaryDisposable = terminal.onBinary((raw) => {
-      const ascii = asciiBinaryInput(raw);
-      if (ascii === undefined) {
-        setInputError(translateRef.current("terminal.binaryUnsupported"));
-        return;
-      }
-      sendInput(ascii);
-    });
+    // Deliberately do not subscribe to xterm.onBinary. That event only emits
+    // legacy mouse bytes, which node-pty.write(string) cannot carry losslessly.
+    // Silently dropping them avoids partial escape sequences in CLI editors.
 
     let reconnectTimer: number | undefined;
     let heartbeatTimer: number | undefined;
@@ -697,12 +699,10 @@ export function TerminalView({
       observer.disconnect();
       clearImeTimers();
       imeInput.cancel();
-      mouseReportGuard.reset();
       terminalTextarea?.removeEventListener("compositionstart", onCompositionStart);
       terminalTextarea?.removeEventListener("compositionend", onCompositionEnd);
       mount.removeEventListener("click", focusTerminal);
       dataDisposable.dispose();
-      binaryDisposable.dispose();
       inputQueueRef.current?.abort(true);
       inputQueueRef.current = null;
       socketRef.current?.close(1000, "Leaving terminal view");
@@ -756,6 +756,12 @@ export function TerminalView({
     terminalRef.current?.focus();
   };
 
+  const toggleTouchMode = () => {
+    const next = touchModeRef.current === "browse" ? "interact" : "browse";
+    touchModeRef.current = next;
+    setTouchMode(next);
+  };
+
   const adjustFontSize = (delta: number) => {
     setFontSize((current) => normalizeTerminalFontSize(current + delta));
   };
@@ -799,6 +805,8 @@ export function TerminalView({
         ctrl={ctrl}
         alt={alt}
         moreOpen={moreKeysOpen}
+        touchMode={touchMode}
+        onToggleTouchMode={toggleTouchMode}
         onFocusKeyboard={() => terminalRef.current?.focus()}
         onToggleCtrl={toggleCtrl}
         onToggleAlt={toggleAlt}
