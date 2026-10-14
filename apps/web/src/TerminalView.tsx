@@ -15,6 +15,7 @@ import {
 } from "./terminal-ime-input.js";
 import {
   applyTerminalModifiers,
+  isKeyboardTerminalData,
   encodeTerminalKey,
   type TerminalKey
 } from "./terminal-key-input.js";
@@ -25,6 +26,12 @@ import {
   writeTerminalFontSize
 } from "./terminal-preferences.js";
 import { useTheme } from "./theme.js";
+import {
+  TerminalInputQueue,
+  asciiBinaryInput,
+  isSgrMouseReport,
+  utf8InputBytes
+} from "./terminal-input-transport.js";
 
 export type ConnectionState =
   | "connecting"
@@ -45,10 +52,12 @@ function websocketUrl(sessionId: string) {
 
 function LongInputDialog({
   connected,
+  error,
   onCancel,
   onPaste
 }: {
   connected: boolean;
+  error: string | null;
   onCancel(): void;
   onPaste(data: string, submit: boolean): void;
 }) {
@@ -85,6 +94,7 @@ function LongInputDialog({
           placeholder={t("terminal.composer")}
           rows={8}
         />
+        {error && <p className="tool-inline-error" role="alert">{error}</p>}
       </div>
       <div className="long-input-actions">
         <button type="button" className="ghost" onClick={onCancel}>
@@ -137,6 +147,7 @@ export function TerminalView({
   const activeRef = useRef(active);
   const terminalMountRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const inputQueueRef = useRef<TerminalInputQueue | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const refitRef = useRef<(() => void) | null>(null);
   const lastSeqRef = useRef(0);
@@ -152,6 +163,7 @@ export function TerminalView({
   const altRef = useRef(false);
   const handledInsertRef = useRef<number | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
+  const [inputError, setInputError] = useState<string | null>(null);
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
   const [moreKeysOpen, setMoreKeysOpen] = useState(false);
@@ -191,6 +203,8 @@ export function TerminalView({
   useEffect(() => {
     onConnectionChange(connection);
   }, [connection, onConnectionChange]);
+
+  useEffect(() => setInputError(null), [sessionId]);
 
   useEffect(() => {
     activeRef.current = active;
@@ -236,8 +250,7 @@ export function TerminalView({
     if (!inputReadyRef.current || socket?.readyState !== WebSocket.OPEN) {
       return false;
     }
-    socket.send(JSON.stringify({ type: "input", data }));
-    return true;
+    return inputQueueRef.current?.enqueue(data) ?? false;
   }
 
   useEffect(() => {
@@ -383,8 +396,9 @@ export function TerminalView({
         ctrl: ctrlRef.current,
         alt: altRef.current
       };
-      const data = applyTerminalModifiers(raw, modifiers);
-      if (!sendInput(data)) return;
+      const keyboard = isKeyboardTerminalData(raw);
+      const data = keyboard ? applyTerminalModifiers(raw, modifiers) : raw;
+      if (!sendInput(data) || !keyboard) return;
 
       if (modifiers.ctrl) {
         ctrlRef.current = false;
@@ -397,8 +411,17 @@ export function TerminalView({
     };
 
     const dataDisposable = terminal.onData((raw) => {
-      const data = imeInput.captureTerminalData(raw);
+      // Mouse reports are not IME text, even during keyCode-229 fallback.
+      const data = isSgrMouseReport(raw) ? raw : imeInput.captureTerminalData(raw);
       if (data !== undefined) forwardTerminalData(data);
+    });
+    const binaryDisposable = terminal.onBinary((raw) => {
+      const ascii = asciiBinaryInput(raw);
+      if (ascii === undefined) {
+        setInputError(translateRef.current("terminal.binaryUnsupported"));
+        return;
+      }
+      sendInput(ascii);
     });
 
     let reconnectTimer: number | undefined;
@@ -461,6 +484,14 @@ export function TerminalView({
 
       const socket = new WebSocket(websocketUrl(sessionId), WS_SUBPROTOCOL);
       socketRef.current = socket;
+      const inputQueue = new TerminalInputQueue(socket, (failure) => {
+        setInputError(translateRef.current(
+          failure === "overflow" ? "terminal.inputTooLarge"
+            : failure === "interrupted" ? "terminal.inputInterrupted"
+              : "terminal.inputSendFailed"
+        ));
+      });
+      inputQueueRef.current = inputQueue;
 
       socket.addEventListener("open", () => {
         if (socketRef.current !== socket) return;
@@ -582,6 +613,8 @@ export function TerminalView({
 
       socket.addEventListener("close", (event) => {
         if (socketRef.current !== socket) return;
+        inputQueue.abort(true);
+        inputQueueRef.current = null;
         socketRef.current = null;
         ready = false;
         inputReadyRef.current = false;
@@ -654,6 +687,9 @@ export function TerminalView({
       terminalTextarea?.removeEventListener("compositionend", onCompositionEnd);
       mount.removeEventListener("click", focusTerminal);
       dataDisposable.dispose();
+      binaryDisposable.dispose();
+      inputQueueRef.current?.abort(true);
+      inputQueueRef.current = null;
       socketRef.current?.close(1000, "Leaving terminal view");
       socketRef.current = null;
       terminal.dispose();
@@ -735,6 +771,14 @@ export function TerminalView({
       {protocolError && (
         <p className="tool-inline-error" role="alert">{t("terminal.protocolMismatch")}</p>
       )}
+      {inputError && (
+        <p className="tool-inline-error" role="alert">
+          {inputError}{" "}
+          <button type="button" className="ghost compact"
+            aria-label={t("terminal.dismissInputError")}
+            onClick={() => setInputError(null)}>×</button>
+        </p>
+      )}
       <TerminalKeyBar
         connected={connection === "connected" && controlRole === "owner"}
         ctrl={ctrl}
@@ -748,6 +792,7 @@ export function TerminalView({
         onSendData={sendKeyData}
         onLongInput={() => {
           clearModifiers();
+          setInputError(null);
           setLongInputOpen(true);
         }}
         fontSize={fontSize}
@@ -758,6 +803,7 @@ export function TerminalView({
       {longInputOpen && (
         <LongInputDialog
           connected={connection === "connected" && controlRole === "owner"}
+          error={inputError}
           onCancel={() => setLongInputOpen(false)}
           onPaste={(data, submit) => {
             const terminal = terminalRef.current;
@@ -766,6 +812,11 @@ export function TerminalView({
               !inputReadyRef.current ||
               socketRef.current?.readyState !== WebSocket.OPEN
             ) return;
+            // Reserve room for bracketed-paste delimiters and explicit Enter.
+            if (!inputQueueRef.current?.canAccept(utf8InputBytes(data) + 32)) {
+              setInputError(t("terminal.inputTooLarge"));
+              return;
+            }
             clearModifiers();
             terminal.paste(data);
             if (submit) terminal.input("\r", true);

@@ -120,3 +120,8 @@ Windows exposes TCP excluded-port ranges through `netsh interface ipv4/ipv6 show
 ## node-pty flow control API (2026-10)
 
 `node-pty` 1.1.0 exposes `IPty.pause()` / `IPty.resume()` for controlling its underlying PTY socket. PalmTTY now invokes them at independent canonical-headless output-queue high/low watermarks (512 KiB/128 KiB); this is different from optional XON/XOFF `handleFlowControl` on user input. References: [node-pty typings](https://github.com/microsoft/node-pty/blob/main/typings/node-pty.d.ts), [flow control documentation](https://github.com/microsoft/node-pty#flow-control). Validate ConPTY and WSL behavior on real hosts before claiming complete stress-test certification.
+
+
+## Browser-to-PTY input encoding boundary (2026-10-14)
+
+Current node-pty's public IPty.write(data: string) API is a UTF-8 string input boundary, not a raw Uint8Array sink. xterm's onData emits terminal input strings, including modern SGR mouse reports, while onBinary emits a byte-string form used by some legacy protocols. PalmTTY splits UTF-8 input strings at Unicode scalar boundaries and forwards ASCII-only onBinary payloads; it rejects legacy onBinary values containing high-bit bytes rather than pretending UTF-8 string conversion preserves the original byte stream. This capability is a deliberate limitation, not an upgrade or alternate raw-PTY write path. Requalify on both Linux PTY and Windows ConPTY before expanding the byte-level contract.
