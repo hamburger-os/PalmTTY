@@ -1,5 +1,6 @@
 import { useI18n } from "./i18n.js";
 import { MobilePrimaryInputActions } from "./MobilePrimaryInputActions.js";
+import type { TouchInputMode } from "./terminal-input-router.js";
 import {
   encodeControlShortcut,
   type TerminalKey
@@ -30,6 +31,8 @@ export function TerminalKeyBar({
   ctrl,
   alt,
   moreOpen,
+  touchMode,
+  onToggleTouchMode,
   onFocusKeyboard,
   onToggleCtrl,
   onToggleAlt,
@@ -45,6 +48,8 @@ export function TerminalKeyBar({
   ctrl: boolean;
   alt: boolean;
   moreOpen: boolean;
+  touchMode: TouchInputMode;
+  onToggleTouchMode(): void;
   onFocusKeyboard(): void;
   onToggleCtrl(): void;
   onToggleAlt(): void;
@@ -100,6 +105,15 @@ export function TerminalKeyBar({
             disabled={!connected} aria-pressed={ctrl} onClick={onToggleCtrl}>Ctrl</button>
         </div>
         <div className="keybar-pinned">
+          <button type="button" className={touchMode === "browse" ? "armed" : ""}
+            aria-pressed={touchMode === "browse"}
+            aria-label={t("terminal.touchModeLabel", {
+              mode: t(touchMode === "browse" ? "terminal.touchBrowse" : "terminal.touchInteract")
+            })}
+            title={t("terminal.touchModeHelp")}
+            onClick={onToggleTouchMode}>
+            {t(touchMode === "browse" ? "terminal.touchBrowse" : "terminal.touchInteract")}
+          </button>
           <button type="button" className={moreOpen ? "armed" : ""}
             aria-expanded={moreOpen} aria-controls="terminal-keybar-more"
             onClick={onToggleMore}>

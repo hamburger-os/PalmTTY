@@ -20,6 +20,7 @@
 - 未 adoption Worker 通过短创建租约自清理；`adopt` 为幂等提交，可跨 IPC 重连安全重试，确认后才进入持久 Session；
 - 单用户 token 登录和 Cookie 会话；
 - Origin、安全启动闸门和基础限流；
+- 手机终端新增浏览/交互模式切换：浏览模式阻断鼠标输入污染，由 xterm 原生处理未启用鼠标跟踪时的本地历史滚动，交互模式仅发送完整有效 SGR 鼠标事件。旧式二进制鼠标输入不再穿越 UTF-8 PTY 边界；iPhone/Android 真机惯性滚动和备用屏幕行为仍待验证。
 - 手机端 Session Workbench（终端 / Git / 文件 / 附件）、xterm/PWA、触摸特殊键栏与按需长文本输入，中文/英文界面切换，并提供明确的终端替换重启动作；Session 附件支持手机/浏览器上传 PNG/JPEG/WebP/GIF、预览、删除和把本地路径安全插入终端，Files 同时可直接预览 Workspace 中的受支持图片；
 - Git Source Control 工作台与 Workspace 根目录只读文件浏览/预览/完整文件导出已经作为独立、有界、认证的 Agent API 落地，不复用终端协议；Files 提供 512 KiB 预览与独立 8 MiB 完整文件复制/分享/下载，Git 提供“更改 / 历史”、snapshot-stable cursor 分页、文件级 history、commit changed-files/file-diff，以及受控 stage/unstage/restore/commit/branch/stash/fetch/pull/push；
 - PalmTTY 自有的三主题视觉系统（炫彩流光/黑曜石/白霜）、效果/性能两档、reduced-motion 处理与主题审查 skills；

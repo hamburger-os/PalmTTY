@@ -1,6 +1,6 @@
 # Terminal runtime references
 
-Last reviewed: 2026-09-23.
+Last reviewed: 2026-10-15.
 
 ## Microsoft Windows Pseudoconsole (ConPTY)
 
@@ -122,11 +122,22 @@ Windows exposes TCP excluded-port ranges through `netsh interface ipv4/ipv6 show
 `node-pty` 1.1.0 exposes `IPty.pause()` / `IPty.resume()` for controlling its underlying PTY socket. PalmTTY now invokes them at independent canonical-headless output-queue high/low watermarks (512 KiB/128 KiB); this is different from optional XON/XOFF `handleFlowControl` on user input. References: [node-pty typings](https://github.com/microsoft/node-pty/blob/main/typings/node-pty.d.ts), [flow control documentation](https://github.com/microsoft/node-pty#flow-control). Validate ConPTY and WSL behavior on real hosts before claiming complete stress-test certification.
 
 
-## Browser-to-PTY input encoding boundary (2026-10-14)
+## Browser-to-PTY input encoding boundary (2026-10-15)
 
-Current node-pty's public IPty.write(data: string) API is a UTF-8 string input boundary, not a raw Uint8Array sink. xterm's onData emits terminal input strings, including modern SGR mouse reports, while onBinary emits a byte-string form used by some legacy protocols. PalmTTY splits UTF-8 input strings at Unicode scalar boundaries and forwards ASCII-only onBinary payloads; it rejects legacy onBinary values containing high-bit bytes rather than pretending UTF-8 string conversion preserves the original byte stream. This capability is a deliberate limitation, not an upgrade or alternate raw-PTY write path. Requalify on both Linux PTY and Windows ConPTY before expanding the byte-level contract.
+The public node-pty `IPty.write(data: string)` contract accepts a UTF-8 string, not arbitrary byte arrays. PalmTTY preserves Unicode scalar boundaries in its bounded browser input queue. Modern SGR and SGR-pixel mouse reports from xterm `onData` are ASCII control sequences and may be sent only after complete validation.
 
+PalmTTY deliberately does **not** subscribe to xterm `onBinary`: xterm uses this event for legacy binary mouse reports, whose arbitrary bytes cannot be forwarded faithfully through `IPty.write(string)`. Even ASCII-looking fragments can be interpreted as ordinary text by a CLI that does not accept the report. Legacy X10 mouse input is explicitly **unsupported**; reintroducing it requires a byte-preserving transport across the entire browser/WebSocket/Worker/PTY stack and real Windows/Linux qualification.
 
-## SGR mouse reports during browser touch inertia (2026-10-14)
+## Mobile touch browse / interact input policy (2026-10-15)
 
-In xterm's browser Gesture/MouseService path, real touchmove events carry pointer client coordinates but synthetic inertia CHANGE events may not. Mouse-report coordinate arithmetic can therefore produce NaN in an SGR wheel report. Terminal applications are not required to accept invalid CSI fields, and a rejected control sequence can leak trailing printable fragments into the input editor. PalmTTY applies a narrow browser output guard to complete SGR mouse reports: forward valid coordinates unmodified, substitute a bounded recent verified wheel location only for NaN inertia coordinates, and otherwise fail closed. This guard does not emulate scrolling, intercept touch gestures, or imply support for raw 8-bit legacy mouse bytes; xterm stays the gesture/viewport owner.
+xterm 6.1 beta retains ownership of touch gestures, scrolling inertia, and normal scrollback. PalmTTY does **not** register a competing application touch adapter or change `touch-action: none`.
+
+A single input router classifies `onData` before the IME/key handling path:
+
+- Normal keyboard, IME and paste data continue unchanged.
+- SGR mouse reports must be complete and contain finite, safe integer button/coordinates. Malformed reports, including inertia `NaN`, and legacy X10 `ESC[M...` prefixes are dropped without stale-coordinate reconstruction.
+- Coarse-pointer clients start in **Browse** mode: mouse reports are dropped entirely. With no active tracking, xterm retains its native touch history scrolling. With tracking enabled, Browse does not manufacture alternate scrolling or forward the event; switch to Interact to operate the application's mouse-controlled viewport.
+- **Interact** mode forwards complete valid SGR mouse reports to the current PTY. The toggle is browser-local state, not Session authority.
+- When a full-screen TUI uses an alternate buffer, no local scrollback exists; Browse cannot simulate app-specific internal scrolling. Switch to Interact or use app keyboard navigation instead.
+
+The input queue, Worker lease, reconnect/snapshot state and PTY lifecycle remain unchanged. Validate iPhone Safari and Android Chrome gestures, scrollback ends, alternate buffers, Chinese IME and external pointer devices before marking real-device testing complete.

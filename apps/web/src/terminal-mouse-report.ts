@@ -1,11 +1,9 @@
-// xterm's touch inertia may synthesize Gesture CHANGE events without clientX/Y.
-// In an SGR mouse-tracking TUI, its coordinates can then serialize as "NaN".
-// Never forward malformed mouse reports to the PTY: the application's CSI
-// parser may reject the escape and insert the trailing "NaNM" as ordinary text.
-// Reuse a recent, validated wheel position only for those inertia frames.
-// xterm continues to own gesture generation, scrolling, and mouse modes.
-const SGR_MOUSE_FIELDS = /^\u001b\[<([^;Mm]{1,24});([^;Mm]{1,24});([^;Mm]{1,24})([Mm])$/;
-const WHEEL_POSITION_MAX_AGE_MS = 2000;
+// Only complete, finite SGR mouse reports are forwarded. Legacy X10 reports
+// cannot be represented faithfully through node-pty's UTF-8 string input;
+// never let a malformed prefix reach a TUI input editor as printable text.
+const SGR_MOUSE_FIELDS = /^\u001b\[<(\d{1,12});(\d{1,12});(\d{1,12})([Mm])$/;
+const SGR_MOUSE_PREFIX = "\u001b[<";
+const LEGACY_MOUSE_PREFIX = "\u001b[M";
 
 export type MouseTrackingMode = "none" | "x10" | "vt200" | "drag" | "any";
 
@@ -13,58 +11,34 @@ export type MouseReportInput =
   | { kind: "input"; data: string }
   | { kind: "mouse"; data?: string };
 
-type WheelPosition = { x: number; y: number; timestamp: number };
-
-function validInteger(value: string, min: number): number | undefined {
-  if (!/^\d+$/.test(value)) return undefined;
+function safeInteger(value: string): number | undefined {
   const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed >= min ? parsed : undefined;
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 export class TerminalMouseReportGuard {
-  private lastWheel: WheelPosition | undefined;
-
-  constructor(private readonly now: () => number = () => performance.now()) {}
-
   handle(data: string, mode: MouseTrackingMode): MouseReportInput {
-    if (mode === "none") this.lastWheel = undefined;
+    if (!data.startsWith(SGR_MOUSE_PREFIX) &&
+        !data.startsWith(LEGACY_MOUSE_PREFIX)) {
+      return { kind: "input", data };
+    }
+
     const fields = SGR_MOUSE_FIELDS.exec(data);
-    if (!fields) return { kind: "input", data };
+    if (!fields || mode === "none") return { kind: "mouse" };
 
-    const button = validInteger(fields[1]!, 0);
-    const x = validInteger(fields[2]!, 0);
-    const y = validInteger(fields[3]!, 0);
-    const terminator = fields[4]!;
-    if (button !== undefined && x !== undefined && y !== undefined) {
-      if (mode === "none") return { kind: "mouse" };
-      // Only wheel reports seed inertia recovery. Click/drag must never
-      // redirect the last scroll location or activate a TUI control.
-      if ((button === 64 || button === 65) && terminator === "M") {
-        this.lastWheel = { x, y, timestamp: this.now() };
-      }
-      return { kind: "mouse", data };
+    const button = safeInteger(fields[1]!);
+    const x = safeInteger(fields[2]!);
+    const y = safeInteger(fields[3]!);
+    if (button === undefined || button > 255 ||
+        x === undefined || y === undefined) {
+      return { kind: "mouse" };
     }
 
-    // Reconstruct ONLY the missing coordinates on xterm-generated SGR wheel
-    // reports. No arbitrary malformed button, click, release or drag is repaired.
-    const wheel = button === 64 || button === 65;
-    const missing = fields[2] === "NaN" || fields[3] === "NaN";
-    const onlyCoordinatesMissing =
-      (x !== undefined || fields[2] === "NaN") &&
-      (y !== undefined || fields[3] === "NaN");
-    const previous = this.lastWheel;
-    const age = previous === undefined ? Infinity : this.now() - previous.timestamp;
-    if (mode !== "none" && wheel && terminator === "M" &&
-        missing && onlyCoordinatesMissing && previous &&
-        age >= 0 && age <= WHEEL_POSITION_MAX_AGE_MS) {
-      return { kind: "mouse", data: "\u001b[<" + button + ";" + previous.x + ";" + previous.y + "M" };
-    }
-
-    // An invalid CSI mouse report must not fall through the IME/key input path.
-    return { kind: "mouse" };
-  }
-
-  reset(): void {
-    this.lastWheel = undefined;
+    // Wheel buttons are 64/65 plus optional modifier bits (4/8/16).
+    // 128+ is an extended button, not a wheel.
+    const wheelButton = (button & 192) === 64 ? button & 3 : -1;
+    // Wheel reports have no release packet; a release is not a safe wheel.
+    if (fields[4] === "m" && wheelButton >= 0) return { kind: "mouse" };
+    return { kind: "mouse", data };
   }
 }

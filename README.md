@@ -22,6 +22,12 @@ PalmTTY is a mobile-first, self-hosted remote development workbench centered on 
 
 PalmTTY 是一个面向手机、自托管的远程开发工作台，核心是工作站上可持久的 Activity。Terminal Session 继续覆盖 Windows Host、WSL 和 Linux Host；Windows x64 额外加入 **Unreleased Remote Apps alpha**：按持久 Workspace Profile 启动桌面应用，并通过独立 AppWorker/WebRTC 数据面只呈现 PalmTTY 自己启动的应用窗口。Git/Files 仍是有界 Workspace Tool，Artifacts 仍属于 Terminal Session；Codex/Claude/OpenCode 等继续作为 vendor-neutral workload，不把厂商私有协议写进 PalmTTY 核心。
 
+## Terminal touch controls / 手机终端触摸控制
+
+On touch devices, the terminal starts in **Browse** mode: swipe to review local history when mouse tracking is off, without sending mouse events to CLI apps. Switch to **Interact** from the keybar to send valid SGR mouse actions to a full-screen TUI. Alternate-screen apps have no local scrollback, so use Interact or app-specific keyboard navigation to scroll inside them. Legacy X10 binary mouse input is intentionally unsupported and malformed reports are dropped.
+
+手机终端默认“浏览”：未启用鼠标跟踪时可以原生滑动查看终端历史，且不会将鼠标事件误发给 CLI；如需操作 TUI 内部的滚动和点击，使用快捷键栏中的“交互”。备用屏幕无本地滚动历史，请使用交互模式或应用快捷键。旧式 X10 二进制鼠标协议明确不支持，异常鼠标报告直接丢弃。
+
 ## Unattended browser RDP / 无人值守浏览器 RDP（规划中）
 
 Windows 11 Pro + iPhone Safari 的完整浏览器 RDP 是 v0.3.0 目标，**尚未实现**。已将单机部署调整为原生 Windows Devolutions Gateway + IronRDP，不需要 Hyper-V/WSL2/Docker。只读诊断 `pnpm unattended:check -- --json` 检查 Windows/RDP/NLA 和 Gateway 服务及配置；它不会安装软件、修改登录/防火墙设置或替代真实 iPhone 验收。详细请见 [部署指南](docs/community/unattended-rdp.md) 和 [架构设计](docs/owner/unattended-rdp.md)。

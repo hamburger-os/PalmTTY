@@ -9,6 +9,7 @@ function markup(moreOpen: boolean): string {
   vi.stubGlobal("navigator", { language: "zh-CN" });
   const keybar = createElement(TerminalKeyBar, {
     connected: true, ctrl: false, alt: false, moreOpen,
+    touchMode: "browse", onToggleTouchMode: () => undefined,
     onFocusKeyboard: () => undefined,
     onToggleCtrl: () => undefined,
     onToggleAlt: () => undefined,
@@ -30,6 +31,8 @@ describe("mobile CLI keybar", () => {
     expect(buttons[0]).toContain("⌨");
     expect(buttons[1]).toContain("长文本");
     expect(buttons.some(button => button.includes("更多"))).toBe(true);
+    expect(html).toContain("浏览");
+    expect(html).toContain('aria-pressed="true"');
     expect(html).not.toContain("隐藏工具栏");
     expect(html).not.toContain('id="terminal-keybar-more"');
   });
