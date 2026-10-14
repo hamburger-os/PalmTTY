@@ -20,6 +20,7 @@ const SHORTCUTS = {
   ctrlL: encodeControlShortcut("L"),
   ctrlO: encodeControlShortcut("O"),
   ctrlR: encodeControlShortcut("R"),
+  ctrlQ: encodeControlShortcut("Q"),
   ctrlU: encodeControlShortcut("U"),
   ctrlW: encodeControlShortcut("W")
 } as const;
@@ -117,6 +118,9 @@ export function TerminalKeyBar({
           {keyButton("→", "arrowRight", t("terminal.keyArrowRight"))}
           {shortcutButton("Ctrl+C", SHORTCUTS.ctrlC)}
           {shortcutButton("Ctrl+J", SHORTCUTS.ctrlJ)}
+          {keyButton("Shift+Enter", "shiftEnter")}
+          {keyButton("Alt+Enter", "altEnter")}
+          {shortcutButton("Ctrl+Q", SHORTCUTS.ctrlQ)}
           {keyButton("Shift+Tab", "backTab")}
           {shortcutButton("Ctrl+D", SHORTCUTS.ctrlD)}
           <button type="button" disabled={fontSize <= MIN_TERMINAL_FONT_SIZE}
