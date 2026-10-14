@@ -8,6 +8,7 @@ describe("workspace presets", () => {
     )).toMatchObject({
       codex: "codex",
       claude: "claude",
+      pi: "pi",
       antigravity: "agy",
       gemini: "gemini",
       opencode: "opencode",
