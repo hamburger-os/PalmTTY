@@ -37,10 +37,8 @@ import { Brand } from "./Brand.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { useI18n } from "./i18n.js";
 import { WorkspaceWorkbench } from "./WorkspaceWorkbench.js";
-import {
-  WorkspaceDialog,
-  workspaceRuntimeSummary
-} from "./WorkspaceDialog.js";
+import { WorkspaceDialog } from "./WorkspaceDialog.js";
+import { workspaceRuntimeSummary } from "./workspace-runtime-helpers.js";
 
 type AuthState = { enabled: boolean; authenticated: boolean };
 type WorkspaceEditor = WorkspacePublic | "new" | null;
