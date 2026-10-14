@@ -216,7 +216,7 @@ for (const [selector, marker] of [
 
 // The scrollbar option, not CSS, must own both the visible indicator
 // and FitAddon's reserved column width. The second CSS gutter caused a
-// persistent blank strip in mobile Safari.
+// extra reserved space in browsers with non-overlay gutters.
 if (
   !terminalView.includes('scrollbar: {') ||
   !terminalView.includes('width: terminalScrollbarWidth(window.matchMedia("(pointer: coarse)").matches)') ||
