@@ -162,3 +162,11 @@ Files 的普通文本预览可以进入独立阅读视图，沿用 Workspace 文
 OpenCode 等全屏 TUI 开启 mouse 后，xterm.js 的触摸惯性事件可能缺失 clientX/clientY；鼠标坐标编码出现 NaN，应用不识别 ESC 报告时会把 NaNM 等残片显示在输入框。此问题与小说文字的编码无关，也不应该使用逐行手势模拟来规避。
 
 终端的 xterm 输入边界增设极窄的 SGR 鼠标报告校验：正常报告原样发送，只有近期已确认的滚轮坐标可以用于修复惯性滚动产生的 NaN 坐标；没有有效参考坐标、超过 2 秒、非滚轮或鼠标跟踪关闭时直接丢弃。异常报告不得进入 IME 输入事务或作为文本发给 PTY；方向键、中文输入、长文本粘贴等保持原有语义。终端仍由 xterm.js 独占触摸滚动和惯性物理，没有自己的 touchmove handler、额外滚动层或 OpenCode 专属适配。真实 iPhone Safari 滑动/甩动需部署后验收。
+
+## 手机终端滚动条与右侧留白修订（2026-10-15）
+
+终端右侧长期留白来自外框水平 padding、xterm 滚动条宽度及按完整字符列计算后的余数，不应把所有余量都当成浏览器原生滚动条。浏览器启动 xterm 时采用公开的 `scrollbar.width`：粗指针触屏 4 CSS px、精确指针 8 CSS px。xterm 与 FitAddon 由同一配置决定列数与滚动指示器宽度，避免以 CSS 单独缩窄可见滚动条造成最后一列裁切。
+
+终端 viewport 不再使用 `scrollbar-gutter: stable` 额外预留空间，手机宽度下仅收紧 `terminal-frame` 左右 padding，`terminal-mount` 继续不带 padding/border。保留 xterm 原有触摸惯性、滚动条/备用屏幕/鼠标跟踪行为；不引入第二滚动层或 touchmove adapter，也不因主题、工具页切换重新创建 Session。
+
+验证重点：iOS Safari 竖屏/横屏、Android Chrome、桌面鼠标；终端内滚动不得带动整页，滚动条不应长期形成明显宽槽，最右列与最下行不可被裁切；软键盘、字号变化、重连与全屏 TUI 的几何/鼠标语义保持正确。CI 的配置单测不能替代真机可视验收。
