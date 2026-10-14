@@ -10,7 +10,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 ### Terminal TUI input and long-paste reliability (unreleased)
 
 - Preserve SGR mouse/terminal control reports across virtual Ctrl/Alt and IME handling; handle ASCII-only legacy mouse binary notifications while warning for raw 8-bit reports that cannot be represented losslessly by node-pty UTF-8 string writes.
-- Stream large xterm bracketed pastes via an ordered, <=16 KiB UTF-8 framed, 8 MiB-bounded browser input queue with WebSocket backpressure, explicit interruption/overflow feedback and no unsent-input replay after disconnect.
+- Stream large xterm bracketed pastes via an ordered, <=12 KiB UTF-8 framed, 8 MiB-bounded browser input queue with WebSocket backpressure, explicit interruption/overflow feedback and no unsent-input replay after disconnect.
 
 
 ### Unattended browser RDP foundation

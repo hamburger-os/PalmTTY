@@ -29,10 +29,17 @@ describe("terminal input transport", () => {
     const chunks = splitUtf8Input(content);
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks.join("")).toBe(content);
-    expect(chunks.every(part => utf8InputBytes(part) <= 16 * 1024)).toBe(true);
+    expect(chunks.every(part => utf8InputBytes(part) <= 12 * 1024)).toBe(true);
     expect(splitUtf8Input("abc")).toEqual(["abc"]);
     expect(splitUtf8Input("")).toEqual([]);
     expect(() => splitUtf8Input("hello", 3)).toThrow(RangeError);
+  });
+
+  it("keeps JSON-escaped control-heavy input below the 80 KiB WebSocket frame cap", () => {
+    for (const chunk of splitUtf8Input("\u0000".repeat(26000))) {
+      expect(utf8InputBytes(JSON.stringify({ type: "input", data: chunk })))
+        .toBeLessThanOrEqual(80 * 1024);
+    }
   });
 
   it("streams bracketed paste and following Enter in order under backpressure", () => {
@@ -50,7 +57,7 @@ describe("terminal input transport", () => {
       vi.advanceTimersByTime(40);
     }
     expect(sent.join("")).toBe(input + "\r");
-    expect(sent.every(part => utf8InputBytes(part) <= 16 * 1024)).toBe(true);
+    expect(sent.every(part => utf8InputBytes(part) <= 12 * 1024)).toBe(true);
     expect(failures).toEqual([]);
     queue.abort();
   });

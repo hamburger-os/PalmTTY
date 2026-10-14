@@ -1,6 +1,8 @@
 // One ordered browser-to-PTY input stream. WebSocket text frames carry UTF-8,
 // so split at Unicode scalar boundaries rather than JavaScript code units.
-export const TERMINAL_INPUT_CHUNK_BYTES = 16 * 1024;
+// 12 KiB also bounds worst-case JSON control-character escaping below the
+// 80 KiB WebSocket message limit (each ASCII control may encode as six bytes).
+export const TERMINAL_INPUT_CHUNK_BYTES = 12 * 1024;
 export const MAX_QUEUED_TERMINAL_INPUT_BYTES = 8 * 1024 * 1024;
 const SOCKET_HIGH_WATER_BYTES = 128 * 1024;
 
