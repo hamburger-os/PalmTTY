@@ -54,6 +54,7 @@ describe("canonical terminal mouse encoding snapshot", () => {
       await write(terminal, "06h");
       expect(encoding.snapshotSuffix()).toBe("\u001b[?1006h");
       await write(terminal, "\u001b[?1015;1006h");
+      // xterm does not implement urxvt 1015: it cannot override SGR.
       expect(encoding.snapshotSuffix()).toBe("\u001b[?1006h");
       await write(terminal, "\u001b[?1016h");
       expect(encoding.snapshotSuffix()).toBe("\u001b[?1016h");
