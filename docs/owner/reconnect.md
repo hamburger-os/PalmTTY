@@ -121,6 +121,6 @@ Session Worker 独立于 Agent 存活。#100 升级浏览器协议时没有改�
 
 ## SGR 鼠标编码与快照恢复（2026-10-15）
 
-Worker headless parser 负责识别 PTY 输出中的 DECSET/DECRST 1006（SGR）、1015、1016 和 RIS 硬重置；xterm SerializeAddon 本身序列化鼠标 tracking mode，但遗漏独立的鼠标**编码格式**。因此 Worker 把当前编码切换追加到相同的 canonical snapshot，计入既有 4 MiB 上限。浏览器恢复时不根据应用名默认开启 SGR，更不转发无法通过 UTF-8 字符串通道安全保真的 X10/onBinary。未变更 Session 协议、Agent 权限或 PTY 所有权。
+Worker headless parser 负责识别 PTY 输出中的 DECSET/DECRST 1006（SGR）、1016（SGR pixels）和 RIS（xterm 不支持 1015） 硬重置；xterm SerializeAddon 本身序列化鼠标 tracking mode，但遗漏独立的鼠标**编码格式**。因此 Worker 把当前编码切换追加到相同的 canonical snapshot，计入既有 4 MiB 上限。浏览器恢复时不根据应用名默认开启 SGR，更不转发无法通过 UTF-8 字符串通道安全保真的 X10/onBinary。未变更 Session 协议、Agent 权限或 PTY 所有权。
 
 恢复操作不能重建 TUI 内部对话历史：普通 buffer scrollback 来自 Worker 镜像，全屏 alternate-buffer 中的滚动位置必须由仍运行的 TUI 自己维护并响应有效滚轮或键盘操作。
