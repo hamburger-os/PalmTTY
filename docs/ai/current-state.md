@@ -287,7 +287,7 @@ Review hardening: Browser SpeechSynthesis is not intrinsically offline. The read
 
 ## Canonical snapshot mouse encoding recovery (2026-10-15)
 
-- The Worker headless parser observes DECSET/DECRST 1006 (SGR), 1015 (urxvt) and 1016 (SGR-pixel), plus RIS resets, while continuing normal xterm parsing. SerializeAddon serializes mouse tracking but omits its encoding selection, so the Worker appends the active encoding to its existing bounded snapshot. The browser never guesses a mouse protocol or enables unsupported onBinary transport. The serialized suffix counts toward the same <=4 MiB budget; Worker remains the sole canonical owner.
+- The Worker headless parser observes DECSET/DECRST 1006 (SGR) and 1016 (SGR-pixel), plus RIS resets (1015 urxvt is unsupported by xterm), while continuing normal xterm parsing. SerializeAddon serializes mouse tracking but omits its encoding selection, so the Worker appends the active encoding to its existing bounded snapshot. The browser never guesses a mouse protocol or enables unsupported onBinary transport. The serialized suffix counts toward the same <=4 MiB budget; Worker remains the sole canonical owner.
 - A backgrounded mobile page still remounts xterm and restores the bounded canonical snapshot rather than replaying minutes of output. This fix restores input negotiation but does not invent scrollback inside an alternate-screen TUI. Browser+Pi real-device regression coverage is still required.
 
 ## xterm touch wheel / SGR NaN regression guard (2026-10-14)
