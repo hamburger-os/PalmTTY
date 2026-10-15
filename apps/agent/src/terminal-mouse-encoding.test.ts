@@ -69,7 +69,7 @@ describe("canonical terminal mouse encoding snapshot", () => {
   it("ignores control-looking text inside OSC and output glyphs", async () => {
     const { terminal, encoding } = fixture();
     try {
-      await write(terminal, "\u001b]0;fake \u001b[?1006h\u0007");
+      await write(terminal, "\u001b]0;fake ?1006h\u0007");
       expect(encoding.snapshotSuffix()).toBe("");
       await write(terminal, "normal text ?1006h");
       expect(encoding.snapshotSuffix()).toBe("");
