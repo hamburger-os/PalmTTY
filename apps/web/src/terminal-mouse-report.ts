@@ -9,7 +9,7 @@ export type MouseTrackingMode = "none" | "x10" | "vt200" | "drag" | "any";
 
 export type MouseReportInput =
   | { kind: "input"; data: string }
-  | { kind: "mouse"; data?: string };
+  | { kind: "mouse"; data?: string; wheel?: true };
 
 function safeInteger(value: string): number | undefined {
   const parsed = Number(value);
@@ -39,6 +39,8 @@ export class TerminalMouseReportGuard {
     const wheelButton = (button & 192) === 64 ? button & 3 : -1;
     // Wheel reports have no release packet; a release is not a safe wheel.
     if (fields[4] === "m" && wheelButton >= 0) return { kind: "mouse" };
-    return { kind: "mouse", data };
+    return wheelButton >= 0
+      ? { kind: "mouse", data, wheel: true }
+      : { kind: "mouse", data };
   }
 }
