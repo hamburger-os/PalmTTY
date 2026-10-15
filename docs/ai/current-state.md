@@ -10,7 +10,7 @@ The browser-integrated native Devolutions Gateway/IronRDP NLA path and pre-login
 
 ### Mobile terminal pointer routing (2026-10-15)
 
-- Touch clients start in Browse mode; the fixed keybar switches to Interact. Browse blocks mouse events from PTY input, and xterm alone handles native scrollback when mouse tracking is disabled. Interact forwards only validated complete SGR reports. NaN/malformed SGR and X10 prefixes are discarded; xterm.onBinary legacy packets are never forwarded over the UTF-8 PTY string boundary. No independent touch gesture owner is installed. Alternate-screen TUI internal scrolling requires Interact or keyboard navigation. These controls are browser-local and do not alter Worker replay, lease, or reconnection. Real iOS/Android testing remains necessary.
+- Touch clients start in Browse mode; the fixed keybar switches to Interact. Browse forwards **only validated SGR wheel reports** when a TUI enables mouse tracking (so the TUI can scroll its own transcript), while blocking mouse clicks/drags/movement; when tracking is off, xterm scrolls local normal-buffer history without sending mouse input. Interact forwards all valid complete SGR reports. NaN/malformed SGR and X10/onBinary packets are always discarded. Touch physics still belongs only to xterm. Alternate buffers have no native scrollback; scrolling there depends on the TUI's wheel support. Real iOS/Android testing remains necessary.
 
 
 ### Repository and governance
@@ -279,13 +279,16 @@ Review hardening: Browser SpeechSynthesis is not intrinsically offline. The read
 - Independently durable Session Workers spawned before #100 still authenticate over Worker IPC v5 but emit `hello.protocol=3`. Previously the v4 `WorkerEventSchema` rejected this delivery, disconnected authenticated IPC and triggered a 1012 browser reconnect loop. The Agent now recognizes only the old v3 `hello` shape on **authenticated Worker IPC** and translates its protocol to v4 before sending it to a browser; all other messages and worker ownership remain unchanged. This is not a general legacy browser API or a fallback shell restart.
 
 
-## Terminal TUI input hardening (2026-10-14)
+## Terminal TUI input hardening (2026-10-15)
 
-- The browser uses one bounded, ordered terminal-input queue for keyboard, mouse reports, IME, virtual keys and xterm paste. It splits oversized onData payloads at UTF-8 code-point boundaries into <=12 KiB WebSocket input frames, caps unsent input at 8 MiB, and waits for WebSocket buffer drain before sending more. A socket close discards unsent input rather than replaying potentially duplicated paste bytes. A close can still interrupt a partially accepted paste; no exactly-once acknowledgement is promised.
-- Only known keyboard sequences and single Unicode characters can consume the virtual Ctrl/Alt modifier. SGR mouse reports bypass pending iOS keyCode-229 text deduplication; xterm continues to own mouse tracking, scrolling, gesture physics and terminal modes. A browser onBinary hook now forwards ASCII-only legacy reports. Raw legacy 8-bit reports containing bytes >=0x80 are **not** transmittable through the current node-pty UTF-8 string-write API and produce a visible warning instead of malformed output. This is not complete legacy mouse-protocol support.
-- Long Text preflights the pending buffer before calling xterm.paste, preserving bracketed-paste delimiters and optional Enter ordering. A rejected draft remains in the dialog. Visible warnings cover queue overflow, dropped pending bytes on socket close, transport failure and unsupported 8-bit legacy mouse bytes.
-- Touch scrolling remains xterm-owned; this change does **not** add phone-specific touch translation or promise real-device OpenCode compatibility. Real iPhone Safari/ConPTY mouse + IME + reconnect testing is still required.
+- All keyboard, mouse reports, IME, virtual keys and xterm paste share one bounded ordered browser input queue. Large Unicode data splits at <=12 KiB WebSocket frames, unsent data is capped at 8 MiB, and interrupted paste is not replayed after socket close. No exactly-once acknowledgement is promised.
+- Only keyboard/control data consumes virtual Ctrl/Alt modifiers. Complete valid SGR mouse reports are independently classified before IME. Browse forwards only wheel events to a mouse-tracking TUI, not clicks/drags/movement; Interact forwards all validated mouse reports. Normal-buffer scroll remains xterm-local. Legacy X10/onBinary and malformed/NaN SGR are always discarded; no UTF-8-incompatible byte stream is sent to node-pty.
+- Long Text preflights the buffer before xterm.paste, preserving bracketed-paste ordering; input failure warnings remain visible. There is no PalmTTY-owned touch gesture/row translation layer.
 
+## Canonical snapshot mouse encoding recovery (2026-10-15)
+
+- The Worker headless parser observes DECSET/DECRST 1006 (SGR), 1015 (urxvt) and 1016 (SGR-pixel), plus RIS resets, while continuing normal xterm parsing. SerializeAddon serializes mouse tracking but omits its encoding selection, so the Worker appends the active encoding to its existing bounded snapshot. The browser never guesses a mouse protocol or enables unsupported onBinary transport. The serialized suffix counts toward the same <=4 MiB budget; Worker remains the sole canonical owner.
+- A backgrounded mobile page still remounts xterm and restores the bounded canonical snapshot rather than replaying minutes of output. This fix restores input negotiation but does not invent scrollback inside an alternate-screen TUI. Browser+Pi real-device regression coverage is still required.
 
 ## xterm touch wheel / SGR NaN regression guard (2026-10-14)
 
