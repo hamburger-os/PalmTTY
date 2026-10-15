@@ -197,3 +197,11 @@ Terminal browser clients and the Agent must use `palmtty.v4` together. If a v4 b
 **English:** The browser terminal configures xterm's public `scrollbar.width` option to 4 CSS px on coarse-pointer devices and 8 CSS px with a precise pointer. This keeps the same width in xterm's scrollable area and FitAddon column calculations. The terminal viewport does not reserve an additional CSS `scrollbar-gutter`; on phone-width layouts only the decorative outer frame padding is tightened. Xterm retains ownership of scrollback, touch momentum, alternate-screen and mouse tracking. Some empty pixels may remain because the terminal fits whole character cells. Real-device Safari/Chrome visual and gesture checks are required before certifying the appearance.
 
 **中文：** 浏览器终端通过 xterm 公开的 `scrollbar.width` 为粗指针触屏设置 4 CSS px、精确指针设置 8 CSS px；滚动区域和 FitAddon 列数计算使用同一宽度。终端 viewport 不再附加 CSS `scrollbar-gutter`，手机窄屏只收紧外层装饰框的 padding。滚动历史、惯性、备用屏幕和鼠标追踪仍归 xterm 管理；字符列只能取整，右侧仍可能出现少量正常余量。最终视觉和手势表现需要 Safari/Chrome 真机验收。
+
+### Mobile TUI wheel navigation and mouse recovery (October 2026)
+
+Browse mode allows only validated SGR wheel reports through to a mouse-tracking TUI while blocking clicks, drags and movement. Interact allows all validated SGR mouse reports. Without mouse tracking, xterm still owns normal-buffer scrollback. There is no parallel touch adapter or transcript buffer. The Worker observes parsed CSI mouse encoding negotiation (1006/1015/1016) and completes the bounded canonical terminal snapshot with the encoding that SerializeAddon does not restore. This prevents a reattached browser xterm from accidentally falling back to legacy X10, which remains unsupported on the UTF-8 node-pty input path. Alternate-screen scrollback remains owned by the TUI, not PalmTTY.
+
+### 手机 TUI 滚动与鼠标协议恢复（2026 年 10 月）
+
+浏览模式只把有效的 SGR 滚轮交给已启用鼠标跟踪的 TUI，继续拦截点击、拖动、移动；交互模式允许全部经过校验的 SGR 鼠标输入。未启用跟踪时普通缓冲区的滚动仍由 xterm 本地处理，不增加第二套触摸适配器或历史缓冲区。Worker 从 headless parser 捕获 1006/1015/1016 鼠标编码协商，并把 SerializeAddon 漏掉的编码状态补在同一个有界快照内，避免重新附着后的浏览器回退到不支持的 X10。备用屏幕的内部消息历史只能由 TUI 自身维护和滚动。
