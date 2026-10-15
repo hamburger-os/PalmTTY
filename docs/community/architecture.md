@@ -188,7 +188,7 @@ Terminal browser clients and the Agent must use `palmtty.v4` together. If a v4 b
 
 ### Touch-inertia mouse validation / 触摸惯性鼠标校验（2026-10）
 
-**English:** Some xterm browser touch-inertia CHANGE events lack pointer coordinates; under a mouse-tracking full-screen TUI this can produce invalid SGR reports with literal NaN and insert "NaNM" into an application's prompt. PalmTTY validates complete xterm onData SGR mouse reports before IME/key processing. A correctly encoded wheel report is untouched; NaN wheel coordinates may be reconstructed only from a recent validated wheel position (<=2 seconds). Other invalid reports are suppressed. No second touch event system, CLI-specific decoding, or protocol/Worker changes are introduced. Real iPhone Safari / OpenCode swipe and fling verification remains a device acceptance task.
+**English:** Some xterm browser touch-inertia CHANGE events lack pointer coordinates; under a mouse-tracking full-screen TUI this can produce invalid SGR reports with literal NaN and insert "NaNM" into an application's prompt. PalmTTY validates complete xterm onData SGR mouse reports before IME/key processing. Complete valid wheel reports are routed under the active Browse/Interact policy; NaN or otherwise malformed reports are discarded without inventing or reusing previous coordinates. No extra touch-gesture owner or vendor-specific CLI protocol is introduced. Real iPhone Safari and Android Chrome tests remain necessary.
 
 **中文：** xterm 的触摸惯性 CHANGE 事件可能缺少坐标，全屏鼠标模式下生成带有 NaN 的无效 SGR 报告，使应用输入框出现 NaNM。PalmTTY 在 xterm onData 输入边界校验完整的 SGR 鼠标报告：正常滚轮不改变；含 NaN 的惯性报告与其他畸形报告均直接丢弃，不使用历史坐标猜测修复。不会增加第二套触摸手势、解析特定 CLI 或修改会话协议与 Worker；iPhone Safari / OpenCode 的滑动和惯性体验仍需真机验收。
 
