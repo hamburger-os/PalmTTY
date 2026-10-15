@@ -14,13 +14,20 @@ describe("terminal mouse / keyboard input routing", () => {
     }
   });
 
-  it("does not emit CLI mouse events in browse mode", () => {
+  it("allows only valid TUI wheel scrolling in browse mode", () => {
     expect(router.route(UP, "vt200", "browse"))
-      .toEqual({ kind: "drop" });
-    expect(router.route("\u001b[<65;4;5M", "vt200", "browse"))
-      .toEqual({ kind: "drop" });
-    expect(router.route("\u001b[<0;4;5M", "vt200", "browse"))
-      .toEqual({ kind: "drop" });
+      .toEqual({ kind: "mouse", data: UP });
+    expect(router.route("\u001b[<65;4;5M", "drag", "browse"))
+      .toEqual({ kind: "mouse", data: "\u001b[<65;4;5M" });
+    expect(router.route("\u001b[<68;4;5M", "any", "browse"))
+      .toEqual({ kind: "mouse", data: "\u001b[<68;4;5M" });
+    for (const event of [
+      "\u001b[<0;4;5M", "\u001b[<0;4;5m",
+      "\u001b[<32;4;5M", "\u001b[<128;4;5M"
+    ]) {
+      expect(router.route(event, "any", "browse"))
+        .toEqual({ kind: "drop" });
+    }
     expect(router.route(UP, "none", "browse"))
       .toEqual({ kind: "drop" });
   });
