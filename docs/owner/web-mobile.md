@@ -175,5 +175,5 @@ OpenCode 等全屏 TUI 开启 mouse 后，xterm.js 的触摸惯性事件可能�
 ## 2026-10-15 Pi 手机滚动和后台恢复修订
 
 - 手机浏览模式放行**有效 SGR 滚轮**，仍阻止其它鼠标操作；这是将 TUI 自带的滚动交给 TUI，不是浏览器自建 scrollback。交互模式仍可点击与拖动。普通缓冲区继续由 xterm 滚动，绝不能因为鼠标跟踪关闭而向 Shell 发送假滚轮控制码。
-- Worker 的 headless xterm 仍是 canonical 终端状态；`SerializeAddon` 能恢复鼠标追踪类型，却不会恢复独立的 `?1006` SGR 鼠标编码等模式。Worker 通过 headless parser 的 CSI handler 跟踪已解析的编码切换（包括 `?1015`/`?1016` 和硬重置），在有界快照尾部补齐必要模式；浏览器不根据 TUI 名称或历史滚轮坐标猜测协议，也不打开 `onBinary`。不会额外持久化终端文本或产生第二个缓冲区来源。
+- Worker 的 headless xterm 仍是 canonical 终端状态；`SerializeAddon` 能恢复鼠标追踪类型，却不会恢复独立的 `?1006` SGR 鼠标编码等模式。Worker 通过 headless parser 的 CSI handler 跟踪已解析的编码切换（包括 `?1016` 和硬重置；xterm 不支持 `?1015`），在有界快照尾部补齐必要模式；浏览器不根据 TUI 名称或历史滚轮坐标猜测协议，也不打开 `onBinary`。不会额外持久化终端文本或产生第二个缓冲区来源。
 - 真机回归必须分别覆盖 Pi 普通模式/全屏鼠标模式、连续输出、切换前后台、输出结束后继续滚动、TUI 退出后的普通缓冲区；恢复的快照只能保留 Worker 持有的终端状态，不能替代 TUI 内部的完整对话历史。
