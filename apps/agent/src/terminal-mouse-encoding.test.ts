@@ -28,17 +28,25 @@ describe("canonical terminal mouse encoding snapshot", () => {
   it("restores SGR encoding missing from SerializeAddon without replacing tracking", async () => {
     const { terminal, serializer, encoding } = fixture();
     try {
-      await write(terminal, "\u001b[?1000;1006hPi transcript");
+      await write(terminal, "\u001b[?1049h\u001b[?1000;1006hPi transcript");
       const base = serializer.serialize();
       expect(base).toContain("\u001b[?1000h");
+      expect(base).toContain("\u001b[?1049h");
       expect(base).not.toContain("\u001b[?1006h");
       expect(encoding.snapshotSuffix()).toBe("\u001b[?1006h");
 
       const restored = new HeadlessTerminal({ cols: 80, rows: 24, allowProposedApi: true });
+      const restoredEncoding = new TerminalMouseEncoding(restored);
       try {
         await write(restored, base + encoding.snapshotSuffix());
         expect(restored.modes.mouseTrackingMode).toBe("vt200");
+        expect(restored.buffer.active.type).toBe("alternate");
+        expect(restoredEncoding.snapshotSuffix()).toBe("\u001b[?1006h");
         expect(restored.buffer.active.getLine(0)?.translateToString()).toContain("Pi transcript");
+        // A subsequent AI reply does not renegotiate the encoding; it must
+        // remain active after snapshot recovery and ordinary output.
+        await write(restored, "\r\nmore AI output");
+        expect(restoredEncoding.snapshotSuffix()).toBe("\u001b[?1006h");
       } finally {
         restored.dispose();
       }
