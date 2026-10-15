@@ -200,8 +200,8 @@ Terminal browser clients and the Agent must use `palmtty.v4` together. If a v4 b
 
 ### Mobile TUI wheel navigation and mouse recovery (October 2026)
 
-Browse mode allows only validated SGR wheel reports through to a mouse-tracking TUI while blocking clicks, drags and movement. Interact allows all validated SGR mouse reports. Without mouse tracking, xterm still owns normal-buffer scrollback. There is no parallel touch adapter or transcript buffer. The Worker observes parsed CSI mouse encoding negotiation (1006/1015/1016) and completes the bounded canonical terminal snapshot with the encoding that SerializeAddon does not restore. This prevents a reattached browser xterm from accidentally falling back to legacy X10, which remains unsupported on the UTF-8 node-pty input path. Alternate-screen scrollback remains owned by the TUI, not PalmTTY.
+Browse mode allows only validated SGR wheel reports through to a mouse-tracking TUI while blocking clicks, drags and movement. Interact allows all validated SGR mouse reports. Without mouse tracking, xterm still owns normal-buffer scrollback. There is no parallel touch adapter or transcript buffer. The Worker observes parsed CSI mouse encoding negotiation (1006/1016; unsupported urxvt 1015 is not tracked) and completes the bounded canonical terminal snapshot with the encoding that SerializeAddon does not restore. This prevents a reattached browser xterm from accidentally falling back to legacy X10, which remains unsupported on the UTF-8 node-pty input path. Alternate-screen scrollback remains owned by the TUI, not PalmTTY.
 
 ### 手机 TUI 滚动与鼠标协议恢复（2026 年 10 月）
 
-浏览模式只把有效的 SGR 滚轮交给已启用鼠标跟踪的 TUI，继续拦截点击、拖动、移动；交互模式允许全部经过校验的 SGR 鼠标输入。未启用跟踪时普通缓冲区的滚动仍由 xterm 本地处理，不增加第二套触摸适配器或历史缓冲区。Worker 从 headless parser 捕获 1006/1015/1016 鼠标编码协商，并把 SerializeAddon 漏掉的编码状态补在同一个有界快照内，避免重新附着后的浏览器回退到不支持的 X10。备用屏幕的内部消息历史只能由 TUI 自身维护和滚动。
+浏览模式只把有效的 SGR 滚轮交给已启用鼠标跟踪的 TUI，继续拦截点击、拖动、移动；交互模式允许全部经过校验的 SGR 鼠标输入。未启用跟踪时普通缓冲区的滚动仍由 xterm 本地处理，不增加第二套触摸适配器或历史缓冲区。Worker 从 headless parser 捕获 1006/1016 鼠标编码（xterm 不支持 1015）协商，并把 SerializeAddon 漏掉的编码状态补在同一个有界快照内，避免重新附着后的浏览器回退到不支持的 X10。备用屏幕的内部消息历史只能由 TUI 自身维护和滚动。
