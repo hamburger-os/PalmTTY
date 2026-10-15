@@ -136,8 +136,14 @@ A single input router classifies `onData` before the IME/key handling path:
 
 - Normal keyboard, IME and paste data continue unchanged.
 - SGR mouse reports must be complete and contain finite, safe integer button/coordinates. Malformed reports, including inertia `NaN`, and legacy X10 `ESC[M...` prefixes are dropped without stale-coordinate reconstruction.
-- Coarse-pointer clients start in **Browse** mode: mouse reports are dropped entirely. With no active tracking, xterm retains its native touch history scrolling. With tracking enabled, Browse does not manufacture alternate scrolling or forward the event; switch to Interact to operate the application's mouse-controlled viewport.
+- Coarse-pointer clients start in **Browse** mode: validated SGR wheel reports pass to mouse-tracking TUIs to scroll their internal viewport, while clicks, drags and movement are blocked. Without tracking, xterm handles local scrollback and emits no mouse reports.
 - **Interact** mode forwards complete valid SGR mouse reports to the current PTY. The toggle is browser-local state, not Session authority.
-- When a full-screen TUI uses an alternate buffer, no local scrollback exists; Browse cannot simulate app-specific internal scrolling. Switch to Interact or use app keyboard navigation instead.
+- When a full-screen TUI uses an alternate buffer, no local scrollback exists; wheel events are forwarded to the TUI, which may implement internal scrolling. If it does not, use its keyboard navigation; PalmTTY does not reconstruct an app transcript.
 
 The input queue, Worker lease, reconnect/snapshot state and PTY lifecycle remain unchanged. Validate iPhone Safari and Android Chrome gestures, scrollback ends, alternate buffers, Chinese IME and external pointer devices before marking real-device testing complete.
+
+### DECSET mouse encoding is separate from mouse tracking
+
+Authoritative references: [xterm IParser](https://xtermjs.org/docs/api/terminal/interfaces/iparser/), [xterm IModes](https://xtermjs.org/docs/api/terminal/interfaces/imodes/), [SGR mouse mode 1006](https://terminfo.dev/modes/decset-1006-sgr-mouse).
+
+Mouse tracking (DECSET 9/1000/1002/1003) and event *encoding* (1006 SGR and 1016 SGR pixels; xterm does not implement urxvt 1015) are independent states. The pinned SerializeAddon restores tracking but does not serialize event encoding. The Worker uses the proposed headless parser CSI handlers to observe decoded mode changes and RIS, returning false so xterm's built-in parser remains authoritative. On canonical snapshot generation, it appends the current supported encoding sequence within the existing 4 MiB budget. Never force ?1006 on a TUI which did not enable it, and never infer mouse modes by searching raw PTY chunks that may split CSI or contain OSC text.

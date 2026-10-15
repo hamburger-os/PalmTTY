@@ -49,7 +49,7 @@
 - 文件视图以持久 Workspace 根目录为边界浏览目录和文件，提供 UTF-8 文本只读预览；PNG/JPEG/WebP/GIF 通过独立受保护接口按真实签名、尺寸/像素边界校验并使用稳定有界读取后直接预览，其他二进制文件只显示状态，大文本预览在 512 KiB 截断。预览与“完整文件”语义明确分离：复制完整文本、系统 Share Sheet 文件分享和下载 fallback 使用独立、同 containment 的 8 MiB 有界完整文件接口，因此不会把 512 KiB 截断预览误当成完整内容；手机预览标题优先显示 basename，把父目录作为次级信息，并可一键进入该文件 Git 历史；
 - 附件视图是 Session 范围的图片入口：手机/桌面浏览器可选择 PNG/JPEG/WebP/GIF，上传后显示尺寸/大小与大图预览，支持删除，并可把基于 Session 创建时不可变运行身份得到的 runtime 可读文件路径写入当前终端输入流。该动作只写路径文本 + 空格，不发送 Enter；附件不进入 Workspace/Git，Agent 重启时跟随仍存活 Session 恢复，旧 Session retirement 后清理；
 - xterm.js；浏览器端 xterm/fit 由根目录 `terminal-stack.json` 精确锁定，当前浏览器栈使用包含上游触摸滚动修复的 xterm 6.1 beta，而 Worker 端 headless/serialize 暂时保持稳定 6.0/0.14，避免把移动端输入修复与 canonical snapshot/recovery 升级绑在一起；
-- 手机终端输入分为“浏览／交互”：触摸设备默认浏览模式，鼠标报告一律不发送给 CLI；只有未启用鼠标跟踪时，xterm 的原生手势可以正常滚动本地历史。应用启用鼠标跟踪后浏览模式不制造第二套滚动逻辑。交互模式转发完整且有效的 SGR 鼠标事件。备用屏幕没有本地历史时，浏览模式不会模拟 TUI 内部滚动，需切换交互模式或使用程序快捷键。旧式 X10/onBinary 鼠标数据完全不转发；NaN/不完整协议报告直接丢弃，不再用历史坐标修补。切换仅影响浏览器输入行为，不影响 Session Worker 或重连。真实手机惯性滚动尚需验收；
+- 手机终端输入分为“浏览／交互”：触摸设备默认浏览模式。未启用鼠标跟踪时由 xterm 本地滚动普通缓冲区；启用 TUI 鼠标跟踪时，浏览模式仅向 CLI 转发经过完整校验的 SGR 滚轮事件（含合法修饰键），其余点击、移动、拖动等鼠标输入全部拦截，因此可以浏览由 Pi 等 TUI 自己管理的历史而不会误触控件。交互模式转发全部合法 SGR 鼠标事件。备用屏幕自身仍没有终端 scrollback；滚动能否显示历史取决于 TUI 是否实现滚轮导航。旧式 X10/onBinary 无法通过 UTF-8 PTY 字符串接口可靠转发，始终丢弃；NaN/不完整协议直接丢弃。两模式只改变浏览器输入权限，不创建第二套触摸物理系统；真机仍需验收；
 - 手机终端不再维护 PalmTTY 自己的逐行 touch adapter：`.xterm-screen` 只用 `touch-action: none` 阻止 Safari/浏览器把手势变成页面平移，触摸事件继续由 xterm 自己的 Gesture/Viewport 路径处理，因此 normal scrollback 使用连续像素滚动与惯性，alternate buffer、mouse tracking、滚动条也保持同一套 xterm 语义；不建立第二个 DOM 滚动层，也不增加应用级 document touch handler。终端普通 click/tap 只承担 `terminal.focus()` 的键盘激活桥接，不读取 touch delta、不拦截 swipe；手机 keybar 另提供显式“键盘”按钮作为可靠入口；在 coarse-pointer/mobile 布局上，所有可编辑 `input/textarea/select`（包括紧凑主题/性能/语言选择器、登录/Git 输入和 xterm helper textarea）统一至少 16px，避免 iOS 因聚焦小字号控件而主动放大页面；
 - 自动重连状态；
 - 浏览器键盘/IME 仍以 xterm 为唯一主 owner；针对 iOS/CJK 输入法 `keyCode=229` 的已知上游缺口，只在 xterm 公开的 textarea / custom-key-handler / input API 外围增加一个窄状态机：暂存同一事务内的 `onData`，等 textarea 最终值后只提交一次差量；真实 `compositionstart` 会立即取消兜底。物理 Ctrl+字母、Ctrl+Space、Escape 只在非 composing 的 229 keydown 且有明确 `KeyboardEvent.code` 时恢复，避免 keyup 重复发送；
@@ -154,7 +154,7 @@ Files 的普通文本预览可以进入独立阅读视图，沿用 Workspace 文
 
 - 手机终端仍由 xterm.js 自己处理触摸滚动、滚轮、鼠标追踪和全屏 TUI。PalmTTY 不针对 OpenCode 注入专属鼠标协议、不拦截 touchmove，也不增设第二套手势物理系统。
 - 浏览器将 xterm 的输入统一写入有界队列，按 Unicode 码点拆成最多 12 KiB 的 WebSocket 输入帧；单连接尚未发送的输入最多保留 8 MiB，浏览器发送缓冲过高时等待清空再继续。对于超出预算的长文本，保留编辑弹窗及草稿，并显示错误提示。bracketed-paste 前后标记及显式回车保持同一 FIFO 顺序。
-- Ctrl/Alt 虚拟修饰只作用于单字符或已识别的导航按键，不改变 SGR 鼠标报告、控制序列和多字符粘贴；SGR 鼠标报告不参与 iOS 229 输入法文本兜底。旧式 onBinary 的纯 ASCII 报告可透传，但包含 0x80–0xff 的原始鼠标字节无法通过当前 node-pty 的 UTF-8 字符串写入接口无损还原，会显式告警并阻止发送，不宣称支持所有旧协议。
+- Ctrl/Alt 虚拟修饰只作用于单字符或已识别的导航按键，不改变 SGR 鼠标报告、控制序列和多字符粘贴；SGR 鼠标报告不参与 iOS 229 输入法文本兜底。旧式 X10/onBinary 鼠标数据一律不订阅也不转发：node-pty 的 UTF-8 字符串输入无法无损传输任意二进制鼠标字节，不尝试凭借 ASCII 片段做不完整兼容。
 - 断线时不会重放未发送队列；由于已送入浏览器 WebSocket 的字节无法获得 PTY 级确认，大段粘贴在断线时可能部分成功，需要先检查末尾内容再重试。真机 iPhone Safari、OpenCode、Windows ConPTY 的完整鼠标兼容性仍需验收。
 
 
@@ -162,7 +162,7 @@ Files 的普通文本预览可以进入独立阅读视图，沿用 Workspace 文
 
 OpenCode 等全屏 TUI 开启 mouse 后，xterm.js 的触摸惯性事件可能缺失 clientX/clientY；鼠标坐标编码出现 NaN，应用不识别 ESC 报告时会把 NaNM 等残片显示在输入框。此问题与小说文字的编码无关，也不应该使用逐行手势模拟来规避。
 
-终端的 xterm 输入边界增设极窄的 SGR 鼠标报告校验：正常报告原样发送，只有近期已确认的滚轮坐标可以用于修复惯性滚动产生的 NaN 坐标；没有有效参考坐标、超过 2 秒、非滚轮或鼠标跟踪关闭时直接丢弃。异常报告不得进入 IME 输入事务或作为文本发给 PTY；方向键、中文输入、长文本粘贴等保持原有语义。终端仍由 xterm.js 独占触摸滚动和惯性物理，没有自己的 touchmove handler、额外滚动层或 OpenCode 专属适配。真实 iPhone Safari 滑动/甩动需部署后验收。
+终端的 xterm 输入边界增设极窄的 SGR 鼠标报告校验：正常报告原样发送，含 NaN 的坐标直接丢弃，不依据历史滚轮位置推测；非法按钮、坐标、非完整帧、鼠标跟踪关闭时也直接丢弃。异常报告不得进入 IME 输入事务或作为文本发给 PTY；方向键、中文输入、长文本粘贴等保持原有语义。终端仍由 xterm.js 独占触摸滚动和惯性物理，没有自己的 touchmove handler、额外滚动层或 OpenCode 专属适配。真实 iPhone Safari 滑动/甩动需部署后验收。
 
 ## 手机终端滚动条与右侧留白修订（2026-10-15）
 
@@ -171,3 +171,9 @@ OpenCode 等全屏 TUI 开启 mouse 后，xterm.js 的触摸惯性事件可能�
 终端 viewport 不再使用 `scrollbar-gutter: stable` 额外预留空间，手机宽度下仅收紧 `terminal-frame` 左右 padding，`terminal-mount` 继续不带 padding/border。保留 xterm 原有触摸惯性、滚动条/备用屏幕/鼠标跟踪行为；不引入第二滚动层或 touchmove adapter，也不因主题、工具页切换重新创建 Session。
 
 验证重点：iOS Safari 竖屏/横屏、Android Chrome、桌面鼠标；终端内滚动不得带动整页，滚动条不应长期形成明显宽槽，最右列与最下行不可被裁切；软键盘、字号变化、重连与全屏 TUI 的几何/鼠标语义保持正确。CI 的配置单测不能替代真机可视验收。
+
+## 2026-10-15 Pi 手机滚动和后台恢复修订
+
+- 手机浏览模式放行**有效 SGR 滚轮**，仍阻止其它鼠标操作；这是将 TUI 自带的滚动交给 TUI，不是浏览器自建 scrollback。交互模式仍可点击与拖动。普通缓冲区继续由 xterm 滚动，绝不能因为鼠标跟踪关闭而向 Shell 发送假滚轮控制码。
+- Worker 的 headless xterm 仍是 canonical 终端状态；`SerializeAddon` 能恢复鼠标追踪类型，却不会恢复独立的 `?1006` SGR 鼠标编码等模式。Worker 通过 headless parser 的 CSI handler 跟踪已解析的编码切换（包括 `?1016` 和硬重置；xterm 不支持 `?1015`），在有界快照尾部补齐必要模式；浏览器不根据 TUI 名称或历史滚轮坐标猜测协议，也不打开 `onBinary`。不会额外持久化终端文本或产生第二个缓冲区来源。
+- 真机回归必须分别覆盖 Pi 普通模式/全屏鼠标模式、连续输出、切换前后台、输出结束后继续滚动、TUI 退出后的普通缓冲区；恢复的快照只能保留 Worker 持有的终端状态，不能替代 TUI 内部的完整对话历史。

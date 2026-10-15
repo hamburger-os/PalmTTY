@@ -9,9 +9,9 @@ describe("terminal SGR mouse report safety", () => {
 
   it("accepts complete mouse events only when tracking is active", () => {
     expect(guard.handle(UP, "vt200"))
-      .toEqual({ kind: "mouse", data: UP });
+      .toEqual({ kind: "mouse", data: UP, wheel: true });
     expect(guard.handle(DOWN, "drag"))
-      .toEqual({ kind: "mouse", data: DOWN });
+      .toEqual({ kind: "mouse", data: DOWN, wheel: true });
     expect(guard.handle("\u001b[<0;2;3M", "any"))
       .toEqual({ kind: "mouse", data: "\u001b[<0;2;3M" });
     expect(guard.handle("\u001b[<0;2;3m", "any"))
@@ -48,9 +48,9 @@ describe("terminal SGR mouse report safety", () => {
 
   it("recognizes modified wheel and pixel coordinates", () => {
     expect(guard.handle("\u001b[<68;0;0M", "any"))
-      .toEqual({ kind: "mouse", data: "\u001b[<68;0;0M" });
+      .toEqual({ kind: "mouse", data: "\u001b[<68;0;0M", wheel: true });
     expect(guard.handle("\u001b[<81;900;1600M", "any"))
-      .toEqual({ kind: "mouse", data: "\u001b[<81;900;1600M" });
+      .toEqual({ kind: "mouse", data: "\u001b[<81;900;1600M", wheel: true });
     expect(guard.handle("\u001b[<128;5;5M", "any"))
       .toEqual({ kind: "mouse", data: "\u001b[<128;5;5M" });
   });

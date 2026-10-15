@@ -6,9 +6,15 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+### Mobile Pi/TUI scroll and reconnect mouse state
+
+- Let Browse mode forward only validated SGR wheel events to mouse-tracking TUIs; continue blocking clicks/drags and malformed/legacy events, without adding another touch-scroll owner.
+- Restore negotiated mouse encoding when a paused mobile browser reattaches: the Worker observes canonical CSI mode changes and appends the missing encoding mode to its bounded serialized snapshot, avoiding an unexpected fallback to untransportable X10 mouse reports.
+- Add mode/reset/OSC/split-sequence regression tests. Real-device Pi/TUI testing is still required.
+
 ### Safe mobile terminal touch input
 
-- Introduce Browse / Interact modes on touch clients. Browse drops mouse reports and retains xterm-native scrolling when tracking is off; Interact sends only valid complete SGR mouse reports.
+- Introduce Browse / Interact modes on touch clients. Browse initially blocked all mouse reports (now revised above to allow validated wheel reports for TUI scrolling); Interact sends only valid complete SGR mouse reports.
 - Fail closed for malformed/NaN mouse reports and X10 prefixes. Disable legacy xterm.onBinary forwarding over the UTF-8 PTY string boundary. Preserve xterm's native gesture ownership, terminal IME, bounded paste queue, Session Worker and reconnect pipeline; expand focused protocol tests.
 
 

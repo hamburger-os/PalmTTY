@@ -118,3 +118,9 @@ Agent 启动时对已有 Worker 的 rediscovery 仍使用约 8 秒的有限重�
 浏览器与 Agent 的终端 WebSocket 协议同时为 `palmtty.v4`；更新网页而没有重启旧 Agent，可能收到 1002 协议错误，手机端现在直接给出重启 Agent + 完整刷新网页的提示，而不是无限次重连。
 
 Session Worker 独立于 Agent 存活。#100 升级浏览器协议时没有改变 Worker IPC v5，因此旧 Worker 可以认证却会发出 `hello.protocol=3`；新版 Agent 如直接使用 v4 浏览器消息 schema 校验，就会主动断开旧 Worker IPC 并循环重连。现在只在**经过 secret 认证的本地 Worker 通道**对这一种旧 `hello` 进行 v4 投影，不改变 PTY/Worker 寿命，也不向浏览器开放旧协议。不得为解决升级重连而自动终止 Session Worker。
+
+## SGR 鼠标编码与快照恢复（2026-10-15）
+
+Worker headless parser 负责识别 PTY 输出中的 DECSET/DECRST 1006（SGR）、1016（SGR pixels）和 RIS（xterm 不支持 1015） 硬重置；xterm SerializeAddon 本身序列化鼠标 tracking mode，但遗漏独立的鼠标**编码格式**。因此 Worker 把当前编码切换追加到相同的 canonical snapshot，计入既有 4 MiB 上限。浏览器恢复时不根据应用名默认开启 SGR，更不转发无法通过 UTF-8 字符串通道安全保真的 X10/onBinary。未变更 Session 协议、Agent 权限或 PTY 所有权。
+
+恢复操作不能重建 TUI 内部对话历史：普通 buffer scrollback 来自 Worker 镜像，全屏 alternate-buffer 中的滚动位置必须由仍运行的 TUI 自己维护并响应有效滚轮或键盘操作。
