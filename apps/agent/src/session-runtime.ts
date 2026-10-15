@@ -10,6 +10,7 @@ import type { Terminal as HeadlessTerminalType } from "@xterm/headless";
 import * as pty from "node-pty";
 import { canReplayFrom } from "./reconnect-policy.js";
 import { ReplayHistory } from "./replay-history.js";
+import { TerminalMouseEncoding } from "./terminal-mouse-encoding.js";
 import { buildPtyEnvironment, type RuntimeWorkspace } from "./workspace-runtime.js";
 
 const require = createRequire(import.meta.url);
@@ -90,6 +91,7 @@ export class SessionRuntime {
   private readonly child: PtyHandle;
   private readonly mirror: HeadlessTerminalType;
   private readonly serializer: SerializeAddonType;
+  private readonly mouseEncoding: TerminalMouseEncoding;
   private seq = 0;
   private readonly history: ReplayHistory;
   private pipeline: Promise<void> = Promise.resolve();
@@ -133,6 +135,7 @@ export class SessionRuntime {
     });
     this.serializer = new SerializeAddon();
     this.mirror.loadAddon(this.serializer);
+    this.mouseEncoding = new TerminalMouseEncoding(this.mirror);
 
     this.child.onData((data) => {
       if (this.disposed) return;
@@ -359,7 +362,8 @@ export class SessionRuntime {
     // scrollback first rather than sending an unbounded serialized history.
     let scrollback = this.options.config.scrollbackLines;
     while (true) {
-      const snapshot = this.serializer.serialize({ scrollback });
+      const snapshot = this.serializer.serialize({ scrollback }) +
+        this.mouseEncoding.snapshotSuffix();
       if (Buffer.byteLength(snapshot, "utf8") <= MAX_TERMINAL_SNAPSHOT_BYTES) {
         return snapshot;
       }
