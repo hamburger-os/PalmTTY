@@ -94,8 +94,17 @@ export class SessionWorkerServer {
     });
 
     this.runtime.onRetire(() => {
-      void this.shutdown({ killPty: false, cleanupState: true }).then(() => {
-        this.options.onRetired?.();
+      // PTY exit is not Worker retirement. Publish a distinct final event so
+      // the Agent can retire an exited Session without guessing from IPC EOF.
+      try {
+        this.controller?.send({ type: "retired" });
+      } catch {
+        // A disconnected Agent can infer death from the Worker process later.
+      }
+      setImmediate(() => {
+        void this.shutdown({ killPty: false, cleanupState: true }).then(() => {
+          this.options.onRetired?.();
+        });
       });
     });
   }
@@ -341,6 +350,12 @@ export class SessionWorkerServer {
       }
 
       const request = parsed.data;
+      // Heartbeat belongs to transport liveness, not to the serialized PTY
+      // command queue. A slow recovery snapshot must not evict a live Agent.
+      if (request.type === "ping") {
+        this.respond(framed, request.requestId, { pong: true });
+        return;
+      }
       const run = this.commandPipeline.then(
         () => this.handleRequest(framed, request),
         () => this.handleRequest(framed, request)
@@ -428,9 +443,6 @@ export class SessionWorkerServer {
           return;
         }
 
-        case "ping":
-          this.respond(connection, request.requestId, { pong: true });
-          return;
       }
     } catch (error) {
       this.respondError(

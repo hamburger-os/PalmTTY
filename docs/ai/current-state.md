@@ -93,6 +93,12 @@ The browser-integrated native Devolutions Gateway/IronRDP NLA path and pre-login
 
 ### Durable Session Workers
 
+- restart failure safety: an exited Worker remains retained (including its canonical output and Session attachments) until replacement spawn, local IPC authentication and adoption all succeed; replacement failure leaves the old Session available for inspection and retry
+- an exited retained Worker remains eligible for authenticated IPC reconnection; temporary control-channel closure no longer implies retirement
+- Agent startup retries failed-but-potentially-live Worker discovery periodically while running instead of leaving those Sessions invisible until the next Agent restart
+- concurrent restart calls for the same Session share the same in-flight result; clear and terminate are rejected while replacement is underway; the Web displays server restart details and reconciles its Session catalog on completion/error
+- restart continues to create a new Session ID on success; it is not yet a durable idempotent HTTP operation across Agent crashes or lost response acknowledgements, and a pre-replacement PTY termination cannot be rolled back. These remain explicit limits
+
 - one independent detached Worker process per Session
 - Worker owns node-pty/ConPTY, headless xterm, sequence number, replay history and exited-session retention
 - Windows Named Pipe IPC; Unix-domain-socket IPC on current non-Windows CI hosts
@@ -132,7 +138,7 @@ The browser-integrated native Devolutions Gateway/IronRDP NLA path and pre-login
 - terminal WebSocket closure at login-session expiry
 - explicit Session lifecycle: `running → stopping → exited` for termination, with idempotent terminate requests
 - retained-session removal is separate from termination; only exited/failed Sessions can be cleared immediately, and the Worker owns final terminal/recovery-state disposal
-- explicit terminal restart reserves replacement capacity, resolves and validates the latest persisted workspace before touching the current PTY, then terminates, retires and replaces the Session while preserving terminal geometry; restart intentionally creates a new Session ID/history
+- explicit terminal restart reserves replacement capacity, validates the persisted Workspace and waits for the old PTY to exit; it creates/adopts the replacement before retiring the old exited Session, preserving the old retained record on replacement failure; successful restart creates a new Session ID/history
 - bounded exited-session retention with Worker self-disposal
 
 ### Test coverage

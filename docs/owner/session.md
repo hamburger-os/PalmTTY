@@ -49,7 +49,7 @@ Worker + PTY running
                               └────> Worker 自清理并退出┘
 ~~~
 
-当前会话实现浏览器断线持久化和 Agent 重启持久化。产品动作严格区分“终止”“重启”和“清除”：终止只结束 PTY/进程并进入 `stopping → exited`，退出后的 snapshot/replay 仍按 retention 保留；重启会等待旧 PTY 退出、retire 旧 retained Session，再按同一 Workspace 创建一个新的 Session，因此 Session ID 与终端历史都会更换；清除只允许用于 `exited/failed` Session，并要求 Worker 立即释放 terminal state、recovery metadata 后退出。Session 附件跟随同一个 Session ID：终止后在 retention 内仍可查看，重启会随旧 Session retirement 清理，显式清除/retention 到期也会清理。
+当前会话实现浏览器断线持久化和 Agent 重启持久化。产品动作严格区分“终止”“重启”和“清除”：终止只结束 PTY/进程并进入 `stopping → exited`，退出后的 snapshot/replay 仍按 retention 保留；重启先验证 Workspace、等待旧 PTY 退出，成功创建和 adopt 新 Worker 后才 retire 旧会话。新会话会更换 Session ID；如果新 Worker 创建失败，旧会话及历史仍保留，可检查和重试（已终止进程无法回滚）；清除只允许用于 `exited/failed` Session，并要求 Worker 立即释放 terminal state、recovery metadata 后退出。Session 附件跟随同一个 Session ID：终止后在 retention 内仍可查看，重启会随旧 Session retirement 清理，显式清除/retention 到期也会清理。
 
 明确不承诺：
 

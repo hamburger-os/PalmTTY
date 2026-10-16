@@ -3,7 +3,6 @@ import type { PalmTTYConfig } from "@palmtty/config";
 import {
   encodeServerMessage,
   isActiveSessionState,
-  isTerminalSessionState,
   type SessionPublic,
   type ServerMessage
 } from "@palmtty/protocol";
@@ -97,6 +96,9 @@ export class SessionManager {
   private readonly sessions = new Map<string, ManagedWorker>();
   private readonly pendingByWorkspace = new Map<string, number>();
   private readonly restartInFlight = new Map<string, Promise<SessionPublic>>();
+  private readonly pendingRediscovery = new Map<string, WorkerRecord>();
+  private rediscoveryTimer: NodeJS.Timeout | undefined;
+  private rediscoveryRunning = false;
   private pendingCreates = 0;
   private initialized = false;
   private closing = false;
@@ -136,16 +138,18 @@ export class SessionManager {
           reconnecting: false
         });
       } catch {
-        // Connection failure is not proof that a Worker is dead. In particular,
-        // deleting a live Worker's capability would violate the control-plane /
-        // session-lifetime boundary. Only reclaim state when the recorded
-        // process is definitely absent; a reused/inaccessible PID is preserved.
+        // Failed initial discovery is not proof of Worker death. Keep retrying
+        // while this Agent runs, including after the initial bounded window.
         if (processDefinitelyDead(record.workerPid)) {
           await removeWorkerState(this.runtimeDir, record);
+          await this.disposeSessionResources(record.sessionId);
+        } else {
+          this.pendingRediscovery.set(record.sessionId, record);
         }
       }
     }));
     this.initialized = true;
+    if (this.pendingRediscovery.size > 0) this.scheduleRediscovery();
   }
 
   list(): SessionPublic[] {
@@ -386,6 +390,7 @@ export class SessionManager {
   }
 
   async terminate(id: string): Promise<SessionPublic | undefined> {
+    if (this.restartInFlight.has(id)) throw new Error("Session is restarting");
     const managed = this.sessions.get(id);
     if (!managed) return undefined;
     await managed.worker.terminate();
@@ -431,7 +436,16 @@ export class SessionManager {
       traceWindowsSpawn(`workspace:${workspaceId}`, "runtime.resolve.ready");
 
       if (isActiveSessionState(managed.session.state)) {
-        await managed.worker.terminate();
+        try {
+          await managed.worker.terminate();
+        } catch (error) {
+          // An IPC response can time out after the Worker accepted terminate.
+          // Reconcile against authoritative state instead of assuming the
+          // destructive operation never happened.
+          if (this.sessions.get(id) !== managed) throw error;
+          // A still-running Worker can publish its subsequent exit asynchronously.
+          // If it never does, the bounded wait returns a concrete failure.
+        }
         const deadline = Date.now() + RESTART_EXIT_TIMEOUT_MS;
         while (
           this.sessions.get(id) === managed &&
@@ -444,29 +458,44 @@ export class SessionManager {
         }
       }
 
-      if (this.sessions.get(id) === managed) {
-        const removed = await this.remove(id);
-        if (removed === "active") {
-          throw new Error("Terminal remained active during restart");
-        }
-      }
-
-      return await this.spawnSession(
+      // Do not retire the old, exited Worker before the replacement is
+      // adopted. A spawn/IPC/adoption error must leave a retained session
+      // with its canonical history and attachments available for inspection
+      // and another restart attempt.
+      const next = await this.spawnSession(
         replacement,
         sessionLaunchRuntime(definition),
         cols,
         rows
       );
+      if (this.sessions.get(id) === managed) {
+        try {
+          await this.retireManaged(id, managed);
+        } catch (error) {
+          // Replacement is already durable. Let the old retained Worker expire
+          // naturally rather than converting cleanup failure into a misleading
+          // restart failure (and an accidental second restart on retry).
+          console.warn("[PalmTTY] Retiring replaced terminal failed:", error);
+        }
+      }
+      return next;
     } finally {
       release();
     }
   }
 
   async remove(id: string): Promise<"removed" | "not_found" | "active"> {
+    if (this.restartInFlight.has(id)) return "active";
     const managed = this.sessions.get(id);
     if (!managed) return "not_found";
-    if (isActiveSessionState(managed.session.state)) return "active";
+    return this.retireManaged(id, managed);
+  }
 
+  private async retireManaged(
+    id: string,
+    managed: ManagedWorker
+  ): Promise<"removed" | "active"> {
+    if (isActiveSessionState(managed.session.state)) return "active";
     await managed.worker.retire();
 
     if (this.sessions.get(id) === managed) {
@@ -488,6 +517,9 @@ export class SessionManager {
   async close(): Promise<void> {
     if (this.closing) return;
     this.closing = true;
+    if (this.rediscoveryTimer) clearInterval(this.rediscoveryTimer);
+    this.rediscoveryTimer = undefined;
+    this.pendingRediscovery.clear();
     for (const managed of this.sessions.values()) {
       for (const socket of managed.clients.values()) {
         try {
@@ -504,31 +536,40 @@ export class SessionManager {
 
   private install(managed: ManagedWorker): void {
     this.sessions.set(managed.record.sessionId, managed);
+    const worker = managed.worker;
+    const current = () => !this.closing &&
+      this.sessions.get(managed.record.sessionId) === managed &&
+      managed.worker === worker;
 
-    managed.worker.onDeliver((clientId, message) => {
-      this.deliver(managed, clientId, message);
+    worker.onDeliver((clientId, message) => {
+      if (current()) this.deliver(managed, clientId, message);
     });
 
-    managed.worker.onStatus((session) => {
-      managed.session = session;
+    worker.onStatus((session) => {
+      if (current()) managed.session = session;
     });
 
-    managed.worker.onClose(() => {
-      if (this.closing || this.sessions.get(managed.record.sessionId) !== managed) return;
-
-      if (isTerminalSessionState(managed.session.state)) {
-        this.sessions.delete(managed.record.sessionId);
-        for (const socket of managed.clients.values()) {
-          try {
-            socket.close(1000, "Exited session retention expired");
-          } catch {
-            // Best effort during normal retired-session cleanup.
-          }
+    worker.onRetired(() => {
+      if (!current()) return;
+      this.sessions.delete(managed.record.sessionId);
+      for (const socket of managed.clients.values()) {
+        try {
+          socket.close(1000, "Exited session retention expired");
+        } catch {
+          // Best effort when the Worker retires after its retention timer.
         }
-        managed.clients.clear();
-        void this.disposeSessionResources(managed.record.sessionId);
-        return;
       }
+      managed.clients.clear();
+      managed.worker.close();
+      void this.disposeSessionResources(managed.record.sessionId);
+    });
+
+    worker.onClose(() => {
+      if (!current()) return;
+
+      // Terminal status describes the PTY, not Worker liveness. An exited
+      // Worker can still serve retained history after a transient IPC loss.
+      // Only confirmed Worker death or explicit retirement releases its state.
 
       for (const socket of managed.clients.values()) {
         try {
@@ -626,6 +667,60 @@ export class SessionManager {
       }
     } finally {
       managed.reconnecting = false;
+    }
+  }
+
+  private scheduleRediscovery(): void {
+    if (this.rediscoveryTimer || this.closing) return;
+    this.rediscoveryTimer = setInterval(() => {
+      void this.retryPendingRediscovery();
+    }, 5_000);
+    this.rediscoveryTimer.unref();
+  }
+
+  private async retryPendingRediscovery(): Promise<void> {
+    if (this.rediscoveryRunning || this.closing) return;
+    this.rediscoveryRunning = true;
+    try {
+      await Promise.all([...this.pendingRediscovery.values()].map(async (record) => {
+        if (this.closing || this.sessions.has(record.sessionId)) {
+          this.pendingRediscovery.delete(record.sessionId);
+          return;
+        }
+        try {
+          const secret = await readWorkerSecret(this.runtimeDir, record.sessionId);
+          const worker = await WorkerClient.connect({
+            runtimeDir: this.runtimeDir,
+            endpointId: record.endpointId,
+            secret
+          });
+          if (this.closing || this.sessions.has(record.sessionId)) {
+            worker.close();
+          } else {
+            this.install({
+              record,
+              secret,
+              worker,
+              session: worker.session,
+              clients: new Map(),
+              reconnecting: false
+            });
+          }
+          this.pendingRediscovery.delete(record.sessionId);
+        } catch {
+          if (processDefinitelyDead(record.workerPid)) {
+            this.pendingRediscovery.delete(record.sessionId);
+            await removeWorkerState(this.runtimeDir, record);
+            await this.disposeSessionResources(record.sessionId);
+          }
+        }
+      }));
+    } finally {
+      this.rediscoveryRunning = false;
+      if (this.pendingRediscovery.size === 0 && this.rediscoveryTimer) {
+        clearInterval(this.rediscoveryTimer);
+        this.rediscoveryTimer = undefined;
+      }
     }
   }
 

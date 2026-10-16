@@ -416,12 +416,19 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       if (!sessionMutationLimiter.allow(request.ip)) {
         return reply.code(429).send({ error: "too_many_session_requests" });
       }
-      const session = await sessions.terminate(request.params.id);
-      if (!session) {
-        return reply.code(404).send({ error: "session_not_found" });
+      try {
+        const session = await sessions.terminate(request.params.id);
+        if (!session) {
+          return reply.code(404).send({ error: "session_not_found" });
+        }
+        const terminal = session.state === "exited" || session.state === "failed";
+        return reply.code(terminal ? 200 : 202).send({ session });
+      } catch (error) {
+        if (error instanceof Error && error.message === "Session is restarting") {
+          return reply.code(409).send({ error: "session_restarting" });
+        }
+        throw error;
       }
-      const terminal = session.state === "exited" || session.state === "failed";
-      return reply.code(terminal ? 200 : 202).send({ session });
     }
   );
 

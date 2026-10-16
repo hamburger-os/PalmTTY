@@ -48,7 +48,9 @@ Security, session and reconnect changes should include or update tests for:
 - auth-session expiry closing established sockets
 - backpressure / slow-client cutoff
 - explicit terminate action transitions an active Session through `stopping` to `exited`, repeated terminate is idempotent, and `stopping` still counts as active
-- explicit restart reserves replacement capacity, validates/resolves the replacement before terminating the current PTY, then waits for exit, retires the previous retained Session, creates a new Session ID with the previous geometry, and does not accept ad-hoc launch overrides
+- explicit restart reserves replacement capacity, validates/resolves the replacement before terminating the current PTY, waits for exit, creates/authenticates/adopts a new Worker before retiring the previous retained Session, and creates a new Session ID with the previous geometry; injected replacement-startup failure must retain exited history for retry, and concurrent restart must not race with terminate/clear or spawn duplicate PTYs. No ad-hoc launch overrides are accepted
+- a transient IPC close for an exited-but-retained Worker must not erase its Session record; initial Agent discovery that fails for a potentially-live Worker must keep retrying while that Agent runs instead of waiting for another restart
+- browser must stop reconnecting to a known-retired Session ID (1000 Session removed), surface bounded server restart errors and refresh the Session catalog after a restart outcome
 - active/stopping Sessions reject clear/delete, while exited/failed Sessions can be cleared immediately and disappear from the registry
 - exit delivery and retention-expiry cleanup
 - concurrent maxSessions enforcement

@@ -357,8 +357,31 @@ describe("session worker security boundary", () => {
     });
     await expect(readWorkerSecret(runtimeDir, sessionId)).resolves.toBe(secret);
 
+    // The missing endpoint reappears after initial rediscovery gave up.
+    // The *same* Agent must find it without a process restart.
+    const worker = new SessionWorkerServer({
+      ...bootstrap(runtimeDir),
+      sessionId,
+      endpointId,
+      secret
+    }, { ptyFactory: silentPtyFactory });
+    servers.add(worker);
+    await worker.start();
+    const first = await WorkerClient.connect({ runtimeDir, endpointId, secret });
+    await first.adopt();
+    first.close();
+    const deadline = Date.now() + 8_000;
+    while (manager.get(sessionId) === undefined) {
+      if (Date.now() > deadline) throw new Error("Worker rediscovery never recovered");
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    expect(manager.get(sessionId)).toMatchObject({
+      id: sessionId,
+      state: "running"
+    });
+
     await manager.close();
-  }, 12_000);
+  }, 22_000);
 
   it("republishes missing Worker-owned recovery artifacts", async () => {
     const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-worker-heal-"));

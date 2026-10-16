@@ -44,7 +44,7 @@ PalmTTY Agent (Fastify)
 
 Each Session is owned by one independent detached Worker process. The Worker owns the PTY, headless terminal mirror, monotonically increasing output sequence, bounded replay history and exited-session retention.
 
-Session lifecycle actions are explicit. Termination moves an active Session through `stopping` to `exited` and keeps its retained terminal state available. Restart is a replacement operation: it waits for the old PTY to exit, retires the retained Session, then creates a new Session ID from the same persisted workspace and previous terminal geometry. Deletion is separate and allowed only for `exited/failed` Sessions; it asks the Worker to retire immediately and release terminal/recovery state. The Agent deliberately does not own a second canonical copy of terminal state or delete Worker recovery files behind the Worker's back.
+Session lifecycle actions are explicit. Termination moves an active Session through `stopping` to `exited` and keeps its retained terminal state available. Restart is a replacement operation: it waits for the old PTY to exit, creates and adopts the replacement Worker, and only then retires the previous retained Session. The replacement gets a new Session ID with the previous geometry; a failed replacement leaves the old exited history available for inspection and retry. Deletion is separate and allowed only for `exited/failed` Sessions; it asks the Worker to retire immediately and release terminal/recovery state. The Agent deliberately does not own a second canonical copy of terminal state or delete Worker recovery files behind the Worker's back.
 
 ### Persistence semantics
 
@@ -89,7 +89,7 @@ PalmTTY 是一个单用户、自托管的交互式开发终端控制面。Web �
 
 每个 Session 由独立 detached Worker 持有。Worker 是 PTY、headless xterm、输出序号、有限 replay 和退出保留期的唯一 canonical owner；Agent 只负责 Web/API、认证、安全策略、Worker 发现与浏览器代理。
 
-Session 生命周期动作明确分离：“终止”把活动会话推进为 `stopping → exited`，退出后的终端状态仍在 retention 内可查看；“重启”会等待旧 PTY 退出并 retire 旧 Session，再按同一 Workspace 与原终端几何创建新的 Session ID；“清除”只允许用于 `exited/failed` 会话，并由 Worker 立即释放 terminal/replay/recovery state 后退出。Agent 不直接删 Worker 的恢复文件来伪造删除。
+Session 生命周期动作明确分离：“终止”把活动会话推进为 `stopping → exited`，退出后的终端状态仍在 retention 内可查看；“重启”先等待旧 PTY 退出，再创建并 adopt 新 Worker，成功后 retire 旧 Session 并生成新 ID；若创建失败则保留旧会话历史和附件，以便查看及重试（原进程不能回滚）；“清除”只允许用于 `exited/failed` 会话，并由 Worker 立即释放 terminal/replay/recovery state 后退出。Agent 不直接删 Worker 的恢复文件来伪造删除。
 
 当前持久化语义包括：
 

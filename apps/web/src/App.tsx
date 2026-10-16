@@ -218,8 +218,20 @@ export function App() {
           kind: "terminal",
           sessionId: activeSession.id,
           onRestart: async () => {
-            const result = await restartSession(activeSession.id);
-            setActiveSession(result.session);
+            try {
+              const result = await restartSession(activeSession.id);
+              setSessions((current) => [
+                ...current.filter((session) => session.id !== activeSession.id),
+                result.session
+              ]);
+              setActiveSession(result.session);
+              void refreshCatalog().catch(() => undefined);
+            } catch (cause) {
+              // A response may be lost after the server already changed state.
+              // Reconcile the catalog rather than relying on stale client data.
+              void refreshCatalog().catch(() => undefined);
+              throw new Error(formatError(cause, "session_restart_failed", translateError));
+            }
           }
         }}
         activityOptions={activityOptionsFor(

@@ -356,7 +356,9 @@ export function WorkspaceWorkbench({
             setRestarting(true);
             setRestartError(null);
             void activity.onRestart()
-              .catch(() => setRestartError(t("errors.session_restart_failed")))
+              .catch((cause: unknown) => setRestartError(
+                cause instanceof Error ? cause.message : t("errors.session_restart_failed")
+              ))
               .finally(() => setRestarting(false));
           }}
         />
