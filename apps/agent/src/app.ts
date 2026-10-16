@@ -423,8 +423,11 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
         }
         const terminal = session.state === "exited" || session.state === "failed";
         return reply.code(terminal ? 200 : 202).send({ session });
-      } catch {
-        return reply.code(409).send({ error: "session_restarting" });
+      } catch (error) {
+        if (error instanceof Error && error.message === "Session is restarting") {
+          return reply.code(409).send({ error: "session_restarting" });
+        }
+        throw error;
       }
     }
   );
