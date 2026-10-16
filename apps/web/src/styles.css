@@ -395,6 +395,14 @@ button.icon-button {
   color: var(--text-muted);
 }
 
+/* Native modal geometry is viewport-owned; glass-modal only supplies material. */
+dialog.glass-modal:modal {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  max-height: calc(100dvh - 24px);
+}
+
 .workspace-dialog,
 .confirm-dialog {
   color: var(--text-primary);
@@ -627,6 +635,23 @@ button.directory-choose {
 .confirm-dialog-actions {
   justify-content: flex-end;
   padding: 0 var(--space-5) var(--space-5);
+}
+
+@media (max-width: 620px) {
+  /* Compact mobile confirmations are anchored above the safe-area bottom. */
+  dialog.confirm-dialog:modal {
+    inset: auto max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+    width: auto;
+    margin: 0;
+    overflow-y: auto;
+  }
+
+  .confirm-dialog-actions > button {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 .connection {

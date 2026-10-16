@@ -82,6 +82,7 @@ export function App() {
   const [sessionAction, setSessionAction] = useState<SessionAction>(null);
   const [appSessionBusyId, setAppSessionBusyId] = useState<string | null>(null);
   const [appSessionAction, setAppSessionAction] = useState<AppSessionAction>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshCatalog = useCallback(async () => {
@@ -290,60 +291,68 @@ export function App() {
   };
 
   const stopSession = async (session: SessionPublic) => {
-    if (!isActiveSessionState(session.state) || session.state === "stopping") return;
+    if (!isActiveSessionState(session.state) || session.state === "stopping") return false;
 
     setSessionBusyId(session.id);
-    setError(null);
+    setActionError(null);
     try {
       await terminateSession(session.id);
       await refreshCatalog();
+      return true;
     } catch (cause) {
-      setError(formatError(cause, "session_action_failed", translateError));
+      setActionError(formatError(cause, "session_action_failed", translateError));
+      return false;
     } finally {
       setSessionBusyId(null);
     }
   };
 
   const clearSession = async (session: SessionPublic) => {
-    if (!isTerminalSessionState(session.state)) return;
+    if (!isTerminalSessionState(session.state)) return false;
 
     setSessionBusyId(session.id);
-    setError(null);
+    setActionError(null);
     try {
       await deleteSession(session.id);
       setSessions((current) => current.filter((item) => item.id !== session.id));
+      return true;
     } catch (cause) {
-      setError(formatError(cause, "session_action_failed", translateError));
+      setActionError(formatError(cause, "session_action_failed", translateError));
+      return false;
     } finally {
       setSessionBusyId(null);
     }
   };
 
   const stopAppSession = async (session: AppSessionPublic) => {
-    if (!isActiveAppSessionState(session.state) || session.state === "stopping") return;
+    if (!isActiveAppSessionState(session.state) || session.state === "stopping") return false;
 
     setAppSessionBusyId(session.id);
-    setError(null);
+    setActionError(null);
     try {
       await terminateAppSession(session.id);
       await refreshCatalog();
+      return true;
     } catch (cause) {
-      setError(formatError(cause, "app_session_action_failed", translateError));
+      setActionError(formatError(cause, "app_session_action_failed", translateError));
+      return false;
     } finally {
       setAppSessionBusyId(null);
     }
   };
 
   const clearAppSession = async (session: AppSessionPublic) => {
-    if (!isTerminalAppSessionState(session.state)) return;
+    if (!isTerminalAppSessionState(session.state)) return false;
 
     setAppSessionBusyId(session.id);
-    setError(null);
+    setActionError(null);
     try {
       await deleteAppSession(session.id);
       setAppSessions((current) => current.filter((item) => item.id !== session.id));
+      return true;
     } catch (cause) {
-      setError(formatError(cause, "app_session_action_failed", translateError));
+      setActionError(formatError(cause, "app_session_action_failed", translateError));
+      return false;
     } finally {
       setAppSessionBusyId(null);
     }
@@ -598,7 +607,7 @@ export function App() {
                       type="button"
                       className="session-action danger-outline compact"
                       disabled={sessionBusyId !== null || session.state === "stopping"}
-                      onClick={() => setSessionAction({ kind: "terminate", session })}
+                      onClick={() => { setActionError(null); setSessionAction({ kind: "terminate", session }); }}
                     >
                       {busy || session.state === "stopping"
                         ? t("sessions.terminating")
@@ -609,7 +618,7 @@ export function App() {
                       type="button"
                       className="session-action danger-outline compact"
                       disabled={sessionBusyId !== null}
-                      onClick={() => setSessionAction({ kind: "clear", session })}
+                      onClick={() => { setActionError(null); setSessionAction({ kind: "clear", session }); }}
                     >
                       {busy ? t("sessions.clearing") : t("sessions.clear")}
                     </button>
@@ -646,7 +655,7 @@ export function App() {
                     type="button"
                     className="session-action danger-outline compact"
                     disabled={appSessionBusyId !== null || session.state === "stopping"}
-                    onClick={() => setAppSessionAction({ kind: "terminate", session })}
+                    onClick={() => { setActionError(null); setAppSessionAction({ kind: "terminate", session }); }}
                   >
                     {busy || session.state === "stopping"
                       ? t("sessions.terminating")
@@ -657,7 +666,7 @@ export function App() {
                     type="button"
                     className="session-action danger-outline compact"
                     disabled={appSessionBusyId !== null}
-                    onClick={() => setAppSessionAction({ kind: "clear", session })}
+                    onClick={() => { setActionError(null); setAppSessionAction({ kind: "clear", session }); }}
                   >
                     {busy ? t("sessions.clearing") : t("sessions.clear")}
                   </button>
@@ -694,15 +703,16 @@ export function App() {
             : t("sessions.clear")}
           danger
           busy={appSessionBusyId === appSessionAction.session.id}
+          error={actionError}
           onCancel={() => setAppSessionAction(null)}
           onConfirm={() => {
             const action = appSessionAction;
-            setAppSessionAction(null);
-            if (action.kind === "terminate") {
-              void stopAppSession(action.session);
-            } else {
-              void clearAppSession(action.session);
-            }
+            void (async () => {
+              const success = action.kind === "terminate"
+                ? await stopAppSession(action.session)
+                : await clearAppSession(action.session);
+              if (success) setAppSessionAction(null);
+            })();
           }}
         />
       )}
@@ -722,15 +732,16 @@ export function App() {
             : t("sessions.clear")}
           danger
           busy={sessionBusyId === sessionAction.session.id}
+          error={actionError}
           onCancel={() => setSessionAction(null)}
           onConfirm={() => {
             const action = sessionAction;
-            setSessionAction(null);
-            if (action.kind === "terminate") {
-              void stopSession(action.session);
-            } else {
-              void clearSession(action.session);
-            }
+            void (async () => {
+              const success = action.kind === "terminate"
+                ? await stopSession(action.session)
+                : await clearSession(action.session);
+              if (success) setSessionAction(null);
+            })();
           }}
         />
       )}

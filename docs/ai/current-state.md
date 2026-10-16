@@ -293,3 +293,9 @@ Review hardening: Browser SpeechSynthesis is not intrinsically offline. The read
 ## xterm touch wheel / SGR NaN regression guard (2026-10-15)
 
 - Some browser xterm inertia events may lack coordinates and generate malformed SGR wheel data containing literal NaN. The single input guard validates a complete report, its button, position and active mouse mode; valid reports are forwarded under Browse/Interact policy, but all NaN/partial/legacy reports are rejected without remembering or reusing past coordinates. No vendor-specific CLI heuristics or application-level gesture adapter is installed. Real iPhone Safari and Android Chrome touch/fling tests remain outstanding.
+
+## Mobile confirmation and retained terminal recovery (2026-10-16)
+
+- ConfirmDialog uses native showModal() top-layer semantics with viewport-positioned modal layout. `.glass-modal` owns material only; compact phone confirmations stay reachable above the safe-area bottom edge. Terminal and Remote App terminate/clear confirmations remain open while running, show failures inline and close only after success.
+- A retained exited/stopping Session does not resize the canonical headless buffer during an attachment from a different-sized browser. The Worker snapshots the original terminal geometry; a running Session continues to resize PTY and mirror before its snapshot.
+- Existing Pi Regular xterm scrolling, full-screen TUI input routing, multi-line Shell startup commands and background fast-forward protection are unchanged. Real iPhone + Pi Fullscreen mouse behavior remains to be validated.
