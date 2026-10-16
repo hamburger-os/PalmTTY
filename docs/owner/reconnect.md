@@ -124,3 +124,9 @@ Session Worker 独立于 Agent 存活。#100 升级浏览器协议时没有改�
 Worker headless parser 负责识别 PTY 输出中的 DECSET/DECRST 1006（SGR）、1016（SGR pixels）和 RIS（xterm 不支持 1015） 硬重置；xterm SerializeAddon 本身序列化鼠标 tracking mode，但遗漏独立的鼠标**编码格式**。因此 Worker 把当前编码切换追加到相同的 canonical snapshot，计入既有 4 MiB 上限。浏览器恢复时不根据应用名默认开启 SGR，更不转发无法通过 UTF-8 字符串通道安全保真的 X10/onBinary。未变更 Session 协议、Agent 权限或 PTY 所有权。
 
 恢复操作不能重建 TUI 内部对话历史：普通 buffer scrollback 来自 Worker 镜像，全屏 alternate-buffer 中的滚动位置必须由仍运行的 TUI 自己维护并响应有效滚轮或键盘操作。
+
+## 已退出会话重新查看时的几何（2026-10-16）
+
+`exited` / `stopping` 的保留会话是只读终端记录：从不同 cols/rows 的浏览器重新附着时，Worker 不再 resize Headless Terminal，而是在原规范尺寸下发送有界快照。仍在运行的 Session 则维持先 resize PTY 与镜像、再发送新尺寸快照的既有语义。浏览器得到快照后采用消息中的 canonical cols/rows，避免反复几何不匹配重连。
+
+手机后台超过 1.5 秒后的防快放重建策略保持现状，避免未经真机验证就移除已有保护。Regular 滚动可用不代表 Fullscreen TUI 鼠标滚轮已经通过真机验收。

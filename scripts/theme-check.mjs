@@ -92,6 +92,13 @@ const viewportDebug = await readFile(viewportDebugPath, "utf8");
 const mainSource = await readFile(mainPath, "utf8");
 const indexHtml = await readFile(indexHtmlPath, "utf8");
 const styles = (await readFile(stylesPath, "utf8")).replaceAll("\r\n", "\n");
+
+const glassModalBlock = themeCss.match(/\.glass-modal\s*\{([^}]*)\}/)?.[1] ?? "";
+if (/\bposition\s*:/.test(glassModalBlock) ||
+    !styles.includes("dialog.glass-modal:modal {") ||
+    !styles.includes("dialog.confirm-dialog:modal {")) {
+  failures.push("apps/web [modal-viewport] dialogs must own their viewport positioning");
+}
 const workspaceWorkbench = await readFile(workspaceWorkbenchPath, "utf8");
 const remoteAppView = await readFile(path.join(webSource, "RemoteAppView.tsx"), "utf8");
 const workspaceDialog = await readFile(workspaceDialogPath, "utf8");

@@ -338,7 +338,6 @@ button:disabled {
 }
 
 .glass-modal {
-  position: relative;
   background:
     var(--specular-panel),
     var(--theme-modal-veil),

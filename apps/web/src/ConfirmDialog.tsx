@@ -8,6 +8,7 @@ type Props = {
   confirmLabel?: string;
   danger?: boolean;
   busy?: boolean;
+  error?: string | null;
   onCancel(): void;
   onConfirm(): void;
 };
@@ -18,6 +19,7 @@ export function ConfirmDialog({
   confirmLabel,
   danger = false,
   busy = false,
+  error = null,
   onCancel,
   onConfirm
 }: Props) {
@@ -45,6 +47,7 @@ export function ConfirmDialog({
       <div className="confirm-dialog-body">
         <h2 id="confirm-dialog-title">{title}</h2>
         <p>{message}</p>
+        {error && <p className="tool-inline-error" role="alert">{error}</p>}
       </div>
       <div className="confirm-dialog-actions">
         <button

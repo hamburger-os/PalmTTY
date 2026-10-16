@@ -197,10 +197,10 @@ export class SessionRuntime {
   ): Promise<void> {
     await this.enqueue(() => {
       const geometryChanged = cols !== this.cols || rows !== this.rows;
-      if (geometryChanged) {
-        if (this.state === "running" || this.state === "starting") {
-          this.child.resize(cols, rows);
-        }
+      // Do not reflow an exited/stopping Session's canonical terminal history
+      // to the geometry of a later phone/browser attachment.
+      if (geometryChanged && (this.state === "running" || this.state === "starting")) {
+        this.child.resize(cols, rows);
         this.mirror.resize(cols, rows);
         this.cols = cols;
         this.rows = rows;

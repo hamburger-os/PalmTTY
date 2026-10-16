@@ -205,3 +205,9 @@ Browse mode allows only validated SGR wheel reports through to a mouse-tracking 
 ### 手机 TUI 滚动与鼠标协议恢复（2026 年 10 月）
 
 浏览模式只把有效的 SGR 滚轮交给已启用鼠标跟踪的 TUI，继续拦截点击、拖动、移动；交互模式允许全部经过校验的 SGR 鼠标输入。未启用跟踪时普通缓冲区的滚动仍由 xterm 本地处理，不增加第二套触摸适配器或历史缓冲区。Worker 从 headless parser 捕获 1006/1016 鼠标编码（xterm 不支持 1015）协商，并把 SerializeAddon 漏掉的编码状态补在同一个有界快照内，避免重新附着后的浏览器回退到不支持的 X10。备用屏幕的内部消息历史只能由 TUI 自身维护和滚动。
+
+### Viewport-safe confirmations / 手机端确认框（2026-10）
+
+Terminal and Remote App terminate/clear confirmations now remain open during asynchronous actions, show failures inline, and close after success. Native modal layout is anchored to the viewport, with compact phone confirmations near the safe-area bottom edge. Retained non-running terminals keep their canonical geometry when viewed from a different-sized browser. Pi Regular/xterm scrolling and existing background reconnection policies are unchanged.
+
+终端与远程应用的终止/清除操作在执行期间保持确认弹窗，失败就地展示，成功才关闭；手机短确认框位于视口底部安全区域。已退出终端从不同尺寸的浏览器重新查看时，不再修改 Worker 端规范终端几何。Pi Regular 滚动和后台重连策略保持不变。
