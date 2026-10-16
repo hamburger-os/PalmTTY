@@ -135,7 +135,8 @@ export const WorkerStatusSchema = z.object({
 export const WorkerEventSchema = z.discriminatedUnion("type", [
   WorkerResponseSchema,
   WorkerDeliverSchema,
-  WorkerStatusSchema
+  WorkerStatusSchema,
+  z.object({ type: z.literal("retired") })
 ]);
 export type WorkerEvent = z.infer<typeof WorkerEventSchema>;
 

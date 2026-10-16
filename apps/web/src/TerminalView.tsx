@@ -643,7 +643,10 @@ export function TerminalView({
         }
         // A retired session can no longer be resumed. Retrying its old ID
         // indefinitely hides a successful server-side replacement.
-        if (event.code === 1000 && event.reason === "Session removed") {
+        if (event.code === 1000 && (
+          event.reason === "Session removed" ||
+          event.reason === "Exited session retention expired"
+        )) {
           setConnection("closed");
           return;
         }

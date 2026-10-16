@@ -94,8 +94,17 @@ export class SessionWorkerServer {
     });
 
     this.runtime.onRetire(() => {
-      void this.shutdown({ killPty: false, cleanupState: true }).then(() => {
-        this.options.onRetired?.();
+      // PTY exit is not Worker retirement. Publish a distinct final event so
+      // the Agent can retire an exited Session without guessing from IPC EOF.
+      try {
+        this.controller?.send({ type: "retired" });
+      } catch {
+        // A disconnected Agent can infer death from the Worker process later.
+      }
+      setImmediate(() => {
+        void this.shutdown({ killPty: false, cleanupState: true }).then(() => {
+          this.options.onRetired?.();
+        });
       });
     });
   }

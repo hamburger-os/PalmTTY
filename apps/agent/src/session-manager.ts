@@ -545,6 +545,21 @@ export class SessionManager {
       managed.session = session;
     });
 
+    managed.worker.onRetired(() => {
+      if (this.closing || this.sessions.get(managed.record.sessionId) !== managed) return;
+      this.sessions.delete(managed.record.sessionId);
+      for (const socket of managed.clients.values()) {
+        try {
+          socket.close(1000, "Exited session retention expired");
+        } catch {
+          // Best effort when the Worker retires after its retention timer.
+        }
+      }
+      managed.clients.clear();
+      managed.worker.close();
+      void this.disposeSessionResources(managed.record.sessionId);
+    });
+
     managed.worker.onClose(() => {
       if (this.closing || this.sessions.get(managed.record.sessionId) !== managed) return;
 

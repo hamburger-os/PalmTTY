@@ -29,6 +29,7 @@ export class WorkerClient {
   private readonly deliverListeners = new Set<DeliverListener>();
   private readonly statusListeners = new Set<StatusListener>();
   private readonly closeListeners = new Set<CloseListener>();
+  private readonly retiredListeners = new Set<() => void>();
   private heartbeatTimer: NodeJS.Timeout | undefined;
   private heartbeatBusy = false;
   private closed = false;
@@ -108,6 +109,11 @@ export class WorkerClient {
   onClose(listener: CloseListener): () => void {
     this.closeListeners.add(listener);
     return () => this.closeListeners.delete(listener);
+  }
+
+  onRetired(listener: () => void): () => void {
+    this.retiredListeners.add(listener);
+    return () => this.retiredListeners.delete(listener);
   }
 
   async adopt(): Promise<void> {
@@ -199,6 +205,10 @@ export class WorkerClient {
       return;
     }
 
+    if (event.type === "retired") {
+      for (const listener of [...this.retiredListeners]) listener();
+      return;
+    }
     this.latestSession = event.session;
     for (const listener of [...this.statusListeners]) listener(event.session);
   }
@@ -229,5 +239,6 @@ export class WorkerClient {
     this.deliverListeners.clear();
     this.statusListeners.clear();
     this.closeListeners.clear();
+    this.retiredListeners.clear();
   }
 }
