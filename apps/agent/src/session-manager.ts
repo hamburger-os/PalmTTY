@@ -536,17 +536,21 @@ export class SessionManager {
 
   private install(managed: ManagedWorker): void {
     this.sessions.set(managed.record.sessionId, managed);
+    const worker = managed.worker;
+    const current = () => !this.closing &&
+      this.sessions.get(managed.record.sessionId) === managed &&
+      managed.worker === worker;
 
-    managed.worker.onDeliver((clientId, message) => {
-      this.deliver(managed, clientId, message);
+    worker.onDeliver((clientId, message) => {
+      if (current()) this.deliver(managed, clientId, message);
     });
 
-    managed.worker.onStatus((session) => {
-      managed.session = session;
+    worker.onStatus((session) => {
+      if (current()) managed.session = session;
     });
 
-    managed.worker.onRetired(() => {
-      if (this.closing || this.sessions.get(managed.record.sessionId) !== managed) return;
+    worker.onRetired(() => {
+      if (!current()) return;
       this.sessions.delete(managed.record.sessionId);
       for (const socket of managed.clients.values()) {
         try {
@@ -560,8 +564,8 @@ export class SessionManager {
       void this.disposeSessionResources(managed.record.sessionId);
     });
 
-    managed.worker.onClose(() => {
-      if (this.closing || this.sessions.get(managed.record.sessionId) !== managed) return;
+    worker.onClose(() => {
+      if (!current()) return;
 
       // Terminal status describes the PTY, not Worker liveness. An exited
       // Worker can still serve retained history after a transient IPC loss.
