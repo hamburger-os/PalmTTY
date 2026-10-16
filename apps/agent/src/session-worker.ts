@@ -341,6 +341,12 @@ export class SessionWorkerServer {
       }
 
       const request = parsed.data;
+      // Heartbeat belongs to transport liveness, not to the serialized PTY
+      // command queue. A slow recovery snapshot must not evict a live Agent.
+      if (request.type === "ping") {
+        this.respond(framed, request.requestId, { pong: true });
+        return;
+      }
       const run = this.commandPipeline.then(
         () => this.handleRequest(framed, request),
         () => this.handleRequest(framed, request)
@@ -428,9 +434,6 @@ export class SessionWorkerServer {
           return;
         }
 
-        case "ping":
-          this.respond(connection, request.requestId, { pong: true });
-          return;
       }
     } catch (error) {
       this.respondError(

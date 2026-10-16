@@ -63,6 +63,7 @@ class ControlledPty implements PtyHandle {
 
 class EmbeddedWorkerSpawner implements WorkerSpawner {
   readonly ptys: ControlledPty[] = [];
+  failNextSpawn = false;
   private readonly servers: SessionWorkerServer[] = [];
   readonly factory: PtyFactory = () => {
     const pty = new ControlledPty();
@@ -77,11 +78,23 @@ class EmbeddedWorkerSpawner implements WorkerSpawner {
   }
 
   async spawn(bootstrap: WorkerBootstrap): Promise<void> {
+    if (this.failNextSpawn) {
+      this.failNextSpawn = false;
+      throw new Error("Injected replacement worker startup failure");
+    }
     const server = new SessionWorkerServer(bootstrap, {
       ptyFactory: this.factory
     });
     await server.start();
     this.servers.push(server);
+  }
+
+  disconnectFirstController(): void {
+    // Force a transient Agent/Worker IPC loss without terminating the PTY.
+    const server = this.servers[0] as unknown as {
+      controller?: { destroy(): void };
+    } | undefined;
+    server?.controller?.destroy();
   }
 
   async closeAll(): Promise<void> {
@@ -354,6 +367,118 @@ describe("session lifecycle API", () => {
     });
     expect(stillRunning.statusCode).toBe(200);
     expect(stillRunning.json().session.state).toBe("running");
+  });
+
+
+  it("retains exited history when replacement startup fails, then permits retry", async () => {
+    const { app, spawner } = await buildHarness();
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions",
+      headers: { origin: ORIGIN },
+      payload: { workspaceId: "lifecycle", cols: 80, rows: 24 }
+    });
+    const original = created.json().session as SessionPublic;
+    spawner.failNextSpawn = true;
+
+    const restarting = app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${original.id}/restart`,
+      headers: { origin: ORIGIN }
+    });
+    await waitUntil(() => spawner.pty.killCount === 1);
+    spawner.pty.emitExit(9);
+
+    const failed = await restarting;
+    expect(failed.statusCode).toBe(409);
+    expect(failed.json().error).toBe("session_restart_failed");
+    const retained = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${original.id}`
+    });
+    expect(retained.statusCode).toBe(200);
+    expect(retained.json().session).toMatchObject({
+      id: original.id,
+      state: "exited",
+      exitCode: 9
+    });
+
+    const retried = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${original.id}/restart`,
+      headers: { origin: ORIGIN }
+    });
+    expect(retried.statusCode).toBe(201);
+    expect(retried.json().session.id).not.toBe(original.id);
+    expect(spawner.ptys).toHaveLength(2);
+  });
+
+  it("serializes concurrent restart requests against clear and terminate", async () => {
+    const { app, spawner } = await buildHarness();
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions",
+      headers: { origin: ORIGIN },
+      payload: { workspaceId: "lifecycle", cols: 80, rows: 24 }
+    });
+    const id = (created.json().session as SessionPublic).id;
+    const url = `/api/v1/sessions/${id}/restart`;
+    const first = app.inject({ method: "POST", url, headers: { origin: ORIGIN } });
+    const second = app.inject({ method: "POST", url, headers: { origin: ORIGIN } });
+    await waitUntil(() => spawner.pty.killCount === 1);
+
+    const clear = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/sessions/${id}`,
+      headers: { origin: ORIGIN }
+    });
+    expect(clear.statusCode).toBe(409);
+    const stop = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${id}/terminate`,
+      headers: { origin: ORIGIN }
+    });
+    expect(stop.statusCode).toBe(409);
+    expect(stop.json().error).toBe("session_restarting");
+
+    spawner.pty.emitExit();
+    const [resultA, resultB] = await Promise.all([first, second]);
+    expect(resultA.statusCode).toBe(201);
+    expect(resultB.statusCode).toBe(201);
+    expect(resultA.json().session.id).toBe(resultB.json().session.id);
+    expect(spawner.ptys).toHaveLength(2);
+  });
+
+  it("keeps an exited retained session after a transient IPC disconnect", async () => {
+    const { app, spawner } = await buildHarness();
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions",
+      headers: { origin: ORIGIN },
+      payload: { workspaceId: "lifecycle", cols: 80, rows: 24 }
+    });
+    const id = (created.json().session as SessionPublic).id;
+    spawner.pty.emitExit(2);
+    await waitUntil(async () => {
+      const response = await app.inject({
+        method: "GET", url: `/api/v1/sessions/${id}`
+      });
+      return response.statusCode === 200 && response.json().session.state === "exited";
+    });
+
+    spawner.disconnectFirstController();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const retained = await app.inject({
+      method: "GET", url: `/api/v1/sessions/${id}`
+    });
+    expect(retained.statusCode).toBe(200);
+    expect(retained.json().session.state).toBe("exited");
+    await waitUntil(async () => {
+      const response = await app.inject({
+        method: "GET", url: `/api/v1/sessions/${id}`
+      });
+      return response.statusCode === 200;
+    });
   });
 
   it("restarts by replacing the PTY with a new session", async () => {

@@ -641,6 +641,12 @@ export function TerminalView({
           setConnection("closed");
           return;
         }
+        // A retired session can no longer be resumed. Retrying its old ID
+        // indefinitely hides a successful server-side replacement.
+        if (event.code === 1000 && event.reason === "Session removed") {
+          setConnection("closed");
+          return;
+        }
         if (event.code === 1008) {
           if (event.reason === "Authentication expired") {
             window.location.reload();
