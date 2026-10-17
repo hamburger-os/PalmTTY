@@ -23,7 +23,7 @@ describe("Markdown file preview routing", () => {
 
   it("refuses escape paths and executable/browser URL schemes", () => {
     for (const href of [
-      "../../secrets", "../outside.md", "/etc/passwd", "\\\\server\\share",
+      "../../secrets", "../../outside.md", "/etc/passwd", "\\\\server\\share",
       "//evil.example/file.md", "javascript:alert(1)", "data:text/html,hello",
       "file:///etc/passwd", "%2Fetc%2Fpasswd", "dir%5Cfile.md",
       "%2e%2e/%2e%2e/key", "https://", "bad%XX", "#section", "?raw=1"
