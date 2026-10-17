@@ -54,7 +54,8 @@ describe("Markdown navigation and confined images", () => {
       .toEqual(["世界观", "世界观-1"]);
     expect(root.querySelector("a")?.getAttribute("data-markdown-fragment")).toBe("世界观");
     expect(markdownHeadingSlug("Hello, 世界！")).toBe("hello-世界");
-    expect(root.querySelector("[id]")).toBeNull();
+    expect([...root.querySelectorAll("[id]")].every(element =>
+      element.id.startsWith("palmtty-md-"))).toBe(true);
   });
 
   it("routes only local images through the Workspace API placeholder", () => {

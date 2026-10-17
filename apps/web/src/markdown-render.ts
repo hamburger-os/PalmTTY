@@ -127,19 +127,39 @@ export function renderMarkdown(content: string, path: string, labels: MarkdownLa
   const template = document.createElement("template");
   template.innerHTML = sanitized;
 
-  // Generated headings and footnotes are scoped to this article, never to
-  // the host document's global element ids.
+  // Prefix generated ids instead of dropping them: scoped navigation still
+  // works, and footnote/KaTeX aria-labelledby/describedby relations survive.
+  let hash = 0;
+  for (const char of path) hash = (Math.imul(hash, 31) + char.charCodeAt(0)) >>> 0;
+  const prefix = "palmtty-md-" + hash.toString(36) + "-";
+  const ids = new Map<string, string>();
   for (const element of template.content.querySelectorAll<HTMLElement>("[id]")) {
-    const id = element.id;
-    element.removeAttribute("id");
-    if (id) element.dataset.markdownAnchor = id;
+    const original = element.id;
+    if (!original) continue;
+    const scoped = prefix + original;
+    element.id = scoped;
+    element.dataset.markdownAnchor = original;
+    ids.set(original, scoped);
+  }
+  for (const element of template.content.querySelectorAll<HTMLElement>(
+    "[aria-labelledby],[aria-describedby],[aria-owns]"
+  )) {
+    for (const attribute of ["aria-labelledby", "aria-describedby", "aria-owns"]) {
+      const original = element.getAttribute(attribute);
+      if (!original) continue;
+      const rewritten = original.split(/\\s+/).map(id => ids.get(id)).filter(Boolean).join(" ");
+      if (rewritten) element.setAttribute(attribute, rewritten);
+      else element.removeAttribute(attribute);
+    }
   }
   const headingCounts = new Map<string, number>();
   for (const heading of template.content.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6")) {
     const base = markdownHeadingSlug(heading.textContent ?? "") || "section";
     const count = headingCounts.get(base) ?? 0;
     headingCounts.set(base, count + 1);
-    heading.dataset.markdownAnchor = count === 0 ? base : base + "-" + count;
+    const anchor = count === 0 ? base : base + "-" + count;
+    heading.dataset.markdownAnchor = anchor;
+    heading.id = prefix + anchor;
   }
 
   for (const table of template.content.querySelectorAll("table")) {
