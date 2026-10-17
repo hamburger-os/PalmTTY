@@ -111,6 +111,9 @@ describe("Markdown extensions and bounds", () => {
       "graph TD\nclick A https://evil.example",
       "graph TD\nA[<img src=x>]",
       "graph TD\nA-->B\nhref A javascript:alert(1)",
+      "---\nconfig:\n  securityLevel: loose\n---\ngraph TD\nA-->B",
+      "graph TD\nconfig: { securityLevel: loose }",
+      "graph TD\nA[//evil.example/image]",
       "A".repeat(12_001)
     ]) expect(isSafeMermaidSource(source)).toBe(false);
   });
