@@ -44,7 +44,7 @@ PalmTTY 当前是单维护者、AI 主维护项目。强制人工 approval 会�
 - AI 不能直接 push `main`；
 - 所有改动必须留下 PR 记录；
 - Windows 与 Ubuntu CI 必须通过；
-- 生产依赖漏洞审计与 license policy 检查必须通过；
+- 生产依赖漏洞审计与 license policy 检查必须通过；许可证白名单默认严格拒绝未评审 SPDX 选项，DOMPurify 3.4.16 的 `(MPL-2.0 OR Apache-2.0)` 仅按明确可选的 Apache-2.0 路径做精确包名／版本／表达式例外，不放宽全局许可策略；
 - CodeQL 必须通过；
 - review conversation 必须处理完；
 - 主干不能被删除或 force push；

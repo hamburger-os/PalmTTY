@@ -74,6 +74,25 @@ test("accepts only fully reviewed permissive production dependency expressions",
   assert.deepEqual(result.licenses, ["MIT", "MIT OR Apache-2.0"]);
 });
 
+test("accepts only the exactly reviewed DOMPurify Apache alternative", () => {
+  const license = "(MPL-2.0 OR Apache-2.0)";
+  assert.equal(inspectLicenseReport({ [license]: [
+    { name: "dompurify", versions: ["3.4.16"], license }
+  ] }).packageCount, 1);
+  for (const [name, versions] of [
+    ["dompurify", ["3.4.15"]],
+    ["not-dompurify", ["3.4.16"]],
+    ["dompurify", ["3.4.16", "3.4.15"]]
+  ]) {
+    assert.throws(() => inspectLicenseReport({ [license]: [
+      { name, versions, license }
+    ] }));
+  }
+  assert.throws(() => inspectLicenseReport({ "MPL-2.0": [
+    { name: "dompurify", versions: ["3.4.16"], license: "MPL-2.0" }
+  ] }));
+});
+
 test("fails closed for unknown or restricted-only licenses", () => {
   assert.throws(() =>
     inspectLicenseReport({

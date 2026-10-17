@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SpeechReader } from "./SpeechReader.js";
+import { MarkdownPreview } from "./MarkdownPreview.js";
+import { isMarkdownPath } from "./markdown-preview.js";
 import type {
   WorkspaceFileListResponse,
   WorkspaceFileReadResponse
@@ -31,6 +33,7 @@ function parentPath(path: string): string {
 
 function fileMime(path: string, binary: boolean): string {
   const extension = path.split(".").at(-1)?.toLowerCase();
+  if (extension === "md" || extension === "markdown") return "text/markdown;charset=utf-8";
   if (extension === "png") return "image/png";
   if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
   if (extension === "webp") return "image/webp";
@@ -74,6 +77,7 @@ export function FilesPane({
   const [listing, setListing] = useState<WorkspaceFileListResponse | null>(null);
   const [selected, setSelected] = useState<WorkspaceFileReadResponse | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [markdownSourcePath, setMarkdownSourcePath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reading, setReading] = useState(false);
   const [speechText, setSpeechText] = useState<string | null>(null);
@@ -219,6 +223,7 @@ export function FilesPane({
   ]);
 
   const openFile = (filePath: string) => {
+    setSelected(null);
     setSelectedPath(filePath);
   };
 
@@ -303,6 +308,13 @@ export function FilesPane({
   };
 
   const shareSupported = typeof navigator.share === "function";
+  const isMarkdown = !!selectedPath && !!selected && !selected.binary && isMarkdownPath(selectedPath);
+  const showMarkdownSource = isMarkdown && markdownSourcePath === selectedPath;
+  const openLinkedFile = (linkedPath: string) => {
+    setSelected(null);
+    setPath(parentPath(linkedPath));
+    setSelectedPath(linkedPath);
+  };
 
   return (
     <section className={`files-pane tool-pane glass-content${selectedPath ? " has-preview" : ""}`}>
@@ -398,6 +410,12 @@ export function FilesPane({
               </span>
             </div>
             <div className="file-preview-actions">
+              {isMarkdown && speechText === null && (
+                <button type="button" className="ghost compact"
+                  onClick={() => setMarkdownSourcePath(showMarkdownSource ? null : selectedPath)}>
+                  {showMarkdownSource ? t("files.markdownPreview") : t("files.markdownSource")}
+                </button>
+              )}
               {selected && !selected.binary && speechText === null && (
                 <button type="button" className="ghost compact"
                   disabled={fileAction !== null || speechLoading}
@@ -461,7 +479,11 @@ export function FilesPane({
             {speechText !== null ? (
               <SpeechReader text={speechText} sourceId={`${workspaceId}:${selectedPath}`} onClose={() => setSpeechText(null)} />
             ) : (
-              <pre className="file-preview-content" tabIndex={0}>{selected.content}</pre>
+              isMarkdown && !showMarkdownSource && selectedPath ? (
+                <MarkdownPreview content={selected.content} path={selectedPath} onOpenFile={openLinkedFile} />
+              ) : (
+                <pre className="file-preview-content" tabIndex={0}>{selected.content}</pre>
+              )
             )}
             {selected.truncated && speechText === null && (
               <div className="tool-hint">{t("files.previewTruncated")}</div>
