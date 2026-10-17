@@ -54,7 +54,7 @@ describe("Markdown preview lifecycle", () => {
     const { host } = await mount("[next](./chapter.md#part)", onOpenFile);
     const link = host.querySelector<HTMLAnchorElement>("a[data-markdown-workspace-path]")!;
     expect(link.href.endsWith("#")).toBe(true);
-    await act(async () => link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })));
+    await act(async () => { link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); });
     expect(onOpenFile).toHaveBeenCalledWith("docs/chapter.md", "part");
   });
 
