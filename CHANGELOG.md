@@ -6,6 +6,10 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+### Workspace Markdown preview
+
+- Render `.md`/`.markdown` as sanitized, read-only GFM with a source toggle; keep relative file links within Workspace authority and prevent implicit remote image loads. Preserve existing bounded reads, copy/share, speech and history workflows.
+
 ### Mobile Pi/TUI scroll and reconnect mouse state
 
 - Let Browse mode forward only validated SGR wheel events to mouse-tracking TUIs; continue blocking clicks/drags and malformed/legacy events, without adding another touch-scroll owner.

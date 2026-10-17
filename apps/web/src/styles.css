@@ -1330,6 +1330,79 @@ button.directory-choose {
 }
 
 
+/* The Files preview owns one scroll container in source and rendered Markdown modes. */
+.file-markdown-preview {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4);
+  color: var(--text-primary);
+  background: transparent;
+  font-size: var(--text-base);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.file-markdown-preview > :first-child { margin-top: 0; }
+.file-markdown-preview > :last-child { margin-bottom: 0; }
+.file-markdown-preview h1,
+.file-markdown-preview h2,
+.file-markdown-preview h3,
+.file-markdown-preview h4,
+.file-markdown-preview h5,
+.file-markdown-preview h6 {
+  margin: var(--space-5) 0 var(--space-2);
+  line-height: 1.35;
+}
+.file-markdown-preview h1 { font-size: 1.55rem; }
+.file-markdown-preview h2 { font-size: 1.3rem; }
+.file-markdown-preview h3 { font-size: 1.13rem; }
+.file-markdown-preview p,
+.file-markdown-preview ul,
+.file-markdown-preview ol,
+.file-markdown-preview blockquote,
+.file-markdown-preview pre,
+.file-markdown-preview table { margin: 0 0 var(--space-3); }
+.file-markdown-preview ul,
+.file-markdown-preview ol { padding-left: var(--space-6); }
+.file-markdown-preview li { margin: var(--space-1) 0; }
+.file-markdown-preview blockquote {
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+.file-markdown-preview a {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+.file-markdown-preview a:focus-visible { outline: 2px solid var(--border-strong); }
+.file-markdown-preview code,
+.file-markdown-preview pre { font-family: var(--font-mono); font-size: var(--text-sm); }
+.file-markdown-preview code {
+  padding: 1px 3px;
+  border-radius: var(--radius-xs);
+  background: var(--control-bg);
+}
+.file-markdown-preview pre {
+  max-width: 100%;
+  overflow: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--control-bg);
+  overflow-wrap: normal;
+}
+.file-markdown-preview pre code { padding: 0; background: transparent; }
+.file-markdown-preview table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.file-markdown-preview th,
+.file-markdown-preview td { padding: 6px 10px; border: 1px solid var(--border); }
+.file-markdown-preview th { background: var(--control-bg); }
+.file-markdown-preview hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-4) 0; }
+.file-markdown-preview .markdown-image-label { color: var(--text-muted); font-size: var(--text-sm); }
+
 /* Reader controls stay fixed; the novel scrolls independently of the page. */
 .speech-reader {
   display: grid;

@@ -12,6 +12,8 @@
     "@palmtty/protocol": "workspace:*",
     "@xterm/addon-fit": "0.12.0-beta.301",
     "@xterm/xterm": "6.1.0-beta.304",
+    "dompurify": "3.4.16",
+    "marked": "18.0.14",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
