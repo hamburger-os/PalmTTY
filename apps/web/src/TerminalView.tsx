@@ -289,7 +289,6 @@ export function TerminalView({
       cursorBlink: true,
       fontSize: fontSizeRef.current,
       lineHeight: 1.15,
-      customGlyphs: true,
       fontFamily: '"Cascadia Mono", "SFMono-Regular", Consolas, monospace',
       scrollback: 10000,
       scrollbar: {
