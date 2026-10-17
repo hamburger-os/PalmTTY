@@ -71,6 +71,9 @@ importers:
       '@xterm/addon-fit':
         specifier: 0.12.0-beta.301
         version: 0.12.0-beta.301(@xterm/xterm@6.1.0-beta.304)
+      '@xterm/addon-webgl':
+        specifier: 0.20.0-beta.300
+        version: 0.20.0-beta.300(@xterm/xterm@6.1.0-beta.304)
       '@xterm/xterm':
         specifier: 6.1.0-beta.304
         version: 6.1.0-beta.304
