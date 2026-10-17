@@ -1,0 +1,32 @@
+name: Markdown dependency lock preview
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/package.json'
+      - '.github/workflows/markdown-lock-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+      - run: corepack enable
+      - name: Resolve exact pnpm lock (no lifecycle scripts)
+        shell: bash
+        run: |
+          pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
+          node - <<'JS'
+          const fs = require('node:fs');
+          const encoded = fs.readFileSync('pnpm-lock.yaml').toString('base64');
+          console.log('BEGIN_PALMTTY_GENERATED_LOCK');
+          for (let i=0;i<encoded.length;i+=4000) console.log('PALMTTY_LOCK_PART:'+encoded.slice(i,i+4000));
+          console.log('END_PALMTTY_GENERATED_LOCK');
+          JS
