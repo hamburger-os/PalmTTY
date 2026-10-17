@@ -71,6 +71,9 @@ function markdownParser(path: string): Marked {
     gfm: true,
     breaks: false,
     renderer: {
+      checkbox({ checked }) {
+        return checked ? "☑ " : "☐ ";
+      },
       html({ text }) {
         return renderSafeAuthorHtml(text);
       },
@@ -162,6 +165,13 @@ export function renderMarkdown(content: string, path: string, labels: MarkdownLa
     if (fragment) {
       anchor.href = "#";
       anchor.dataset.markdownFragment = fragment;
+      continue;
+    }
+    const external = markdownLinkTarget(path, href);
+    if (external?.kind === "external") {
+      anchor.href = external.href;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
       continue;
     }
     const hash = href.indexOf("#");

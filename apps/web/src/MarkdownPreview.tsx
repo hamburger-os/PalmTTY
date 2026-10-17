@@ -61,7 +61,6 @@ function loadLocalImages(root: HTMLElement, workspaceId: string): () => void {
         const url = URL.createObjectURL(blob);
         urls.push(url);
         const image = document.createElement("img");
-        image.src = url;
         image.alt = holder.getAttribute("aria-label") ?? "";
         image.loading = "lazy";
         image.decoding = "async";
@@ -70,6 +69,7 @@ function loadLocalImages(root: HTMLElement, workspaceId: string): () => void {
           holder.replaceChildren(image);
         }, { once: true });
         image.addEventListener("error", () => URL.revokeObjectURL(url), { once: true });
+        image.src = url;
       }).catch(() => {
         // Preserve the source's safe alt-text placeholder on read failure.
       }).finally(() => {

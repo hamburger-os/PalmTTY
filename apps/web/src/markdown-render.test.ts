@@ -65,6 +65,14 @@ describe("Markdown navigation and confined images", () => {
     expect(root.querySelector("img")).toBeNull();
   });
 
+  it("retains external URL fragments and GFM task list markers", () => {
+    const root = preview("[web](https://example.com/readme#part)\n\n- [x] Done\n- [ ] Pending");
+    expect(root.querySelector("a")?.href).toBe("https://example.com/readme#part");
+    expect(root.textContent).toContain("☑");
+    expect(root.textContent).toContain("☐");
+    expect(root.querySelector("input")).toBeNull();
+  });
+
   it("keeps file and in-file fragment links distinct and rejects dangerous schemes", () => {
     const root = preview(
       "[same](#chapter-1) [other](../outline.md#summary) " +
