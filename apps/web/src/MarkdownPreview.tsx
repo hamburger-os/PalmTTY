@@ -3,6 +3,11 @@ import DOMPurify from "dompurify";
 import { Marked } from "marked";
 import { markdownLinkTarget } from "./markdown-preview.js";
 
+function escapeHtml(text: string): string {
+  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
 // Each document is parsed locally. Nothing is submitted to a rendering service.
 const parser = new Marked({
   gfm: true,
@@ -11,15 +16,12 @@ const parser = new Marked({
     // Render raw HTML as text *before* sanitization. Constructing a detached
     // HTML DOM with untrusted <img> can itself cause an unwanted network load.
     html({ text }) {
-      return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+      return escapeHtml(text);
     },
     // Markdown images must not silently fetch arbitrary remote URLs with the
     // reader's network identity. Keep alt text visible without creating a fetch.
     image({ text }) {
-      const escaped = text.replaceAll("&", "&amp;").replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-      return '<span class="markdown-image-label">[' + escaped + "]</span>";
+      return '<span class="markdown-image-label">[' + escapeHtml(text) + "]</span>";
     },
     checkbox({ checked }) {
       return checked ? "☑ " : "☐ ";

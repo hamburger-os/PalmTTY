@@ -33,6 +33,7 @@ function parentPath(path: string): string {
 
 function fileMime(path: string, binary: boolean): string {
   const extension = path.split(".").at(-1)?.toLowerCase();
+  if (extension === "md" || extension === "markdown") return "text/markdown;charset=utf-8";
   if (extension === "png") return "image/png";
   if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
   if (extension === "webp") return "image/webp";
@@ -222,6 +223,7 @@ export function FilesPane({
   ]);
 
   const openFile = (filePath: string) => {
+    setSelected(null);
     setSelectedPath(filePath);
   };
 
@@ -309,6 +311,7 @@ export function FilesPane({
   const isMarkdown = !!selectedPath && !!selected && !selected.binary && isMarkdownPath(selectedPath);
   const showMarkdownSource = isMarkdown && markdownSourcePath === selectedPath;
   const openLinkedFile = (linkedPath: string) => {
+    setSelected(null);
     setPath(parentPath(linkedPath));
     setSelectedPath(linkedPath);
   };

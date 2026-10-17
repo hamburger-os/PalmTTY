@@ -15,6 +15,13 @@ export const APPROVED_LICENSE_IDS = new Set([
   "Zlib"
 ]);
 
+// Dual-licensed dependencies require one explicit, version-pinned review.
+// DOMPurify publishes an Apache-2.0 alternative. This exception does not
+// approve MPL-2.0 as a general license for other production dependencies.
+const REVIEWED_DUAL_LICENSES = new Map([
+  ["dompurify@3.4.16", "(MPL-2.0 OR Apache-2.0)"]
+]);
+
 export function normalizeVersion(value) {
   const version = String(value ?? "").trim().replace(/^v/, "");
   if (!VERSION_PATTERN.test(version)) {
@@ -124,7 +131,9 @@ export function inspectLicenseReport(report) {
 
   const failures = [];
   for (const pkg of packages) {
-    if (!isApprovedLicenseExpression(pkg.license)) {
+    const specificallyReviewed = pkg.versions.length === 1 &&
+      REVIEWED_DUAL_LICENSES.get(`${pkg.name}@${pkg.versions[0]}`) === pkg.license;
+    if (!isApprovedLicenseExpression(pkg.license) && !specificallyReviewed) {
       failures.push(
         `${pkg.name}@${pkg.versions.join(",")} = ${pkg.license}`
       );

@@ -24,7 +24,7 @@ The browser-integrated native Devolutions Gateway/IronRDP NLA path and pre-login
 - Windows ConPTY smoke coverage that prefers PowerShell 7 locally, falls back to Windows PowerShell for generic host checks, and is forced to PowerShell 7 in repository Windows CI
 - end-to-end Fastify HTTP/WebSocket/Worker IPC lifecycle coverage with deterministic PTY adapters
 - detached-process integration coverage proving a Worker survives the creator Agent process exit and can be rediscovered with replay intact
-- production dependency vulnerability audit, fail-closed production dependency license-policy review, and CodeQL
+- production dependency vulnerability audit, fail-closed production dependency license-policy review (including an exact version-pinned DOMPurify 3.4.16 Apache-2.0 alternative exception for its dual-license metadata), and CodeQL
 - CODEOWNERS, PR/Issue templates, contribution/security/governance/release documentation
 - root `package.json` is the single release/runtime version source; private workspace manifests intentionally omit duplicate versions and the Agent health endpoint reads the root version
 - the source tree targets `0.2.0`; `CHANGELOG.md` keeps `[Unreleased]` empty at publication time and carries the explicit `0.1.0` → `0.2.0` exposure-profile migration note instead of compatibility code
