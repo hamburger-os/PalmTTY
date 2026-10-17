@@ -220,3 +220,8 @@ Terminal and Remote App terminate/clear confirmations now remain open during asy
 ### Markdown 文件预览功能
 
 Files 通过单一 GFM 解析/净化流水线展示常用安全 HTML 排版、脚注、局部标题锚点、工作区相对路径图片、提示块、代码高亮、KaTeX 和按需 Mermaid；图片仍走受保护只读接口，图表在禁止脚本和网络的沙箱中展示。保留 512 KiB 预览与 8 MiB 完整导出边界、正文唯一纵向滚动、源码/朗读/Git 链路。
+### Terminal renderer and Pi fullscreen / 终端渲染器与 Pi 全屏滚动条（2026-10）
+
+**English:** Browser xterm prefers a version-matched WebGL2 addon with custom Box Drawing/Block Elements glyphs so full-screen TUIs such as Pi can draw vertically adjacent scrollbar cells without typical DOM font gaps. The same xterm instance falls back to its DOM renderer on unavailable WebGL2, failed activation or context loss; it does not reconnect the PTY, change canonical Worker state or create a second scroll owner. The xterm 4 CSS px touch scrollbar is distinct from Pi's character-drawn scrollbar. Normal scrollback remains local xterm inertia; fullscreen TUI scrolling goes through validated SGR wheel reports and cannot be promised Safari-native pixel momentum. Real mobile browser testing remains necessary.
+
+**中文：** 浏览器 xterm 优先启用精确版本匹配的 WebGL2 插件和框线/块状字符自绘，改善 Pi 等全屏 TUI 逐行绘制滚动轨道时的字形间隙；WebGL2 不可用、装载失败或 context loss 时同一个 xterm 实例退回 DOM，既不重连 PTY，也不增加滚动状态或改变 Worker 规范历史。xterm 的触屏 4 CSS px 滚动条与 Pi 在字符单元格中绘制的竖线是两个不同对象。普通历史沿用 xterm 惯性；全屏 TUI 仍消费经过校验的 SGR 滚轮信号，不能等价于 Safari 原生逐像素滚动。真机验收仍是必要步骤。
