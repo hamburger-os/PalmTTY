@@ -132,3 +132,8 @@ Host 的文本预览、完整内容导出和图片读取现在以规范路径打
 ## 终端浏览器升级与 Worker 边界（2026-10）
 
 存活的旧 Session Worker 可能使用现有 IPC v5 发送早一版的终端 `hello`。Agent 仅在通过 secret 认证后的本地 IPC 对精确 v3 hello 做归一化；其他未知版本/格式仍拒绝。浏览器 WebSocket 仍只接受 `palmtty.v4`，不能把此恢复措施扩展为公开的旧版客户端入口，也不能跳过认证/Origin 校验或强制杀掉已有 PTY。
+
+
+## Markdown 浏览器端资源权限（2026-10-17）
+
+源 Markdown 的 HTML 在接触浏览器 DOM 前先通过无属性安全标签白名单，之后全部输出由 DOMPurify 清理。注释隐藏、恶意 HTML 保持文本，不允许脚本、事件属性、远程图片/字体自动加载，也不保留可影响全局 DOM 的作者 ID。标题和脚注在当前预览内部解析。工作区图片只能调用现有认证 + 精确 Origin + 路径约束 + 文件签名/像素验证接口，浏览器按需生成并释放 Object URL。Mermaid 输入有 12,000 字符上限、最多 8 图，禁用外链/点击/配置指令；SVG 二次净化并放入 sandbox 为空的 iframe，srcdoc CSP 默认拒绝全部网络和脚本。Mermaid 是额外的第三方解析面，更新版本需特别审查恶意图示与浏览器隔离；仍不能据此获得写文件、执行命令或扩大 Workspace authority。

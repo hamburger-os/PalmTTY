@@ -201,6 +201,13 @@ The browser-integrated native Devolutions Gateway/IronRDP NLA path and pre-login
 - terminal line-height and bottom spacing tuned so the last rendered row is not clipped by the lower controls
 - PWA manifest and non-caching service worker
 
+### Safe Markdown preview extensions (2026-10-17)
+
+- Files has one GFM parser and DOMPurify sanitizer. Attribute-free author HTML accepts br, sup, sub, u, mark, kbd, small, details and summary; HTML comments are not shown. All other author HTML stays inert text, and normal Markdown single newline behavior is unchanged.
+- Footnotes, repeated heading anchors and cross-file heading links are scoped to the current preview and existing Workspace read authority. PNG/JPEG/WebP/GIF images load only from the existing authenticated and dimension-checked Workspace image endpoint, only near the viewport, with at most two concurrent requests and 24 images; object URLs are reclaimed on disposal.
+- Locally bundled syntax highlighter, KaTeX and GFM alerts share that same parser. Mermaid is dynamically imported for at most eight visible fenced blocks, rejecting directives, external links and clicks, rendering strict-mode sanitized SVG inside a sandboxed no-script iframe with a deny-by-default resource CSP; invalid diagrams retain fenced source.
+- No new Agent endpoint, remote rendering service, terminal lifecycle state, external fonts or remote image loading. Markdown preview remains 512 KiB-bounded and full file export/reader retain separate established limits; real-device Safari scrolling and memory still require manual validation.
+
 ## Known gaps
 
 - Windows/Linux current-user Agent autostart is implemented, but there is still no OS-reboot persistence for the pre-reboot PTY/Worker. Autostart creates a fresh Agent control plane after sign-in/user-manager startup.

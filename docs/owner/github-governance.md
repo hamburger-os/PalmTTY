@@ -148,3 +148,8 @@ Windows 原生进程和病毒扫描程序可能在子进程退出后短暂占用
 ## 2026-10 npm 依赖整合审查
 
 在保持 Node 22 运行时与对应类型定义的前提下，将经单独验证的 TypeScript 7、Vitest 5、Vite 8 及 tsx/@fastify/static/ws 补丁统一合入一份 pnpm 锁文件，并在组合提交上重新执行 Windows/Ubuntu CI、Windows/Linux 安装包 smoke、安全审计与 CodeQL。旧 Dependabot PR 在此组合 PR 合并后关闭并自动清理远程分支。遇到新的主版本升级，先确认 Node 最低运行基线、原生依赖和发行包兼容，再更新自动化升级策略。
+
+
+## 新增 Mermaid 间接依赖许可证审查（2026-10）
+
+khroma 2.1.0 的 npm 包没有 license 元数据，pnpm 报告 Unknown；但上游 https://github.com/fabiospampinato/khroma/blob/master/license 是 MIT 完整许可证文本。仓库只对 khroma@2.1.0 + Unknown 精确放行，并有版本/包名负测试，绝不全局允许 Unknown。原 DOMPurify 双许可证 Apache-2.0 选项精确例外仍保持独立。

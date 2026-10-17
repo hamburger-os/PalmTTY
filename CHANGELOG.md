@@ -4,7 +4,13 @@ All notable PalmTTY changes are recorded here.
 
 The project follows a Keep-a-Changelog-style structure and uses Semantic Versioning for tagged releases.
 
+
+
 ## [Unreleased]
+
+### Complete Markdown preview
+
+- Add safe explicit HTML line breaks/formatting, local Workspace image embeds, footnotes, heading fragments, GFM alerts, syntax highlighting, local KaTeX and lazy Mermaid with restricted scriptless sandboxing. The existing read-only file API, transcript lifecycles, single preview vertical scroll and file export/reader contracts are unchanged.
 
 ### Workspace Markdown preview
 

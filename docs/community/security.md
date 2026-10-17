@@ -56,6 +56,10 @@ The optional Agent `--env-file` keeps bootstrap secret **values** out of task/un
 
 Prefer a private HTTPS entry point such as Tailscale Serve, or an authenticated HTTPS reverse proxy such as Caddy/QNAP. Keep the PalmTTY upstream port private.
 
+### Markdown viewer threat model
+
+Only attribute-free formatting HTML passes the source prefilter; all resulting Marked/plugin HTML is sanitized. Preview-local anchors cannot clobber host IDs. Relative images are served exclusively through the authenticated Workspace image endpoint with read/size bounds; remote images/fonts never auto-load. Mermaid source is bounded and forbids external links/click directives; strict rendering and SVG sanitization are followed by a sandboxed scriptless CSP-locked iframe. File/terminal authority does not increase.
+
 ## 中文
 
 PalmTTY 会以运行它的 OS 用户权限提供 Shell，应按“开发电脑账号被接管”的风险级别设计。
@@ -161,3 +165,8 @@ PalmTTY does not downgrade browser terminal protocol v4. To protect already-runn
 ### 存活 Worker 的协议边界（2026 年 10 月）
 
 浏览器终端仍严格使用 v4，不允许降级。为在 Agent 更新后保住既有 CLI 会话，经过私有 secret 认证的 Worker IPC 只接收一个明确的旧版 hello 形状并转换为 v4；未认证 IPC、未知版本及公开浏览器 v3 继续拒绝。更新时应重启 Agent、刷新网页，而不是终止 Session Worker。
+
+
+### Markdown 预览安全模型
+
+作者 HTML 必须先经过无属性排版白名单，解析器输出再统一净化；标题/脚注不能污染宿主 DOM 全局 ID。相对图片仍使用具备认证、Origin、路径和尺寸约束的工作区接口，禁止远程图片或字体自动加载。Mermaid 严格输入限制、屏蔽点击和外链，净化 SVG 并置于无脚本/无网络 CSP 的 sandbox iframe 内，绝不扩大文件/终端权限。
