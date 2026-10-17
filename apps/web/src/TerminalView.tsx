@@ -32,6 +32,7 @@ import {
 } from "./terminal-input-transport.js";
 import { TerminalInputRouter, type TouchInputMode } from "./terminal-input-router.js";
 import { terminalScrollbarWidth } from "./terminal-scrollbar.js";
+import { installTerminalRenderer } from "./terminal-renderer.js";
 
 export type ConnectionState =
   | "connecting"
@@ -301,6 +302,7 @@ export function TerminalView({
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     terminal.open(mount);
+    const disposeRenderer = installTerminalRenderer(terminal);
     fit.fit();
     terminalRef.current = terminal;
 
@@ -712,6 +714,7 @@ export function TerminalView({
       inputQueueRef.current = null;
       socketRef.current?.close(1000, "Leaving terminal view");
       socketRef.current = null;
+      disposeRenderer();
       terminal.dispose();
       terminalRef.current = null;
     };

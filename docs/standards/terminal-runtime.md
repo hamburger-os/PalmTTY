@@ -1,6 +1,6 @@
 # Terminal runtime references
 
-Last reviewed: 2026-10-15.
+Last reviewed: 2026-10-17.
 
 ## Microsoft Windows Pseudoconsole (ConPTY)
 
@@ -75,6 +75,7 @@ PalmTTY uses:
 - @xterm/headless inside each Session Worker;
 - @xterm/addon-serialize for a reconnectable terminal-state snapshot;
 - @xterm/addon-fit for browser sizing.
+- @xterm/addon-webgl for optional browser-side custom-glyph rendering.
 
 ### Pinned terminal compatibility set
 
@@ -84,6 +85,7 @@ The repository-level `terminal-stack.json` is the source of truth for the xterm 
 |---|---|---|
 | Browser | `@xterm/xterm` | `6.1.0-beta.304` |
 | Browser | `@xterm/addon-fit` | `0.12.0-beta.301` |
+| Browser | `@xterm/addon-webgl` | `0.20.0-beta.300` |
 | Worker | `@xterm/headless` | `6.0.0` |
 | Worker | `@xterm/addon-serialize` | `0.14.0` |
 
@@ -147,3 +149,7 @@ The input queue, Worker lease, reconnect/snapshot state and PTY lifecycle remain
 Authoritative references: [xterm IParser](https://xtermjs.org/docs/api/terminal/interfaces/iparser/), [xterm IModes](https://xtermjs.org/docs/api/terminal/interfaces/imodes/), [SGR mouse mode 1006](https://terminfo.dev/modes/decset-1006-sgr-mouse).
 
 Mouse tracking (DECSET 9/1000/1002/1003) and event *encoding* (1006 SGR and 1016 SGR pixels; xterm does not implement urxvt 1015) are independent states. The pinned SerializeAddon restores tracking but does not serialize event encoding. The Worker uses the proposed headless parser CSI handlers to observe decoded mode changes and RIS, returning false so xterm's built-in parser remains authoritative. On canonical snapshot generation, it appends the current supported encoding sequence within the existing 4 MiB budget. Never force ?1006 on a TUI which did not enable it, and never infer mouse modes by searching raw PTY chunks that may split CSI or contain OSC text.
+
+### WebGL custom glyphs and fullscreen scrollbar ownership (2026-10-17)
+
+Upstream references: https://github.com/xtermjs/xterm.js/issues/6224 and https://github.com/xtermjs/xterm.js/blob/master/addons/addon-webgl/typings/addon-webgl.d.ts. The default DOM renderer relies on font-provided block and box glyphs, which can leave inter-row gaps on some font/DPR combinations; xterm's WebGL addon supports custom drawing for U+2500–U+257F and U+2580–U+259F, including `│`, `┃` and `█`. The paired WebGL beta has a peer dependency on browser xterm 6.1.0-beta.304. Renderer availability is presentation-only: xterm remains the same buffer/input/resize owner and WebGL can be disposed for DOM fallback after GPU loss. A TUI's text-cell scrollbar is distinct from xterm's own browser scrollbar. In an alternate-buffer mouse-tracking TUI, wheel scrolling involves application-directed SGR input, so smooth native DOM pixel momentum cannot be guaranteed or manufactured by the terminal host without changing TUI semantics.
