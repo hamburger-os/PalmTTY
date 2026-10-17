@@ -1,6 +1,6 @@
 # Terminal runtime references
 
-Last reviewed: 2026-10-15.
+Last reviewed: 2026-10-17.
 
 ## Microsoft Windows Pseudoconsole (ConPTY)
 
