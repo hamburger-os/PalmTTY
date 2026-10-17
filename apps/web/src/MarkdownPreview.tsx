@@ -187,7 +187,7 @@ export function MarkdownPreview({ content, path, workspaceId, initialFragment, o
   content: string;
   path: string;
   workspaceId: string;
-  initialFragment?: string;
+  initialFragment?: string | undefined;
   onOpenFile(path: string, fragment?: string): void;
 }) {
   const { t } = useI18n();

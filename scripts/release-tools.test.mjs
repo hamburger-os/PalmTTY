@@ -93,6 +93,16 @@ test("accepts only the exactly reviewed DOMPurify Apache alternative", () => {
   ] }));
 });
 
+test("allows only reviewed khroma 2.1.0 MIT despite absent SPDX metadata", () => {
+  const report = { Unknown: [{ name: "khroma", versions: ["2.1.0"], license: "Unknown" }] };
+  assert.equal(inspectLicenseReport(report).packageCount, 1);
+  for (const [name, version] of [["khroma", "2.0.0"], ["not-khroma", "2.1.0"]]) {
+    assert.throws(() => inspectLicenseReport({ Unknown: [
+      { name, versions: [version], license: "Unknown" }
+    ] }));
+  }
+});
+
 test("fails closed for unknown or restricted-only licenses", () => {
   assert.throws(() =>
     inspectLicenseReport({
