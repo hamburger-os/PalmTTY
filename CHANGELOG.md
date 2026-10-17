@@ -9,6 +9,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 ### Workspace Markdown preview
 
 - Render `.md`/`.markdown` as sanitized, read-only GFM with a source toggle; keep relative file links within Workspace authority and prevent implicit remote image loads. Preserve existing bounded reads, copy/share, speech and history workflows.
+- Keep Markdown tables in native intrinsic layout, use bounded horizontal table scrolling instead of squeezing columns into one-character stacks, and show keyboard-accessible sideways-scroll affordance only for overflowing tables.
 
 ### Mobile Pi/TUI scroll and reconnect mouse state
 

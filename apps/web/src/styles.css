@@ -1396,10 +1396,50 @@ button.directory-choose {
   overflow-wrap: normal;
 }
 .file-markdown-preview pre code { padding: 0; background: transparent; }
-.file-markdown-preview table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
-.file-markdown-preview th,
-.file-markdown-preview td { padding: 6px 10px; border: 1px solid var(--border); }
-.file-markdown-preview th { background: var(--control-bg); }
+/* Intrinsic table columns must never be shrunk into vertical one-character stacks. */
+.file-markdown-preview .markdown-table-container {
+  min-width: 0;
+  max-width: 100%;
+  margin-bottom: var(--space-3);
+}
+.file-markdown-preview .markdown-table-scroll {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.file-markdown-preview .markdown-table-scroll > table {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+.file-markdown-preview .markdown-table-scroll th,
+.file-markdown-preview .markdown-table-scroll td {
+  min-width: 9rem;
+  max-width: 24rem;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  vertical-align: top;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+.file-markdown-preview .markdown-table-scroll th { background: var(--control-bg); }
+.file-markdown-preview .markdown-table-hint {
+  display: none;
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  text-align: right;
+}
+.file-markdown-preview .markdown-table-container[data-overflowing] > .markdown-table-hint {
+  display: block;
+}
 .file-markdown-preview hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-4) 0; }
 .file-markdown-preview .markdown-image-label { color: var(--text-muted); font-size: var(--text-sm); }
 
