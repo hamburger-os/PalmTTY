@@ -147,7 +147,7 @@ export function renderMarkdown(content: string, path: string, labels: MarkdownLa
     for (const attribute of ["aria-labelledby", "aria-describedby", "aria-owns"]) {
       const original = element.getAttribute(attribute);
       if (!original) continue;
-      const rewritten = original.split(/\\s+/).map(id => ids.get(id)).filter(Boolean).join(" ");
+      const rewritten = original.split(/\s+/).map(id => ids.get(id)).filter(Boolean).join(" ");
       if (rewritten) element.setAttribute(attribute, rewritten);
       else element.removeAttribute(attribute);
     }
