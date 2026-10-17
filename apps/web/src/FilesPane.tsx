@@ -78,6 +78,7 @@ export function FilesPane({
   const [selected, setSelected] = useState<WorkspaceFileReadResponse | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [markdownSourcePath, setMarkdownSourcePath] = useState<string | null>(null);
+  const [markdownTarget, setMarkdownTarget] = useState<{ path: string; fragment: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [reading, setReading] = useState(false);
   const [speechText, setSpeechText] = useState<string | null>(null);
@@ -223,6 +224,7 @@ export function FilesPane({
   ]);
 
   const openFile = (filePath: string) => {
+    setMarkdownTarget(null);
     setSelected(null);
     setSelectedPath(filePath);
   };
@@ -310,7 +312,8 @@ export function FilesPane({
   const shareSupported = typeof navigator.share === "function";
   const isMarkdown = !!selectedPath && !!selected && !selected.binary && isMarkdownPath(selectedPath);
   const showMarkdownSource = isMarkdown && markdownSourcePath === selectedPath;
-  const openLinkedFile = (linkedPath: string) => {
+  const openLinkedFile = (linkedPath: string, fragment?: string) => {
+    setMarkdownTarget(fragment ? { path: linkedPath, fragment } : null);
     setSelected(null);
     setPath(parentPath(linkedPath));
     setSelectedPath(linkedPath);
@@ -480,7 +483,9 @@ export function FilesPane({
               <SpeechReader text={speechText} sourceId={`${workspaceId}:${selectedPath}`} onClose={() => setSpeechText(null)} />
             ) : (
               isMarkdown && !showMarkdownSource && selectedPath ? (
-                <MarkdownPreview content={selected.content} path={selectedPath} onOpenFile={openLinkedFile} />
+                <MarkdownPreview content={selected.content} path={selectedPath} workspaceId={workspaceId}
+                  initialFragment={markdownTarget?.path === selectedPath ? markdownTarget.fragment : undefined}
+                  onOpenFile={openLinkedFile} />
               ) : (
                 <pre className="file-preview-content" tabIndex={0}>{selected.content}</pre>
               )

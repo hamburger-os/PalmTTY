@@ -1441,7 +1441,87 @@ button.directory-choose {
   display: block;
 }
 .file-markdown-preview hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-4) 0; }
-.file-markdown-preview .markdown-image-label { color: var(--text-muted); font-size: var(--text-sm); }
+.file-markdown-preview .markdown-image-label,
+.file-markdown-preview .markdown-local-image {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.file-markdown-preview .markdown-local-image img {
+  display: block;
+  max-width: min(100%, 960px);
+  height: auto;
+  margin: var(--space-2) 0;
+  border-radius: var(--radius-sm);
+}
+.file-markdown-preview .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+}
+.file-markdown-preview mark {
+  color: var(--text-primary);
+  background: var(--control-hover);
+}
+.file-markdown-preview kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--control-bg);
+  font-family: var(--font-mono);
+}
+.file-markdown-preview details {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.file-markdown-preview summary { cursor: pointer; font-weight: 650; }
+.file-markdown-preview .footnotes {
+  margin-top: var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.file-markdown-preview .markdown-alert {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--control-bg);
+}
+.file-markdown-preview .markdown-alert-title {
+  margin-bottom: var(--space-2);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+.file-markdown-preview .markdown-alert-title svg { vertical-align: middle; margin-right: 6px; }
+.file-markdown-preview .hljs-keyword,
+.file-markdown-preview .hljs-built_in { color: var(--spectrum-blue); }
+.file-markdown-preview .hljs-string,
+.file-markdown-preview .hljs-attribute { color: var(--spectrum-green); }
+.file-markdown-preview .hljs-number,
+.file-markdown-preview .hljs-literal { color: var(--spectrum-yellow); }
+.file-markdown-preview .hljs-comment,
+.file-markdown-preview .hljs-quote { color: var(--text-muted); }
+.file-markdown-preview .hljs-title,
+.file-markdown-preview .hljs-type { color: var(--text-primary); font-weight: 700; }
+.file-markdown-preview .markdown-mermaid-frame {
+  display: block;
+  width: 100%;
+  height: min(55vh, 480px);
+  min-height: 220px;
+  margin: var(--space-3) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--flat-content);
+}
+.file-markdown-preview .markdown-diagram-error {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
 
 /* Reader controls stay fixed; the novel scrolls independently of the page. */
 .speech-reader {
