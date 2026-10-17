@@ -1,7 +1,9 @@
-import { useMemo, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, type MouseEvent } from "react";
 import DOMPurify from "dompurify";
 import { Marked } from "marked";
 import { markdownLinkTarget } from "./markdown-preview.js";
+import { tableNeedsHorizontalScroll } from "./markdown-table-layout.js";
+import { useI18n } from "./i18n.js";
 
 function escapeHtml(text: string): string {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;")
@@ -29,7 +31,7 @@ const parser = new Marked({
   }
 });
 
-function safeHtml(content: string, currentPath: string): string {
+function safeHtml(content: string, currentPath: string, tableLabel: string, tableHint: string): string {
   const parsed = parser.parse(content, { async: false });
   const sanitized = DOMPurify.sanitize(parsed, {
     USE_PROFILES: { html: true },
@@ -41,6 +43,25 @@ function safeHtml(content: string, currentPath: string): string {
   });
   const template = document.createElement("template");
   template.innerHTML = sanitized;
+
+  // Preserve the native table layout. Only its outer viewport scrolls sideways;
+  // the article remains the sole vertical scroll owner.
+  for (const table of template.content.querySelectorAll("table")) {
+    const container = document.createElement("div");
+    container.className = "markdown-table-container";
+    const viewport = document.createElement("div");
+    viewport.className = "markdown-table-scroll";
+    viewport.setAttribute("role", "region");
+    viewport.setAttribute("aria-label", tableLabel);
+    viewport.tabIndex = -1;
+    const hint = document.createElement("p");
+    hint.className = "markdown-table-hint";
+    hint.textContent = tableHint;
+    hint.setAttribute("aria-hidden", "true");
+    table.replaceWith(container);
+    viewport.append(table);
+    container.append(viewport, hint);
+  }
 
   for (const anchor of template.content.querySelectorAll("a")) {
     const destination = markdownLinkTarget(currentPath, anchor.getAttribute("href") ?? "");
@@ -63,7 +84,42 @@ export function MarkdownPreview({ content, path, onOpenFile }: {
   path: string;
   onOpenFile(path: string): void;
 }) {
-  const html = useMemo(() => safeHtml(content, path), [content, path]);
+  const { t } = useI18n();
+  const rootRef = useRef<HTMLElement>(null);
+  const tableLabel = t("files.markdownTable");
+  const tableHint = t("files.markdownTableHint");
+  const html = useMemo(
+    () => safeHtml(content, path, tableLabel, tableHint),
+    [content, path, tableLabel, tableHint]
+  );
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const viewports = [...root.querySelectorAll<HTMLElement>(".markdown-table-scroll")];
+    if (!viewports.length) return;
+    const update = () => {
+      for (const viewport of viewports) {
+        const overflow = tableNeedsHorizontalScroll(viewport.scrollWidth, viewport.clientWidth);
+        viewport.parentElement?.toggleAttribute("data-overflowing", overflow);
+        // Keyboard users enter only tables with additional offscreen columns.
+        viewport.tabIndex = overflow ? 0 : -1;
+      }
+    };
+    const observer = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(update) : null;
+    for (const viewport of viewports) {
+      observer?.observe(viewport);
+      const table = viewport.querySelector("table");
+      if (table) observer?.observe(table);
+    }
+    if (!observer) window.addEventListener("resize", update);
+    update();
+    return () => {
+      observer?.disconnect();
+      if (!observer) window.removeEventListener("resize", update);
+    };
+  }, [html]);
   const handleClick = (event: MouseEvent<HTMLElement>) => {
     if (!(event.target instanceof Element)) return;
     const anchor = event.target.closest<HTMLAnchorElement>("a[data-workspace-path]");
@@ -73,7 +129,7 @@ export function MarkdownPreview({ content, path, onOpenFile }: {
     if (destination) onOpenFile(destination);
   };
   return (
-    <article className="file-markdown-preview" tabIndex={0}
+    <article ref={rootRef} className="file-markdown-preview" tabIndex={0}
       onClick={handleClick} dangerouslySetInnerHTML={{ __html: html }} />
   );
 }
