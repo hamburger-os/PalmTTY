@@ -1,132 +1,233 @@
 import { useEffect, useMemo, useRef, type MouseEvent } from "react";
 import DOMPurify from "dompurify";
-import { Marked } from "marked";
-import { markdownLinkTarget } from "./markdown-preview.js";
+import { readWorkspaceImage } from "./api.js";
+import { renderMarkdown } from "./markdown-render.js";
+import { isSafeMermaidSource } from "./markdown-mermaid-policy.js";
 import { tableNeedsHorizontalScroll } from "./markdown-table-layout.js";
 import { useI18n } from "./i18n.js";
+import "katex/dist/katex.min.css";
 
-function escapeHtml(text: string): string {
-  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+let nextDiagramId = 0;
+
+function scrollToFragment(root: HTMLElement, fragment: string): void {
+  const normalized = fragment.toLocaleLowerCase();
+  const target = [...root.querySelectorAll<HTMLElement>("[data-markdown-anchor]")]
+    .find((node) => node.dataset.markdownAnchor?.toLocaleLowerCase() === normalized);
+  if (!target) return;
+  root.scrollTop += target.getBoundingClientRect().top -
+    root.getBoundingClientRect().top - 8;
 }
 
-// Each document is parsed locally. Nothing is submitted to a rendering service.
-const parser = new Marked({
-  gfm: true,
-  breaks: false,
-  renderer: {
-    // Render raw HTML as text *before* sanitization. Constructing a detached
-    // HTML DOM with untrusted <img> can itself cause an unwanted network load.
-    html({ text }) {
-      return escapeHtml(text);
-    },
-    // Markdown images must not silently fetch arbitrary remote URLs with the
-    // reader's network identity. Keep alt text visible without creating a fetch.
-    image({ text }) {
-      return '<span class="markdown-image-label">[' + escapeHtml(text) + "]</span>";
-    },
-    checkbox({ checked }) {
-      return checked ? "☑ " : "☐ ";
+function observeTables(root: HTMLElement): () => void {
+  const viewports = [...root.querySelectorAll<HTMLElement>(".markdown-table-scroll")];
+  const update = () => {
+    for (const viewport of viewports) {
+      const overflowing = tableNeedsHorizontalScroll(viewport.scrollWidth, viewport.clientWidth);
+      viewport.parentElement?.toggleAttribute("data-overflowing", overflowing);
+      viewport.tabIndex = overflowing ? 0 : -1;
     }
+  };
+  const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+  for (const viewport of viewports) {
+    observer?.observe(viewport);
+    const table = viewport.querySelector("table");
+    if (table) observer?.observe(table);
   }
-});
-
-function safeHtml(content: string, currentPath: string, tableLabel: string, tableHint: string): string {
-  const parsed = parser.parse(content, { async: false });
-  const sanitized = DOMPurify.sanitize(parsed, {
-    USE_PROFILES: { html: true },
-    FORBID_TAGS: [
-      "img", "input", "form", "iframe", "object", "embed", "svg", "math",
-      "video", "audio", "picture", "source", "style"
-    ],
-    FORBID_ATTR: ["style", "src", "srcset", "id", "name", "formaction", "autofocus"]
-  });
-  const template = document.createElement("template");
-  template.innerHTML = sanitized;
-
-  // Preserve the native table layout. Only its outer viewport scrolls sideways;
-  // the article remains the sole vertical scroll owner.
-  for (const table of template.content.querySelectorAll("table")) {
-    const container = document.createElement("div");
-    container.className = "markdown-table-container";
-    const viewport = document.createElement("div");
-    viewport.className = "markdown-table-scroll";
-    viewport.setAttribute("role", "region");
-    viewport.setAttribute("aria-label", tableLabel);
-    viewport.tabIndex = -1;
-    const hint = document.createElement("p");
-    hint.className = "markdown-table-hint";
-    hint.textContent = tableHint;
-    hint.setAttribute("aria-hidden", "true");
-    table.replaceWith(container);
-    viewport.append(table);
-    container.append(viewport, hint);
-  }
-
-  for (const anchor of template.content.querySelectorAll("a")) {
-    const destination = markdownLinkTarget(currentPath, anchor.getAttribute("href") ?? "");
-    if (destination?.kind === "workspace") {
-      anchor.setAttribute("href", "#");
-      anchor.dataset.workspacePath = destination.path;
-    } else if (destination?.kind === "external") {
-      anchor.setAttribute("href", destination.href);
-      anchor.setAttribute("target", "_blank");
-      anchor.setAttribute("rel", "noopener noreferrer");
-    } else {
-      anchor.replaceWith(...anchor.childNodes);
-    }
-  }
-  return template.innerHTML;
+  if (!observer) window.addEventListener("resize", update);
+  update();
+  return () => {
+    observer?.disconnect();
+    if (!observer) window.removeEventListener("resize", update);
+  };
 }
 
-export function MarkdownPreview({ content, path, onOpenFile }: {
+function loadLocalImages(root: HTMLElement, workspaceId: string): () => void {
+  let disposed = false;
+  const urls: string[] = [];
+  const placeholders = [...root.querySelectorAll<HTMLElement>(".markdown-local-image")]
+    .slice(0, 24);
+  const pending: HTMLElement[] = [];
+  const requested = new Set<HTMLElement>();
+  let active = 0;
+  const next = () => {
+    if (disposed) return;
+    while (active < 2 && pending.length > 0) {
+      const holder = pending.shift()!;
+      const path = holder.dataset.markdownImagePath;
+      if (!path) continue;
+      active += 1;
+      void readWorkspaceImage(workspaceId, path).then((blob) => {
+        if (disposed) return;
+        const url = URL.createObjectURL(blob);
+        urls.push(url);
+        const image = document.createElement("img");
+        image.alt = holder.getAttribute("aria-label") ?? "";
+        image.loading = "lazy";
+        image.decoding = "async";
+        image.addEventListener("load", () => {
+          if (disposed) return;
+          holder.replaceChildren(image);
+        }, { once: true });
+        image.addEventListener("error", () => URL.revokeObjectURL(url), { once: true });
+        image.src = url;
+      }).catch(() => {
+        // Preserve the source's safe alt-text placeholder on read failure.
+      }).finally(() => {
+        active -= 1;
+        next();
+      });
+    }
+  };
+  const enqueue = (holder: HTMLElement) => {
+    if (requested.has(holder)) return;
+    requested.add(holder);
+    pending.push(holder);
+    next();
+  };
+  const observer = typeof IntersectionObserver === "undefined" ? null :
+    new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          observer?.unobserve(entry.target);
+          enqueue(entry.target as HTMLElement);
+        }
+      }
+    }, { root, rootMargin: "240px" });
+  for (const holder of placeholders) {
+    if (observer) observer.observe(holder);
+    else enqueue(holder);
+  }
+  return () => {
+    disposed = true;
+    observer?.disconnect();
+    for (const url of urls) URL.revokeObjectURL(url);
+  };
+}
+
+function renderMermaidDiagrams(root: HTMLElement, failedLabel: string): () => void {
+  let disposed = false;
+  const diagrams = [...root.querySelectorAll<HTMLElement>("pre > code.language-mermaid")]
+    .slice(0, 8);
+  let busy = false;
+  const queue: HTMLElement[] = [];
+  const seen = new Set<HTMLElement>();
+  const run = async () => {
+    if (busy || disposed) return;
+    busy = true;
+    while (!disposed && queue.length > 0) {
+      const code = queue.shift()!;
+      const source = code.textContent ?? "";
+      if (!isSafeMermaidSource(source)) continue;
+      try {
+        // The large diagram engine is loaded only after a diagram approaches view.
+        const { default: mermaid } = await import("mermaid");
+        if (disposed) break;
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: "strict",
+          maxTextSize: 12_000,
+          theme: document.documentElement.dataset.theme === "frosted" ? "default" : "dark",
+          flowchart: { htmlLabels: false }
+        });
+        const { svg } = await mermaid.render("palmtty-md-diagram-" + (++nextDiagramId), source);
+        if (disposed) break;
+        const safeSvg = DOMPurify.sanitize(svg, {
+          USE_PROFILES: { svg: true, svgFilters: true },
+          ADD_TAGS: ["style"],
+          FORBID_TAGS: ["foreignObject", "script", "image", "use"],
+          FORBID_ATTR: ["href", "xlink:href"]
+        });
+        if (!safeSvg.includes("<svg")) throw new Error("No safe SVG");
+        const frame = document.createElement("iframe");
+        frame.className = "markdown-mermaid-frame";
+        frame.setAttribute("sandbox", "");
+        frame.setAttribute("loading", "lazy");
+        frame.title = "Mermaid diagram";
+        // Sandboxed, inert document: no scripts, links, network images or fetches.
+        frame.srcdoc = "<!doctype html><meta charset='utf-8'>" +
+          "<meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; " +
+          "style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'\">" +
+          "<style>html,body{margin:0;overflow:auto;background:transparent}" +
+          "svg{display:block;max-width:100%;height:auto;margin:auto}</style>" + safeSvg;
+        code.parentElement?.replaceWith(frame);
+      } catch {
+        if (disposed) break;
+        const hint = document.createElement("p");
+        hint.className = "markdown-diagram-error";
+        hint.textContent = failedLabel;
+        code.parentElement?.insertAdjacentElement("afterend", hint);
+      }
+    }
+    busy = false;
+  };
+  const enqueue = (code: HTMLElement) => {
+    if (seen.has(code)) return;
+    seen.add(code);
+    queue.push(code);
+    void run();
+  };
+  const observer = typeof IntersectionObserver === "undefined" ? null :
+    new IntersectionObserver((entries) => {
+      for (const entry of entries) if (entry.isIntersecting) {
+        observer?.unobserve(entry.target);
+        enqueue(entry.target as HTMLElement);
+      }
+    }, { root, rootMargin: "240px" });
+  for (const code of diagrams) {
+    if (observer) observer.observe(code);
+    else enqueue(code);
+  }
+  return () => {
+    disposed = true;
+    observer?.disconnect();
+  };
+}
+
+export function MarkdownPreview({ content, path, workspaceId, initialFragment, onOpenFile }: {
   content: string;
   path: string;
-  onOpenFile(path: string): void;
+  workspaceId: string;
+  initialFragment?: string | undefined;
+  onOpenFile(path: string, fragment?: string): void;
 }) {
   const { t } = useI18n();
   const rootRef = useRef<HTMLElement>(null);
-  const tableLabel = t("files.markdownTable");
+  const table = t("files.markdownTable");
   const tableHint = t("files.markdownTableHint");
-  const html = useMemo(
-    () => safeHtml(content, path, tableLabel, tableHint),
-    [content, path, tableLabel, tableHint]
-  );
+  const diagramError = t("files.markdownDiagramError");
+  const html = useMemo(() => renderMarkdown(content, path, { table, tableHint }),
+    [content, path, table, tableHint]);
 
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
-    const viewports = [...root.querySelectorAll<HTMLElement>(".markdown-table-scroll")];
-    if (!viewports.length) return;
-    const update = () => {
-      for (const viewport of viewports) {
-        const overflow = tableNeedsHorizontalScroll(viewport.scrollWidth, viewport.clientWidth);
-        viewport.parentElement?.toggleAttribute("data-overflowing", overflow);
-        // Keyboard users enter only tables with additional offscreen columns.
-        viewport.tabIndex = overflow ? 0 : -1;
-      }
-    };
-    const observer = typeof ResizeObserver !== "undefined"
-      ? new ResizeObserver(update) : null;
-    for (const viewport of viewports) {
-      observer?.observe(viewport);
-      const table = viewport.querySelector("table");
-      if (table) observer?.observe(table);
-    }
-    if (!observer) window.addEventListener("resize", update);
-    update();
+    const disposeTables = observeTables(root);
+    const disposeImages = loadLocalImages(root, workspaceId);
+    const disposeDiagrams = renderMermaidDiagrams(root, diagramError);
     return () => {
-      observer?.disconnect();
-      if (!observer) window.removeEventListener("resize", update);
+      disposeTables();
+      disposeImages();
+      disposeDiagrams();
     };
-  }, [html]);
+  }, [html, workspaceId, diagramError]);
+
+  useEffect(() => {
+    if (initialFragment && rootRef.current) scrollToFragment(rootRef.current, initialFragment);
+  }, [html, initialFragment]);
+
   const handleClick = (event: MouseEvent<HTMLElement>) => {
     if (!(event.target instanceof Element)) return;
-    const anchor = event.target.closest<HTMLAnchorElement>("a[data-workspace-path]");
+    const anchor = event.target.closest<HTMLAnchorElement>("a");
     if (!anchor || !event.currentTarget.contains(anchor)) return;
-    event.preventDefault();
-    const destination = anchor.dataset.workspacePath;
-    if (destination) onOpenFile(destination);
+    const filePath = anchor.dataset.markdownWorkspacePath;
+    const fragment = anchor.dataset.markdownFragment;
+    if (filePath) {
+      event.preventDefault();
+      onOpenFile(filePath, fragment);
+    } else if (fragment) {
+      event.preventDefault();
+      scrollToFragment(event.currentTarget, fragment);
+    }
   };
   return (
     <article ref={rootRef} className="file-markdown-preview" tabIndex={0}

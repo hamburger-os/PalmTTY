@@ -131,6 +131,13 @@ pnpm run preflight
 
 This requires the intended PalmTTY config and authentication environment. For service-style startup, the Agent may also be invoked with `--env-file <path>` so auth values are loaded before config/preflight without placing the secret value in argv. The preflight reports auth/security/server-bind failures. Workspace launch validation is intentionally performed when a workspace is created/updated and again when a Session starts, so a stale project path cannot prevent the Agent control plane from starting. It is not a generic CI/contributor prerequisite. The explicit `run` form is required because pnpm 10 has its own built-in `doctor` command; PalmTTY deliberately names its host check `preflight` to avoid command dispatch ambiguity.
 
+### Complete Markdown acceptance (2026-10-17)
+
+- Verify table-cell br/br-slash, HTML comments hidden, sup/sub/u/mark/kbd/small/details/summary rendered without attributes, and script/iframe/img/onerror/URL payloads never interpreted as author HTML.
+- Verify GFM footnotes and alerts, duplicate heading anchor navigation, same-file and Workspace-confined cross-file fragments, local images via the validated image endpoint, no external fetches, and object URL cleanup after switching files.
+- Verify highlighter and unrecognized language fallback, inline/block KaTeX math from bundled fonts, Mermaid valid diagram/injected directive/error paths with lazy import and scriptless iframe CSP; confirm source remains visible on failure.
+- Check all themes and reduced-motion modes on desktop/iOS Safari/Android Chrome, one Markdown vertical scroll owner, independent bounded table/math horizontal scroll, no terminal/Session remount, and existing copy/share/reader/history workflows.
+
 ## Web visual validation
 
 For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then run the `.agents/skills/palmtty-theme-review/SKILL.md` procedure and manually cover:

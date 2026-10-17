@@ -173,6 +173,8 @@ PalmTTY is primarily operated from a phone.
 - Avoid desktop-only hover as the only affordance.
 - Avoid decorative rendering work that competes with xterm output/reconnect rendering.
 
+Markdown preview is one read-only Files content surface, not a nested glass shell. Safe formatting, footnotes, GFM alerts, syntax highlighting, display math and local images inherit semantic text/surface tokens; no hard-coded per-theme business colors. Its article owns vertical scrolling, while tables, long math and code may scroll horizontally without page pan. Mermaid uses a bounded iframe in the same content region, not a second app-level overlay. Lazy media loading never adds a touch recognizer or competes with xterm gesture ownership.
+
 ## 10. Theme state
 
 Theme and performance mode are local browser preferences and may be persisted in localStorage. They are presentation state, not Agent configuration and not Session authority.

@@ -83,6 +83,10 @@ All PTY output is processed inside the Worker in one ordered pipeline:
 
 On attach, the browser sends its fitted rows/columns together with `lastSeq`. The Worker applies that geometry to the canonical PTY/headless terminal before recovery. Retained history is replayed only when the geometry is unchanged and the requested sequence is still retained; a geometry change forces a fresh serialized snapshot. Recovery frames are sent before `hello`, which marks the recovery-complete boundary. Recovery and establishment of the live subscription occur within the same ordered Worker operation, preventing a message gap.
 
+### Safe Workspace Markdown preview
+
+The single GFM/Marked pipeline now renders safe formatting HTML, footnotes, preview-scoped heading anchors, Workspace-relative image embeds, alerts, highlighted code, KaTeX and lazy Mermaid. All image requests reuse protected bounded Workspace reads; Mermaid produces sanitized SVG in a sandboxed no-script iframe with no external network resources. Markdown preserves the 512 KiB text-preview and 8 MiB export boundaries, one vertical preview scroll owner and the existing source/share/reader/Git workflows.
+
 ## 中文
 
 PalmTTY 是一个单用户、自托管的交互式开发终端控制面。Web 端主题与视觉性能档只属于浏览器本地展示状态，不进入 Agent、Workspace 或 Session 权限/持久化模型。
@@ -211,3 +215,8 @@ Browse mode allows only validated SGR wheel reports through to a mouse-tracking 
 Terminal and Remote App terminate/clear confirmations now remain open during asynchronous actions, show failures inline, and close after success. Native modal layout is anchored to the viewport, with compact phone confirmations near the safe-area bottom edge. Retained non-running terminals keep their canonical geometry when viewed from a different-sized browser. Pi Regular/xterm scrolling and existing background reconnection policies are unchanged.
 
 终端与远程应用的终止/清除操作在执行期间保持确认弹窗，失败就地展示，成功才关闭；手机短确认框位于视口底部安全区域。已退出终端从不同尺寸的浏览器重新查看时，不再修改 Worker 端规范终端几何。Pi Regular 滚动和后台重连策略保持不变。
+
+
+### Markdown 文件预览功能
+
+Files 通过单一 GFM 解析/净化流水线展示常用安全 HTML 排版、脚注、局部标题锚点、工作区相对路径图片、提示块、代码高亮、KaTeX 和按需 Mermaid；图片仍走受保护只读接口，图表在禁止脚本和网络的沙箱中展示。保留 512 KiB 预览与 8 MiB 完整导出边界、正文唯一纵向滚动、源码/朗读/Git 链路。

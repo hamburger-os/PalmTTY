@@ -183,3 +183,10 @@ OpenCode 等全屏 TUI 开启 mouse 后，xterm.js 的触摸惯性事件可能�
 主题 `.glass-modal` 仅拥有材质和阴影，不再覆盖原生 `<dialog>` 的定位；布局规则统一由 `dialog:modal` 提供。手机短确认框固定于视口底部安全区域，工作区和长文本弹窗沿用独立的有界内容区域。终止/清除 Terminal 或 Remote App Session 时，确认框在异步操作期间保持打开，禁止重复提交；失败显示在弹窗内部，成功后才关闭，无需滚回首页顶部。
 
 用户已验证 Pi `--tui-mode regular` 的历史滚动和多行启动命令可用，本轮不修改启动命令模型、触摸事件路由或后台恢复策略。iPhone Safari 横屏、缩放及浏览器工具栏变化仍需真机复验。
+
+
+## 完整 Markdown 只读预览（2026-10-17）
+
+文件功能复用单一 Marked/GFM 解析器和 DOMPurify 净化：安全无属性 HTML 排版标签支持 br、sup、sub、u、mark、kbd、small、details、summary；HTML 注释隐藏。脚注、标题锚点及跨文件跳转只使用已有 Workspace 读权限。图片仅对工作区内 PNG/JPEG/WebP/GIF 使用原图片端点，按需加载最多 24 张，并发不超过 2，离开预览时回收 Blob URL。拒绝自动加载外部资源。
+
+GFM 提示块、常用语言代码高亮和 KaTeX 公式使用本地依赖，Mermaid 只对可见围栏块加载渲染器，单文档最多 8 个图，限制输入大小和指令/外部链接/点击，严格模式产出的 SVG 经过净化并装载到禁止脚本及网络资源的 sandbox iframe。无效图形保留源码。Markdown 正文负责唯一纵向滚动，表格和显示公式只允许局部横向滚动；没有新的 Agent API、Session 状态或兼容分支。

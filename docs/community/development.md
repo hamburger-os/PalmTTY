@@ -132,3 +132,8 @@ When editing terminal recovery, test the single input owner, rejected read-only 
 ### 终端控制与阅读器回归测试（2026 年 10 月）
 
 修改终端恢复逻辑时，必须覆盖唯一输入控制者、只读连接拒绝写入/resize、断开后接管、重放容量预算以及 IPC 分片。修改小说阅读时必须保留本地音色策略、章节/段落预算，不允许进度存储正文。Windows/Ubuntu 自动化无法替代真实 iPhone 后台恢复验收。
+
+
+### Markdown extension dependency review
+
+The Mermaid dependency graph includes khroma 2.1.0, whose npm metadata reports Unknown though the upstream license file is MIT; license-check grants only the exact package/version/metadata exception with regression tests. The Markdown preview uses no public rendering/CDN services. / Mermaid 间接依赖 khroma 2.1.0 的 npm 许可证字段缺失，上游文本为 MIT；只允许精确包名/版本/Unknown 组合并验证负样例，不全局放宽。Markdown 图像/公式/图表均不依赖远程渲染服务。
