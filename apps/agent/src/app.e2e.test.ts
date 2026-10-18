@@ -458,8 +458,9 @@ describe("terminal WebSocket integration", () => {
     observer.send(JSON.stringify({ type: "takeControl", cols: 100, rows: 30 }));
     // A former viewer needs a new geometry-sensitive Worker snapshot before
     // the takeover acknowledgement can enable interactive terminal input.
-    expect(await observerInbox.next((message) => message.type === "snapshot"))
-      .toMatchObject({ cols: 100, rows: 30 });
+    expect(await observerInbox.next((message) =>
+      message.type === "snapshot" && message.cols === 100 && message.rows === 30
+    )).toMatchObject({ cols: 100, rows: 30 });
     expect(await observerInbox.next((message) => message.type === "hello"))
       .toMatchObject({ role: "owner", cols: 100, rows: 30 });
     expect(await observerInbox.next((message) => message.type === "control"))
