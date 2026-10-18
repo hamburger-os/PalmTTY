@@ -26,6 +26,7 @@ class DeterministicPty implements PtyHandle {
   private exited = false;
   pauseCalls = 0;
   resumeCalls = 0;
+  failNextResize = false;
   pause(): void { this.pauseCalls++; }
   resume(): void { this.resumeCalls++; }
   readonly events: Array<
@@ -53,6 +54,10 @@ class DeterministicPty implements PtyHandle {
 
   resize(cols: number, rows: number): void {
     if (this.exited) return;
+    if (this.failNextResize) {
+      this.failNextResize = false;
+      throw new Error("Injected PTY resize failure");
+    }
     this.events.push({ type: "resize", cols, rows });
   }
 
@@ -451,6 +456,13 @@ describe("terminal WebSocket integration", () => {
     });
 
     observer.send(JSON.stringify({ type: "takeControl", cols: 100, rows: 30 }));
+    // A former viewer needs a new geometry-sensitive Worker snapshot before
+    // the takeover acknowledgement can enable interactive terminal input.
+    expect(await observerInbox.next((message) =>
+      message.type === "snapshot" && message.cols === 100 && message.rows === 30
+    )).toMatchObject({ cols: 100, rows: 30 });
+    expect(await observerInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner", cols: 100, rows: 30 });
     expect(await observerInbox.next((message) => message.type === "control"))
       .toMatchObject({ role: "owner" });
     observer.send(JSON.stringify({ type: "input", data: "NEW_OWNER" }));
@@ -461,6 +473,141 @@ describe("terminal WebSocket integration", () => {
       type: "resize", cols: 100, rows: 30
     });
     observer.close(1000, "test complete");
+  });
+
+  it("reclaims control after a mobile network handoff with a half-open old socket", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    const session = await createSession(harness, cookie);
+    const instanceId = "a".repeat(32);
+
+    const original = socketFor(harness, session.id, cookie);
+    const originalInbox = new MessageInbox(original);
+    await waitForOpen(original);
+    original.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 80, rows: 24, clientInstanceId: instanceId
+    }));
+    expect(await originalInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner" });
+
+    const otherDevice = socketFor(harness, session.id, cookie);
+    const otherInbox = new MessageInbox(otherDevice);
+    await waitForOpen(otherDevice);
+    otherDevice.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 90, rows: 30, clientInstanceId: "b".repeat(32)
+    }));
+    expect(await otherInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "viewer" });
+
+    // The original socket is still OPEN: the browser changed network before
+    // the Agent received a TCP close. Only the same per-tab identity may
+    // replace it; another authenticated viewer cannot steal control.
+    const originalClosed = waitForClose(original);
+    const replacement = socketFor(harness, session.id, cookie);
+    const replacementInbox = new MessageInbox(replacement);
+    await waitForOpen(replacement);
+    replacement.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 80, rows: 24, clientInstanceId: instanceId
+    }));
+    expect(await replacementInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner" });
+    await originalClosed;
+
+    otherDevice.send(JSON.stringify({ type: "takeControl", cols: 90, rows: 30 }));
+    expect(await otherInbox.next((message) => message.type === "control"))
+      .toMatchObject({ role: "viewer" });
+
+    replacement.send(JSON.stringify({ type: "input", data: "AFTER_HANDOFF" }));
+    await waitUntil(() => harness.pty.latest().events.some((event) =>
+      event.type === "write" && event.data === "AFTER_HANDOFF"
+    ));
+    expect(harness.pty.latest().events.some((event) => event.type === "kill")).toBe(false);
+    replacement.close(1000, "test complete");
+    otherDevice.close(1000, "test complete");
+  });
+
+  it("restores the original controller when a network replacement cannot attach", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    const session = await createSession(harness, cookie);
+    const instanceId = "c".repeat(32);
+    const original = socketFor(harness, session.id, cookie);
+    const originalInbox = new MessageInbox(original);
+    await waitForOpen(original);
+    original.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 80, rows: 24, clientInstanceId: instanceId
+    }));
+    expect(await originalInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner" });
+
+    harness.pty.latest().failNextResize = true;
+    const replacement = socketFor(harness, session.id, cookie);
+    const replacementInbox = new MessageInbox(replacement);
+    await waitForOpen(replacement);
+    replacement.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 100, rows: 30, clientInstanceId: instanceId
+    }));
+    expect(await replacementInbox.next((message) => message.type === "error"))
+      .toMatchObject({ code: "INVALID_MESSAGE" });
+
+    // The old socket must not be terminated before the replacement completes.
+    expect(original.readyState).toBe(WebSocket.OPEN);
+    original.send(JSON.stringify({ type: "input", data: "RECOVERED_OWNER" }));
+    await waitUntil(() => harness.pty.latest().events.some((event) =>
+      event.type === "write" && event.data === "RECOVERED_OWNER"
+    ));
+    expect(harness.pty.latest().events.some((event) => event.type === "kill")).toBe(false);
+    replacement.close(1000, "test complete");
+    original.close(1000, "test complete");
+  });
+
+  it("serializes simultaneous reconnects from the same mobile browser", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    const session = await createSession(harness, cookie);
+    const instanceId = "d".repeat(32);
+    const original = socketFor(harness, session.id, cookie);
+    const originalInbox = new MessageInbox(original);
+    await waitForOpen(original);
+    original.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 80, rows: 24, clientInstanceId: instanceId
+    }));
+    expect(await originalInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner" });
+
+    const first = socketFor(harness, session.id, cookie);
+    const firstInbox = new MessageInbox(first);
+    const second = socketFor(harness, session.id, cookie);
+    const secondInbox = new MessageInbox(second);
+    await Promise.all([waitForOpen(first), waitForOpen(second)]);
+    const originalClosed = waitForClose(original);
+    const firstClosed = waitForClose(first).then(() => "first" as const);
+    const secondClosed = waitForClose(second).then(() => "second" as const);
+    first.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 90, rows: 30, clientInstanceId: instanceId
+    }));
+    second.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 100, rows: 35, clientInstanceId: instanceId
+    }));
+
+    const closed = await Promise.race([firstClosed, secondClosed]);
+    await originalClosed;
+    const winner = closed === "first" ? second : first;
+    const winnerInbox = closed === "first" ? secondInbox : firstInbox;
+    expect(await winnerInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner" });
+    expect(winner.readyState).toBe(WebSocket.OPEN);
+    winner.send(JSON.stringify({ type: "input", data: "SERIALIZED_RECONNECT" }));
+    await waitUntil(() => harness.pty.latest().events.some((event) =>
+      event.type === "write" && event.data === "SERIALIZED_RECONNECT"
+    ));
+    await waitUntil(async () => {
+      const response = await getSession(harness, cookie, session.id);
+      const body = await response.json() as { session: SessionPublic };
+      return body.session.connections === 1;
+    });
+    expect(harness.pty.latest().events.some((event) => event.type === "kill")).toBe(false);
+    winner.close(1000, "test complete");
   });
 
   it("enforces maxSessions across concurrent creates", async () => {

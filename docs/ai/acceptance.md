@@ -34,6 +34,7 @@ Security, session and reconnect changes should include or update tests for:
 - resume-before-input/resize ordering
 - input/size bounds
 - browser disconnect without PTY termination
+- mobile Wi-Fi/cellular handoff: a new socket presenting the same ephemeral per-tab resume identity replaces a half-open owner, while a distinct observer remains read-only; a failed replacement attachment retains a healthy former owner, a viewer takeover emits a new canonical snapshot/hello boundary before input, concurrent lease changes are serialized, Agent-driven ping/pong eventually expires dead owners and the Web visibly explains rejected takeovers
 - reconnect sequence replay
 - stale-history snapshot fallback
 - reconnect with a changed viewport resizes canonical Worker state before recovery and uses a snapshot instead of replaying bytes produced for the old geometry

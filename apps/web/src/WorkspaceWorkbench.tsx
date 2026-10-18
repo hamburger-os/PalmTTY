@@ -290,6 +290,7 @@ export function WorkspaceWorkbench({
         {activity.kind === "terminal" && (
           <div className={`workbench-pane${pane === "terminal" ? " is-active" : ""}`}>
             <TerminalView
+              key={activity.sessionId}
               sessionId={activity.sessionId}
               active={pane === "terminal"}
               insertRequest={terminalInsert}

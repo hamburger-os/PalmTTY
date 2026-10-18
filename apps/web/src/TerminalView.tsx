@@ -150,6 +150,7 @@ export function TerminalView({
   const socketRef = useRef<WebSocket | null>(null);
   const inputQueueRef = useRef<TerminalInputQueue | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
   const refitRef = useRef<(() => void) | null>(null);
   const lastSeqRef = useRef(0);
   const reconnectAttemptRef = useRef(0);
@@ -164,6 +165,13 @@ export function TerminalView({
   const altRef = useRef(false);
   const handledInsertRef = useRef<number | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
+  const [takeoverState, setTakeoverState] = useState<"idle" | "pending" | "busy" | "failed">("idle");
+  // A session-scoped component key owns this stable identity. useState,
+  // unlike useMemo, is not an evictable rendering-performance cache.
+  const [clientInstanceId] = useState(() => {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  });
   const [inputError, setInputError] = useState<string | null>(null);
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
@@ -300,6 +308,7 @@ export function TerminalView({
       theme: terminalThemeRef.current
     });
     const fit = new FitAddon();
+    fitRef.current = fit;
     terminal.loadAddon(fit);
     terminal.open(mount);
     const disposeRenderer = installTerminalRenderer(terminal);
@@ -494,6 +503,7 @@ export function TerminalView({
       if (intentionalCloseRef.current) return;
       ready = false;
       inputReadyRef.current = false;
+      setTakeoverState("idle");
       setConnection(reconnectAttemptRef.current === 0 ? "connecting" : "reconnecting");
 
       const socket = new WebSocket(websocketUrl(sessionId), WS_SUBPROTOCOL);
@@ -516,6 +526,7 @@ export function TerminalView({
         socket.send(JSON.stringify({
           type: "resume",
           lastSeq: lastSeqRef.current,
+          clientInstanceId,
           cols: terminal.cols,
           rows: terminal.rows
         }));
@@ -561,6 +572,7 @@ export function TerminalView({
           const role = message.role ?? "viewer";
           controlRef.current = role;
           setControlRole(role);
+          setTakeoverState("idle");
           if (role === "viewer") terminal.resize(message.cols, message.rows);
           if (role === "owner" && (message.cols !== terminal.cols || message.rows !== terminal.rows)) {
             lastSeqRef.current = 0;
@@ -596,8 +608,19 @@ export function TerminalView({
         if (message.type === "control") {
           controlRef.current = message.role;
           setControlRole(message.role);
-          inputReadyRef.current = ready && message.role === "owner";
-          if (inputReadyRef.current) scheduleResize();
+          setTakeoverState(message.role === "owner" ? "idle" : "busy");
+          inputReadyRef.current = false;
+          if (message.role === "owner") {
+            // The Agent has recovered our Worker subscription, potentially
+            // replacing the viewer's old-geometry screen with a snapshot.
+            // Do not permit PTY input until xterm has parsed that snapshot.
+            void terminalWritePipeline.then(() => {
+              if (disposed || socketRef.current !== socket ||
+                  !ready || controlRef.current !== "owner") return;
+              inputReadyRef.current = true;
+              scheduleResize();
+            });
+          }
           return;
         }
         if (message.type === "pong") {
@@ -619,6 +642,7 @@ export function TerminalView({
         }
 
         if (message.type === "error") {
+          setTakeoverState((current) => current === "pending" ? "failed" : current);
           void enqueueTerminalWrite(
             `\r\n\u001b[31m[PalmTTY] ${message.message}\u001b[0m\r\n`
           );
@@ -715,10 +739,11 @@ export function TerminalView({
       socketRef.current?.close(1000, "Leaving terminal view");
       socketRef.current = null;
       disposeRenderer();
+      fitRef.current = null;
       terminal.dispose();
       terminalRef.current = null;
     };
-  }, [sessionId, terminalGeneration]);
+  }, [sessionId, terminalGeneration, clientInstanceId]);
 
   const toggleCtrl = () => {
     if (connection !== "connected") return;
@@ -786,15 +811,26 @@ export function TerminalView({
       {connection === "connected" && controlRole === "viewer" && (
         <div className="tool-hint" role="status">
           {t("terminal.viewerMode")}{" "}
-          <button type="button" className="ghost compact" onClick={() => {
-            const socket = socketRef.current;
-            const terminal = terminalRef.current;
-            if (socket?.readyState === WebSocket.OPEN && terminal) {
-              socket.send(JSON.stringify({
-                type: "takeControl", cols: terminal.cols, rows: terminal.rows
-              }));
-            }
-          }}>{t("terminal.takeControl")}</button>
+          <button type="button" className="ghost compact"
+            disabled={takeoverState === "pending"}
+            onClick={() => {
+              const socket = socketRef.current;
+              const terminal = terminalRef.current;
+              if (socket?.readyState === WebSocket.OPEN && terminal) {
+                setTakeoverState("pending");
+                // Viewer geometry is deliberately held at the Worker's size.
+                // Propose the actual visible layout without resizing the
+                // observer until the Agent grants the new controller lease.
+                const dimensions = fitRef.current?.proposeDimensions();
+                socket.send(JSON.stringify({
+                  type: "takeControl",
+                  cols: dimensions?.cols ?? terminal.cols,
+                  rows: dimensions?.rows ?? terminal.rows
+                }));
+              }
+            }}>{takeoverState === "pending" ? t("terminal.takingControl") : t("terminal.takeControl")}</button>
+          {takeoverState === "busy" && <span>{t("terminal.controlBusy")}</span>}
+          {takeoverState === "failed" && <span>{t("terminal.controlFailed")}</span>}
         </div>
       )}
       {protocolError && (
