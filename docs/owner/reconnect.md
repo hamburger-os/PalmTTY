@@ -111,6 +111,8 @@ Agent 启动时对已有 Worker 的 rediscovery 仍使用约 8 秒的有限重�
 
 每个 Terminal Session 的输入与 resize 仅由一位已认证连接控制；额外连接以 Worker 规范尺寸的快照进入只读模式，当前控制者离线后才允许显式接管。控制租约是 Agent 内存态，不能当成多用户认证。控制权变化不会创建新的 PTY，几何变更可要求观察者重新连接。
 
+移动端在 Wi-Fi / 蜂窝网络之间切换时，旧 TCP/WebSocket 可能在 Agent 仍显示 OPEN，导致新连接只读且显式接管被拒。浏览器现在为同一个 TerminalView/Session 生成内存态的 128-bit 随机连接身份，通过已认证的 `resume` 发送；Agent 仅允许相同身份的新 socket 原子替换旧控制者，并关闭旧 socket、撤销旧 Worker 订阅。不同身份的已认证连接仍不能抢占在线控制者。Agent 还每 15 秒发送 WebSocket ping，连续未收到 pong 后约 45 秒强制断开失效连接、回收控制权，覆盖页面刷新或浏览器关闭导致身份丢失的情况。控制权未获批准时前端明确提示占用状态，用户可稍后重试。此身份不是登录凭据，不放入 URL/日志/持久化存储；更换网络时不终止 Worker/PTY。
+
 浏览器短断线保留 xterm/seq，后台挂起与渲染过载重建视图。重放缓存有独立帧数和字节预算，Worker IPC 使用增量解析，序列化快照最多 4 MiB并优先削减旧 scrollback。可见屏幕仍超过预算时恢复失败，但不会杀 CLI。Worker 在 PTY→headless 待处理输出超过 512 KiB 时 pause 原生 PTY 读取，低于 128 KiB 时恢复。批次合并解析但保留逐帧 seq。真实 Windows/WSL/手机压力测试仍待验证。
 
 ## 协议升级后的已有会话恢复（2026-10-11）
