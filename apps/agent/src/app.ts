@@ -490,6 +490,20 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
 
       let attached = false;
       let messagePipeline = Promise.resolve();
+      // Client-side timers may be suspended during mobile network changes.
+      // Detect half-open controlling connections on the Agent too.
+      let missedPongs = 0;
+      const heartbeatTimer = setInterval(() => {
+        if (socket.readyState !== 1) return;
+        if (missedPongs >= 2) {
+          socket.terminate();
+          return;
+        }
+        missedPongs += 1;
+        socket.ping();
+      }, 15_000);
+      heartbeatTimer.unref();
+      socket.on("pong", () => { missedPongs = 0; });
       const authSessionId = request.cookies[AUTH_COOKIE];
       const authRemainingMs = auth.enabled ? auth.remainingSessionMs(authSessionId) : undefined;
       if (auth.enabled && authRemainingMs === undefined) {
@@ -523,7 +537,8 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
                 socket,
                 message.lastSeq,
                 message.cols,
-                message.rows
+                message.rows,
+                message.clientInstanceId
               );
               attached = true;
               clearTimeout(resumeTimer);
@@ -567,6 +582,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       });
 
       socket.on("close", () => {
+        clearInterval(heartbeatTimer);
         clearTimeout(resumeTimer);
         if (authExpiryTimer) clearTimeout(authExpiryTimer);
         sessions.detach(id, socket);
