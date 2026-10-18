@@ -96,6 +96,9 @@ export class SessionManager {
     | undefined;
   private readonly sessions = new Map<string, ManagedWorker>();
   private readonly clientInstanceIds = new WeakMap<WebSocket, string>();
+  // A per-Worker queue prevents concurrent resume/takeover requests from
+  // reading or mutating the same controller lease during an awaited IPC call.
+  private readonly leaseOperations = new WeakMap<ManagedWorker, Promise<void>>();
   private readonly pendingByWorkspace = new Map<string, number>();
   private readonly restartInFlight = new Map<string, Promise<SessionPublic>>();
   private readonly pendingRediscovery = new Map<string, WorkerRecord>();
@@ -316,6 +319,22 @@ export class SessionManager {
     }
   }
 
+  private async serializeLeaseChange<T>(
+    managed: ManagedWorker,
+    change: () => Promise<T>
+  ): Promise<T> {
+    const previous = this.leaseOperations.get(managed) ?? Promise.resolve();
+    let release!: () => void;
+    const completed = new Promise<void>((resolve) => { release = resolve; });
+    this.leaseOperations.set(managed, previous.then(() => completed));
+    await previous;
+    try {
+      return await change();
+    } finally {
+      release();
+    }
+  }
+
   async attach(
     id: string,
     socket: WebSocket,
@@ -325,49 +344,61 @@ export class SessionManager {
     clientInstanceId?: string
   ): Promise<void> {
     const managed = this.requireManaged(id);
-    const clientId = randomBytes(12).toString("base64url");
-    const formerControllerId = managed.controllerId;
-    const sameBrowser = Boolean(clientInstanceId &&
-      formerControllerId &&
-      managed.controllerInstanceId === clientInstanceId);
-    const owner = !formerControllerId || sameBrowser;
-    const geometryChanged = owner &&
-      (cols !== managed.session.cols || rows !== managed.session.rows);
+    return this.serializeLeaseChange(managed, async () => {
+      if (socket.readyState !== 1) throw new Error("Terminal socket closed before resume");
+      const clientId = randomBytes(12).toString("base64url");
+      const formerControllerId = managed.controllerId;
+      const formerInstanceId = managed.controllerInstanceId;
+      const sameBrowser = Boolean(clientInstanceId &&
+        formerControllerId &&
+        formerInstanceId === clientInstanceId);
+      const owner = !formerControllerId || sameBrowser;
+      const geometryChanged = owner &&
+        (cols !== managed.session.cols || rows !== managed.session.rows);
 
-    if (sameBrowser && formerControllerId) {
-      // A mobile network handoff can leave the previous TCP socket half-open.
-      // Transfer only the same ephemeral browser identity, not another viewer.
-      const oldSocket = managed.clients.get(formerControllerId);
-      managed.clients.delete(formerControllerId);
-      void managed.worker.detach(formerControllerId).catch(() => undefined);
-      oldSocket?.terminate();
-    }
-    if (owner) {
-      managed.controllerId = clientId;
-      managed.controllerInstanceId = clientInstanceId;
-    }
-    managed.clients.set(clientId, socket);
-    if (clientInstanceId) this.clientInstanceIds.set(socket, clientInstanceId);
-    try {
-      // A viewer must not resize the one canonical PTY during attachment.
-      await managed.worker.attach(
-        clientId, owner ? lastSeq : 0,
-        owner ? cols : managed.session.cols,
-        owner ? rows : managed.session.rows
-      );
-      if (geometryChanged) {
-        for (const [peerId, peer] of managed.clients) {
-          if (peerId !== clientId) peer.close(1012, "Control geometry changed");
+      // Keep the former socket registered until the new Worker attachment has
+      // succeeded. Its input is blocked as soon as controllerId moves, but
+      // failure can still restore it without dropping a healthy terminal.
+      if (owner) {
+        managed.controllerId = clientId;
+        managed.controllerInstanceId = clientInstanceId;
+      }
+      managed.clients.set(clientId, socket);
+      if (clientInstanceId) this.clientInstanceIds.set(socket, clientInstanceId);
+      try {
+        // Viewers must never resize the canonical PTY.
+        await managed.worker.attach(
+          clientId, owner ? lastSeq : 0,
+          owner ? cols : managed.session.cols,
+          owner ? rows : managed.session.rows
+        );
+        if (managed.clients.get(clientId) !== socket || socket.readyState !== 1) {
+          throw new Error("Terminal socket closed while resuming");
         }
+
+        if (sameBrowser && formerControllerId) {
+          const oldSocket = managed.clients.get(formerControllerId);
+          managed.clients.delete(formerControllerId);
+          void managed.worker.detach(formerControllerId).catch(() => undefined);
+          oldSocket?.terminate();
+        }
+        if (geometryChanged) {
+          for (const [peerId, peer] of managed.clients) {
+            if (peerId !== clientId) peer.close(1012, "Control geometry changed");
+          }
+        }
+      } catch (error) {
+        if (managed.clients.get(clientId) === socket) managed.clients.delete(clientId);
+        void managed.worker.detach(clientId).catch(() => undefined);
+        if (managed.controllerId === clientId) {
+          const restoreOld = Boolean(formerControllerId &&
+            managed.clients.has(formerControllerId));
+          managed.controllerId = restoreOld ? formerControllerId : undefined;
+          managed.controllerInstanceId = restoreOld ? formerInstanceId : undefined;
+        }
+        throw error;
       }
-    } catch (error) {
-      managed.clients.delete(clientId);
-      if (managed.controllerId === clientId) {
-        managed.controllerId = undefined;
-        managed.controllerInstanceId = undefined;
-      }
-      throw error;
-    }
+    });
   }
 
   detach(id: string, socket: WebSocket): void {
@@ -403,25 +434,38 @@ export class SessionManager {
 
   async takeControl(id: string, socket: WebSocket, cols: number, rows: number): Promise<boolean> {
     const managed = this.requireManaged(id);
-    const entry = [...managed.clients].find(([, value]) => value === socket);
-    if (!entry) return false;
-    if (managed.controllerId && managed.clients.has(managed.controllerId)) {
-      return managed.controllerId === entry[0];
-    }
-    managed.controllerId = entry[0];
-    managed.controllerInstanceId = this.clientInstanceIds.get(socket);
-    try {
-      await managed.worker.resize(cols, rows);
-      // Existing observers must reattach to the changed canonical geometry.
-      for (const [clientId, peer] of managed.clients) {
-        if (clientId !== entry[0]) peer.close(1012, "Control geometry changed");
+    return this.serializeLeaseChange(managed, async () => {
+      const entry = [...managed.clients].find(([, value]) => value === socket);
+      if (!entry || socket.readyState !== 1) return false;
+      if (managed.controllerId && managed.clients.has(managed.controllerId)) {
+        return managed.controllerId === entry[0];
       }
-      return true;
-    } catch (error) {
-      managed.controllerId = undefined;
-      managed.controllerInstanceId = undefined;
-      throw error;
-    }
+      managed.controllerId = entry[0];
+      managed.controllerInstanceId = this.clientInstanceIds.get(socket);
+      try {
+        // A viewer's renderer was recovered at the former canonical geometry.
+        // Reattach the same Worker subscription to deliver a fresh snapshot
+        // and hello recovery boundary before acknowledging input ownership.
+        await managed.worker.attach(entry[0], 0, cols, rows);
+        if (managed.clients.get(entry[0]) !== socket || socket.readyState !== 1) {
+          if (managed.controllerId === entry[0]) {
+            managed.controllerId = undefined;
+            managed.controllerInstanceId = undefined;
+          }
+          return false;
+        }
+        for (const [clientId, peer] of managed.clients) {
+          if (clientId !== entry[0]) peer.close(1012, "Control geometry changed");
+        }
+        return true;
+      } catch (error) {
+        if (managed.controllerId === entry[0]) {
+          managed.controllerId = undefined;
+          managed.controllerInstanceId = undefined;
+        }
+        throw error;
+      }
+    });
   }
 
   async terminate(id: string): Promise<SessionPublic | undefined> {
