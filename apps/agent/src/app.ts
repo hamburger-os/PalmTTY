@@ -490,20 +490,6 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
 
       let attached = false;
       let messagePipeline = Promise.resolve();
-      // Client-side timers may be suspended during mobile network changes.
-      // Detect half-open controlling connections on the Agent too.
-      let missedPongs = 0;
-      const heartbeatTimer = setInterval(() => {
-        if (socket.readyState !== 1) return;
-        if (missedPongs >= 2) {
-          socket.terminate();
-          return;
-        }
-        missedPongs += 1;
-        socket.ping();
-      }, 15_000);
-      heartbeatTimer.unref();
-      socket.on("pong", () => { missedPongs = 0; });
       const authSessionId = request.cookies[AUTH_COOKIE];
       const authRemainingMs = auth.enabled ? auth.remainingSessionMs(authSessionId) : undefined;
       if (auth.enabled && authRemainingMs === undefined) {
@@ -519,6 +505,21 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
         if (!attached) socket.close(1008, "Resume handshake required");
       }, 5_000);
       resumeTimer.unref();
+
+      // Client-side timers may be suspended during mobile network changes.
+      // Detect half-open controlling connections on the Agent too.
+      let missedPongs = 0;
+      const heartbeatTimer = setInterval(() => {
+        if (socket.readyState !== 1) return;
+        if (missedPongs >= 2) {
+          socket.terminate();
+          return;
+        }
+        missedPongs += 1;
+        socket.ping();
+      }, 15_000);
+      heartbeatTimer.unref();
+      socket.on("pong", () => { missedPongs = 0; });
 
       socket.on("message", (raw, isBinary) => {
         const handleMessage = async () => {
