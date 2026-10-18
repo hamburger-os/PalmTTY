@@ -565,6 +565,9 @@ export type CreateSessionInput = z.infer<typeof CreateSessionSchema>;
 export const ResumeMessageSchema = z.object({
   type: z.literal("resume"),
   lastSeq: z.number().int().nonnegative(),
+  // Ephemeral per-tab identity: permits the same browser to recover its control
+  // lease after a network handoff while an old TCP connection is half-open.
+  clientInstanceId: z.string().regex(/^[a-f0-9]{32}$/).optional(),
   cols: TerminalColumnsSchema,
   rows: TerminalRowsSchema
 });
