@@ -150,6 +150,7 @@ export function TerminalView({
   const socketRef = useRef<WebSocket | null>(null);
   const inputQueueRef = useRef<TerminalInputQueue | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
   const refitRef = useRef<(() => void) | null>(null);
   const lastSeqRef = useRef(0);
   const reconnectAttemptRef = useRef(0);
@@ -305,6 +306,7 @@ export function TerminalView({
       theme: terminalThemeRef.current
     });
     const fit = new FitAddon();
+    fitRef.current = fit;
     terminal.loadAddon(fit);
     terminal.open(mount);
     const disposeRenderer = installTerminalRenderer(terminal);
@@ -735,6 +737,7 @@ export function TerminalView({
       socketRef.current?.close(1000, "Leaving terminal view");
       socketRef.current = null;
       disposeRenderer();
+      fitRef.current = null;
       terminal.dispose();
       terminalRef.current = null;
     };
@@ -813,8 +816,14 @@ export function TerminalView({
               const terminal = terminalRef.current;
               if (socket?.readyState === WebSocket.OPEN && terminal) {
                 setTakeoverState("pending");
+                // Viewer geometry is deliberately held at the Worker's size.
+                // Propose the actual visible layout without resizing the
+                // observer until the Agent grants the new controller lease.
+                const dimensions = fitRef.current?.proposeDimensions();
                 socket.send(JSON.stringify({
-                  type: "takeControl", cols: terminal.cols, rows: terminal.rows
+                  type: "takeControl",
+                  cols: dimensions?.cols ?? terminal.cols,
+                  rows: dimensions?.rows ?? terminal.rows
                 }));
               }
             }}>{takeoverState === "pending" ? t("terminal.takingControl") : t("terminal.takeControl")}</button>
