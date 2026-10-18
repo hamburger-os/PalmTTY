@@ -463,6 +463,57 @@ describe("terminal WebSocket integration", () => {
     observer.close(1000, "test complete");
   });
 
+  it("reclaims control after a mobile network handoff with a half-open old socket", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    const session = await createSession(harness, cookie);
+    const instanceId = "a".repeat(32);
+
+    const original = socketFor(harness, session.id, cookie);
+    const originalInbox = new MessageInbox(original);
+    await waitForOpen(original);
+    original.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 80, rows: 24, clientInstanceId: instanceId
+    }));
+    expect(await originalInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner" });
+
+    const otherDevice = socketFor(harness, session.id, cookie);
+    const otherInbox = new MessageInbox(otherDevice);
+    await waitForOpen(otherDevice);
+    otherDevice.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 90, rows: 30, clientInstanceId: "b".repeat(32)
+    }));
+    expect(await otherInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "viewer" });
+
+    // The original socket is still OPEN: the browser changed network before
+    // the Agent received a TCP close. Only the same per-tab identity may
+    // replace it; another authenticated viewer cannot steal control.
+    const originalClosed = waitForClose(original);
+    const replacement = socketFor(harness, session.id, cookie);
+    const replacementInbox = new MessageInbox(replacement);
+    await waitForOpen(replacement);
+    replacement.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 80, rows: 24, clientInstanceId: instanceId
+    }));
+    expect(await replacementInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner" });
+    await originalClosed;
+
+    otherDevice.send(JSON.stringify({ type: "takeControl", cols: 90, rows: 30 }));
+    expect(await otherInbox.next((message) => message.type === "control"))
+      .toMatchObject({ role: "viewer" });
+
+    replacement.send(JSON.stringify({ type: "input", data: "AFTER_HANDOFF" }));
+    await waitUntil(() => harness.pty.latest().events.some((event) =>
+      event.type === "write" && event.data === "AFTER_HANDOFF"
+    ));
+    expect(harness.pty.latest().events.some((event) => event.type === "kill")).toBe(false);
+    replacement.close(1000, "test complete");
+    otherDevice.close(1000, "test complete");
+  });
+
   it("enforces maxSessions across concurrent creates", async () => {
     const harness = await startHarness((config) => {
       config.sessions.maxSessions = 1;
