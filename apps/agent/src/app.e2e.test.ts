@@ -26,6 +26,7 @@ class DeterministicPty implements PtyHandle {
   private exited = false;
   pauseCalls = 0;
   resumeCalls = 0;
+  failNextResize = false;
   pause(): void { this.pauseCalls++; }
   resume(): void { this.resumeCalls++; }
   readonly events: Array<
@@ -53,6 +54,10 @@ class DeterministicPty implements PtyHandle {
 
   resize(cols: number, rows: number): void {
     if (this.exited) return;
+    if (this.failNextResize) {
+      this.failNextResize = false;
+      throw new Error("Injected PTY resize failure");
+    }
     this.events.push({ type: "resize", cols, rows });
   }
 
@@ -451,6 +456,12 @@ describe("terminal WebSocket integration", () => {
     });
 
     observer.send(JSON.stringify({ type: "takeControl", cols: 100, rows: 30 }));
+    // A former viewer needs a new geometry-sensitive Worker snapshot before
+    // the takeover acknowledgement can enable interactive terminal input.
+    expect(await observerInbox.next((message) => message.type === "snapshot"))
+      .toMatchObject({ cols: 100, rows: 30 });
+    expect(await observerInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner", cols: 100, rows: 30 });
     expect(await observerInbox.next((message) => message.type === "control"))
       .toMatchObject({ role: "owner" });
     observer.send(JSON.stringify({ type: "input", data: "NEW_OWNER" }));
@@ -512,6 +523,41 @@ describe("terminal WebSocket integration", () => {
     expect(harness.pty.latest().events.some((event) => event.type === "kill")).toBe(false);
     replacement.close(1000, "test complete");
     otherDevice.close(1000, "test complete");
+  });
+
+  it("restores the original controller when a network replacement cannot attach", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    const session = await createSession(harness, cookie);
+    const instanceId = "c".repeat(32);
+    const original = socketFor(harness, session.id, cookie);
+    const originalInbox = new MessageInbox(original);
+    await waitForOpen(original);
+    original.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 80, rows: 24, clientInstanceId: instanceId
+    }));
+    expect(await originalInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner" });
+
+    harness.pty.latest().failNextResize = true;
+    const replacement = socketFor(harness, session.id, cookie);
+    const replacementInbox = new MessageInbox(replacement);
+    await waitForOpen(replacement);
+    replacement.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 100, rows: 30, clientInstanceId: instanceId
+    }));
+    expect(await replacementInbox.next((message) => message.type === "error"))
+      .toMatchObject({ code: "INVALID_MESSAGE" });
+
+    // The old socket must not be terminated before the replacement completes.
+    expect(original.readyState).toBe(WebSocket.OPEN);
+    original.send(JSON.stringify({ type: "input", data: "RECOVERED_OWNER" }));
+    await waitUntil(() => harness.pty.latest().events.some((event) =>
+      event.type === "write" && event.data === "RECOVERED_OWNER"
+    ));
+    expect(harness.pty.latest().events.some((event) => event.type === "kill")).toBe(false);
+    replacement.close(1000, "test complete");
+    original.close(1000, "test complete");
   });
 
   it("enforces maxSessions across concurrent creates", async () => {
