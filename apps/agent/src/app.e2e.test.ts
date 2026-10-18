@@ -560,6 +560,55 @@ describe("terminal WebSocket integration", () => {
     original.close(1000, "test complete");
   });
 
+  it("serializes simultaneous reconnects from the same mobile browser", async () => {
+    const harness = await startHarness();
+    const cookie = await login(harness);
+    const session = await createSession(harness, cookie);
+    const instanceId = "d".repeat(32);
+    const original = socketFor(harness, session.id, cookie);
+    const originalInbox = new MessageInbox(original);
+    await waitForOpen(original);
+    original.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 80, rows: 24, clientInstanceId: instanceId
+    }));
+    expect(await originalInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner" });
+
+    const first = socketFor(harness, session.id, cookie);
+    const firstInbox = new MessageInbox(first);
+    const second = socketFor(harness, session.id, cookie);
+    const secondInbox = new MessageInbox(second);
+    await Promise.all([waitForOpen(first), waitForOpen(second)]);
+    const originalClosed = waitForClose(original);
+    const firstClosed = waitForClose(first).then(() => "first" as const);
+    const secondClosed = waitForClose(second).then(() => "second" as const);
+    first.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 90, rows: 30, clientInstanceId: instanceId
+    }));
+    second.send(JSON.stringify({
+      type: "resume", lastSeq: 0, cols: 100, rows: 35, clientInstanceId: instanceId
+    }));
+
+    const closed = await Promise.race([firstClosed, secondClosed]);
+    await originalClosed;
+    const winner = closed === "first" ? second : first;
+    const winnerInbox = closed === "first" ? secondInbox : firstInbox;
+    expect(await winnerInbox.next((message) => message.type === "hello"))
+      .toMatchObject({ role: "owner" });
+    expect(winner.readyState).toBe(WebSocket.OPEN);
+    winner.send(JSON.stringify({ type: "input", data: "SERIALIZED_RECONNECT" }));
+    await waitUntil(() => harness.pty.latest().events.some((event) =>
+      event.type === "write" && event.data === "SERIALIZED_RECONNECT"
+    ));
+    await waitUntil(async () => {
+      const response = await getSession(harness, cookie, session.id);
+      const body = await response.json() as { session: SessionPublic };
+      return body.session.connections === 1;
+    });
+    expect(harness.pty.latest().events.some((event) => event.type === "kill")).toBe(false);
+    winner.close(1000, "test complete");
+  });
+
   it("enforces maxSessions across concurrent creates", async () => {
     const harness = await startHarness((config) => {
       config.sessions.maxSessions = 1;
