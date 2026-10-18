@@ -37,6 +37,7 @@ type ManagedWorker = {
   session: SessionPublic;
   clients: Map<string, WebSocket>;
   controllerId?: string | undefined;
+  controllerInstanceId?: string | undefined;
   reconnecting: boolean;
 };
 
@@ -94,6 +95,7 @@ export class SessionManager {
     | ((sessionId: string) => Promise<void> | void)
     | undefined;
   private readonly sessions = new Map<string, ManagedWorker>();
+  private readonly clientInstanceIds = new WeakMap<WebSocket, string>();
   private readonly pendingByWorkspace = new Map<string, number>();
   private readonly restartInFlight = new Map<string, Promise<SessionPublic>>();
   private readonly pendingRediscovery = new Map<string, WorkerRecord>();
@@ -319,13 +321,33 @@ export class SessionManager {
     socket: WebSocket,
     lastSeq: number,
     cols: number,
-    rows: number
+    rows: number,
+    clientInstanceId?: string
   ): Promise<void> {
     const managed = this.requireManaged(id);
     const clientId = randomBytes(12).toString("base64url");
-    const owner = !managed.controllerId;
-    if (owner) managed.controllerId = clientId;
+    const formerControllerId = managed.controllerId;
+    const sameBrowser = Boolean(clientInstanceId &&
+      formerControllerId &&
+      managed.controllerInstanceId === clientInstanceId);
+    const owner = !formerControllerId || sameBrowser;
+    const geometryChanged = owner &&
+      (cols !== managed.session.cols || rows !== managed.session.rows);
+
+    if (sameBrowser && formerControllerId) {
+      // A mobile network handoff can leave the previous TCP socket half-open.
+      // Transfer only the same ephemeral browser identity, not another viewer.
+      const oldSocket = managed.clients.get(formerControllerId);
+      managed.clients.delete(formerControllerId);
+      void managed.worker.detach(formerControllerId).catch(() => undefined);
+      oldSocket?.terminate();
+    }
+    if (owner) {
+      managed.controllerId = clientId;
+      managed.controllerInstanceId = clientInstanceId;
+    }
     managed.clients.set(clientId, socket);
+    if (clientInstanceId) this.clientInstanceIds.set(socket, clientInstanceId);
     try {
       // A viewer must not resize the one canonical PTY during attachment.
       await managed.worker.attach(
@@ -333,9 +355,17 @@ export class SessionManager {
         owner ? cols : managed.session.cols,
         owner ? rows : managed.session.rows
       );
+      if (geometryChanged) {
+        for (const [peerId, peer] of managed.clients) {
+          if (peerId !== clientId) peer.close(1012, "Control geometry changed");
+        }
+      }
     } catch (error) {
       managed.clients.delete(clientId);
-      if (managed.controllerId === clientId) managed.controllerId = undefined;
+      if (managed.controllerId === clientId) {
+        managed.controllerId = undefined;
+        managed.controllerInstanceId = undefined;
+      }
       throw error;
     }
   }
@@ -346,7 +376,10 @@ export class SessionManager {
     for (const [clientId, candidate] of managed.clients) {
       if (candidate !== socket) continue;
       managed.clients.delete(clientId);
-      if (managed.controllerId === clientId) managed.controllerId = undefined;
+      if (managed.controllerId === clientId) {
+        managed.controllerId = undefined;
+        managed.controllerInstanceId = undefined;
+      }
       void managed.worker.detach(clientId).catch(() => undefined);
       break;
     }
@@ -376,6 +409,7 @@ export class SessionManager {
       return managed.controllerId === entry[0];
     }
     managed.controllerId = entry[0];
+    managed.controllerInstanceId = this.clientInstanceIds.get(socket);
     try {
       await managed.worker.resize(cols, rows);
       // Existing observers must reattach to the changed canonical geometry.
@@ -385,6 +419,7 @@ export class SessionManager {
       return true;
     } catch (error) {
       managed.controllerId = undefined;
+      managed.controllerInstanceId = undefined;
       throw error;
     }
   }
@@ -580,6 +615,7 @@ export class SessionManager {
       }
       managed.clients.clear();
       managed.controllerId = undefined;
+      managed.controllerInstanceId = undefined;
       void this.reconnect(managed);
     });
   }
@@ -594,14 +630,20 @@ export class SessionManager {
 
     if (socket.readyState !== 1) {
       managed.clients.delete(clientId);
-      if (managed.controllerId === clientId) managed.controllerId = undefined;
+      if (managed.controllerId === clientId) {
+        managed.controllerId = undefined;
+        managed.controllerInstanceId = undefined;
+      }
       void managed.worker.detach(clientId).catch(() => undefined);
       return;
     }
 
     if (socket.bufferedAmount > this.config.sessions.maxSocketBufferedBytes) {
       managed.clients.delete(clientId);
-      if (managed.controllerId === clientId) managed.controllerId = undefined;
+      if (managed.controllerId === clientId) {
+        managed.controllerId = undefined;
+        managed.controllerInstanceId = undefined;
+      }
       void managed.worker.detach(clientId).catch(() => undefined);
       try {
         socket.close(1013, "Client is too slow; reconnect to resume");
