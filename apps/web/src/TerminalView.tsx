@@ -164,7 +164,7 @@ export function TerminalView({
   const altRef = useRef(false);
   const handledInsertRef = useRef<number | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
-  const [takeoverState, setTakeoverState] = useState<"idle" | "pending" | "busy">("idle");
+  const [takeoverState, setTakeoverState] = useState<"idle" | "pending" | "busy" | "failed">("idle");
   const clientInstanceId = useMemo(() => {
     const bytes = crypto.getRandomValues(new Uint8Array(16));
     return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -605,8 +605,18 @@ export function TerminalView({
           controlRef.current = message.role;
           setControlRole(message.role);
           setTakeoverState(message.role === "owner" ? "idle" : "busy");
-          inputReadyRef.current = ready && message.role === "owner";
-          if (inputReadyRef.current) scheduleResize();
+          inputReadyRef.current = false;
+          if (message.role === "owner") {
+            // The Agent has recovered our Worker subscription, potentially
+            // replacing the viewer's old-geometry screen with a snapshot.
+            // Do not permit PTY input until xterm has parsed that snapshot.
+            void terminalWritePipeline.then(() => {
+              if (disposed || socketRef.current !== socket ||
+                  !ready || controlRef.current !== "owner") return;
+              inputReadyRef.current = true;
+              scheduleResize();
+            });
+          }
           return;
         }
         if (message.type === "pong") {
@@ -628,6 +638,7 @@ export function TerminalView({
         }
 
         if (message.type === "error") {
+          setTakeoverState((current) => current === "pending" ? "failed" : current);
           void enqueueTerminalWrite(
             `\r\n\u001b[31m[PalmTTY] ${message.message}\u001b[0m\r\n`
           );
@@ -808,6 +819,7 @@ export function TerminalView({
               }
             }}>{takeoverState === "pending" ? t("terminal.takingControl") : t("terminal.takeControl")}</button>
           {takeoverState === "busy" && <span>{t("terminal.controlBusy")}</span>}
+          {takeoverState === "failed" && <span>{t("terminal.controlFailed")}</span>}
         </div>
       )}
       {protocolError && (
