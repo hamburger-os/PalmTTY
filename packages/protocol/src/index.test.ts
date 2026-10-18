@@ -385,5 +385,12 @@ describe("protocol", () => {
     });
     expect(() => parseClientMessage('{"type":"resume","lastSeq":9}')).toThrow();
     expect(() => parseClientMessage('{"type":"resume","lastSeq":9,"cols":501,"rows":35}')).toThrow();
+    const clientInstanceId = "a".repeat(32);
+    expect(parseClientMessage(JSON.stringify({
+      type: "resume", lastSeq: 9, cols: 120, rows: 35, clientInstanceId
+    }))).toMatchObject({ clientInstanceId });
+    expect(() => parseClientMessage(JSON.stringify({
+      type: "resume", lastSeq: 9, cols: 120, rows: 35, clientInstanceId: "weak"
+    }))).toThrow();
   });
 });
