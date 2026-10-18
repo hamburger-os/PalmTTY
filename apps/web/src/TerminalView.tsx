@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   ServerMessageSchema,
   WS_SUBPROTOCOL,
@@ -166,10 +166,12 @@ export function TerminalView({
   const handledInsertRef = useRef<number | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [takeoverState, setTakeoverState] = useState<"idle" | "pending" | "busy" | "failed">("idle");
-  const clientInstanceId = useMemo(() => {
+  // A session-scoped component key owns this stable identity. useState,
+  // unlike useMemo, is not an evictable rendering-performance cache.
+  const [clientInstanceId] = useState(() => {
     const bytes = crypto.getRandomValues(new Uint8Array(16));
     return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  }, [sessionId]);
+  });
   const [inputError, setInputError] = useState<string | null>(null);
   const [ctrl, setCtrl] = useState(false);
   const [alt, setAlt] = useState(false);
