@@ -162,9 +162,9 @@ Files supports a read-only novel reader using the device's Web Speech API (Speec
 
 文件页新增只读小说朗读视图，通过浏览器 Web Speech API 使用设备可用音色，支持段落导航与语速调节。完整文本沿用现有工作区文件 API，限制 8 MiB；超过上限不会只朗读预览片段。声音品质与后台表现取决于浏览器/系统，不增加云端语音服务和上传权限。
 
-**Privacy/resource limits:** Web Speech defaults may be remote. PalmTTY plays only with voices the browser marks as localService=true, never with an implicit default; if none exists, read-aloud is unavailable. The reader scans up to 20,000 paragraphs, renders 120 at a time, and prepares speech chunks on demand. A very large number of paragraphs is rejected with a clear message instead of freezing a mobile browser.
+**Privacy/resource limits:** Web Speech defaults may be remote. The browser voice picker shows Chinese-language entries only. It prefers localService=true Chinese voices; remote or unknown voices require explicit per-voice consent and are never automatic fallbacks. If no Chinese voice is reported, the reader explains how to enable one. The reader scans up to 20,000 paragraphs, renders 120 at a time, and prepares speech chunks on demand. A very large number of paragraphs is rejected with a clear message instead of freezing a mobile browser.
 
-**隐私与资源限制：**浏览器默认语音可能依赖远程服务。PalmTTY 只使用浏览器报告 localService=true 的音色；无本地音色时禁用朗读。最多解析 20,000 段，单页渲染 120 段，语音片段按需生成；超限会明确提示而不是卡死手机页面。
+**隐私与资源限制：**浏览器默认语音可能依赖远程服务。音色列表仅展示声明中文语言标签的声音；优先选择浏览器报告 localService=true 的中文音色，远程或来源未知的声音须逐音色授权且不自动回退。没有中文音色时显示安装／启用提示。最多解析 20,000 段，单页渲染 120 段，语音片段按需生成；超限会明确提示而不是卡死手机页面。
 
 ### Terminal controller lease and novel progress (October 2026)
 
@@ -228,6 +228,6 @@ Files 通过单一 GFM 解析/净化流水线展示常用安全 HTML 排版、�
 
 ## Novel speech architecture / 小说语音架构 (2026-10)
 
-**English:** Files exposes a read-only novel reader. A single Web controller owns document/chapter/paragraph positions, bounded sentence-group scheduling and playback state. BrowserSpeechOutput uses all voices reported by Web Speech, explicitly distinguishing on-device, remote and unknown-origin voices; remote/unknown use requires per-voice confirmation. QwenSpeechOutput talks only to the authenticated Agent speech API; the Agent uses a fixed loopback address and private host-side token to talk to an optional separately installed Python Qwen3-TTS CustomVoice sidecar. Model files are not bundled with PalmTTY. Audio and cached synthesized clips remain bounded. Neither engine changes Workspace file authority or uses Terminal Worker IPC.
+**English:** Files exposes a read-only novel reader. A single Web controller owns document/chapter/paragraph positions, bounded sentence-group scheduling and playback state. BrowserSpeechOutput filters Web Speech voices to declared Chinese language tags (including Mandarin and Cantonese), excluding non-Chinese entries even when their display names are misleading. It distinguishes on-device, remote and unknown-origin Chinese voices; remote/unknown use requires per-voice confirmation. QwenSpeechOutput talks only to the authenticated Agent speech API; the Agent uses a fixed loopback address and private host-side token to talk to an optional separately installed Python Qwen3-TTS CustomVoice sidecar. Model files are not bundled with PalmTTY. Audio and cached synthesized clips remain bounded. Neither engine changes Workspace file authority or uses Terminal Worker IPC.
 
-**中文：** Files 中的只读小说阅读器由唯一控制器管理正文／章节／段落偏移、语音分块及播放状态。浏览器语音公开所有系统报告的声音，明确区分本地、在线和来源未知；后两者须逐音色确认。Qwen 通过受认证的 Agent 语音接口和固定本机端口连接独立 Python CustomVoice 服务，不将 PyTorch、模型生命周期或音频塞进终端 Worker。模型权重不随 PalmTTY 安装包发布；音频缓存有上限。两种语音引擎均不能修改 Workspace 文件。
+**中文：** Files 中的只读小说阅读器由唯一控制器管理正文／章节／段落偏移、语音分块及播放状态。浏览器语音仅列出声明为中文语言标签的系统声音（包括普通话与粤语），排除非中文音色而不根据音色名称猜测；中文音色仍区分本地、在线和来源未知，后两者须逐音色确认。Qwen 通过受认证的 Agent 语音接口和固定本机端口连接独立 Python CustomVoice 服务，不将 PyTorch、模型生命周期或音频塞进终端 Worker。模型权重不随 PalmTTY 安装包发布；音频缓存有上限。两种语音引擎均不能修改 Workspace 文件。

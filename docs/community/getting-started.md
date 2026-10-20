@@ -249,7 +249,7 @@ Vite 会打印可访问的 LAN URL。Windows 上如果其他设备仍然超时�
 
 **English**
 
-Browser voices work without additional host dependencies. The reader lists every voice exposed by the browser. Local Chinese voices are preferred by default; online or unknown-origin voices require explicit per-voice consent before speech or preview.
+Browser voices work without additional host dependencies. The reader only lists voices whose browser-declared language is Chinese (for example zh-CN, zh-TW, or Cantonese yue-HK), regardless of their display name. A local Chinese voice is preferred; online or unknown-origin Chinese voices require explicit per-voice consent before speech or preview. If none appears, enable/install a Chinese speech voice in the device/browser settings and reopen the reader.
 
 To enable local Qwen speech, prepare Python 3.12 in a **separate virtual environment** on the same host as PalmTTY. Install `qwen-tts` from the project's official distribution. Download one of the official Qwen3-TTS-12Hz `0.6B-CustomVoice` or `1.7B-CustomVoice` models to an operator-controlled local directory first. Example with an already-installed ModelScope CLI:
 
@@ -278,7 +278,7 @@ Restart the Agent, then select **Qwen3-TTS** in Files → Read aloud. The model 
 
 **中文**
 
-浏览器原生语音无需额外主机依赖：会列出浏览器报告的全部声音，默认优先设备本地中文音色；联网或来源未知的声音在试听与播放前都需要当前阅读中明确授权。
+浏览器原生语音无需额外主机依赖：列表仅显示浏览器声明支持中文的音色（如 zh-CN、zh-TW、粤语 yue-HK），不依音色名称猜测语言；默认优先设备本地中文音色。联网或来源未知的中文音色在试听与播放前都需要当前阅读中明确授权；若列表为空，请在设备／浏览器设置中安装或启用中文语音后重新打开阅读器。
 
 Qwen3-TTS 使用**单独的 Python 3.12 虚拟环境**，从官方来源安装 `qwen-tts`，并手工下载匹配的 `Qwen3-TTS-12Hz-0.6B-CustomVoice` 或 `1.7B-CustomVoice` 模型到宿主机私有目录。参考上述命令。为 Python 服务和 PalmTTY Agent 设置同一个独立随机 `PALMTTY_QWEN_TOKEN`（32–512 字符），建议存放于仓库外的用户私有环境文件，严禁写入 YAML、Workspace environment 或命令行参数。运行 `scripts/qwen3-tts-server.py`，打包安装版为安装目录下的 `tools/qwen3-tts-server.py`；显卡运行用 `--device cuda`，CPU 使用 `--device cpu`，0.6B/1.7B 的 `--model` 必须匹配已下载目录。依上方 YAML 启用 `speech.qwen`，重启 Agent 后在「文件 → 朗读」选择 Qwen3-TTS。
 
