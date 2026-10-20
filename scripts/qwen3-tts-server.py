@@ -5,6 +5,8 @@ Install Qwen3-TTS in a separate environment. Download weights explicitly;
 this service never accepts model paths, URLs or credentials from the browser.
 """
 import argparse
+from collections import OrderedDict
+import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import hmac
 import io
@@ -45,6 +47,9 @@ def main():
         args.model_dir, device_map="cuda:0" if args.device == "cuda" else "cpu",
         dtype=dtype
     )
+
+    cache = OrderedDict()
+    cache_bytes = 0
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, _format, *unused):
@@ -102,6 +107,14 @@ def main():
                 self.respond(400, b'{"error":"invalid_request"}')
                 return
 
+            nonlocal cache_bytes
+            key = hashlib.sha256(json.dumps(
+                [args.model, text, speaker, style], ensure_ascii=False
+            ).encode("utf-8")).digest()
+            if key in cache:
+                cache.move_to_end(key)
+                self.respond(200, cache[key], "audio/wav")
+                return
             try:
                 kwargs = {"text": text, "language": "Chinese", "speaker": speaker}
                 if args.model == "1.7b" and style == "story":
@@ -113,6 +126,11 @@ def main():
                 audio = buffer.getvalue()
                 if not 44 <= len(audio) <= MAX_AUDIO_BYTES:
                     raise ValueError("Audio outside bounds")
+                while cache_bytes + len(audio) > 32 * 1024 * 1024 and cache:
+                    _, removed = cache.popitem(last=False)
+                    cache_bytes -= len(removed)
+                cache[key] = audio
+                cache_bytes += len(audio)
                 self.respond(200, audio, "audio/wav")
             except Exception:
                 # Inference failures are bounded and opaque: never echo the source.

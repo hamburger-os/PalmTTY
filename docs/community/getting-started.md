@@ -244,3 +244,42 @@ Vite 会打印可访问的 LAN URL。Windows 上如果其他设备仍然超时�
 不要把 Vite 开发服务器直接暴露到公网。正式/远程访问应使用私有组网，或采用 [security.md](security.md) 中描述的 HTTPS 认证反向代理方案。
 
 如果由 QNAP/Caddy 终止 TLS，可从 `examples/qnap-reverse-proxy.yaml` 开始：浏览器侧保持 HTTPS/WSS，私网 upstream 可以使用 HTTP；反向代理规则必须明确选择支持 **HTTP + WebSocket** 的模式（不能只转普通 HTTP），并把 WebSocket Upgrade/子协议协商转发到 PalmTTY Agent 端口。如果页面和普通 REST API 正常但终端一直“正在重连”，应首先检查这一 WebSocket 代理模式。上游端口仍应只对代理或可信局域网开放。
+
+### Optional local Qwen3-TTS reader / 可选本地 Qwen3-TTS
+
+**English**
+
+Browser voices work without additional host dependencies. The reader lists every voice exposed by the browser. Local Chinese voices are preferred by default; online or unknown-origin voices require explicit per-voice consent before speech or preview.
+
+To enable local Qwen speech, prepare Python 3.12 in a **separate virtual environment** on the same host as PalmTTY. Install `qwen-tts` from the project's official distribution. Download one of the official Qwen3-TTS-12Hz `0.6B-CustomVoice` or `1.7B-CustomVoice` models to an operator-controlled local directory first. Example with an already-installed ModelScope CLI:
+
+~~~bash
+modelscope download --model Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice --local_dir ./qwen3-tts-model
+~~~
+
+Set an independent random secret of 32–512 characters in `PALMTTY_QWEN_TOKEN` for **both** the Python process and the PalmTTY Agent (use the existing private Agent environment file for autostart); never place the value in the YAML or Workspace environment. Start the optional server from the source checkout:
+
+~~~bash
+python scripts/qwen3-tts-server.py --model-dir ./qwen3-tts-model --model 1.7b --device cuda --port 18765
+~~~
+
+Installed builds also provide `tools/qwen3-tts-server.py` under their installation directory. For CPU-only systems, choose `--device cpu`; verify available RAM and performance independently. Use `--model 0.6b` only with the matching 0.6B CustomVoice directory. Model downloads can be several GB and are never triggered by ordinary PalmTTY startup.
+
+Enable the Agent proxy with:
+
+~~~yaml
+speech:
+  qwen:
+    enabled: true
+    port: 18765
+~~~
+
+Restart the Agent, then select **Qwen3-TTS** in Files → Read aloud. The model sidecar must be managed separately; PalmTTY does not install its Python dependencies, preload models, or run arbitrary model installer commands. Qwen runs on the PalmTTY host, not in Safari or the phone. The Python endpoint binds to 127.0.0.1 and needs the private token. Windows Agent + WSL Python cross-networking is not implied by localhost: run the sidecar on the matching host or explicitly secure a port-forward setup. Mobile Safari may require a second user tap after preparing audio and background playback is not guaranteed.
+
+**中文**
+
+浏览器原生语音无需额外主机依赖：会列出浏览器报告的全部声音，默认优先设备本地中文音色；联网或来源未知的声音在试听与播放前都需要当前阅读中明确授权。
+
+Qwen3-TTS 使用**单独的 Python 3.12 虚拟环境**，从官方来源安装 `qwen-tts`，并手工下载匹配的 `Qwen3-TTS-12Hz-0.6B-CustomVoice` 或 `1.7B-CustomVoice` 模型到宿主机私有目录。参考上述命令。为 Python 服务和 PalmTTY Agent 设置同一个独立随机 `PALMTTY_QWEN_TOKEN`（32–512 字符），建议存放于仓库外的用户私有环境文件，严禁写入 YAML、Workspace environment 或命令行参数。运行 `scripts/qwen3-tts-server.py`，打包安装版为安装目录下的 `tools/qwen3-tts-server.py`；显卡运行用 `--device cuda`，CPU 使用 `--device cpu`，0.6B/1.7B 的 `--model` 必须匹配已下载目录。依上方 YAML 启用 `speech.qwen`，重启 Agent 后在「文件 → 朗读」选择 Qwen3-TTS。
+
+Qwen 模型及 Python 依赖是可选独立安装，不随主安装包分发或自动下载。服务只能监听本机回环地址，需要自行管理其启动和生命周期；Windows 主机和 WSL 不是自动共享同一个回环地址。手机只接收音频，不运行模型；iOS Safari 首次媒体解锁及后台播放可能需要额外手动操作或无法持续。

@@ -322,6 +322,10 @@ async function main() {
       path.join(toolsDir, "autostart-core.mjs")
     ),
     copyFile(
+      path.join(repoRoot, "scripts", "qwen3-tts-server.py"),
+      path.join(toolsDir, "qwen3-tts-server.py")
+    ),
+    copyFile(
       path.join(repoRoot, "packaging", "default-config.yaml"),
       path.join(defaultsDir, "config.yaml")
     ),

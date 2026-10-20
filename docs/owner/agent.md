@@ -183,3 +183,7 @@ Remote App Profile 不再保存 FPS/width/height。
 8. Remote App capture 是否出现 desktop fallback；
 9. ICE/TURN 配置是否绕过认证或泄漏 credential；
 10. buffer/session/backpressure 是否仍有硬限制。
+
+## 可选本地语音服务（2026-10-20）
+
+Agent 新增隔离的 Qwen3-TTS 语音代理，只访问固定的 `127.0.0.1` 端口，不在 Agent 或终端 Worker 中加载 PyTorch。运营者显式设置 `speech.qwen.enabled` 与 `port`、通过私有环境提供独立随机 `PALMTTY_QWEN_TOKEN`，并自行启动独立 Python sidecar。未启用时不需要 Python、GPU 或模型文件，不改变现有安装启动路径。启用后仅提供只读就绪状态和受保护的有界文字片段→WAV 合成，不提供任意命令/模型管理能力。sidecar 可随 Agent 重启独立存活；不承诺 OS 重启自动恢复，部署方需要单独管理其生命周期。

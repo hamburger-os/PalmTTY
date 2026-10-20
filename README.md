@@ -51,7 +51,7 @@ PalmTTY is **alpha**. **0.2.0** is the current release baseline; this source lin
 | Workspace workbench | Activity-aware Terminal / Remote App surface plus shared Git / Files; direct switching among live Activities for the same Workspace; switching tools keeps active xterm/WebRTC mounted; Artifacts remain Terminal Session-scoped |
 | Windows Remote Apps | **Unreleased alpha:** detected/.exe-selected saved profiles → detached AppWorker → single owned app window → WebRTC video + bounded typed input; auto capture size; optional operator STUN/TURN; no full desktop/UAC/clipboard/audio; real-app validation still required |
 | Mobile terminal | xterm.js PWA, touch special-key bar, on-demand long-text input |
-| Novel reading / 小说朗读 | Read-only local voice reading, Chinese chapters, private saved paragraph position, bounded paging and speed (up to 8 MiB / 20,000 paragraphs; voice availability depends on device) |
+| Novel reading / 小说朗读 | Read-only novel reader with all browser voices (local-first, remote opt-in), optional private-host Qwen3-TTS CustomVoice, saved chapter/paragraph offsets, bounded paging (8 MiB / 20,000 paragraphs) |
 | Mobile Remote App | View / direct-touch / trackpad modes, two-finger scroll, special keys and bounded Unicode text/IME input; auto viewport/DPR capture sizing plus explicit capture/network diagnostics |
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
 | Network exposure | Explicit `local` / `lan` / `reverseProxy` / direct `https` profiles; HTTPS/private entry is recommended |

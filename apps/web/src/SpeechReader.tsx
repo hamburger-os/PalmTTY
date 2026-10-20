@@ -60,6 +60,7 @@ export function SpeechReader({ text, sourceId, onClose }: {
   const [pitch, setPitch] = useState(() => preferredNumber("palmtty.speech.pitch", PITCHES, 1));
   const [volume, setVolume] = useState(() => preferredNumber("palmtty.speech.volume", VOLUMES, 1));
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const previewRef = useRef<{ controller: AbortController; output: BrowserSpeechOutput } | null>(null);
   const available = typeof window !== "undefined" &&
     "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 
@@ -97,7 +98,11 @@ export function SpeechReader({ text, sourceId, onClose }: {
     };
   }, [available]);
 
-  useEffect(() => () => { playback.stop(); }, [playback]);
+  useEffect(() => () => {
+    previewRef.current?.controller.abort();
+    previewRef.current?.output.stop();
+    playback.stop();
+  }, [playback]);
 
   useEffect(() => {
     try {
@@ -121,7 +126,32 @@ export function SpeechReader({ text, sourceId, onClose }: {
       ? available && !!selectedVoice && !needsConsent
       : !!qwen?.ready && qwen.speakers.includes(speaker) && qwen.styles.includes(style));
 
-  const stop = () => { playback.stop(); };
+  const stop = () => {
+    previewRef.current?.controller.abort();
+    previewRef.current?.output.stop();
+    previewRef.current = null;
+    playback.stop();
+  };
+
+  const previewVoice = () => {
+    if (!selectedVoice || needsConsent) return;
+    stop();
+    setError(null);
+    const controller = new AbortController();
+    const output = new BrowserSpeechOutput(
+      window.speechSynthesis, selectedVoice, rate, pitch, volume
+    );
+    const preview = { controller, output };
+    previewRef.current = preview;
+    void output.speak(t("reader.sampleText"), controller.signal, () => undefined)
+      .catch(() => { if (!controller.signal.aborted) setError(t("reader.speechError")); })
+      .finally(() => {
+        if (previewRef.current === preview) {
+          previewRef.current = null;
+          output.stop();
+        }
+      });
+  };
 
   const playFrom = (paragraph: number, offset = 0) => {
     const target = Math.max(0, Math.min(paragraph, paragraphs.length - 1));
@@ -255,8 +285,11 @@ export function SpeechReader({ text, sourceId, onClose }: {
               {RATES.map((value) => <option key={value} value={value}>{value}×</option>)}
             </select>
           </label>
-          {engine === "browser" && (
-            <>
+        </div>
+        {engine === "browser" && (
+          <details className="speech-reader-advanced">
+            <summary>{t("reader.moreSettings")}</summary>
+            <div className="speech-reader-options">
               <label>{t("reader.pitch")}
                 <select className="glass-input glass-select" value={pitch} onChange={(event) => {
                   stop();
@@ -274,12 +307,24 @@ export function SpeechReader({ text, sourceId, onClose }: {
                   setVolume(next);
                   putSetting("palmtty.speech.volume", String(next));
                 }}>
-                  {VOLUMES.map((value) => <option key={value}>{Math.round(value * 100)}%</option>)}
+                  {VOLUMES.map((value) => <option key={value} value={value}>{Math.round(value * 100)}%</option>)}
                 </select>
               </label>
-            </>
-          )}
-        </div>
+            </div>
+          </details>
+        )}
+        {engine === "browser" && !!selectedVoice && !needsConsent && (
+          <div className="speech-reader-actions">
+            <button type="button" className="ghost compact" onClick={previewVoice}>
+              {t("reader.previewVoice")}
+            </button>
+            {approvedRemote === selectedVoice.voiceURI && mayUseRemoteSpeech(selectedVoice) && (
+              <button type="button" className="ghost compact" onClick={() => {
+                stop(); setApprovedRemote(null);
+              }}>{t("reader.revokeRemote")}</button>
+            )}
+          </div>
+        )}
         {needsConsent && (
           <div className="speech-reader-consent">
             <p className="tool-hint">{t("reader.remoteConsent")}</p>

@@ -1,12 +1,12 @@
 export type VoiceOrigin = "local" | "remote" | "unknown";
 
-export function voiceOrigin(voice: Pick<SpeechSynthesisVoice, "localService">): VoiceOrigin {
+export function voiceOrigin(voice: { localService?: boolean }): VoiceOrigin {
   if (voice.localService === true) return "local";
   if (voice.localService === false) return "remote";
   return "unknown";
 }
 
-export function selectInitialVoice<T extends Pick<SpeechSynthesisVoice, "voiceURI" | "localService" | "lang">>(
+export function selectInitialVoice<T extends { voiceURI: string; localService?: boolean; lang: string }>(
   voices: readonly T[], preferred: string
 ): string {
   if (preferred && voices.some((voice) => voice.voiceURI === preferred)) return preferred;

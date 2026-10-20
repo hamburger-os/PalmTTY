@@ -170,3 +170,8 @@ PalmTTY does not downgrade browser terminal protocol v4. To protect already-runn
 ### Markdown 预览安全模型
 
 作者 HTML 必须先经过无属性排版白名单，解析器输出再统一净化；标题/脚注不能污染宿主 DOM 全局 ID。相对图片仍使用具备认证、Origin、路径和尺寸约束的工作区接口，禁止远程图片或字体自动加载。Mermaid 严格输入限制、屏蔽点击和外链，净化 SVG 并置于无脚本/无网络 CSP 的 sandbox iframe 内，绝不扩大文件/终端权限。
+## Novel speech / 小说朗读 (2026-10)
+
+**English:** A browser voice with localService=false or missing is treated as potentially remote. An explicit consent for that voice is required in the current reading view; there is no automatic remote fallback. The browser/OS provider may receive spoken fragments; PalmTTY cannot control the provider's retention. Qwen is disabled by default. Once enabled, the Agent requires session authentication + exact Origin for POST synthesis, fixed-bounded speaker/style/text, request limits and a separate PALMTTY_QWEN_TOKEN for a loopback-only Python service. Raw manuscript contents and model credentials are not logged. The operator must trust/download model weights explicitly; do not run the model service on a public interface. On private LAN HTTP, novel audio/text transmission is not encrypted; prefer HTTPS.
+
+**中文：** 浏览器报告为在线或来源未知的音色，一律视为可能发送原文，需要本次阅读逐音色明确授权，不提供静默远端回退。第三方系统语音的数据保留政策不受 PalmTTY 控制。Qwen 默认关闭；启用后 Agent 合成 POST 要求登录认证、精确 Origin、固定的文本／音色／风格上限、限流与独立的本机服务 token。正文和 token 不进入默认日志。部署者必须手工选择并信任已下载的模型权重，不应把 Python 服务绑定公网地址。局域网 HTTP 传输未加密，未发表小说建议使用 HTTPS。
