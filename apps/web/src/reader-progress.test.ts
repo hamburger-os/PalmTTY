@@ -1,26 +1,35 @@
 import { describe, expect, it } from "vitest";
 import {
-  readerChapters, readerProgressKey, readerTextSignature, savedReaderParagraph
+  readerChapters, readerProgressKey, readerTextSignature, savedReaderPosition
 } from "./reader-progress.js";
 
-describe("private reader progress and chapter navigation", () => {
-  it("recognizes Chinese and English headings and preserves positions", () => {
+describe("private novel reading progress", () => {
+  it("recognizes Chinese and English chapter headings", () => {
     expect(readerChapters(["序言", "第一章 重逢", "正文", "Chapter 2", "尾声"])).toEqual([
       { paragraph: 0, title: "" },
       { paragraph: 1, title: "第一章 重逢" },
       { paragraph: 3, title: "Chapter 2" }
     ]);
   });
-  it("rejects invalid/stale indices and does not put paths into storage keys", () => {
-    const signature = readerTextSignature("这是一篇小说");
-    expect(savedReaderParagraph(JSON.stringify({ signature, paragraph: 2 }),signature,4)).toBe(2);
-    expect(savedReaderParagraph(JSON.stringify({ signature, paragraph: 4 }),signature,4)).toBeNull();
-    expect(savedReaderParagraph(JSON.stringify({ signature: "old", paragraph: 2 }),signature,4)).toBeNull();
-    expect(savedReaderParagraph("nonsense",signature,4)).toBeNull();
+  it("validates paragraph and UTF-16 offsets without persisting paths", () => {
+    const content = ["你好", "世界"];
+    const signature = readerTextSignature(content.join("\n"));
+    expect(savedReaderPosition(JSON.stringify({ signature, paragraph: 0, offset: 1 }), signature, content))
+      .toEqual({ paragraph: 0, offset: 1 });
+    expect(savedReaderPosition(JSON.stringify({ signature, paragraph: 0, offset: 3 }), signature, content))
+      .toBeNull();
+    expect(savedReaderPosition(JSON.stringify({ signature: "old", paragraph: 0, offset: 1 }), signature, content))
+      .toBeNull();
+    expect(savedReaderPosition("invalid", signature, content)).toBeNull();
     expect(readerProgressKey("secret/novel.txt")).not.toContain("secret");
   });
-  it("bounds chapter options on a large novel", () => {
-    const chapters=readerChapters(Array.from({length:1000},(_,i)=>`第${i+1}章`));
-    expect(chapters).toHaveLength(256);
+  it("fingerprints changes throughout the document", () => {
+    const x = "a".repeat(1024);
+    const y = x.slice(0, 300) + "b" + x.slice(301);
+    expect(readerTextSignature(x)).not.toBe(readerTextSignature(y));
+  });
+  it("bounds chapter navigation", () => {
+    expect(readerChapters(Array.from({ length: 1000 }, (_, i) => `第${i + 1}章`)))
+      .toHaveLength(256);
   });
 });

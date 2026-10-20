@@ -42,6 +42,7 @@ import {
   type WorkspaceStore
 } from "./workspace-store.js";
 import { registerWorkspaceToolRoutes } from "./workspace-tool-routes.js";
+import { registerSpeechRoutes } from "./speech-routes.js";
 import { defaultWebRoot } from "./runtime-layout.js";
 import { PALMTTY_VERSION } from "./version.js";
 import { defaultRuntimeDir } from "./worker-storage.js";
@@ -260,6 +261,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   );
 
   const sensitiveEnvironmentKeys = controlEnvironmentKeys(config.auth.tokenEnv);
+  registerSpeechRoutes(app, { config, requireAuth, requireOrigin });
   registerWorkspaceToolRoutes(app, {
     workspaceStore,
     requireAuth,

@@ -1,5 +1,5 @@
-// Reader metadata contains only opaque keys, a lightweight content signature
-// and a paragraph number. Never persist the text itself to browser storage.
+// Only opaque keys, the content signature, and the reading position are persisted.
+// Never persist workspace text in browser storage.
 function hashText(value: string): string {
   let valueHash = 2166136261;
   for (let i = 0; i < value.length; i++) {
@@ -29,24 +29,26 @@ export function readerProgressKey(sourceId: string): string {
 }
 
 export function readerTextSignature(text: string): string {
-  const sample = text.slice(0, 256) + text.slice(Math.floor(text.length / 2), Math.floor(text.length / 2) + 256) + text.slice(-256);
-  return text.length + ":" + hashText(sample);
+  // Hash every code unit; edits away from the sampled beginning/middle/end matter.
+  return text.length + ":" + hashText(text);
 }
 
-export function savedReaderParagraph(
-  stored: string | null, signature: string, paragraphCount: number
-): number | null {
+export type ReaderPosition = { paragraph: number; offset: number };
+
+export function savedReaderPosition(
+  stored: string | null, signature: string, paragraphs: readonly string[]
+): ReaderPosition | null {
   if (!stored) return null;
   try {
     const value: unknown = JSON.parse(stored);
     if (!value || typeof value !== "object") return null;
     const entry = value as Record<string, unknown>;
     if (entry.signature !== signature || !Number.isSafeInteger(entry.paragraph) ||
-        (entry.paragraph as number) < 0 || (entry.paragraph as number) >= paragraphCount) {
+        (entry.paragraph as number) < 0 || (entry.paragraph as number) >= paragraphs.length ||
+        !Number.isSafeInteger(entry.offset) || (entry.offset as number) < 0 ||
+        (entry.offset as number) > (paragraphs[entry.paragraph as number]?.length ?? 0)) {
       return null;
     }
-    return entry.paragraph as number;
-  } catch {
-    return null;
-  }
+    return { paragraph: entry.paragraph as number, offset: entry.offset as number };
+  } catch { return null; }
 }
