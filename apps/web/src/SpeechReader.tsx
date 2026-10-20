@@ -87,9 +87,9 @@ export function SpeechReader({ text, sourceId, onClose }: {
     if (!available) return;
     const synth = window.speechSynthesis;
     const updateVoices = () => {
-      const chinese = chineseSpeechVoices(synth.getVoices());
-      setVoices(chinese);
-      setVoiceUri((previous) => selectInitialVoice(chinese, previous));
+      const reported = synth.getVoices();
+      setVoices(chineseSpeechVoices(reported));
+      setVoiceUri((previous) => selectInitialVoice(reported, previous));
     };
     updateVoices();
     synth.addEventListener("voiceschanged", updateVoices);
