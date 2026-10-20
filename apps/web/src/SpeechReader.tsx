@@ -7,7 +7,9 @@ import {
 } from "./reader-progress.js";
 import { BrowserSpeechOutput, QwenSpeechOutput, ReaderPlayback, type ReaderPlaybackState } from "./speech-playback.js";
 import { READER_PAGE_SIZE, speechParagraphs } from "./speech-segments.js";
-import { mayUseRemoteSpeech, selectInitialVoice, voiceOrigin } from "./speech-voices.js";
+import {
+  chineseSpeechVoices, mayUseRemoteSpeech, selectInitialVoice, voiceOrigin
+} from "./speech-voices.js";
 
 function getSetting(key: string, fallback: string): string {
   try { return window.localStorage.getItem(key) ?? fallback; }
@@ -85,9 +87,9 @@ export function SpeechReader({ text, sourceId, onClose }: {
     if (!available) return;
     const synth = window.speechSynthesis;
     const updateVoices = () => {
-      const next = synth.getVoices();
-      setVoices(next);
-      setVoiceUri((previous) => selectInitialVoice(next, previous));
+      const chinese = chineseSpeechVoices(synth.getVoices());
+      setVoices(chinese);
+      setVoiceUri((previous) => selectInitialVoice(chinese, previous));
     };
     updateVoices();
     synth.addEventListener("voiceschanged", updateVoices);
