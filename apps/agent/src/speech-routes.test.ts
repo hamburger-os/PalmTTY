@@ -83,6 +83,25 @@ describe("private Qwen speech boundary", () => {
     await app.close();
   });
 
+  it("rejects oversized chunked model status without buffering unbounded JSON", async () => {
+    process.env.PALMTTY_QWEN_TOKEN = TOKEN;
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.write("x".repeat(6000));
+      response.end();
+    });
+    upstreamServers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const app = await createRoutes(true, (server.address() as AddressInfo).port);
+    const response = await app.inject({
+      method: "GET", url: "/api/v1/speech/qwen/status",
+      headers: { cookie: "session=test" }
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ enabled: true, ready: false });
+    await app.close();
+  });
+
   it("proxies bounded WAV only and does not reveal the private Qwen token", async () => {
     process.env.PALMTTY_QWEN_TOKEN = TOKEN;
     const port = await fakeModel();

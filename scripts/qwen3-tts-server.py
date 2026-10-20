@@ -16,7 +16,7 @@ import os
 SPEAKERS = frozenset(("Vivian", "Serena", "Uncle_Fu", "Dylan", "Eric",
                       "Ryan", "Aiden", "Ono_Anna", "Sohee"))
 MAX_INPUT_BYTES = 2048
-MAX_AUDIO_BYTES = 2 * 1024 * 1024
+MAX_AUDIO_BYTES = 8 * 1024 * 1024
 
 
 def main():

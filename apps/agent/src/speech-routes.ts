@@ -9,7 +9,8 @@ const QwenRequest = z.object({
   speaker: z.enum(speakers),
   style: z.enum(["neutral", "story"]).default("neutral")
 }).strict();
-const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
+const MAX_STATUS_BYTES = 4096;
 const TOKEN_ENV = "PALMTTY_QWEN_TOKEN";
 
 type Guard = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -23,13 +24,12 @@ function secret(): string | null {
   return value && value.length >= 32 && value.length <= 512 ? value : null;
 }
 
-async function boundedWav(response: Response): Promise<Buffer> {
-  if (!response.ok || response.headers.get("content-type")?.split(";")[0] !== "audio/wav") {
-    throw new Error("Invalid speech response");
+async function boundedBody(response: Response, limit: number): Promise<Buffer> {
+  if (!response.ok || !response.body) throw new Error("Upstream unavailable");
+  const claimed = response.headers.get("content-length");
+  if (claimed !== null && (!/^\d+$/.test(claimed) || Number(claimed) > limit)) {
+    throw new Error("Upstream response too large");
   }
-  const claimedSize = Number(response.headers.get("content-length") ?? "0");
-  if (claimedSize > MAX_AUDIO_BYTES) throw new Error("Speech response too large");
-  if (!response.body) throw new Error("Empty speech response");
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -38,13 +38,20 @@ async function boundedWav(response: Response): Promise<Buffer> {
       const { value, done } = await reader.read();
       if (done) break;
       total += value.byteLength;
-      if (total > MAX_AUDIO_BYTES) throw new Error("Speech response too large");
+      if (total > limit) throw new Error("Upstream response too large");
       chunks.push(value);
     }
   } finally {
     await reader.cancel().catch(() => undefined);
   }
-  const result = Buffer.concat(chunks, total);
+  return Buffer.concat(chunks, total);
+}
+
+async function boundedWav(response: Response): Promise<Buffer> {
+  if (response.headers.get("content-type")?.split(";")[0] !== "audio/wav") {
+    throw new Error("Invalid speech response");
+  }
+  const result = await boundedBody(response, MAX_AUDIO_BYTES);
   if (result.length < 44 || result.toString("ascii", 0, 4) !== "RIFF" ||
       result.toString("ascii", 8, 12) !== "WAVE") {
     throw new Error("Invalid WAV data");
@@ -74,10 +81,8 @@ export function registerSpeechRoutes(app: FastifyInstance, options: {
         redirect: "manual",
         signal: AbortSignal.timeout(2500)
       });
-      if (!response.ok || Number(response.headers.get("content-length") ?? 0) > 4096) {
-        throw new Error("Unavailable");
-      }
-      const status: unknown = await response.json();
+      const body = await boundedBody(response, MAX_STATUS_BYTES);
+      const status: unknown = JSON.parse(body.toString("utf8"));
       if (!status || typeof status !== "object") throw new Error("Invalid status");
       const data = status as Record<string, unknown>;
       if (data.model !== "0.6b" && data.model !== "1.7b") throw new Error("Invalid model");

@@ -166,7 +166,9 @@ export class QwenSpeechOutput implements SpeechOutput {
   private readonly pending = new Map<string, Promise<Blob>>();
   private readonly cache = new Map<string, Blob>();
   private bytes = 0;
-  private player: HTMLAudioElement | null = null;
+  // Keep one audio element across chunks; a new element per fragment can lose
+  // mobile Safari's media activation and needlessly remount the media pipeline.
+  private readonly player = new Audio();
   private currentUrl: string | null = null;
   private retryPlay: (() => void) | null = null;
 
@@ -181,7 +183,7 @@ export class QwenSpeechOutput implements SpeechOutput {
     const pending = this.pending.get(text);
     if (pending) return pending;
     const promise = this.synthesize(text, signal).then((blob) => {
-      if (blob.size > 0 && blob.size <= 4 * 1024 * 1024 && !signal.aborted) {
+      if (blob.size > 0 && blob.size <= 8 * 1024 * 1024 && !signal.aborted) {
         while (this.bytes + blob.size > 12 * 1024 * 1024 && this.cache.size) {
           const oldest = this.cache.keys().next().value;
           if (oldest === undefined) break;
@@ -207,8 +209,8 @@ export class QwenSpeechOutput implements SpeechOutput {
     if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
     const url = URL.createObjectURL(blob);
     this.currentUrl = url;
-    const player = new Audio(url);
-    this.player = player;
+    const player = this.player;
+    player.src = url;
     player.playbackRate = this.rate;
     player.preload = "auto";
     try {
@@ -247,18 +249,18 @@ export class QwenSpeechOutput implements SpeechOutput {
       player.pause();
       player.removeAttribute("src");
       player.load();
-      if (this.player === player) this.player = null;
       this.retryPlay = null;
       URL.revokeObjectURL(url);
       if (this.currentUrl === url) this.currentUrl = null;
     }
   }
 
-  pause(): void { this.player?.pause(); }
+  pause(): void { this.player.pause(); }
   resume(): void { this.retryPlay?.(); }
   stop(): void {
-    this.player?.pause();
-    this.player = null;
+    this.player.pause();
+    this.player.removeAttribute("src");
+    this.player.load();
     this.retryPlay = null;
     if (this.currentUrl) URL.revokeObjectURL(this.currentUrl);
     this.currentUrl = null;

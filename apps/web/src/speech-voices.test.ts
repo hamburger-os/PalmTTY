@@ -17,5 +17,6 @@ describe("browser voice origin and private default", () => {
     expect(selectInitialVoice(voices, "")).toBe("local");
     expect(selectInitialVoice(voices.slice(0, 2), "")).toBe("");
     expect(selectInitialVoice(voices, "remote")).toBe("remote");
+    expect(selectInitialVoice([], "remote")).toBe("remote");
   });
 });
