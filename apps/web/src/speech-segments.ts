@@ -2,12 +2,6 @@ export const MAX_SPEECH_SEGMENT_LENGTH = 180;
 export const MAX_READER_PARAGRAPHS = 20_000;
 export const READER_PAGE_SIZE = 120;
 
-export function localSpeechVoices<T extends { localService?: boolean }>(
-  voices: readonly T[]
-): T[] {
-  return voices.filter((voice) => voice.localService === true);
-}
-
 export function speechParagraphs(text: string): {
   paragraphs: string[];
   tooMany: boolean;
@@ -34,12 +28,14 @@ export function speechParagraphs(text: string): {
 
 // A single bounded utterance at a time, using UTF-16 offsets to avoid
 // allocating the entire speech queue for a large chapter.
-export function nextSpeechChunk(paragraph: string, offset: number): {
+export function nextSpeechChunk(paragraph: string, offset: number, maxLength = MAX_SPEECH_SEGMENT_LENGTH): {
   text: string;
+  startOffset: number;
   nextOffset: number;
 } | null {
   if (offset < 0 || offset >= paragraph.length) return null;
-  let end = Math.min(offset + MAX_SPEECH_SEGMENT_LENGTH, paragraph.length);
+  if (!Number.isSafeInteger(maxLength) || maxLength < 64 || maxLength > 320) return null;
+  let end = Math.min(offset + maxLength, paragraph.length);
   // Do not cut a surrogate pair at a chunk boundary.
   if (end < paragraph.length) {
     const code = paragraph.charCodeAt(end - 1);
@@ -51,5 +47,6 @@ export function nextSpeechChunk(paragraph: string, offset: number): {
       }
     }
   }
-  return { text: paragraph.slice(offset, end).trim(), nextOffset: end };
+  const leading = paragraph.slice(offset, end).length - paragraph.slice(offset, end).trimStart().length;
+  return { text: paragraph.slice(offset, end).trim(), startOffset: offset + leading, nextOffset: end };
 }

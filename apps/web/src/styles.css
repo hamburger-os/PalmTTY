@@ -2858,3 +2858,23 @@ body.remote-app-active { overflow: hidden; }
     min-height: 36px;
   }
 }
+
+/* Reader disclosure uses the existing semantic controls; no nested vertical scroll owner. */
+.speech-reader-advanced summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.speech-reader-advanced .speech-reader-options {
+  margin-top: var(--space-2);
+}
+.speech-reader-consent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.speech-reader-consent p { flex: 1 1 220px; }
+@media (max-width: 760px) {
+  .speech-reader-consent button, .speech-reader-advanced select { min-height: var(--touch-target); }
+}

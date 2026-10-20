@@ -553,3 +553,34 @@ export async function deleteAppSession(id: string) {
     }
   ));
 }
+
+export type QwenSpeechStatus = {
+  enabled: boolean;
+  ready: boolean;
+  model: "0.6b" | "1.7b" | null;
+  speakers: string[];
+  styles: ("neutral" | "story")[];
+};
+
+export async function qwenSpeechStatus(): Promise<QwenSpeechStatus> {
+  return responseJson<QwenSpeechStatus>(await fetch("/api/v1/speech/qwen/status", {
+    credentials: "same-origin",
+    cache: "no-store"
+  }));
+}
+
+export async function synthesizeQwenSpeech(
+  text: string,
+  speaker: string,
+  style: "neutral" | "story",
+  signal: AbortSignal
+): Promise<Blob> {
+  return responseBlob(await fetch("/api/v1/speech/qwen/synthesize", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text, speaker, style }),
+    signal,
+    cache: "no-store"
+  }));
+}

@@ -38,3 +38,11 @@ remoteApps:
     # routable. Reverse-proxy/public deployments may need STUN/TURN here.
     # ICE credentials are delivered only to authenticated Remote App clients.
     iceServers: []
+
+# Optional high-quality local novel reader. Start the separate Python sidecar,
+# configure PALMTTY_QWEN_TOKEN in both its environment and the Agent's env-file,
+# then enable this endpoint. The model never runs inside the terminal Worker.
+speech:
+  qwen:
+    enabled: false
+    port: 18765

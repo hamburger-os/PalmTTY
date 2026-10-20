@@ -105,6 +105,13 @@ const RemoteAppsConfigSchema = z.object({
   }).strict().default({ iceServers: [] })
 }).strict();
 
+const SpeechConfigSchema = z.object({
+  qwen: z.object({
+    enabled: z.boolean().default(false),
+    port: z.number().int().min(1024).max(65535).default(18765)
+  }).strict().default({ enabled: false, port: 18765 })
+}).strict();
+
 export const PalmTTYConfigSchema = z.object({
   server: ServerConfigSchema.default({
     port: 7688,
@@ -123,6 +130,7 @@ export const PalmTTYConfigSchema = z.object({
     replayBytes: 2 * 1024 * 1024,
     maxSocketBufferedBytes: 2 * 1024 * 1024
   }),
+  speech: SpeechConfigSchema.default({ qwen: { enabled: false, port: 18765 } }),
   remoteApps: RemoteAppsConfigSchema.default({
     enabled: true,
     maxSessions: 4,

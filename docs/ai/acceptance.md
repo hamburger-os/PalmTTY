@@ -266,3 +266,10 @@ The task summary should identify:
 - Existing v3-hello Workers must reconnect through authenticated Worker IPC v5 and deliver the current v4 browser hello; never terminate a running PTY merely due to a browser/Agent deployment.
 - Worker deliver-schema unit regression accepts exactly retained v3 hello and current v4 hello, converts only legacy hello, rejects unknown versions/malformed messages; browser wire v4 schema still rejects v3.
 - A v4 browser connecting to an old Agent that closes WS 1002 must show a version-specific error and stop retrying; operators restart Agent and hard-refresh the PWA. Network 1012/1013 interruptions still use bounded backoff.
+
+## Optional speech reader acceptance (2026-10-20)
+
+- Web voices: local/remote/unknown visibility, local-only default, explicit consent and revoke for remote/unknown, dynamic voiceschanged, preview privacy, error/cancel races, pause/resume and segment UTF-16 positions.
+- Reader: paragraph/chapter navigation, full-text signature invalidation, 20,000 paragraph/120 visible row bounds, 8 MiB complete-file cap, no text storage/logging, shared playback state across browser/Qwen and cancellation on file switch.
+- Qwen: configuration strict validation, disabled-by-default behavior, status authentication, POST authenticated exact Origin, token absent, invalid and oversized text, speaker/style allowlist, fixed 127.0.0.1 upstream, 8 MiB audio cap and WAV header validation, model unavailable/timeout, single inflight inference and cache bounds; fake service tests cannot prove actual Qwen output quality or GPU load.
+- Deployment: packaged optional Python sidecar script, no model bundled, pinned operator-downloaded model, private PALMTTY_QWEN_TOKEN env, ordinary Windows/Linux Agent packaging unchanged; native iOS Safari/Android Chrome voice availability, media activation, lock screen and background playback require real-device checks.

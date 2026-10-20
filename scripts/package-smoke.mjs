@@ -92,6 +92,10 @@ async function main() {
     );
     const cli = path.join(root, "tools", "installed-cli.mjs");
     const agent = path.join(root, "app", "dist", "index.js");
+    const qwenSidecar = path.join(root, "tools", "qwen3-tts-server.py");
+    if (!(await readFile(qwenSidecar, "utf8")).includes("Qwen3-TTS")) {
+      throw new Error("Packaged runtime is missing the optional Qwen3-TTS sidecar script");
+    }
     if (process.platform === "win32") {
       const helper = await readFile(
         path.join(root, "bin", "palmtty-remote-app-host.exe")
