@@ -2,7 +2,7 @@ import { nextSpeechChunk } from "./speech-segments.js";
 
 export type ReaderPlaybackState = "idle" | "preparing" | "playing" | "paused" | "completed" | "error";
 export interface SpeechOutput {
-  speak(text: string, signal: AbortSignal, onPlaying: () => void): Promise<void>;
+  speak(text: string, signal: AbortSignal, onPlaying: () => void, onBlocked: () => void): Promise<void>;
   prefetch?(text: string, signal: AbortSignal): void;
   pause(): void;
   resume(): void;
@@ -14,6 +14,7 @@ export class ReaderPlayback {
   private controller: AbortController | null = null;
   private output: SpeechOutput | null = null;
   private paused = false;
+  private blocked = false;
   private state: ReaderPlaybackState = "idle";
 
   constructor(
@@ -22,6 +23,7 @@ export class ReaderPlayback {
   ) {}
 
   get currentState(): ReaderPlaybackState { return this.state; }
+  get needsUserGesture(): boolean { return this.blocked; }
   private publish(next: ReaderPlaybackState): void {
     this.state = next;
     this.onState(next);
@@ -34,6 +36,7 @@ export class ReaderPlayback {
     this.output?.stop();
     this.output = null;
     this.paused = false;
+    this.blocked = false;
     this.publish("idle");
   }
 
@@ -46,9 +49,9 @@ export class ReaderPlayback {
 
   resume(): void {
     if (!this.output || this.state !== "paused") return;
-    this.output.resume();
     this.paused = false;
-    this.publish("playing");
+    this.publish(this.blocked ? "preparing" : "playing");
+    this.output.resume();
   }
 
   async start(
@@ -80,8 +83,15 @@ export class ReaderPlayback {
             nextSpeechChunk(paragraphs[index + 1] ?? "", 0, segmentLimit);
           await output.speak(chunk.text, controller.signal, () => {
             if (controller.signal.aborted || generation !== this.generation) return;
+            this.paused = false;
+            this.blocked = false;
             this.publish("playing");
             if (next?.text) output.prefetch?.(next.text, controller.signal);
+          }, () => {
+            if (controller.signal.aborted || generation !== this.generation) return;
+            this.paused = true;
+            this.blocked = true;
+            this.publish("paused");
           });
           if (controller.signal.aborted || generation !== this.generation) return;
         }
@@ -158,6 +168,7 @@ export class QwenSpeechOutput implements SpeechOutput {
   private bytes = 0;
   private player: HTMLAudioElement | null = null;
   private currentUrl: string | null = null;
+  private retryPlay: (() => void) | null = null;
 
   constructor(
     private readonly synthesize: (text: string, signal: AbortSignal) => Promise<Blob>,
@@ -191,7 +202,7 @@ export class QwenSpeechOutput implements SpeechOutput {
     void this.getAudio(text, signal).catch(() => undefined);
   }
 
-  async speak(text: string, signal: AbortSignal, onPlaying: () => void): Promise<void> {
+  async speak(text: string, signal: AbortSignal, onPlaying: () => void, onBlocked: () => void): Promise<void> {
     const blob = await this.getAudio(text, signal);
     if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
     const url = URL.createObjectURL(blob);
@@ -217,23 +228,38 @@ export class QwenSpeechOutput implements SpeechOutput {
         player.addEventListener("ended", ended, { once: true });
         player.addEventListener("error", failed, { once: true });
         signal.addEventListener("abort", abort, { once: true });
-        void player.play().then(() => { if (!signal.aborted) onPlaying(); }).catch((error: unknown) => { cleanup(); reject(error); });
+        const play = () => {
+          void player.play().then(() => {
+            if (!signal.aborted) onPlaying();
+          }).catch((error: unknown) => {
+            if (!signal.aborted && error instanceof DOMException && error.name === "NotAllowedError") {
+              onBlocked();
+            } else {
+              cleanup();
+              reject(error);
+            }
+          });
+        };
+        this.retryPlay = play;
+        play();
       });
     } finally {
       player.pause();
       player.removeAttribute("src");
       player.load();
       if (this.player === player) this.player = null;
+      this.retryPlay = null;
       URL.revokeObjectURL(url);
       if (this.currentUrl === url) this.currentUrl = null;
     }
   }
 
   pause(): void { this.player?.pause(); }
-  resume(): void { if (this.player) void this.player.play(); }
+  resume(): void { this.retryPlay?.(); }
   stop(): void {
     this.player?.pause();
     this.player = null;
+    this.retryPlay = null;
     if (this.currentUrl) URL.revokeObjectURL(this.currentUrl);
     this.currentUrl = null;
     this.pending.clear();

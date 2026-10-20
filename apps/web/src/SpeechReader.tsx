@@ -341,6 +341,8 @@ export function SpeechReader({ text, sourceId, onClose }: {
         {engine === "qwen" && !qwen?.ready &&
           <p role="status" className="tool-hint">{t("reader.qwenUnavailable")}</p>}
         {state === "preparing" && <p role="status" className="tool-hint">{t("reader.preparing")}</p>}
+        {engine === "qwen" && state === "paused" && playback.needsUserGesture &&
+          <p role="status" className="tool-hint">{t("reader.audioUnlock")}</p>}
         {parsed.tooMany && <p role="alert" className="tool-inline-error">{t("reader.tooMany")}</p>}
         {error && <p role="alert" className="tool-inline-error">{error}</p>}
         <p className="tool-hint">{t("reader.hint")}</p>

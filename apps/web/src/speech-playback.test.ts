@@ -17,6 +17,29 @@ describe("single reader playback owner", () => {
     expect(states.at(-1)).toBe("completed");
   });
 
+  it("resumes a gesture-blocked audio track without restarting synthesis", async () => {
+    let release: (() => void) | undefined;
+    let started: (() => void) | undefined;
+    let blocked: (() => void) | undefined;
+    const output: SpeechOutput = {
+      speak(_text, _signal, onPlaying, onBlocked) {
+        started = onPlaying;
+        blocked = onBlocked;
+        return new Promise<void>((resolve) => { release = resolve; });
+      },
+      pause() {},
+      resume() { started?.(); release?.(); },
+      stop() {}
+    };
+    const reader = new ReaderPlayback(() => undefined, () => undefined);
+    const run = reader.start(["这是一段朗读。"], 0, output, 180);
+    blocked?.();
+    expect(reader.currentState).toBe("paused");
+    reader.resume();
+    await run;
+    expect(reader.currentState).toBe("completed");
+  });
+
   it("prevents a stale completion from advancing after stop", async () => {
     let release: (() => void) | undefined;
     const output: SpeechOutput = {
