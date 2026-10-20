@@ -14,6 +14,6 @@ export function selectInitialVoice<T extends { voiceURI: string; localService: b
   return (local.find((voice) => /^zh(?:-|_)/i.test(voice.lang)) ?? local[0])?.voiceURI ?? "";
 }
 
-export function mayUseRemoteSpeech(voice: Pick<SpeechSynthesisVoice, "localService">): boolean {
+export function mayUseRemoteSpeech(voice: { localService: boolean | undefined }): boolean {
   return voiceOrigin(voice) !== "local";
 }
