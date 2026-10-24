@@ -2226,8 +2226,7 @@ button.directory-choose {
 
 
 .workspace-dialog-title-row,
-.settings-section-heading,
-.remote-app-keybar {
+.settings-section-heading {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -2245,8 +2244,7 @@ button.directory-choose {
 }
 
 .workspace-settings-card,
-.settings-page,
-.remote-app-picker-section {
+.settings-page {
   display: grid;
   gap: var(--space-3);
 }
@@ -2324,10 +2322,6 @@ button.settings-list-row:hover:not(:disabled),
   background: var(--control-hover);
 }
 
-.remote-app-list-row {
-  padding: 0;
-}
-
 .settings-list-main {
   min-width: 0;
   flex: 1;
@@ -2342,11 +2336,6 @@ button.settings-list-row:hover:not(:disabled),
   box-shadow: none;
   color: inherit;
   text-align: left;
-}
-
-.remote-app-list-row > .danger-outline {
-  margin-right: 7px;
-  flex: 0 0 auto;
 }
 
 .settings-empty {
@@ -2370,26 +2359,6 @@ button.settings-list-row:hover:not(:disabled),
   gap: var(--space-3);
   padding: var(--space-3);
   border-radius: var(--radius-md);
-}
-
-.remote-app-manual-path {
-  padding: var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-
-.remote-app-manual-path > summary {
-  min-height: var(--touch-target-compact);
-  display: flex;
-  align-items: center;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.remote-app-picker-section {
-  min-width: 0;
 }
 
 .executable-browser {
@@ -2438,8 +2407,6 @@ button.settings-list-row:hover:not(:disabled),
   .selected-executable { align-items: stretch; flex-direction: column; }
   .workbench-activity-switcher { max-width: 42vw; }
   .workbench-activity-name { display: none; }
-  .remote-app-modes button { padding: 5px 7px; }
-  .remote-app-keybar button { padding: 5px 11px; }
 }
 
 @media (max-width: 760px) {
