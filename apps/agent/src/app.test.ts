@@ -104,45 +104,18 @@ describe("HTTP security boundary", () => {
     await app.close();
   });
 
-  it("keeps authenticated Remote App ICE capabilities out of caches", async () => {
+  it("returns only configured integration links behind authentication", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
-    const config = parseConfig({
-      server: {
-        port: 7688,
-        exposure: { mode: "local" }
-      },
-      auth: {
-        enabled: true,
-        tokenEnv: "PALMTTY_TEST_TOKEN",
-        sessionTtlMinutes: 60
-      },
-      remoteApps: {
-        webrtc: {
-          iceServers: [{
-            urls: ["turns:relay.example.test:5349"],
-            username: "palmtty",
-            credential: "secret"
-          }]
-        }
-      }
-    });
-    const app = await buildTestApp(config);
+    const app = await buildTestApp(parseConfig({
+      integrations: { vscodeWeb: "http://127.0.0.1:8000/" }
+    }));
+    const unauthorized = await app.inject({ method: "GET", url: "/api/v1/integrations" });
+    expect(unauthorized.statusCode).toBe(401);
     const cookie = await loginCookie(app);
-    const response = await app.inject({
-      method: "GET",
-      url: "/api/v1/remote-apps/capabilities",
-      headers: { cookie }
-    });
+    const response = await app.inject({ method: "GET", url: "/api/v1/integrations", headers: { cookie } });
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("private, no-store");
-    expect(response.json()).toMatchObject({
-      iceServers: [{
-        urls: ["turns:relay.example.test:5349"],
-        username: "palmtty",
-        credential: "secret"
-      }],
-      relayConfigured: true
-    });
+    expect(response.json()).toEqual({ vscodeWeb: "http://127.0.0.1:8000/" });
     await app.close();
   });
 
