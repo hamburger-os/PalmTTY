@@ -40,7 +40,6 @@ function hostWorkspace(
     name: "Node",
     cwd,
     terminal: { runtime: { kind: "host", shell, args: ["--version"] } },
-    remoteApps: []
   };
 }
 
@@ -70,7 +69,6 @@ describe("deterministic terminal startup", () => {
     const base: WorkspaceDefinition = {
       id: "wsl-launch", name: "WSL", cwd: "/home/dev/my project",
       terminal: { runtime: { kind: "wsl", distribution: "Ubuntu", args: [] }, startupCommand: "pi" },
-      remoteApps: []
     };
     const defaultArgs = buildWslLaunchArgs(base);
     expect(defaultArgs.slice(0, 4)).toEqual(["--distribution", "Ubuntu", "--cd", "/home/dev/my project"]);
@@ -259,7 +257,6 @@ describe("workspace runtime resolution", () => {
           args: []
         }
       },
-      remoteApps: []
     })).rejects.toThrow(
       "WSL workspaces are supported only by a Windows PalmTTY Agent"
     );
@@ -278,7 +275,6 @@ describe("workspace runtime resolution", () => {
           args: ["-l"]
         }
       },
-      remoteApps: []
     };
 
     expect(buildWslLaunchArgs(workspace)).toEqual([
@@ -304,7 +300,6 @@ describe("workspace runtime resolution", () => {
           args: []
         }
       },
-      remoteApps: []
     };
 
     expect(buildWslLaunchArgs(workspace)).toEqual([

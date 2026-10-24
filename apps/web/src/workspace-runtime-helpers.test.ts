@@ -19,7 +19,7 @@ describe("workspace runtime view helpers", () => {
     const runtime = runtimeFromState("wsl", "Ubuntu", "/bin/bash", []);
     expect(runtime).toEqual({ kind: "wsl", distribution: "Ubuntu", shell: "/bin/bash", args: [] });
     expect(workspaceRuntimeSummary({
-      id: "one", name: "one", cwd: "/home/dev", terminal: { runtime }, remoteApps: []
+      id: "one", name: "one", cwd: "/home/dev", terminal: { runtime }
     }, { host: "Host", wsl: "WSL", defaultShell: "Default" }))
       .toBe("Ubuntu · /bin/bash");
   });

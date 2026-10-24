@@ -22,7 +22,6 @@ function workspaceForProcessWorker(): WorkspaceDefinition {
             args: ["-NoLogo", "-NoProfile"]
           }
         },
-        remoteApps: []
       }
     : {
         id: "process",
@@ -35,7 +34,6 @@ function workspaceForProcessWorker(): WorkspaceDefinition {
             args: ["-i"]
           }
         },
-        remoteApps: []
       };
 }
 

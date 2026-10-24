@@ -3,7 +3,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "./i18n.js";
 import { MobilePrimaryInputActions } from "./MobilePrimaryInputActions.js";
-import { RemoteAppKeybar } from "./RemoteAppKeybar.js";
 
 vi.stubGlobal("window", { localStorage: { getItem: () => "zh-CN" } });
 vi.stubGlobal("navigator", { language: "zh-CN" });

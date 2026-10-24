@@ -14,7 +14,6 @@ import { preflightRuntime } from "./preflight.js";
 import { describeServerBindError } from "./server-endpoint.js";
 import { loadServerTlsOptions } from "./server-tls.js";
 import { runSessionWorkerFromStdin } from "./session-worker.js";
-import { runRemoteAppWorkerFromStdin } from "./remote-app-worker.js";
 
 function pathFromArgs(option: string): string | undefined {
   const index = process.argv.indexOf(option);
@@ -33,10 +32,6 @@ function configPathFromArgs(): string {
 async function main() {
   if (process.argv.includes("--session-worker")) {
     await runSessionWorkerFromStdin();
-    return;
-  }
-  if (process.argv.includes("--remote-app-worker")) {
-    await runRemoteAppWorkerFromStdin();
     return;
   }
 
