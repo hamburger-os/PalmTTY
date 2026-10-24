@@ -56,14 +56,6 @@ For each relevant combination inspect:
 
 Check that the always-visible mobile CLI dock places Keyboard and Long Text first, pinned More opens the advanced row directly and Collapse closes it, and no obsolete full/hidden modes remain. Check single-row Tools navigation without remounting xterm/WebSocket. Theme or workbench-pane switching while a terminal is live must not recreate xterm or WebSocket state. Presentation-state changes must not be wired into the terminal transport lifecycle.
 
-## Additional Remote App matrix
-
-Check all three themes, Quality/Performance, portrait/short landscape, keyboard open and reduced motion with a video-first Remote App. Verify compact header, Tools overlay, a video surface free of permanent controls, the outside-video mode/options strip and key dock, immersive one-row layout with an always-reachable dock exit, on-demand diagnostics, and no waiting text after the browser has decoded a frame. On real mobile Safari, verify View pinch remains browser-owned and Trackpad/Direct touch never scroll the page, including two-finger partial lifts/pointercancel; test the restrained 5.667×8 cursor scale against dark/light applications, verify Terminal and Remote App both render Keyboard then Long Text as their first two actions, the Safari Keyboard tap synchronously focuses a real 1px in-viewport bridge with >=16px font without an extra visible input panel, Chinese IME commits exactly once, held Backspace/Delete drains in bounded ordered batches without double-firing keydown/beforeinput/input, and Long Text waits for explicit send, neither input appears in Options, test quick drag prediction and idle convergence after verified native samples without canvas/video flicker, shared `.glass-panel` material on both Remote App key docks, unadapted full-window contain and adapted ≤4% automatic fill (with no redundant Fill menu), a constrained/minimum-size app that stays contained instead of losing controls, video content-box/cursor/direct-touch/Trackpad mapping, clipped/off-window cursor hiding, one-finger tap, long-press drag/cancel release, two-finger right tap/scroll, native input-blocked feedback and user-consented Windows window resize/restore. Confirm switching Git/Files does not reset App/Terminal connections. Windows native compile and installed video smoke cannot replace real Codex/7-Zip capture tests.
-
-### Browser terminal glyph renderer
-
-Confirm one WebGL2 addon is loaded only after xterm is opened, with custom box/block glyphs. Test unavailable WebGL2, activation failure, onContextLoss and unmount; every path must preserve DOM fallback or dispose only the GPU addon (never create a second xterm, scroll controller or WebSocket). Visually compare `│`/`┃`/`█` stacks on a real high-DPR iPhone in Pi fullscreen and normal-shell output, including after Safari background/foreground; native input, scrollbar and gesture semantics must not change. CI mocks cannot certify Safari GPU availability, scrollbar continuity or inertia.
-
 ## Review priorities
 
 CRITICAL:
@@ -123,11 +115,9 @@ Write the report in Chinese:
 
 Do not add new visual rules here. If the specification is incomplete, update `palmtty-theme/SKILL.md`.
 
-When auditing Remote App pointer smoothness, test a low-FPS/slow-capture Windows app and verify the independently sampled cursor stays responsive, high-frequency Safari pointer moves are coalesced per animation frame, and the browser avoids one React tree update per cursor telemetry event. Check that tap and long-press drag flush pending movement before button up, and that new peers, off-window cursor reports, or a switch to View/Direct mode hide or reset a speculative cursor. Simulator/CI cannot prove perceived Safari latency; validate on the owner device.
 
 ## Headless input and desktop-safe geometry regression matrix
 
-Review a Windows host with no physical display, with a dummy HDMI / signed virtual output, logged in/unlocked, locked, logged off, and after RDP disconnect. Only an Active interactive WinSta0/Default desktop with a usable display may receive input; video may still be available in other states. Confirm each bounded diagnostic is shown in the outside-video dock even in View mode and updates when the Windows state changes without a tap. Never expose HWND/PID/desktop identity in browser telemetry or recommend elevation as a secure-desktop bypass. On Windows with bottom or side taskbars and a negative-coordinate secondary monitor, adapt only the verified app HWND within rcWork; disable/teardown restores original position and dimensions. Inspect DWM crop vs true cursor/Direct Touch at corners and block WindowFromPoint hits on Start, Task View, taskbar and unrelated windows. Run the packaged native geometry self-test, and require real Windows/Safari acceptance for secure desktops and headless graphics.
 
 
 Additional terminal TUI acceptance: with mouse reporting enabled in OpenCode (or an equivalent SGR-reporting test TUI), one-finger swipe plus inertia must not inject NaNM fragments into the prompt. Verify real SGR wheel reports still reach the TUI, while invalid reports with absent/stale coordinates are not interpreted as keyboard text. The browser must not install competing touchmove listeners or scroll physics.

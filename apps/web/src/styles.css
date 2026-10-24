@@ -898,14 +898,6 @@ button.directory-choose {
   overscroll-behavior: none;
 }
 
-.workbench-page.is-remote-app.remote-app-immersive {
-  grid-template-rows: minmax(0, 1fr);
-}
-
-.workbench-page.is-remote-app.remote-app-immersive .workbench-header {
-  display: none;
-}
-
 .workbench-page.has-visual-viewport-frame {
   position: fixed;
   top: var(--workbench-visual-top);
@@ -2233,38 +2225,8 @@ button.directory-choose {
 }
 
 
-/* Remote App profiles and sessions */
-.workspace-remote-apps {
-  display: grid;
-  gap: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--border);
-}
-
-.workspace-remote-apps-label,
-.workspace-remote-app-unavailable {
-  color: var(--text-muted);
-}
-
-.workspace-remote-app-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.workspace-remote-app-launch {
-  flex: 1 1 140px;
-  min-height: var(--touch-target-compact);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .workspace-dialog-title-row,
 .settings-section-heading,
-.remote-app-text-actions,
-.remote-app-toolbar,
-.remote-app-modes,
 .remote-app-keybar {
   display: flex;
   align-items: center;
@@ -2284,7 +2246,6 @@ button.directory-choose {
 
 .workspace-settings-card,
 .settings-page,
-.remote-app-picker,
 .remote-app-picker-section {
   display: grid;
   gap: var(--space-3);
@@ -2487,7 +2448,6 @@ button.settings-list-row:hover:not(:disabled),
   .workbench-page.is-terminal .terminal-frame {
     padding: 6px 2px 7px 3px;
   }
-  .workbench-page.is-remote-app,
   .workbench-page.is-terminal {
     gap: 4px;
     padding:
@@ -2496,46 +2456,10 @@ button.settings-list-row:hover:not(:disabled),
       max(3px, env(safe-area-inset-bottom))
       max(4px, env(safe-area-inset-left));
   }
-  .workbench-page.is-remote-app .workbench-header,
-  .workbench-page.is-terminal .workbench-header {
-    position: relative;
-    min-height: var(--touch-target);
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "leading actions";
-    gap: 4px;
-    padding: 3px 6px;
   }
-  .workbench-page.is-remote-app .workbench-name,
-  .workbench-page.is-terminal .workbench-name { max-width: 38vw; }
-  .workbench-page.is-remote-app .workbench-activity-switcher,
-  .workbench-page.is-terminal .workbench-activity-switcher { max-width: 27vw; }
-  .workbench-page.is-remote-app .workbench-tabs,
-  .workbench-page.is-terminal .workbench-tabs { display: none; }
-  .workbench-page.is-remote-app .workbench-tabs.mobile-open,
-  .workbench-page.is-terminal .workbench-tabs.mobile-open {
-    position: absolute;
-    z-index: 20;
-    display: flex;
-    top: calc(100% + 5px);
-    left: 0;
-    right: 0;
-    width: 100%;
-    padding: 5px;
-    background: var(--flat-modal);
-    border: 1px solid var(--border-strong);
-    box-shadow: var(--shadow);
-  }
-  .workbench-page.is-remote-app .mobile-workbench-tools,
-  .workbench-page.is-terminal .mobile-workbench-tools { display: inline-flex; }
-  .workbench-page.is-remote-app .workbench-actions,
-  .workbench-page.is-terminal .workbench-actions { gap: 4px; }
-}
 
 @media (orientation: landscape) and (max-height: 520px) {
-  .workbench-page.is-remote-app:not(.remote-app-immersive) .workbench-header {
-    min-height: 36px;
   }
-}
 
 /* Reader disclosure uses the existing semantic controls; no nested vertical scroll owner. */
 .speech-reader-advanced summary {
