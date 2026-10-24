@@ -1,6 +1,5 @@
 import { MAX_SESSION_ARTIFACT_BYTES } from "@palmtty/protocol";
 import type {
-  AppSessionPublic,
   BrowseDirectoryRequest,
   CreateWorkspaceInput,
   DirectoryListing,
@@ -15,11 +14,6 @@ import type {
   GitRemoteRequest,
   GitRemoteResponse,
   GitStatusResponse,
-  BrowseRemoteAppExecutableRequest,
-  RemoteAppAnswerResponse,
-  RemoteAppCapabilities,
-  RemoteAppCatalogResponse,
-  RemoteAppExecutableListing,
   RuntimeCapabilities,
   SessionArtifact,
   SessionArtifactListResponse,
@@ -65,6 +59,14 @@ async function responseJson<T>(response: Response): Promise<T> {
 async function responseBlob(response: Response): Promise<Blob> {
   if (!response.ok) return responseError(response);
   return response.blob();
+}
+
+export type IntegrationLinks = { vscodeWeb?: string; harness?: string };
+
+export async function integrationLinks() {
+  return responseJson<IntegrationLinks>(await fetch("/api/v1/integrations", {
+    credentials: "same-origin", cache: "no-store"
+  }));
 }
 
 export async function authStatus() {
@@ -446,113 +448,6 @@ export async function deleteSession(id: string) {
   ));
 }
 
-
-export async function detectRemoteApps() {
-  return responseJson<RemoteAppCatalogResponse>(await fetch(
-    "/api/v1/remote-apps/catalog",
-    {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: "{}"
-    }
-  ));
-}
-
-export async function browseRemoteAppExecutables(
-  input: BrowseRemoteAppExecutableRequest = {}
-) {
-  return responseJson<RemoteAppExecutableListing>(await fetch(
-    "/api/v1/remote-apps/executables/browse",
-    {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(input)
-    }
-  ));
-}
-
-export async function remoteAppCapabilities() {
-  return responseJson<RemoteAppCapabilities>(
-    await fetch("/api/v1/remote-apps/capabilities", {
-      credentials: "same-origin"
-    })
-  );
-}
-
-export async function listAppSessions() {
-  return responseJson<{ sessions: AppSessionPublic[] }>(
-    await fetch("/api/v1/app-sessions", { credentials: "same-origin" })
-  );
-}
-
-export async function getAppSession(id: string) {
-  return responseJson<{ session: AppSessionPublic }>(
-    await fetch(`/api/v1/app-sessions/${encodeURIComponent(id)}`, {
-      credentials: "same-origin"
-    })
-  );
-}
-
-export async function createAppSession(workspaceId: string, profileId: string) {
-  return responseJson<{ session: AppSessionPublic }>(await fetch(
-    "/api/v1/app-sessions",
-    {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ workspaceId, profileId })
-    }
-  ));
-}
-
-export async function negotiateRemoteApp(sessionId: string, sdp: string) {
-  return responseJson<RemoteAppAnswerResponse>(await fetch(
-    `/api/v1/app-sessions/${encodeURIComponent(sessionId)}/offer`,
-    {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ type: "offer", sdp })
-    }
-  ));
-}
-
-export async function detachRemoteApp(
-  sessionId: string,
-  connectionId: string
-) {
-  return responseJson<void>(await fetch(
-    `/api/v1/app-sessions/${encodeURIComponent(sessionId)}/detach`,
-    {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ connectionId })
-    }
-  ));
-}
-
-export async function terminateAppSession(id: string) {
-  return responseJson<{ session: AppSessionPublic }>(await fetch(
-    `/api/v1/app-sessions/${encodeURIComponent(id)}/terminate`,
-    {
-      method: "POST",
-      credentials: "same-origin"
-    }
-  ));
-}
-
-export async function deleteAppSession(id: string) {
-  return responseJson<void>(await fetch(
-    `/api/v1/app-sessions/${encodeURIComponent(id)}`,
-    {
-      method: "DELETE",
-      credentials: "same-origin"
-    }
-  ));
-}
 
 export type QwenSpeechStatus = {
   enabled: boolean;
