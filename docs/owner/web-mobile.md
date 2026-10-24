@@ -12,14 +12,10 @@
 - 在网页端创建、编辑、删除持久化 Workspace；
 - “新建工作区”不等待可选运行环境探测即可打开；Host 始终可配置，WSL 选项在能力探测完成后按结果显示；
 - Workspace 对话框由 React 状态控制开关，原生 `dialog` 的激活逻辑可重复执行，兼容开发环境 StrictMode；
-- Workspace 根页不再直接堆叠 Host/WSL/App 高级字段：基础页只保留名称、cwd、environment，并通过独立的 Terminal / Remote Apps 设置入口进入对应 Activity 配置；
 - 工作目录支持在网页内浏览并选择 Agent 宿主机或所选 WSL 发行版中的目录；这是远端目录浏览，不调用浏览器本机文件选择器；
-- Workspace 弹窗继续使用固定 Header / 单一可滚动 Body / 固定 Footer，但 Body 现在是层级设置页：Workspace → Terminal 或 Remote Apps → 单个 App / App 选择器；返回/关闭/保存操作始终可达，目录与 executable 列表各自只作为有界数据区滚动；删除确认使用统一主题确认框；
 - Terminal 设置页只显示一个“终端环境”选择器：已知 Host Shell 与已注册 WSL 发行版作为一级 Profile；Host/WSL 内部 runtime、显式 shell/argv 只在“自定义”高级路径展开；Terminal startup command 也归入此页；
 - 环境变量使用每行一个 `NAME=value` 的结构化编辑，适合代理等必须在 Shell 启动前存在的变量；为兼容从 PowerShell/文档复制的写法，最外层成对单引号/双引号会在保存时去除，不成对引号直接报错；它们持久化在 Workspace 中，不是密钥存储；
 - 启动命令改为多行输入，并提供常用终端 Agent 快捷项，目前包括 Codex、Claude Code、Antigravity、Gemini CLI、OpenCode、Aider，点击只填写命令，不负责安装工具；
-- Workspace 卡片可创建 Terminal Session，也可直接启动已保存 Remote App Profile；
-- 首页把 Terminal Session 与 Remote App Session 合并为一个 Activity 列表；
 - Activity 状态和连接数保持显式；运行/终止中的 Activity 显示连接状态，已退出 Activity 显示退出码（如果可用）；
 - 会话动作按生命周期分离：运行中的会话显示“终止”，已退出/失败会话显示“清除”；会话工作台提供经确认的“重启终端”，它会替换 PTY/Session 并重新读取最新 Workspace/宿主环境；不再使用含义模糊的红色 ×；
 - WorkspaceWorkbench 是 Activity-aware 工作台：顶栏可在同一 Workspace 的 live Terminal/App Activity 间直接切换；当前 Activity 旁仍提供 Git/Files Workspace Tool；Artifacts 只在 Terminal Activity 中出现。Git 与 Files 使用 Workspace authority，不从 PTY 当前 `cd` 猜测作用域；
@@ -90,50 +86,9 @@
 
 手机体验优化不能绕开终端协议新增隐式高权限 API。Git/文件能力已经通过独立、有界 Workspace API 落地：Files 保持只读，Git 只开放 typed 写操作。继续增加更高级 Git 或文件写能力时仍必须单独审查权限、仓库 hooks/filters、并发写、symlink/路径逃逸与敏感环境变量继承。
 
-## Remote App 手机交互
+## 独立 Web 应用入口
 
-WorkspaceWorkbench 把 Terminal 与 Remote App 作为独立 Activity，把 Git/Files 作为共享 Workspace Tool，把 Artifacts 保持为 Terminal Session scope。切换 Git/Files 不卸载当前 Activity；如果同一 Workspace 有多个 live Terminal/App，Header 的 Activity selector 可以直接切换，不必先回首页。
-
-Remote App Profile 的普通编辑流程不再要求用户理解帧率/分辨率：
-
-1. 添加应用；
-2. 从已检测应用选择，或浏览宿主 Windows 的目录 + `.exe`；
-3. 可选填写 argv；
-4. 手工 executable 路径只在 Advanced 中作为兜底。
-
-Remote App Surface 使用三种显式触摸语义：
-
-- 查看：不发送 pointer，浏览器保留 pinch zoom/页面手势；
-- 直触：屏幕坐标映射到目标应用窗口；
-- 触控板：单指相对移动、轻点点击、双指滚动。
-
-画质为自动模式。Surface 的实际几何/DPR 通过 bounded display hint 发给 AppWorker/helper，横竖屏或 viewport 变化后自动缩放，不把 FPS/宽高存进 Profile。
-
-手机 Terminal 和 Remote App 复用共享「键盘、长文本」主按钮。Terminal 键盘继续聚焦 xterm；Remote App 键盘在点击时同步聚焦 16px 字号、1px 大小的 Safari 隐形输入桥，不再覆盖远程应用画面；已确认 Unicode 以有界消息按帧合并发送，连续 Backspace/Delete 每批最多 32 次；长文本保留可编辑预览和明确发送，断线时即时输入中尚未发送的文字可转到长文本面板。常用 Ctrl/Alt/Shift、方向、Enter、Tab、Esc、Backspace/Delete 沿用 allowlisted typed key。Remote App 不复用 xterm textarea，也不把桌面输入逻辑混入 TerminalView。
-
-Remote App 画面状态必须可诊断：等待窗口、等待首帧、正在串流、capture unavailable 与 WebRTC 路径失败分别显示；不能把所有失败都退化成黑屏。浏览器首帧成功解码后停止初始等待覆盖层，后续故障以外置控制条中的非阻塞提示呈现；详细计数在选项中按需查看。公网/反向代理环境如果需要 TURN，Web 只使用认证 capability 返回的 host-configured ICE servers；UI 不提供任意 ICE 注入。
-
-
-
-## 远程 App 沉浸式手机布局
-
-工作区在远程 App 活动中使用紧凑单行顶栏，Git/文件改由工具菜单进入。沉浸模式同时隐藏顶栏并将工作台改为单行内容 Grid，避免绝对定位的 Activity Pane 失去高度；底部外置控制条保留显式退出按钮。操作模式、选项/诊断不再常驻遮挡视频；底部控制条与核心快捷键 Dock 一起固定在 VisualViewport 可见区域内，额外导航按键通过“更多”展开。共享页面的 section 顶部留白只作用于首页，不作用于视频组件。视频默认完整等比展示，用户可以选择裁切填充；坐标映射与实际 object-fit 对齐，不会盲目拉伸内容。
-
-直触/触控板模式使用主动的表面级 touch-action 和非被动 touchmove，仅拦截远端画面区域内部的手势；查看模式保留原生浏览器缩放。触控板状态机明确管理单指移动/轻点、双指中心滚动、部分抬起和取消；取消不合成 click。可选窗口适配通过有界 typed display hint 请求，Windows Host 必须重新验证 Job 归属才能改变尺寸。
-
-## 精简 CLI 与手机导航
-
-Terminal/Remote App 在手机上共用单行工作台标题栏，通过按需展开的「工具」访问 Git、文件及终端附件。Terminal 键栏直接显示手机键盘、长文本、Esc、Tab、Enter、`/`、Ctrl，“更多/收起”固定在横向滚动区之外，一次点击展开或收起包含 Alt、方向键、Ctrl 快捷键、字体大小及编辑按键的第二行。已移除多余的完整/隐藏状态；展开仅改变浏览器布局，由原有 mount ResizeObserver/FitAddon 重新计算终端行列，不能重建 xterm 或 WebSocket。
-
-Remote App 视频仅叠加不接管触摸事件的主题 SVG 鼠标，坐标来自受控 Windows 窗口；支持长按拖动和双指右键，DataChannel 就绪与 Windows 原生输入被拒绝分别显示。
-
-## 本轮 CLI 与 Remote App 微调
-
-CLI 将长文本固定在键盘之后第二位，仅保留始终可见的核心行和直接展开的“更多/收起”，不再提供收益有限的隐藏态或中间完整模式。Remote App 底部常用/额外按键均使用共享 `.glass-panel` 主题材质与标准控制令牌，不再以不透明 `--flat-content` 单独铺底。鼠标光标由 26×34 缩小为 17×24 CSS px，描边与阴影同步减轻，保留受控窗口验证与 contain/cover 映射。真机主题矩阵仍需部署后验收。
-
-## Remote App 无显示器与输入状态
-
-WebRTC 已连接只说明媒体通道可用；手机在当前已连接视频旁仍需独立呈现有类型的 Windows 输入诊断。原生 Host 只报告严格的抽象状态：断开的 Windows 用户会话、锁屏／UAC／非默认交互桌面、无活动显示输出、当前 Job-owned 窗口失效、焦点激活失败、当前点击被任务栏或其他窗口遮挡，以及原生输入被拒绝。所有消息在视频外的 Dock 呈现，不重新叠加覆盖远程软件的阻断弹窗，不暴露 Windows PID/HWND/全局坐标。媒体状态、键盘／长文本、查看／触控板／直触、沉浸模式及主题布局保持不变。
+首页可以显示独立的 DeepSeek Harness Web 外部链接，VS Code Web 在每个 Workspace 卡片上使用同一个主机级 URL。浏览器在新页面打开上游服务。Codex、Pi、Claude 均保留为 Terminal 的启动命令配置，不新增 Agent Activity。尚未在 iPhone Safari/Android 上验收 VS Code 与 Harness 的跨设备安全访问。
 
 ## 小说朗读（2026-10-20）
 
@@ -182,7 +137,6 @@ OpenCode 等全屏 TUI 开启 mouse 后，xterm.js 的触摸惯性事件可能�
 
 ## 手机确认弹窗与 Pi Regular 验收（2026-10-16）
 
-主题 `.glass-modal` 仅拥有材质和阴影，不再覆盖原生 `<dialog>` 的定位；布局规则统一由 `dialog:modal` 提供。手机短确认框固定于视口底部安全区域，工作区和长文本弹窗沿用独立的有界内容区域。终止/清除 Terminal 或 Remote App Session 时，确认框在异步操作期间保持打开，禁止重复提交；失败显示在弹窗内部，成功后才关闭，无需滚回首页顶部。
 
 用户已验证 Pi `--tui-mode regular` 的历史滚动和多行启动命令可用，本轮不修改启动命令模型、触摸事件路由或后台恢复策略。iPhone Safari 横屏、缩放及浏览器工具栏变化仍需真机复验。
 
