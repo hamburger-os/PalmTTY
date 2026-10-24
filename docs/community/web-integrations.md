@@ -34,3 +34,9 @@ integrations:
 **Harness**：独立首页入口，直接进入官方 DSH Web，由 DSH 自行管理其工作区、会话、模型和登录。
 
 手机上的 `127.0.0.1` 不指向 Windows。手机远程访问需要另行配置可信 HTTPS/私有网络，本轮不实现 Azure Tunnel、反代/VPN、单点登录或第三方程序进程管理。Windows 中 Ctrl+C 退出 serve-web 可能留有子进程，不可盲目结束所有 VS Code/Node 进程。
+
+## Workspace upgrade / 工作区升级
+
+Back up the v3 store and stop the Agent, then run `node scripts/migrate-workspaces-v4.mjs --from <v3-path> --to <v4-path>`. It never overwrites existing output, does not delete the source, and omits removed Remote App profiles. The runtime reads only v4.
+
+升级前关闭 Agent 并备份；离线运行转换工具，保留原 V3，不覆盖已有 V4；新运行时只读取 V4。

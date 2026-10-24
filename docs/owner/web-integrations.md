@@ -20,3 +20,7 @@ Workspace V4 删除 Remote App 数据；运行时不读取旧 V3。卸载旧 Web
 
 ## 验收缺口
 VS Code Codex 扩展、浏览器文件夹深链接、真实手机访问、DSH 登录会话和独立服务长期运行仍需实机验收。完成链接入口不等于完成这些外围能力。
+
+## 一次性升级
+
+关闭 PalmTTY Agent 并备份工作区存储后，用 `node scripts/migrate-workspaces-v4.mjs --from <v3-file> --to <v4-file>` 离线转换。输出文件必须不存在，V3 原件保留，V4 只保存现有 Workspace/Terminal 字段，移除旧 Remote App Profile。运行时不提供自动 V3 回退。
