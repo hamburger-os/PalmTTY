@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { WorkspacePublic } from "@palmtty/protocol";
 import { ArtifactsPane } from "./ArtifactsPane.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
@@ -37,6 +37,11 @@ export function WorkspaceWorkbench({
   const [terminalInsert, setTerminalInsert] = useState<TerminalInsertRequest>();
   const terminalInsertSequence = useRef(0);
   const workbenchRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    setPane("terminal");
+    setMobileToolsOpen(false);
+  }, [activity.sessionId]);
 
   const terminalConnectionChanged = useCallback((next: ConnectionState) => {
     setTerminalConnection(next);
