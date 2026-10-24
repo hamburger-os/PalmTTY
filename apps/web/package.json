@@ -12,7 +12,7 @@
     "@palmtty/protocol": "workspace:*",
     "@xterm/addon-fit": "0.12.0-beta.301",
     "@xterm/addon-webgl": "0.20.0-beta.300",
-    "@xterm/xterm": "6.1.0-beta.304",
+    "@xterm/xterm": "6.1.0-beta.315",
     "dompurify": "3.4.16",
     "highlight.js": "11.12.0",
     "katex": "0.17.0",
