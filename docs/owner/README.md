@@ -10,8 +10,8 @@
 - [session.md](session.md) — Host / WSL / PTY 会话模型
 - [reconnect.md](reconnect.md) — 断线重连与终端状态恢复
 - [security.md](security.md) — 安全模型、认证与公网边界
+- [web-integrations.md](web-integrations.md) — 官方 VS Code Web、独立 Harness 与权限边界
 - [web-mobile.md](web-mobile.md) — 手机端 Web/PWA 交互
-- [remote-apps.md](remote-apps.md) — Windows Remote Apps、AppWorker/WebRTC 与移动控制边界
 - [deployment.md](deployment.md) — Windows、QNAP 与反向代理部署
 - [github-governance.md](github-governance.md) — GitHub Ruleset、合并策略、社区治理与仓库设置
 - [roadmap.md](roadmap.md) — 当前完成度与后续阶段
@@ -28,4 +28,3 @@
 
 如果 Owner 文档与代码事实冲突，应视为任务未完成。
 
-- [Unattended browser RDP / 无人值守浏览器 RDP](unattended-rdp.md) — v0.3.0 架构与交付门槛。
