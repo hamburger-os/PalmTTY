@@ -58,7 +58,7 @@ const en = {
     "sessions.state.exited": "exited",
     "sessions.state.failed": "failed",
     "activities.title": "Activities",
-    "activities.empty": "No Terminal or Remote App activities yet.",
+    "activities.empty": "No terminal sessions yet.",
     "activities.terminal": "Terminal",
     "workspace.addTitle": "Add workspace",
     "workspace.editTitle": "Edit workspace",
@@ -394,8 +394,6 @@ const en = {
     "workbench.back": "Activities",
     "workbench.activitySwitcher": "Switch activity",
     "workbench.tools": "Tools",
-    "errors.invalid_remote_app_browse_request": "The Remote App browse request is invalid.",
-    "errors.too_many_remote_app_discovery_requests": "Too many Remote App discovery requests. Try again shortly.",
     "errors.http_500": "The PalmTTY Agent reported an internal error."
 } as const;
 
@@ -786,8 +784,6 @@ const zhCN: Record<MessageKey, string> = {
     "workbench.back": "活动",
     "workbench.activitySwitcher": "切换 Activity",
     "workbench.tools": "工具",
-    "errors.invalid_remote_app_browse_request": "远程 App 浏览请求无效。",
-    "errors.too_many_remote_app_discovery_requests": "远程 App 检测请求过于频繁，请稍后重试。",
     "errors.http_500": "PalmTTY Agent 发生内部错误。"
 };
 

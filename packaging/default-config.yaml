@@ -20,15 +20,11 @@ sessions:
   replayBytes: 2097152
   maxSocketBufferedBytes: 2097152
 
-remoteApps:
-  enabled: true
-  maxSessions: 4
-  exitedRetentionMinutes: 30
-  webrtc:
-    # Empty is sufficient on the same LAN/VPN when direct host candidates are
-    # routable. Reverse-proxy/public deployments may need STUN/TURN here.
-    # ICE credentials are delivered only to authenticated Remote App clients.
-    iceServers: []
+# Optional independently managed VS Code Web / DeepSeek Harness links.
+# URLs must use HTTPS (or loopback HTTP) and must NOT contain connection tokens.
+# integrations:
+#   vscodeWeb: https://code.example.test/
+#   harness: https://harness.example.test/
 
 # Optional high-quality local novel reader. Start the separate Python sidecar,
 # configure PALMTTY_QWEN_TOKEN in both its environment and the Agent's env-file,
