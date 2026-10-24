@@ -25,18 +25,12 @@ import { browseWorkspaceDirectory } from "./workspace-directory-browser.js";
 import { detectTerminalProfiles } from "./terminal-profiles.js";
 import { FixedWindowLimiter, isPrivateClientAddress, isTrustedOrigin } from "./security.js";
 import { registerSessionArtifactRoutes } from "./session-artifact-routes.js";
-import { registerRemoteAppRoutes } from "./remote-app-routes.js";
-import {
-  RemoteAppSessionManager,
-  type RemoteAppSessionManagerOptions
-} from "./remote-app-session-manager.js";
 import { SessionArtifactStore } from "./session-artifacts.js";
 import { SessionManager, type SessionManagerOptions } from "./session-manager.js";
 import {
   detectRuntimeCapabilities,
   resolveRuntimeWorkspace
 } from "./workspace-runtime.js";
-import { validateRemoteAppProfiles } from "./remote-app-launch.js";
 import {
   FileWorkspaceStore,
   type WorkspaceStore
@@ -54,10 +48,6 @@ export type BuildAppOptions = {
   sessionManager?: Omit<
     SessionManagerOptions,
     "workspaceStore" | "onSessionDisposed"
-  >;
-  remoteAppSessionManager?: Omit<
-    RemoteAppSessionManagerOptions,
-    "workspaceStore"
   >;
   workspaceStore?: WorkspaceStore;
   additionalTrustedOrigins?: readonly string[];
@@ -119,11 +109,6 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
   await sessions.initialize();
   await artifacts.initialize();
-  const remoteApps = new RemoteAppSessionManager(config, {
-    ...options.remoteAppSessionManager,
-    workspaceStore
-  });
-  await remoteApps.initialize();
   const runtimeCapabilitiesPromise = detectRuntimeCapabilities();
   const createLimiter = new FixedWindowLimiter(20, 60_000);
   const sessionMutationLimiter = new FixedWindowLimiter(60, 60_000);
@@ -148,7 +133,6 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     workspace: ReturnType<typeof WorkspaceDefinitionSchema.parse>
   ): Promise<void> {
     await resolveRuntimeWorkspace(workspace);
-    await validateRemoteAppProfiles(workspace);
   }
 
   async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
@@ -275,10 +259,9 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     requireOrigin,
     sensitiveEnvironmentKeys
   });
-  registerRemoteAppRoutes(app, {
-    manager: remoteApps,
-    requireAuth,
-    requireOrigin
+  app.get("/api/v1/integrations", { preHandler: requireAuth }, async (_request, reply) => {
+    reply.header("Cache-Control", "private, no-store");
+    return config.integrations;
   });
 
   app.get("/api/v1/workspaces", { preHandler: requireAuth }, async () => ({
@@ -371,8 +354,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
         return reply.code(404).send({ error: "workspace_not_found" });
       }
       if (
-        sessions.hasActiveWorkspaceSessions(request.params.id) ||
-        remoteApps.hasActiveWorkspaceSessions(request.params.id)
+        sessions.hasActiveWorkspaceSessions(request.params.id)
       ) {
         return reply.code(409).send({ error: "workspace_in_use" });
       }
@@ -612,10 +594,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   app.addHook("onClose", async () => {
-    await Promise.all([
-      sessions.close(),
-      remoteApps.close()
-    ]);
+    await sessions.close();
   });
 
   return app;

@@ -9,8 +9,8 @@ This layer records the external technical basis used by PalmTTY. It is not a pla
 - [autostart.md](autostart.md) — Microsoft Task Scheduler and systemd user-service behavior used by PalmTTY autostart
 - [github-actions.md](github-actions.md) — GitHub reusable-workflow contexts, inputs and concurrency semantics used by release gates
 - [mobile-web-viewport.md](mobile-web-viewport.md) — VisualViewport, iOS focus zoom and WebKit viewport caveats used by mobile layout
+- [vscode-web.md](vscode-web.md) — official VS Code serve-web and DSH Web documentation
 - [speech.md](speech.md) — Browser Web Speech API and upstream Qwen3-TTS model/runtime contracts
-- [remote-app-runtime.md](remote-app-runtime.md) — WebRTC, Windows Job Object, window capture and restricted input references for Remote Apps
 
 ## Rule
 
@@ -18,4 +18,3 @@ When PalmTTY behavior differs from an external source, document the difference i
 
 Last reviewed: 2026-09-24.
 
-- [Unattended browser RDP / 无人值守浏览器 RDP](unattended-rdp.md) — Official Windows/Guacamole references and their interpretation.

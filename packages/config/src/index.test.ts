@@ -38,41 +38,25 @@ describe("configuration", () => {
     expect(config.auth.maxLoginSessions).toBe(32);
     expect(config.sessions.maxSessions).toBe(8);
     expect(config.sessions.exitedRetentionMinutes).toBe(30);
-    expect(config.remoteApps.enabled).toBe(true);
-    expect(config.remoteApps.maxSessions).toBe(4);
-    expect(config.remoteApps.exitedRetentionMinutes).toBe(30);
-    expect(config.remoteApps.webrtc.iceServers).toEqual([]);
+    expect(config.integrations).toEqual({});
   });
 
-  it("parses bounded Remote App ICE servers", () => {
+  it("validates credential-free integration origins", () => {
     const config = parseConfig({
-      remoteApps: {
-        enabled: true,
-        maxSessions: 4,
-        exitedRetentionMinutes: 30,
-        webrtc: {
-          iceServers: [{
-            urls: [
-              "stun:stun.example.test:3478",
-              "turns:turn.example.test:5349"
-            ],
-            username: "palmtty",
-            credential: "secret"
-          }]
-        }
+      integrations: {
+        vscodeWeb: "http://127.0.0.1:8000/",
+        harness: "https://dsh.example.test/"
       }
     });
-    expect(config.remoteApps.webrtc.iceServers[0]?.urls).toHaveLength(2);
-    expect(() => parseConfig({
-      remoteApps: {
-        enabled: true,
-        maxSessions: 4,
-        exitedRetentionMinutes: 30,
-        webrtc: {
-          iceServers: [{ urls: ["https://not-ice.example.test"] }]
-        }
-      }
-    })).toThrow();
+    expect(config.integrations.vscodeWeb).toBe("http://127.0.0.1:8000/");
+    for (const value of [
+      "http://192.168.0.2:8000",
+      "javascript:alert(1)",
+      "https://dsh.example.test/?token=secret",
+      "https://person:secret@dsh.example.test/"
+    ]) {
+      expect(() => parseConfig({ integrations: { harness: value } })).toThrow();
+    }
   });
 
   it("derives LAN listeners and exact private origins", () => {

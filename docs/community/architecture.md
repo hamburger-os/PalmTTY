@@ -105,50 +105,16 @@ Session 生命周期动作明确分离：“终止”把活动会话推进为 `s
 
 Windows 本地控制 IPC 使用 Named Pipe；其他当前 CI 平台使用 Unix domain socket。每个 Worker 有独立 256-bit secret，创建时只经匿名 stdin 传入，不发送到浏览器。持久化 PID 只用于诊断，不能作为 kill authority。Agent 暂时无法连接 Worker 并不等于 Worker 已死亡，因此不会仅因 IPC 超时删除可能仍存活 Worker 的恢复能力；已接管 Worker 的控制连接会持续退避重连。Worker 自己拥有 recovery metadata，文件缺失时会重新发布；如果发现恢复权限被其他内容替换，则 fail closed。
 
-Workspace 现在是 Agent 持有的独立持久化状态，通过“认证 + 精确 Origin”保护的 HTTP API 创建、编辑和删除。Workspace authority 明确拆成基础 name/cwd/environment、嵌套 `terminal` launch profile，以及 `remoteApps` saved profiles；旧的顶层 runtime/startupCommand 不保留兼容层。WorkspaceWorkbench 可以在同一 Workspace 的 live Terminal/App Activity 间切换；Git/Files 是共享 Workspace Tool，Artifacts 只属于 Terminal Session。切换 Git/Files 不会卸载当前 xterm/WebRTC Activity。Session 附件位于 Workspace 之外的当前用户私有 runtime 目录，服务端只接受通过真实文件签名、尺寸与像素总量检查的 PNG/JPEG/WebP/GIF，使用稳定有界读取并限制单文件、数量与总容量，存储名随机化；Web 可以把基于 Session 创建时不可变运行身份得到的 Host/WSL 可读路径写入当前终端，但不会自动发送回车，因此不同 CLI 的图片引用语法仍由工作负载自己决定。只要对应 Worker recovery record 仍存活，Agent 重启后附件可继续发现；Session retirement 或启动 orphan 清理会回收附件目录。Files 的目录、预览与完整文件导出都只接受规范化 Workspace 相对路径并保持只读，Host/WSL 都会做 canonical/symlink 根目录约束，目录最多 512 项，UTF-8 文本预览最多 512 KiB，并明确标记二进制/截断状态；完整文件 copy/share/download 使用独立 8 MiB 稳定有界读取，因此不会把截断预览当成完整内容。Git 明确使用“包含 Workspace cwd 的完整仓库”作为作用域，并返回 Workspace 在仓库中的相对路径；读取使用 porcelain v2 status、有界 diff/branches、固定 HEAD snapshot 的 opaque cursor history 分页、可选文件 history，以及有界 commit 元数据/changed-files/file-diff，禁用 external diff/textconv/fsmonitor。写入只接受 typed stage/unstage/restore/commit/branch/stash/fetch/pull/push operation，必须携带当前 state token 和可信仓库确认，破坏性 restore 还校验已查看 diff snapshot；Git hooks 与交互提示被禁用，仓库 filter 仍可能按正常 Git 语义执行，因此这一确认不是沙箱。辅助子进程会剔除 PalmTTY 控制/认证环境与 askpass 入口。编辑器提供有边界的目录浏览、统一 Terminal Profile 发现，以及 Remote App executable discovery：App 检测只检查少量已知应用，browser 只列目录和 `.exe`，不返回文件内容或执行任意命令。Terminal startup input 持久化在 `workspace.terminal`；Remote App profile 只保存 id/name/executable/argv。Terminal/App Session 创建时都只消费持久 authority，不接受临时 runtime/executable/env 注入。Windows Host 新终端会重新读取 Machine/User 环境与最新 PATH 后再叠加 Workspace environment；WSL 把发行版、cwd、Shell 作为结构化 argv 传递，并通过 `WSLENV` 转发配置变量名。Worker bootstrap 只接收规范化后的运行规格。
 
 浏览器端交互也保持单一所有权：终端滚动物理由 xterm 独占，PalmTTY 只用普通 click/tap focus bridge（以及手机 keybar 的显式键盘按钮）激活 xterm 隐藏 textarea；coarse-pointer/mobile 布局中的可编辑控件统一至少 16px，避免 iOS 聚焦放大。WorkspaceWorkbench 在所有缩放级别都负责当前 VisualViewport 的展示几何，浏览器栏、双指缩放和软键盘先调整整个工作台，再由 terminal mount 的 ResizeObserver/FitAddon 推导终端尺寸；TerminalView 不再直接监听 VisualViewport，`visualViewport.scale` 不会关闭 framing，PalmTTY 也不会写入用户缩放；`?viewportDebug=1` 只输出几何/focus 诊断，不包含终端内容。Git 左侧 sidebar 是“更改 / 历史”与 Git tools 的唯一纵向滚动容器，内部 change/history list 只是内容，不再成为嵌套 scroll owner；Files 可以把当前文件直接带入文件级 Git history，而不改变 Workspace/Session authority。 手机终端快捷键栏只是浏览器侧通用输入适配层，不感知具体 AI CLI：共享纯函数编码器负责 Enter、导航键、Ctrl/Alt 组合和固定控制字符，UI 将键盘和高频长文本固定为前两项，其后是 Esc/Tab/Enter/`/`/Ctrl，滚动区外的“更多”一次展开或收起可选第二行；Codex、Claude Code、Antigravity 等都消费同一套普通终端输入。
 
 PTY 输出、headless mirror、seq 与 replay 都在 Worker 内按同一有序流水线更新，因此 Agent 不在线期间状态仍连续。浏览器恢复时把已 fit 的 rows/cols 与 lastSeq 一起提交；Worker 先把 canonical PTY/headless mirror 调整到该 geometry，尺寸未变且历史仍可用时才 replay，尺寸变化或历史过旧时使用新 geometry 下的 snapshot。恢复帧之后的 `hello` 表示恢复完成，恢复边界与实时订阅之间不留消息窗口。
 
-### Remote App activity / 远程 App Activity
+### External Web applications / 独立 Web 应用
 
-Remote Apps form a second terminal-independent activity data plane:
+Optional operator-configured URLs expose a standalone DeepSeek Harness Web home entry and a host-level official VS Code Web link on each Workspace. Browser requests navigate to external services; the Agent does not proxy or own their identity, sessions, workspaces or process lifecycle. Codex CLI remains a Terminal workload. HTTPS is required except for loopback testing, and credential-bearing URLs are forbidden.
 
-~~~text
-Mobile browser / PWA
-  | Shared Workspace tools: Git / Files
-  | Activities:
-  |   Terminal -> WSS -> Terminal Worker -> PTY
-  |   Remote App -> WebRTC -> AppWorker -> Windows app host -> owned app window
-        |
-   authenticated lifecycle/signaling/discovery
-        |
-   PalmTTY Agent
-~~~
-
-The persisted resource model is layered: Workspace basics, a nested Terminal launch profile, and saved Remote App profiles. Remote App profiles persist only app identity/executable/argv; frame rate and pixel dimensions are automatic presentation policy.
-
-A Remote App request starts only a saved profile by workspace ID + profile ID. Known-app detection and the executable browser are bounded discovery surfaces, not arbitrary file/command APIs. A Workspace may use WSL for Terminal/Git/Files while its Remote Apps still launch as the current Windows user.
-
-The App surface sends bounded display-size hints so capture adapts to the current phone viewport. AppWorker/native code clamps them and reports explicit media states such as waiting-for-window, waiting-for-frame, streaming and capture-unavailable.
-
-WebRTC may use operator-configured STUN/TURN through `remoteApps.webrtc.iceServers`; directly routable LAN/VPN use may keep it empty. PalmTTY does not provide a cloud relay. Media/input never travels through the terminal WebSocket, capture never falls back to the desktop, and AppWorker recovery is versioned independently from Terminal Worker recovery.
-
-Remote Apps 当前是与终端独立的第二条 Activity 数据面。Workspace 基础配置、Terminal launch profile 与 Remote App profile 分层持久化；App profile 不再保存 FPS/宽高。普通流程通过有界“检测 App / 浏览 .exe”选择应用，手机 Surface 自动发送有界画面尺寸提示。Terminal 可以使用 WSL，而 Remote App 仍作为 Windows 当前用户应用独立启动。公网/反代环境可配置 STUN/TURN，但 PalmTTY 不提供云中继；所有 capture/input authority 仍只属于 PalmTTY 自己启动的单个应用窗口。
-
-
-### Mobile cursor and terminal dock / 手机鼠标与终端工具栏
-
-Windows helper cursor telemetry stays inside the verified Job-owned application HWND. AppWorker forwards bounded typed coordinates and foreground/UIPI input-state feedback only to its single authenticated WebRTC peer; Web overlays the cursor using the same contain/cover geometry as clicks. A one-row mobile Tools header and an always-visible terminal key dock keep xterm/WebSocket mounted; the pinned More button directly toggles extra keys, without separate full or hidden modes.
-
-原生 Helper 仅提供 Job-owned 受控窗口内的归一化光标坐标，通过现有已认证的单一 WebRTC Peer 回传；手机光标与点击使用同一 contain/cover 映射。手机导航收成单行工具菜单，CLI 键栏取消完整/隐藏状态，将高频长文本固定在键盘之后，通过始终可见的“更多”直接展开或收起其他按键，绝不重建 xterm/WebSocket。
-
-### Shared mobile inputs / 手机输入一致性
-
-Terminal and Remote App docks render the same shared Keyboard → Long Text primary actions before their mode-specific shortcuts. The Terminal keyboard focuses xterm’s own input; Remote App Keyboard synchronously focuses a dedicated mobile-safe textarea in the originating iPhone tap, sends committed Unicode on its existing authenticated bounded WebRTC control channel and routes only allowlisted navigation keys via typed key messages. Long Text remains an explicitly submitted composer, with unsent live input preserved when switching. No shared PTY or additional input authority is created.
-
-Terminal 和 Remote App 共用「键盘 → 长文本」两项主按钮，其他功能键后置。Terminal 继续由 xterm 接管软键盘；Remote App 在用户点击当下聚焦独立输入框，输入法完成组合后使用现有 WebRTC 有界文字通道即时发送，特殊键仍走白名单。长文本由用户明确发送，切换时保留即时输入中未发送的草稿，不增加 PTY 通道或桌面控制权限。
+可选的外部应用入口只保存不含凭据的 URL。DSH 作为独立一级入口自行管理工作区与会话；每个 PalmTTY 工作区显示同一个 Windows 主机 VS Code Web 地址，文件夹由 VS Code 自己选择。PalmTTY 不反代第三方，也不提供 Azure 隧道或管理第三方进程。
 
 ### Mobile recovery and browser read-aloud (October 2026)
 
@@ -212,7 +178,6 @@ Browse mode allows only validated SGR wheel reports through to a mouse-tracking 
 
 ### Viewport-safe confirmations / 手机端确认框（2026-10）
 
-Terminal and Remote App terminate/clear confirmations now remain open during asynchronous actions, show failures inline, and close after success. Native modal layout is anchored to the viewport, with compact phone confirmations near the safe-area bottom edge. Retained non-running terminals keep their canonical geometry when viewed from a different-sized browser. Pi Regular/xterm scrolling and existing background reconnection policies are unchanged.
 
 终端与远程应用的终止/清除操作在执行期间保持确认弹窗，失败就地展示，成功才关闭；手机短确认框位于视口底部安全区域。已退出终端从不同尺寸的浏览器重新查看时，不再修改 Worker 端规范终端几何。Pi Regular 滚动和后台重连策略保持不变。
 

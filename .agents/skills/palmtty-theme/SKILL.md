@@ -58,16 +58,13 @@ Surface tiers:
 - `.glass-modal`: modal dialogs that must visually isolate form/readability content from the ambient field. It uses a stronger theme veil, an almost opaque semantic `--flat-modal` base under the specular material, and shadow; never large-area backdrop blur or transparent overlay of underlying text.
 - `.glass-panel`: structural controls such as terminal header, key bar and composer shell. No large-area backdrop blur.
 - `.terminal-surface`: the single terminal viewport owner. Its opaque background must come from the same active xterm theme background value; do not place `.glass-content` behind xterm.
-- `.remote-app-surface`: the separately owned video viewport uses the opaque semantic `--remote-video-background` token when no remote frame is available. It must not leak ambient gradients or inherit the Terminal palette.
 - `.glass-content`: stable non-terminal read areas and empty states. No backdrop blur.
 - `.glass-control`: dense nested controls such as the directory picker. No backdrop blur.
 - `.glass-card`: workspace/session cards derived from the same physics.
 
 A visual region has one surface owner. Do not stack equivalent glass surfaces merely to make an element look "more glassy".
 
-### Immersive Remote App on phones
 
-The remote app video is the one visual owner of all available workbench content height. The video surface has no persistent pointer-mode or diagnostic overlays except a pointer-events-none, theme-tokenized SVG cursor constrained to the verified owned-window position in Trackpad mode: a compact control strip lives below the video and above the special-key dock, using semantic surfaces and the shared touch-target tokens. The one-row mobile Workspace header can collapse into a Tools overlay; immersive mode removes the header's grid row but keeps a labeled exit button in the bottom control strip. Media diagnostics live in the on-demand options menu; before the first decoded frame an initial status may cover the empty surface, and after a frame has rendered any connection/capture warning belongs in the dock, not over the remote application's controls. The entire dock remains reachable inside VisualViewport above browser chrome, with an explicit expandable second key row. Complete aspect-ratio display is default; after explicit phone-window adaptation, only small remaining aspect gaps (≤4% crop) fill automatically, with no separate cropped-cover menu. Video, cursor and touch all share one effective content-box geometry; constrained windows remain fully visible, never stretched. Remote App native touch ownership must not steal xterm's independent gesture path.
 
 ## 4. Theme identity
 
@@ -168,7 +165,6 @@ PalmTTY is primarily operated from a phone.
 - Keep mobile editable controls at 16px or larger; achieve compactness with spacing and control dimensions, not sub-16px form text.
 - Keep terminal viewport ownership simple: one decorative frame around one padding-free xterm mount; xterm remains the only terminal scroll-physics implementation.
 - Controls must remain reachable in portrait and short landscape layouts.
-- The mobile terminal keybar may use horizontally scrollable rows, but it must not become a competing vertical scroll owner. An always-visible row places Keyboard first and frequent Long Text second; one pinned More/Collapse control directly toggles its advanced row without separate full or hidden modes. The mobile Terminal and Remote App share a single-row header with Tools on demand. Changing any of these presentation states must not reconnect xterm/WebSocket. Keep high-frequency actions (including Enter and a literal `/` fallback) in the core row; lower-frequency symbol/navigation actions belong in an optional second horizontal row, and modifier buttons must expose pressed state accessibly. Browser-local terminal font-size controls may refit the mounted xterm in place, but must not recreate transport/session state.
 - Workspace dialogs keep one intentional body scroll owner with header/footer actions always reachable; nested data regions may scroll only when bounded.
 - Dense workbench regions also need one intentional vertical scroll owner. In particular, the Git sidebar owns scrolling for repository summary, the first-class Changes/History switch, change/history lists and Git tools; group/list descendants must not create nested competing vertical scrollers. Commit detail/diff replaces the Git list on narrow screens and must keep an explicit back action reachable. Files and Artifacts use one list scroller plus one independent preview scroller on wide screens; on narrow screens the selected preview replaces the list rather than creating side-by-side overflow. File preview actions (copy/share-download/history) belong to the preview toolbar/action row, must remain reachable as touch targets, and must not create a new vertical scroll owner. Image previews use ordinary bounded `<img>` content inside `.glass-content`, never a new backdrop/material layer.
 - High-frequency touch targets use the shared 44px target where space allows; compact secondary controls use the shared compact target rather than ad-hoc geometry.
@@ -202,17 +198,11 @@ At minimum validate:
 
 Hard-coded visual color values belong only in the theme layer or explicit xterm theme definitions. Business/component layout CSS should consume tokens.
 
-### Remote App dock and cursor visual scale
 
-Use `.glass-panel` for both the primary and extended Remote App key docks, never override their material with `--flat-content`; keep nested buttons theme-tokenized. The verified-window pointer overlay should remain a very small high-contrast arrow (5.667×8 CSS px, one third of its previous size) with a fine theme-owned outline and compact shadow; retain the exact hotspot and contain/cover geometry to avoid obscuring application controls.
 
-### Lightweight Remote App pointer rendering
 
-Both Terminal and Remote App key docks render the same shared Keyboard then Long Text primary actions first; only afterward come mode-specific shortcut/modifier keys. On iPhone Remote App Keyboard must synchronously focus a true 1px, almost-transparent in-viewport editable bridge with computed font >=16px (not display:none); no large extra input panel may cover the remote software. It must never send partial/duplicated IME commits or double-process Backspace from keydown and beforeinput/input. Only Long Text may render the visible text composer. Long Text remains a deliberate-send composer with draft recovery. The top Options menu should only contain display/cropping, explicit current-window resizing, quality and diagnostics; do not duplicate the text entry there. Mouse positions must use a small pointer-events-none SVG with the existing theme fill/outline and exact contain/cover projection; update its transform imperatively in a scheduled animation frame rather than rerendering the large video/workbench React subtree on each cursor report. Optimistic pointer display is permitted only for locally sent, bounded mouse movement and must reconcile with verified native coordinates. Native off-window/peer reset must hide it without continuing stale prediction. Never tie pointer telemetry sampling to PrintWindow frame rate or expand owned-window authority.
 
-## 10. Headless Windows Remote App state belongs outside the video
 
-A decoded single-app video frame is not proof of a usable Windows user session, active input desktop or display output. The existing compact, outside-video dock must show a precise actionable input diagnostic for disconnected WTS sessions, locked/secure desktops, missing active physical/virtual display output, lost window, denied foreground, occluded screen pixels and rejected native input. It must remain readable in View/Trackpad/Direct and in all three themes and performance modes, without a permanent overlay that covers remote app controls. Do not imply that elevated execution, a dummy display or WebRTC connection bypasses Windows lock/UAC. Phone window adaptation must fit the active monitor work area excluding taskbars and use the same DWM-visible crop as cursor/touch mapping.
 
 
 ### TUI touch wheel report integrity (2026-10-14)

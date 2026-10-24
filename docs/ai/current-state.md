@@ -1,12 +1,16 @@
 # Current implementation state
 
-Status: **0.2.x alpha foundation implemented with durable Terminal Workers plus a Windows-x64 Remote App Session data plane, Windows/Ubuntu CI, current-user Windows/Linux Agent autostart, installable Windows/Linux release packaging, and a mobile-first Workspace Workbench. Release qualification requires native package builds plus detached installed-runtime smoke before asset-bearing publication. Real mobile/Codex Desktop/CLI/deployment checks remain recommended release evidence rather than a workflow gate.**
-
-## v0.3.0 unattended RDP work (NOT implemented end-to-end)
-
-The browser-integrated native Devolutions Gateway/IronRDP NLA path and pre-login Windows Machine Service are planned, not in the current release. The read-only Windows-native service and gateway configuration diagnostic and tests have been updated; see [unattended-rdp-plan.md](unattended-rdp-plan.md). A passing readiness probe proves neither a working iPhone login nor service/VM access or secure-user-session coordination. Do not bump the release or state that headless Remote Apps work before real-device gates.
 
 ## Implemented
+
+### Optional external web links (2026-10-25)
+
+- Authenticated no-store API returns operator-configured VS Code Web and independent Harness URL without embedded credentials/query tokens. HTTPS is required except loopback HTTP.
+- VS Code Web link is host-level, shown on Workspace cards without automatic folder selection; Harness is standalone on the home page. No web proxy, cloud tunnel, new Session kind, or managed third-party process lifecycle.
+- Codex CLI remains a Terminal startup command. Codex IDE extension, phone access and Windows serve-web process-tree shutdown still require real-device validation.
+- Workspace Store v4 drops Remote App profiles; older stores are not read automatically.
+
+
 
 ### Mobile terminal pointer routing (2026-10-15)
 
@@ -24,7 +28,7 @@ The browser-integrated native Devolutions Gateway/IronRDP NLA path and pre-login
 - Windows ConPTY smoke coverage that prefers PowerShell 7 locally, falls back to Windows PowerShell for generic host checks, and is forced to PowerShell 7 in repository Windows CI
 - end-to-end Fastify HTTP/WebSocket/Worker IPC lifecycle coverage with deterministic PTY adapters
 - detached-process integration coverage proving a Worker survives the creator Agent process exit and can be rediscovered with replay intact
-- production dependency vulnerability audit, fail-closed production dependency license-policy review (including an exact version-pinned DOMPurify 3.4.16 Apache-2.0 alternative exception for its dual-license metadata), and CodeQL
+- production dependency vulnerability audit, fail-closed production dependency license-policy review (including an exact version-pinned DOMPurify 3.4.17 Apache-2.0 alternative exception for its dual-license metadata), and CodeQL
 - CODEOWNERS, PR/Issue templates, contribution/security/governance/release documentation
 - root `package.json` is the single release/runtime version source; private workspace manifests intentionally omit duplicate versions and the Agent health endpoint reads the root version
 - the source tree targets `0.2.0`; `CHANGELOG.md` keeps `[Unreleased]` empty at publication time and carries the explicit `0.1.0` → `0.2.0` exposure-profile migration note instead of compatibility code
@@ -60,36 +64,6 @@ The browser-integrated native Devolutions Gateway/IronRDP NLA path and pre-login
 - bounded client message size and terminal dimensions
 - no intentional terminal I/O logging
 - Agent is a replaceable control plane and no longer owns PTYs or canonical terminal state
-
-### Remote App Sessions (Windows x64 alpha)
-
-- Remote Apps are a separate Activity/data plane from Terminal Sessions; no Remote App media/control message enters the terminal WebSocket or Terminal Worker protocol.
-- Workspace persistence is explicitly layered: Workspace owns name/cwd/bounded environment, `workspace.terminal` owns runtime + optional startupCommand, and `workspace.remoteApps` owns saved application profiles. The removed top-level `runtime/startupCommand` shape is not compatibility-preserved.
-- a Remote App profile contains id/name/typed Win32-or-MSIX launch identity/argv. Capture FPS/max dimensions are presentation/runtime policy and are not persisted profile fields.
-- Remote App launch is independent of the Terminal runtime. A Workspace may use WSL for Terminal/Git/Files while a Remote App launches under the current Windows user; WSL no longer deletes/rejects Remote App profiles.
-- browser App Session creation accepts only persisted workspaceId + profileId. Executable/argv/environment/PID/HWND/capture target cannot be supplied by create/signaling requests.
-- authenticated discovery prioritizes current-user registered Store/MSIX apps obtained through Get-StartApps and verified against Get-AppxPackage; ordinary Win32 detection keeps PATH/install-root/App Paths/shortcut bounds. The public list is capped at 64 and executable browsing exposes only directories plus .exe files. Manual executable paths remain an Advanced UI fallback.
-- Windows Remote App readiness probes the actual `@roamhq/wrtc` native APIs in a disposable subprocess before creating a Session; a missing source dependency produces actionable reinstall guidance instead of an unexpected AppWorker bootstrap error. Windows installed-runtime smoke actually loads the packaged native WebRTC module.
-- saved executables are resolved/validated at Workspace mutation and again at App Session creation.
-- the Agent exposes separate authenticated + exact-Origin App Session lifecycle/signaling routes and capability endpoint; discovery/create/signaling/mutation surfaces are independently bounded/rate-limited.
-- one detached AppWorker owns each App Session. Remote Apps use Worker protocol v2 with a distinct `app-runtime-v2` recovery generation, per-session secret, READY + idempotent authenticated adoption, heartbeat/reconnect, Worker-owned recovery metadata and bounded exited-session retention.
-- Agent restart disconnects AppWorker control but does not intentionally terminate an adopted App Session; a replacement Agent re-discovers/authenticates it. Persisted Worker/App PIDs remain diagnostic only.
-- the Windows GUI-subsystem helper starts Win32 apps suspended before assigning its KILL_ON_JOB_CLOSE Job. For MSIX it uses IApplicationActivationManager with a registered AUMID, verifies a fresh PID and the exact package family, then requires successful Job assignment; existing/singleton or unassignable packaged processes are rejected rather than captured.
-- only visible top-level windows owned by a process in the PalmTTY Job may be targeted. Current capture is window-only `PrintWindow(PW_RENDERFULLCONTENT)`; there is no desktop/monitor/BitBlt fallback.
-- native capture status, AppWorker received/submitted frame counters and browser first-decoded-frame health are separate. The bounded PTF1 frame decoder assembles arbitrary stdout chunks with one allocation per frame; malformed/native conversion failures are visible instead of being reported as healthy streaming. Media diagnostics (including counters) are on demand in the outside-video options menu; before the first browser-decoded frame the empty video area may show capture/connection progress, and afterwards stale worker waiting states cannot reintroduce that overlay. Actual stalls/reconnection after the first frame use a non-blocking status in the dock.
-- capture size is automatic. The browser sends a typed bounded display hint derived from current Remote App surface geometry/DPR; protocol/native code clamps it to the 320×240–1600×1000 presentation envelope and the helper retains source/window/frame hard limits. The UI exposes “Quality · Auto”, not FPS/width/height fields.
-- AppWorker accepts one media peer. A later negotiation replaces the prior peer.
-- `remoteApps.webrtc.iceServers` accepts bounded STUN/TURN configuration. The authenticated capability response supplies ICE config to the browser and reports whether a TURN URL is configured; the Agent also sends its current ICE config with every authenticated AppWorker negotiation so an adopted worker can follow config changes after Agent restart. Empty ICE configuration remains valid for directly routable LAN/VPN use; PalmTTY does not operate a cloud relay.
-- restricted control supports owned-window absolute/relative pointer, wheel, allowlisted keyboard, bounded Unicode text and the non-input display hint. Native input re-validates window ownership and does not bypass UIPI/UAC.
-- no full desktop, arbitrary existing-window capture, elevated control, clipboard, audio, microphone, camera, file drag/drop or arbitrary input-command channel is implemented.
-- `WorkspaceWorkbench` can switch among live Terminal/App Activities for the same Workspace; Git/Files remain Workspace tools and Artifacts remains Terminal Session-scoped.
-- mobile Remote App interaction has View / Touch / Trackpad modes, two-finger scroll, special keys and Unicode text/IME/dictation.
-- Windows distributions precompile/include `palmtty-remote-app-host.exe`; source mode compiles the helper into private runtime state under a SHA-256 fingerprint of the exact C# source snapshot and compiler options. A newly started Agent after a source update automatically chooses the new native binary without reusing the old fixed-name cache; existing detached AppWorkers continue to use their already launched helper.
-- the native host now emits bounded startup stage, exception class and HRESULT; AppWorker preserves these before READY, and initializes native WebRTC only after app ownership and readiness are proven, so MSIX startup errors are not obscured by native addon teardown. An unverified returned PID is never terminated.
-- Remote App mobile presentation is video-first: the common App page margin is scoped off the video view, the one-row mobile header exposes Git/Files on demand, and immersive mode removes the header grid row rather than collapsing the content pane. Pointer mode selection, immersive exit and the options/diagnostics menu live in a compact dock outside the video above the pinned special-key row; expanded navigation stays inside VisualViewport. The same mounted video/WebRTC connection survives immersive toggles and pane switching. Complete-window contain is default; opt-in phone resizing uses DWM-frame-aware HWND sizing and automatically fills at most 4% residual aspect gaps, with matching Touch/Trackpad/cursor mapping; larger unresizable-window mismatches stay contained instead of hiding controls. No independent fill/crop toggle remains. A dedicated pointer state machine owns one/two-finger gestures and cancellation; active Touch/Trackpad modes suppress native Safari scroll only inside the remote surface.
-- display hints preserve portrait aspect ratio under one bounded scale factor. An optional explicit adaptWindow flag adjusts only the current verified owned HWND and restores its previous size on disable/helper exit. Dark successful PrintWindow frames are still forwarded after a same-owned-window retry, while an ambiguous blank-frame diagnostic remains visible. Browser video-frame callbacks detect later stalls only after the browser has demonstrably delivered a callback; Safari media-readiness fallback alone cannot prove continued frame delivery and must not trigger a false frozen warning.
-
-- known gaps: Windows x64 only; one peer; no audio/clipboard/multi-window/full desktop/UAC; PrintWindow compatibility still varies for GPU/protected apps and a true window-only Windows Graphics Capture backend is not yet implemented; PrintWindow now retries its standard mode on blank/failed same-window frames and exposes native failure categories. MSIX activation may be denied by an existing singleton or OS Job restrictions; real Codex Store/7-Zip/VS Code plus browser validation is still required. STUN/TURN remains operator supplied; no OS reboot/logoff/AppWorker-death recovery.
 
 ### Durable Session Workers
 
@@ -172,15 +146,11 @@ The browser-integrated native Devolutions Gateway/IronRDP NLA path and pre-login
 - first-party PalmTTY branding assets: a canonical transparent `logo.png`, square 192/512 PNG app icons, theme-safe icon + live-text branding in login/loading/home chrome, plus favicon/Apple-touch/PWA manifest wiring; branding is presentation-only and does not enter terminal/session state
 - client-side Spectrum / Obsidian / Frosted visual themes with persisted browser preference, plus Quality / Performance rendering modes and reduced-motion-aware decorative animation
 - PalmTTY-owned semantic glass surface system and four-color ambient field; visual rules live in `.agents/skills/palmtty-theme/SKILL.md` rather than component-local palettes, with dedicated modal and terminal surface ownership instead of stacking generic glass under those regions
-- workspace create/edit/delete UI with three explicit configuration surfaces: Workspace basics, Terminal settings and Remote Apps; Terminal profiles remain the primary Terminal choice and Host/WSL details stay behind Custom
 - Terminal startup-command presets include Pi (`pi`) alongside Codex/Claude and other CLI workloads; presets fill persisted `workspace.terminal.startupCommand` and do not install binaries or change Session launch authority.
 - Startup commands now execute via selected shell argv (PowerShell `-NoExit -Command`, cmd `/K`, Unix interactive `-c`, WSL explicit shell or bounded default-shell trampoline) instead of the old 75ms PTY typing race. Unknown shells fail explicit validation. Unix shells return to a new interactive shell when the startup command exits.
 - Browser xterm enables Kitty keyboard VT extension; mobile keybar adds generic Shift+Enter/Alt+Enter CSI-u and Ctrl+Q without changing xterm IME ownership, bounded transport or mouse handling. Real phone Pi/ConPTY/WSL modifier-key and CJK IME tests remain required.
 - Host/WSL remote directory picker that selects directories on the Agent runtime rather than the browser device
-- workspace dialog uses a dedicated fixed-header/footer settings shell. The root page keeps only name/cwd/environment plus Terminal/Remote Apps navigation; Terminal settings own profile/runtime/startup command; Remote Apps use a compact profile list + detected-app/.exe picker + Advanced manual path. Installed Host shells and registered WSL distributions appear in one Terminal profile selector with Custom fallback; Host/WSL cwd drafts remain separate; workspace environment editing keeps structured `NAME=value` normalization
 - workspace launcher
-- home presents Terminal Sessions and Remote App Sessions in one Activity list with explicit text actions; active items use “Terminate”, retained exited/failed items use “Clear”; Terminal workbench retains confirmed “Restart terminal”; the ambiguous red × control is absent
-- WorkspaceWorkbench is Activity-aware: the current Terminal or Remote App surface stays mounted while switching shared Git/Files tools, and the header can switch directly among live Activities for that Workspace. Artifacts remains Terminal Session-scoped. Terminal Artifacts accepts bounded images and may insert only the local path without implicit Enter/vendor-specific protocol
 - Git pane is a source-control workbench with first-class Changes / History modes: Changes keeps repository scope/branch/tracking state, conflict/staged/unstaged/untracked groups, structured unified diff with line numbers, untracked previews, stage/unstage plus explicit repository-wide stage-all/unstage-all actions, rename-aware single-file pathsets, stale-safe discard, commit, branch create/switch, stash, and fetch/pull/push; History is always read-only and lazily loads snapshot-stable paged commit history, optional file history, commit metadata/changed files and per-commit file diff. Write controls stay disabled until the user acknowledges the trusted-repository filter boundary for the current Session workbench; that acknowledgement survives Terminal/Git/Files/Artifacts pane switching but not leaving the Session page; status refreshes on entry, focus/visibility and a low-frequency visible-tab poll; the Git sidebar remains the single vertical scroll owner so wheel/trackpad/touch input over changes or history does not get trapped in nested list scrollers
 - Files pane provides workspace-root-scoped directory navigation plus bounded read-only UTF-8 preview with binary/truncation states; `.md`/`.markdown` use a client-only GFM Markdown renderer with a Source/Rendered toggle, sanitized HTML, and no automatic external image fetch. Relative links resolve only inside the Workspace and use existing authenticated file reads; external HTTP(S)/mailto links open with `noopener noreferrer`. Wide GFM tables now keep native table layout in a bounded, horizontally scrollable viewport with 9rem minimum columns, normal wrapping, an overflow-only swipe hint, and keyboard focus only when overflow exists. The Markdown article alone scrolls vertically, without a new file-reading authority; rendering still uses only the capped preview bytes; the preview toolbar promotes basename over deep parent path and provides complete-text copy, Web Share file handoff with download fallback, plus a direct file-history jump into Git. Complete-file actions use the separate 8 MiB export path rather than the 512 KiB preview when necessary; supported image files use the protected image-preview endpoint so AI-generated screenshots/diagrams in the Workspace can be viewed directly without making Files writable; it remains a viewer/export surface, not a browser IDE/editor
 - stopping Sessions remain non-interactive in the terminal view
@@ -233,43 +203,11 @@ Do not claim persistence beyond what is tested: browser disconnect and Agent res
 
 ### Mobile cursor and terminal dock (latest)
 
-- The native helper samples cursor position only inside its current verified Job-owned HWND, emits normalized fixed-point 0–1000000 coordinates or hidden, and never leaks global desktop coordinates. AppWorker strictly parses native stderr records and forwards only typed cursor/native-input state through the existing authenticated single-peer WebRTC control DataChannel with bounded backpressure. Web overlays a theme-tokenized SVG pointer via the inverse contain/cover transform, hiding off-window and cropped positions.
 - Trackpad adds short two-finger right tap and long-press primary drag with cancellation releasing the button. Windows foreground/UIPI input denial is distinct from DataChannel readiness and neither expands authority.
-- Terminal/Remote App use a single-row mobile Tools header; the CLI dock has one visible core row with Keyboard/Long Text first and a pinned direct More/Collapse button; no full or hidden intermediate state remains. Neither may recreate xterm, WebSocket or Session Worker canonical state; the existing terminal mount ResizeObserver/FitAddon owns geometry.
 
 ### Mobile control polish
 
 - Terminal keybar now exposes Keyboard and Long Text first, followed by Esc/Tab/Enter/slash/Ctrl, and uses one fixed More/Collapse action to reveal the optional advanced row. The compact/full/hidden state machine is removed; xterm/WebSocket lifecycle is unaffected.
-- Remote App primary and expanded key docks use shared `.glass-panel` surfaces and standard theme control tokens instead of `--flat-content`. The verified-window remote cursor is now approximately 5.667×8 CSS px (one third of the previous 17×24), retains its theme-owned SVG outline and a subdued shadow; its hotspot and contain/cover mapping remain unchanged.
-
-### Low-latency Remote App cursor and text docking
-
-- Native verified-owned-window cursor sampling runs on its own best-effort ~30Hz thread and rechecks ownership/visibility/bounds; unlike capture-loop sampling, PrintWindow/encoding stalls do not pause cursor feedback. A foreground-owned input fast path avoids repeated expensive window activation while retaining the same Job/UIPI checks.
-- Web batches finger-relative motion into at most one ordered DataChannel message per requestAnimationFrame; pending movement is flushed before button releases and cancelled on peer teardown. Display-only optimistic normalized prediction moves the theme SVG by an imperative RAF transform and reconciles latest typed native telemetry after touch release, removing a React rerender per cursor packet. Native hidden state remains immediate. Real network delays are not bypassed.
-- Remote App and Terminal share Keyboard and Long Text as the first two mobile dock actions. Remote App Keyboard synchronously focuses a real 1px, nearly invisible in-viewport Safari input (16px computed font) in the originating tap, never a second visible composer. Confirmed IME Unicode is serialized into ordered <=2 KiB text messages and consecutive Backspace/Delete uses strictly bounded native keyRepeat (1–32), while other navigation retains typed keys. Long Text remains a deliberate-send composer; unsent live drafts transfer there on closing. Neither input action is duplicated in display/diagnostic options. Cursor display is exactly one third of the preceding 17×24 CSS px arrow, now 5.667×8 CSS px.
-
-### Phone adaptation edge fill
-
-- Remote App has only one explicit display adaptation switch (`adaptWindow`). Without it, show the full window via contain. With it, correct bounded (≤32 px per axis) DWM invisible outer-frame margins in the owned HWND resize and automatically cover only residual video-to-surface ratio mismatches with ≤4% crop. Fall back to contain if an app enforces an incompatible minimum size/aspect; expose a non-blocking reason in Options, never blindly crop controls.
-- Remove manual cover/contain UI and translation keys. Measure the actual video content rectangle rather than the decorated surface border for display hints and Direct Touch projection; cursor positioning and Trackpad gain use the same effective fit and geometry. No extra authority, media peer or reconnect path is introduced.
-
-### Invisible Safari keyboard and batched editing
-
-- The first App dock actions remain Keyboard and Long Text. Keyboard synchronously focuses a genuine, in-viewport 1px almost-transparent 16px-font textarea with a nonempty sentinel for mobile autorepeat; do not overlay a second visible input on the video or use display:none. Long Text remains the explicit send surface.
-- Browser serializes confirmed IME text and deletion into a 16KiB pending queue, <=2KiB text frames and typed keyRepeat for Backspace/Delete only (count 1–32), never keydown plus beforeinput/input duplicate deletion. Under DataChannel congestion, preserve unsent text for Long Text. Treat DataChannel accepted as queued, not native ACK.
-- Windows host revalidates the repeat key/count and the same verified Job-owned HWND/foreground/UIPI. Already-foreground windows avoid repeated ShowWindow, SetFocus and cross-thread activation for text/key/repeat; repeated keys execute in one SendInput batch. Do not add arbitrary repeat keys, clipboard/PTY or other desktop authority. iPhone Safari Chinese IME, held delete, and video echo still require real-host acceptance.
-
-### Agent native-control backpressure
-
-A single per-AppWorker drain-aware FIFO replaces dropping WebRTC controls whenever helper stdin reports writableNeedDrain. write(false) is accepted and never replayed; later ordered controls wait for drain under strict 64KiB/128 queued-message caps. Close and discard pending input when the helper exits or the worker is disposed. It does not create a new IPC channel or end-to-end native ACK, and must not retain inputs across a retired AppWorker.
-
-### Windows headless Remote App qualification
-
-- A valid `PrintWindow` stream and authenticated WebRTC control channel do not imply a usable Windows input desktop. Native host checks its own WTS session Active, WinSta0/Default input/thread desktops and a usable active physical **or virtual** monitor output. Refuse input on disconnected/locked/secure desktops or absent display and expose only bounded typed reasons to the authorized peer; a 1s periodic probe updates diagnostics without a click. Never switch desktop, auto-login, elevate, install a display driver or turn Remote App into pre-login service.
-- `adaptWindow` computes per-monitor work area excluding taskbars, fits and positions only the verified Job-owned app window, then restores both original size and position on disable/helper shutdown. `PrintWindow` captures the complete outer HWND, then crops bounded invisible DWM margins so browser frames and native pointer/cursor use the exact same visible-frame rectangle. Reject input into overlaid OS/other-window pixels by comparing `WindowFromPoint`'s root HWND to the captured HWND.
-- Typed `inputState` statuses: ready / session-disconnected / desktop-unavailable / display-unavailable / window-unavailable / focus-denied / window-occluded / input-rejected. Parse and validate native diagnostic tokens in Agent; no desktop IDs, monitor identities, window handles or keyboard contents leave native. Unit tests cover protocol and localization; the packaged native host has geometry self-tests, but headless/RDP/lock/secure desktop acceptance requires physical Windows host + iPhone, and synthetic Windows runners do not establish actual input readiness.
-
-- Unsafe native session/desktop/display statuses additionally gate AppWorker's incoming typed input and clear its bounded yet-unwritten helper stdin FIFO. Foreground or window occlusion failure must not deadlock recovery by gating subsequent user actions. The pipe may have accepted earlier bytes, so native execution-time input-desktop checks remain mandatory and no stale-click guarantee is absolute across rapid races.
 
 ## Mobile terminal latest-state recovery and native novel reader (2026-10-11)
 
@@ -309,7 +247,6 @@ A single per-AppWorker drain-aware FIFO replaces dropping WebRTC controls whenev
 
 ## Mobile confirmation and retained terminal recovery (2026-10-16)
 
-- ConfirmDialog uses native showModal() top-layer semantics with viewport-positioned modal layout. `.glass-modal` owns material only; compact phone confirmations stay reachable above the safe-area bottom edge. Terminal and Remote App terminate/clear confirmations remain open while running, show failures inline and close only after success.
 - A retained exited/stopping Session does not resize the canonical headless buffer during an attachment from a different-sized browser. The Worker snapshots the original terminal geometry; a running Session continues to resize PTY and mirror before its snapshot.
 - Existing Pi Regular xterm scrolling, full-screen TUI input routing, multi-line Shell startup commands and background fast-forward protection are unchanged. Real iPhone + Pi Fullscreen mouse behavior remains to be validated.
 

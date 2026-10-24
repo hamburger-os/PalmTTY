@@ -58,7 +58,6 @@ async function fixture(): Promise<{
       name: "Git history test",
       cwd: root,
       terminal: { runtime: { kind: "host", args: [] } },
-      remoteApps: []
     }
   };
 }

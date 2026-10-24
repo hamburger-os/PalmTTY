@@ -171,7 +171,6 @@ function e2eWorkspace() {
         args: []
       }
     },
-    remoteApps: []
   };
 }
 

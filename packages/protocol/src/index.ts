@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { RemoteAppProfilesSchema } from "./remote-app.js";
 
 export const PROTOCOL_VERSION = 4 as const;
 export const WS_SUBPROTOCOL = "palmtty.v4";
@@ -93,8 +92,7 @@ export const WorkspaceDefinitionSchema = z.object({
   name: z.string().trim().min(1).max(100),
   cwd: z.string().trim().min(1).max(4096),
   environment: WorkspaceEnvironmentSchema.optional(),
-  terminal: TerminalLaunchProfileSchema,
-  remoteApps: RemoteAppProfilesSchema.default([])
+  terminal: TerminalLaunchProfileSchema
 }).strict();
 export type WorkspaceDefinition = z.infer<typeof WorkspaceDefinitionSchema>;
 
@@ -673,4 +671,3 @@ export function encodeServerMessage(message: ServerMessage): string {
   return JSON.stringify(ServerMessageSchema.parse(message));
 }
 
-export * from "./remote-app.js";

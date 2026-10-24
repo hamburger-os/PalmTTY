@@ -18,9 +18,9 @@ Mobile-first · self-hosted · Windows-first · Host + WSL runtimes · xterm.js
 > [!WARNING]
 > PalmTTY exposes an interactive shell with the privileges of the OS user running the Agent. Treat compromise as workstation compromise. Use a private HTTPS entry point or an authenticated HTTPS reverse proxy; do not expose an unauthenticated Agent port to the Internet.
 
-PalmTTY is a mobile-first, self-hosted remote development workbench centered on durable workstation activities. Terminal Sessions remain the core across Windows host shells, WSL and the Linux host path; Windows x64 also has an **Unreleased Remote Apps alpha** that launches a saved Workspace application profile and exposes only that PalmTTY-owned application window over a separate WebRTC/AppWorker data plane. Git/Files stay bounded Workspace tools, Terminal Artifacts remain Session-scoped, and Codex/Claude/OpenCode integrations remain vendor-neutral workloads rather than private PalmTTY protocols.
+PalmTTY is a mobile-first self-hosted remote development workbench centered on durable Terminal Sessions, workspace Git/Files/Artifacts, and optional external links to official VS Code Web and DeepSeek Harness. Codex/Claude/Pi CLIs remain ordinary terminal workloads.
 
-PalmTTY 是一个面向手机、自托管的远程开发工作台，核心是工作站上可持久的 Activity。Terminal Session 继续覆盖 Windows Host、WSL 和 Linux Host；Windows x64 额外加入 **Unreleased Remote Apps alpha**：按持久 Workspace Profile 启动桌面应用，并通过独立 AppWorker/WebRTC 数据面只呈现 PalmTTY 自己启动的应用窗口。Git/Files 仍是有界 Workspace Tool，Artifacts 仍属于 Terminal Session；Codex/Claude/OpenCode 等继续作为 vendor-neutral workload，不把厂商私有协议写进 PalmTTY 核心。
+PalmTTY 是一个面向手机的自托管远程开发工作台。Windows Host、WSL、Linux Host 使用独立持久的 Terminal Worker；Git/Files/Artifacts 保持工作区工具。VS Code Web 和独立的 DeepSeek Harness 只提供可选外部入口，不接管第三方进程、认证与会话。Codex CLI 仍是终端启动命令。
 
 ## Terminal touch controls / 手机终端触摸控制
 
@@ -28,13 +28,8 @@ On touch devices, the terminal starts in **Browse** mode: swipe to review local 
 
 手机终端默认“浏览”：未启用鼠标跟踪时可以原生滑动查看终端历史，且不会将鼠标事件误发给 CLI；如需操作 TUI 内部的滚动和点击，使用快捷键栏中的“交互”。备用屏幕无本地滚动历史，请使用交互模式或应用快捷键。旧式 X10 二进制鼠标协议明确不支持，异常鼠标报告直接丢弃。
 
-## Unattended browser RDP / 无人值守浏览器 RDP（规划中）
-
-Windows 11 Pro + iPhone Safari 的完整浏览器 RDP 是 v0.3.0 目标，**尚未实现**。已将单机部署调整为原生 Windows Devolutions Gateway + IronRDP，不需要 Hyper-V/WSL2/Docker。只读诊断 `pnpm unattended:check -- --json` 检查 Windows/RDP/NLA 和 Gateway 服务及配置；它不会安装软件、修改登录/防火墙设置或替代真实 iPhone 验收。详细请见 [部署指南](docs/community/unattended-rdp.md) 和 [架构设计](docs/owner/unattended-rdp.md)。
-
 ## Status / 当前状态
 
-PalmTTY is **alpha**. **0.2.0** is the current release baseline; this source line carries Unreleased Remote Apps work. Each terminal runs in an independent durable Session Worker, so restarting only the HTTP/API Agent does not terminate the live PTY. Windows and Ubuntu CI cover authenticated Worker IPC, Agent restart rediscovery, replay/snapshot recovery and detached-process survival; Windows CI also uses real node-pty + PowerShell 7 / ConPTY for Unicode and resize smoke coverage. Release publication is guarded by pinned-SHA CI/security/license/CodeQL gates. Real phone + real workstation + long-running Codex checks remain recommended release evidence, but are not represented by a manual publication checkbox.
 
 | Capability | Alpha status |
 |---|---|
@@ -42,17 +37,13 @@ PalmTTY is **alpha**. **0.2.0** is the current release baseline; this source lin
 | Linux host runtime | Implemented and exercised on Ubuntu CI |
 | WSL runtime | Implemented with runtime validation; real-owner-host validation still required |
 | macOS host runtime | Architecture implemented; no repository macOS CI yet |
-| Web workspace management | Persistent layered Workspace settings: name/cwd/environment + nested Terminal profile/startup + saved Remote App profiles; Host shells + WSL distributions remain unified in Terminal settings |
 | UI languages | English and Simplified Chinese |
 | Visual themes | Spectrum / Obsidian / Frosted with Quality / Performance rendering modes |
 | Browser or network disconnect | PTY survives while the Agent stays alive |
 | Reconnect | Short disconnects preserve xterm with bounded replay; long suspension or renderer congestion restores a bounded canonical snapshot (PTY survives) |
 | Session lifecycle | Explicit terminate / restart-as-replacement / retained clear; no ambiguous close/kill control |
-| Workspace workbench | Activity-aware Terminal / Remote App surface plus shared Git / Files; direct switching among live Activities for the same Workspace; switching tools keeps active xterm/WebRTC mounted; Artifacts remain Terminal Session-scoped |
-| Windows Remote Apps | **Unreleased alpha:** detected/.exe-selected saved profiles → detached AppWorker → single owned app window → WebRTC video + bounded typed input; auto capture size; optional operator STUN/TURN; no full desktop/UAC/clipboard/audio; real-app validation still required |
 | Mobile terminal | xterm.js PWA, touch special-key bar, on-demand long-text input |
 | Novel reading / 小说朗读 | Read-only novel reader with all browser voices (local-first, remote opt-in), optional private-host Qwen3-TTS CustomVoice, saved chapter/paragraph offsets, bounded paging (8 MiB / 20,000 paragraphs) |
-| Mobile Remote App | View / direct-touch / trackpad modes, two-finger scroll, special keys and bounded Unicode text/IME input; auto viewport/DPR capture sizing plus explicit capture/network diagnostics |
 | Authentication | Single-user bootstrap token + HttpOnly session cookie |
 | Network exposure | Explicit `local` / `lan` / `reverseProxy` / direct `https` profiles; HTTPS/private entry is recommended |
 | Agent restart persistence | Implemented: independent Session Worker + authenticated local rediscovery |
@@ -68,42 +59,28 @@ PalmTTY is intentionally narrower than a browser IDE:
 - **Survive mobile reality.** WebSocket reconnect, bounded replay, snapshot recovery and application heartbeat are built around Wi-Fi/cellular switching and backgrounded tabs.
 - **Keep remote authority explicit.** Workspace changes are persistent authenticated mutations, not ad-hoc Session parameters. A Workspace may contain bounded environment variables, but Session creation/restart cannot inject temporary cwd/shell/env overrides.
 - **Stay AI-vendor-neutral.** Codex, Claude Code, OpenCode and other terminal tools are workloads, not protocol dependencies.
-- **Remain self-hosted.** No PalmTTY cloud relay is required or operated. Direct LAN/VPN WebRTC can stay relay-free; operators may configure their own STUN/TURN when NAT traversal requires it.
+
+## External Web integrations / 外部 Web 工具
+
+`code serve-web` runs separately as a Windows-local VS Code Web Server. PalmTTY can show its safe external link on Workspace cards without managing the IDE lifecycle or choosing its folders. DeepSeek Harness has its own independent home entry; its workspaces and sessions remain its own. Neither uses Azure Tunnel.
+
+```yaml
+integrations:
+  vscodeWeb: "https://code.example.test/"
+  harness: "https://harness.example.test/"
+```
+
+Only HTTPS or loopback HTTP URLs without credentials, query strings or fragments are accepted. The upstream connection-token URL is not a safe configuration URL. Mobile remote access requires a separately protected HTTPS/private connection; a phone's 127.0.0.1 is not the Windows host. See [external Web integrations](docs/community/web-integrations.md).
+
+VS Code Web 由 Windows 本机独立运行；PalmTTY 只保存不含令牌的外部入口。Harness 与工作区平行，由 DSH 自行管理其工作区/会话。本轮不提供反代/VPN/单点登录，也不自动代管第三方进程。
 
 ## Architecture / 架构
 
 ```text
-Phone / PWA
- ├─ Terminal activity (WSS → Terminal Worker)
- ├─ Remote App activity (WebRTC → AppWorker; Windows x64 alpha)
- ├─ Git / Files workspace tools (bounded typed HTTP APIs)
- └─ Terminal Artifacts (Session-scoped bounded image context)
-    │ HTTPS / WSS + WebRTC signaling
-    ▼
-Private HTTPS entry point
-(Tailscale Serve / QNAP / Caddy / equivalent)
-    │
-    ▼
-PalmTTY Agent
- ├─ authentication + exact Origin policy
- ├─ persistent workspace catalog + runtime validation
- ├─ Terminal/App Worker registries
- ├─ terminal WebSocket proxy + Remote App signaling
- └─ static Web/PWA
-    │ authenticated local IPC
-    ├───────────────┐
-    ▼               ▼
-Terminal Worker     AppWorker (Windows x64 alpha)
- ├─ node-pty        ├─ WebRTC video/control
- ├─ headless xterm  └─ native single-window app host
- └─ seq + replay             │
-    │                        └─ Codex Desktop / VS Code / ...
-Host shell / WSL shell
-    │
-Codex CLI / Git / npm / dotnet / ...
+Browser/PWA -> PalmTTY Agent (auth, Workspace, Git, Files)
+                    -> detached per-session Terminal Worker -> Host/WSL PTY
+External browser links -> separately running VS Code Web / DSH Web
 ```
-
-A browser disconnect does **not** kill the PTY. Restarting only the PalmTTY Agent also leaves the independent Session Worker and PTY alive; after the Agent returns, sign in again and reconnect to the same Session. PalmTTY can automatically start the Agent again on Windows/Linux, but it does **not** claim PTY persistence across OS reboot, user logoff, or loss of the Worker process itself. Autostart restores the control plane; persisted Workspaces remain available for creating new Sessions.
 
 ## Install / 安装
 
@@ -158,7 +135,6 @@ pnpm check
 pnpm start
 ```
 
-Open `http://127.0.0.1:17688`, sign in with the access token, then create a workspace from the Web UI. Workspaces are stored separately from `palmtty.local.yaml`. The editor root keeps Workspace name/cwd/environment compact; open **Terminal** for runtime/startup settings and **Remote Apps** for saved desktop applications. In Terminal settings, choose a **Terminal environment** directly: Host shells such as PowerShell 7 and registered WSL distributions such as `Ubuntu-22.04` appear in one selector. Use **Custom** only when explicit runtime/executable/argv control is required. Workspace environment entries use `NAME=value` lines and are applied before the Shell starts; balanced outer quotes are normalized, so copied forms such as `HTTP_PROXY="http://127.0.0.1:10808"` save the same value as the unquoted URL. The Terminal startup field accepts multiple lines sent after startup. On Windows x64, Remote Apps can be added by choosing a detected application or browsing host directories for an `.exe`; manual executable entry is an Advanced fallback. Remote App profiles do not expose FPS/resolution fields—the phone surface requests a bounded capture size automatically.
 
 `pnpm run preflight` validates the authentication environment, security exposure rules and configured Agent TCP listen endpoint before the Agent starts. Workspace directories and shells are validated when a workspace is created/updated and again when a Session starts or is explicitly restarted. Windows Store/MSIX PowerShell is supported through the current user's App Execution Alias, and resolved host shells are normalized to absolute launch paths before Worker creation. Each new/restarted Windows Host terminal rebuilds its environment from current Machine/User values before Workspace overrides are applied, so a CLI added to the user's PATH after the PalmTTY Agent started can be picked up by **Restart terminal** without restarting the Agent.
 
@@ -201,7 +177,6 @@ PalmTTY uses an explicit exposure profile instead of independent low-level secur
 - `reverseProxy` — HTTP upstream plus explicit HTTPS browser Origins; Secure cookies are derived automatically. Use this for Tailscale Serve, Caddy, QNAP, Nginx, and similar ingress.
 - `https` — Agent terminates TLS directly using configured certificate/key files and explicit HTTPS Origins.
 
-Remote App signaling follows the same authenticated Origin boundary, but WebRTC media has its own ICE path. Directly routable LAN/VPN deployments may keep `remoteApps.webrtc.iceServers` empty; reverse-proxy/public deployments can configure operator-owned STUN/TURN when required. PalmTTY does not operate a hosted TURN relay.
 
 For normal remote use, prefer a private HTTPS entry point or authenticated HTTPS reverse proxy. Keep an HTTP reverse-proxy upstream private/firewalled.
 
@@ -212,7 +187,6 @@ Deployment references:
 - [QNAP/reverse-proxy example](examples/qnap-reverse-proxy.yaml)
 - [Caddy example](examples/Caddyfile.example)
 - [Community security guide](docs/community/security.md)
-- [Remote Apps / 远程 App](docs/community/remote-apps.md)
 - [Security policy](SECURITY.md)
 
 ## Repository quality gates / 质量门禁
