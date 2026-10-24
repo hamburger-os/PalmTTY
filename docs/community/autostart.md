@@ -139,10 +139,3 @@ pnpm autostart uninstall
 ### 持久化边界
 
 自启动恢复的是 **Agent 服务**，不是 OS 重启前的旧 PTY。浏览器断线与“仅 Agent 重启”仍通过独立 Worker 保持；OS reboot/用户注销会终止旧 Worker/PTY。机器回来后 Agent 会干净启动，持久化 Workspace 仍可用于创建新 Session。
-
-
-### Planned v0.3.0 unattended Windows entry / 规划中的 v0.3.0 无人值守入口
-
-The existing InteractiveToken login task is unchanged. A distinct opt-in pre-login Machine Service and native Windows Devolutions Gateway/IronRDP browser path are planned, **not shipped**. See [unattended RDP](unattended-rdp.md); the read-only `pnpm unattended:check` does not enable remote access.
-
-现有 InteractiveToken 登录任务没有改变。独立登录前机器服务和 Windows 原生 Devolutions Gateway/IronRDP 浏览器路径处于规划阶段，**尚未发布**。详见[无人值守浏览器 RDP](unattended-rdp.md)；只读的 `pnpm unattended:check` 不会开启远程访问。
