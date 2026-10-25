@@ -11,7 +11,7 @@ PalmTTY 首页固定展示微软官方 **VS Code Web（`code serve-web`）**和 
 
 ## 用户显式前台联合启动
 
-`pnpm build` 后，在拥有官方 VS Code 安装且已配置 PalmTTY Token 的用户交互式终端中执行 `pnpm start:with-vscode`。它在启动任何进程前检查 Agent 构建文件、配置和官方 `code` CLI，不允许通过非交互式 TTY 启动，不自动接受微软许可。官方 Web 使用 `--host 127.0.0.1`、配置中的回环端口（否则 8000）；使用官方生成/要求的连接令牌，不传递 `PALMTTY_*` 或 PalmTTY bootstrap Token 环境变量。Agent 仍由原本入口启动，关闭联合启动器时只清理本次创建的进程树，不接管未知 PID。Windows `code.cmd` 通过已转义的 PowerShell 命令在当前用户控制台执行；Linux 启动真实 `code` 可执行程序。
+`pnpm build` 后，在拥有官方 VS Code 安装且已配置 PalmTTY Token 的用户交互式终端中执行 `pnpm start:with-vscode`。它在启动任何进程前检查 Agent 构建文件、配置和官方 `code` CLI，不允许通过非交互式 TTY 启动，不自动接受微软许可。官方 Web 使用 `--host 127.0.0.1`、配置中的回环端口（否则 8000）；使用官方生成/要求的连接令牌，不传递 `PALMTTY_*` 或 PalmTTY bootstrap Token 环境变量。Agent 仍由原本入口启动，关闭联合启动器时只停止本次创建的官方 CLI 子树与 Agent 主进程，不接管未知 PID；Windows Agent 不能使用 `taskkill /T` 误杀有意独立持久的 Session Worker。Windows `code.cmd` 通过已转义的 PowerShell 命令在当前用户控制台执行；Linux 启动真实 `code` 可执行程序。
 
 `pnpm start` 仍然只启动 Agent；发行版 `palmtty service` 和源码 `pnpm autostart` 仍然只启动 Agent。微软官方许可限制以微软文档为准；这个助手不把 VS Code 服务器作为 PalmTTY 内嵌发行产品提供。上述联合脚本是用户明确发起的前台辅助工具，不是无人值守服务模式。Windows 实机子进程树清理与首次许可证提示需验证。
 

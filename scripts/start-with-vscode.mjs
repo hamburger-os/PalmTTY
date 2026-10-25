@@ -72,10 +72,17 @@ function exitObservation(child, label) {
   });
 }
 
-async function stopOwnedChild(child) {
+async function stopOwnedChild(child, { preserveDetachedWorkers = false } = {}) {
   if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
   if (process.platform === "win32") {
-    // Only terminate the tree rooted at the exact child this invocation owns.
+    if (preserveDetachedWorkers) {
+      // Terminal Session Workers deliberately outlive an Agent restart.
+      // taskkill /T here would follow Agent's parent-child lineage and may
+      // terminate those independently detached Workers.
+      child.kill();
+      return;
+    }
+    // VS Code's owned CLI wrapper may spawn its own server subprocesses.
     await new Promise((resolve) => {
       const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], {
         windowsHide: true, stdio: "ignore"
@@ -177,7 +184,7 @@ export async function main() {
   } finally {
     process.off("SIGINT", onSigint);
     process.off("SIGTERM", onSigterm);
-    await Promise.all([stopOwnedChild(agent), stopOwnedChild(vscode)]);
+    await Promise.all([stopOwnedChild(agent, { preserveDetachedWorkers: true }), stopOwnedChild(vscode)]);
   }
 }
 
