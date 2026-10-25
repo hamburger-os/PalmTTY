@@ -11,6 +11,8 @@ import {
   ApiError,
   authStatus,
   integrationLinks,
+  ensureWebApp,
+  type WebAppId,
   type IntegrationLinks,
   createSession,
   createWorkspace,
@@ -57,7 +59,7 @@ export function App() {
   const { t, error: translateError, connections } = useI18n();
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null);
-  const [integrations, setIntegrations] = useState<IntegrationLinks>({});
+  const [integrations, setIntegrations] = useState<IntegrationLinks | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspacePublic[]>([]);
   const [sessions, setSessions] = useState<SessionPublic[]>([]);
   const [activeSession, setActiveSession] = useState<SessionPublic | null>(null);
@@ -86,9 +88,13 @@ export function App() {
         setCapabilities(null);
         setError(translateError("runtime_capabilities_failed"));
       });
-    void integrationLinks().then(setIntegrations).catch(() => setIntegrations({}));
+    void integrationLinks().then(setIntegrations)
+      .catch(() => setError(t("integrations.loadFailed")));
+    void ensureWebApp("harness").catch(() =>
+      setError(t("integrations.ensureFailed"))
+    );
     await refreshCatalog();
-  }, [refreshCatalog, translateError]);
+  }, [refreshCatalog, translateError, t]);
 
   useEffect(() => {
     void (async () => {
@@ -101,6 +107,14 @@ export function App() {
       }
     })();
   }, [loadAuthenticatedState, translateError]);
+
+  useEffect(() => {
+    if (!auth?.authenticated) return;
+    const poll = window.setInterval(() => {
+      void integrationLinks().then(setIntegrations).catch(() => undefined);
+    }, 4000);
+    return () => window.clearInterval(poll);
+  }, [auth?.authenticated]);
 
   useEffect(() => {
     if (!auth?.authenticated || activeSession) return;
@@ -305,6 +319,42 @@ export function App() {
     }
   };
 
+  const renderWebApp = (id: WebAppId) => {
+    const info = integrations?.apps[id];
+    const phase = info?.phase ?? "detecting";
+    const canRetry = id === "harness" &&
+      !["running", "installing", "starting", "detecting"].includes(phase);
+    return (
+      <section className="glass-card integration-entry" key={id}>
+        <div className="integration-detail">
+          <strong>{t(`integrations.${id}` as Parameters<typeof t>[0])}</strong>
+          <small>{t(`integrations.phase.${phase}` as Parameters<typeof t>[0])}</small>
+          {info?.detail && (
+            <small>{t(`integrations.detail.${info.detail}` as Parameters<typeof t>[0])}</small>
+          )}
+          {!info?.accessUrl && id === "harness" && phase === "running" && (
+            <small>{t("integrations.remoteSetup")}</small>
+          )}
+        </div>
+        <div className="integration-actions">
+          {info?.accessUrl && (
+            <a className="ghost compact" href={info.accessUrl}
+               target="_blank" rel="noopener noreferrer">
+              {t("integrations.open")} ↗
+            </a>
+          )}
+          {canRetry && (
+            <button className="ghost compact" type="button" onClick={() => {
+              void ensureWebApp(id).then(() =>
+                integrationLinks().then(setIntegrations)
+              ).catch(() => setError(t("integrations.ensureFailed")));
+            }}>{t("integrations.retry")}</button>
+          )}
+        </div>
+      </section>
+    );
+  };
+
   const activities = [...sessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   return (
@@ -321,6 +371,7 @@ export function App() {
                 await logout();
                 setAuth({ enabled: true, authenticated: false });
                 setCapabilities(null);
+                setIntegrations(null);
                 setWorkspaces([]);
                 setSessions([]);
               })()}
@@ -332,14 +383,7 @@ export function App() {
       </header>
 
       {error && <div className="error-banner">{error}</div>}
-      {integrations.harness && (
-        <section className="glass-card integration-entry">
-          <strong>{t("integrations.harness")}</strong>
-          <a className="ghost compact" href={integrations.harness} target="_blank" rel="noopener noreferrer">
-            {t("integrations.open")} ↗
-          </a>
-        </section>
-      )}
+      {renderWebApp("harness")}
 
       <section>
         <div className="section-heading">
@@ -407,12 +451,7 @@ export function App() {
                 >
                   {t("workspaces.newSession")} →
                 </button>
-                {integrations.vscodeWeb && (
-                  <a className="ghost compact integration-link" href={integrations.vscodeWeb}
-                    target="_blank" rel="noopener noreferrer" title={t("integrations.folderHint")}>
-                    {t("integrations.vscodeWeb")} ↗
-                  </a>
-                )}
+                {renderWebApp("vscodeWeb")}
               </article>
             ))}
           </div>

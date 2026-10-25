@@ -61,12 +61,21 @@ async function responseBlob(response: Response): Promise<Blob> {
   return response.blob();
 }
 
-export type IntegrationLinks = { vscodeWeb?: string; harness?: string };
+export type WebAppId = "vscodeWeb" | "harness";
+export type WebAppPhase = "detecting" | "not_installed" | "installed" | "installing" | "starting" | "running" | "manual_required" | "failed";
+export type WebAppStatus = { id: WebAppId; phase: WebAppPhase; accessUrl?: string; detail?: string };
+export type IntegrationLinks = { apps: Record<WebAppId, WebAppStatus> };
 
 export async function integrationLinks() {
   return responseJson<IntegrationLinks>(await fetch("/api/v1/integrations", {
     credentials: "same-origin", cache: "no-store"
   }));
+}
+export async function ensureWebApp(id: WebAppId) {
+  return responseJson<{ accepted: boolean }>(await fetch(
+    `/api/v1/integrations/${encodeURIComponent(id)}/ensure`,
+    { method: "POST", credentials: "same-origin" }
+  ));
 }
 
 export async function authStatus() {
