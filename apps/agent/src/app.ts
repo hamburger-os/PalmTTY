@@ -13,6 +13,7 @@ import {
   MAX_MESSAGE_BYTES,
   MAX_SESSION_ARTIFACT_BYTES,
   WS_SUBPROTOCOL,
+  isWebAppId,
   WorkspaceDefinitionSchema,
   encodeServerMessage,
   parseClientMessage
@@ -279,7 +280,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       if (!managedAppLimiter.allow(request.ip)) {
         return reply.code(429).send({ error: "too_many_web_app_requests" });
       }
-      if (id !== "vscodeWeb" && id !== "harness") {
+      if (!isWebAppId(id)) {
         return reply.code(404).send({ error: "unknown_web_app" });
       }
       // A single-flight task is owned by the Agent. No untrusted URLs, ports,

@@ -87,7 +87,7 @@ const IntegrationUrlSchema = z.string().url().superRefine((value, ctx) => {
   }
 });
 const IntegrationsConfigSchema = z.object({
-  vscodeWeb: IntegrationUrlSchema.optional(),
+  codeServer: IntegrationUrlSchema.optional(),
   harness: IntegrationUrlSchema.optional()
 }).strict();
 

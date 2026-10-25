@@ -1,4 +1,6 @@
 import { MAX_SESSION_ARTIFACT_BYTES } from "@palmtty/protocol";
+import type { WebAppCatalog, WebAppId } from "@palmtty/protocol";
+export type { WebAppCatalog, WebAppId } from "@palmtty/protocol";
 import type {
   BrowseDirectoryRequest,
   CreateWorkspaceInput,
@@ -61,13 +63,8 @@ async function responseBlob(response: Response): Promise<Blob> {
   return response.blob();
 }
 
-export type WebAppId = "vscodeWeb" | "harness";
-export type WebAppPhase = "detecting" | "not_installed" | "installed" | "installing" | "starting" | "running" | "manual_required" | "failed";
-export type WebAppStatus = { id: WebAppId; phase: WebAppPhase; accessUrl?: string; detail?: string };
-export type IntegrationLinks = { apps: Record<WebAppId, WebAppStatus> };
-
 export async function integrationLinks() {
-  return responseJson<IntegrationLinks>(await fetch("/api/v1/integrations", {
+  return responseJson<WebAppCatalog>(await fetch("/api/v1/integrations", {
     credentials: "same-origin", cache: "no-store"
   }));
 }

@@ -2,6 +2,23 @@ import { z } from "zod";
 
 export const PROTOCOL_VERSION = 4 as const;
 export const WS_SUBPROTOCOL = "palmtty.v4";
+
+// Shared wire contract for independently hosted Web application catalogues.
+export const WEB_APP_IDS = ["codeServer", "harness"] as const;
+export type WebAppId = (typeof WEB_APP_IDS)[number];
+export type WebAppPhase =
+  | "detecting" | "not_installed" | "installed" | "installing"
+  | "starting" | "running" | "manual_required" | "failed";
+export type WebAppStatus = {
+  id: WebAppId;
+  phase: WebAppPhase;
+  accessUrl?: string;
+  detail?: string;
+};
+export type WebAppCatalog = { apps: Record<WebAppId, WebAppStatus> };
+export function isWebAppId(value: string): value is WebAppId {
+  return (WEB_APP_IDS as readonly string[]).includes(value);
+}
 export const MAX_INPUT_BYTES = 64 * 1024;
 export const MAX_MESSAGE_BYTES = 80 * 1024;
 

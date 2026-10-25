@@ -3,6 +3,7 @@ import {
   isActiveSessionState,
   isTerminalSessionState,
   type CreateWorkspaceInput,
+  WEB_APP_IDS,
   type RuntimeCapabilities,
   type SessionPublic,
   type WorkspacePublic
@@ -13,7 +14,7 @@ import {
   integrationLinks,
   ensureWebApp,
   type WebAppId,
-  type IntegrationLinks,
+  type WebAppCatalog,
   createSession,
   createWorkspace,
   deleteSession,
@@ -59,7 +60,7 @@ export function App() {
   const { t, error: translateError, connections } = useI18n();
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null);
-  const [integrations, setIntegrations] = useState<IntegrationLinks | null>(null);
+  const [integrations, setIntegrations] = useState<WebAppCatalog | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspacePublic[]>([]);
   const [sessions, setSessions] = useState<SessionPublic[]>([]);
   const [activeSession, setActiveSession] = useState<SessionPublic | null>(null);
@@ -384,8 +385,7 @@ export function App() {
 
       {error && <div className="error-banner">{error}</div>}
       <div className="card-grid" aria-label={t("integrations.applications")}>
-        {renderWebApp("vscodeWeb")}
-        {renderWebApp("harness")}
+        {WEB_APP_IDS.map(renderWebApp)}
       </div>
 
       <section>
