@@ -239,6 +239,13 @@ The task summary should identify:
 - Owner-host autostart and old detached Worker cleanup need real-device confirmation; no Node 22 fallback or Harness auto-installer is in this PR.
 
 
+## Interactive official VS Code Web launcher acceptance
+
+- `pnpm start:with-vscode` is a source-checkout-only, opt-in TTY command after `pnpm build`; `pnpm start`, `pnpm autostart` and `palmtty service` remain unchanged. Non-TTY invocation fails before spawning programs. Missing official CLI or unbuilt Agent fails closed.
+- CLI path detection has one shared implementation consumed by Agent and launcher; no third-party `code-server` runtime or alias returns. Windows handles official `code.cmd` safely without caller shell interpolation; Linux launches executable `code` without shell.
+- Official Web listener always uses 127.0.0.1 and a validated local port (configured loopback integration URL or 8000); no disabled tokens, no silent server-license acceptance. VS Code child receives no PalmTTY bootstrap/control credentials, retains stdin for prompts; Agent does not compete for stdin. The joint process cleans up only children it created and does not adopt arbitrary listeners.
+- Test Windows path quoting, local/external URL port selection, argument injection rejection, non-TTY refusal, and secret isolation. Host-manual checks: first-time VS Code license prompt, own token-auth login, terminal Ctrl+C and Windows descendants, port collisions, phone HTTPS via separate Origin, Codex Web compatibility.
+
 ## Managed Web application acceptance
 
 - For local/no-integration YAML, authenticated `GET /api/v1/integrations` returns both known IDs with explicit states; unauthorized clients get 401; mutation without exact Origin gets 403.

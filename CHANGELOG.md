@@ -10,6 +10,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
+- Add an opt-in, interactive `pnpm start:with-vscode` source-checkout launcher that starts PalmTTY Agent alongside the official Microsoft `code serve-web` foreground CLI. Unify CLI path discovery with the Agent, retain upstream license/token prompts, bind VS Code Web to loopback, strip PalmTTY credentials from its environment, and keep system autostart unchanged.
 - Add always-visible official VS Code Web and Harness status with authenticated no-store discovery and bounded managed-DSH installation/launch, retry and failure diagnostics. DSH pin is 0.2.1-rc.2 and owns its own data; no unsafe same-Origin reverse proxy or remote loopback token leakage. Official VS Code Server remains independently launched under Microsoft licensing.
 - Retain optional operator-provided **separate-origin** HTTPS Web navigation URLs, now shown alongside managed application status. official VS Code Web stays independently user-run; Harness can be deployed and started on Agent loopback when the host provides npm. PalmTTY does not proxy third-party UI, share authentication cookies or infer automatic folder deep links.
 - Provide authenticated, no-store integration-link discovery. Operator URLs require HTTPS (or loopback HTTP for local testing) and cannot include embedded credentials, queries or fragments.
