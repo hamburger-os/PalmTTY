@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it } from "vitest";
@@ -75,4 +76,17 @@ it("does not hide an install failure when a partial Harness CLI appears", async 
   expect(state.phase).toBe("failed");
   expect(state.detail).toBe("install_failed");
   await mgr.close();
+});
+
+it("terminates an owned Harness child and returns from close", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-managed-"));
+  roots.push(root);
+  const mgr = new ManagedWebApps(parseConfig({}), root);
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+    stdio: ["pipe", "pipe", "pipe"], windowsHide: true
+  });
+  const internal = mgr as unknown as { harnessProcess: typeof child };
+  internal.harnessProcess = child;
+  await mgr.close();
+  expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
 });

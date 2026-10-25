@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { access, mkdir } from "node:fs/promises";
+import { access, mkdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { PalmTTYConfig } from "@palmtty/config";
@@ -189,14 +189,18 @@ export class ManagedWebApps {
   private async ensureHarness(): Promise<void> {
     await this.discover();
     if (this.closed) return;
+    // Retry an interrupted installation by replacing only PalmTTY's managed
+    // package directory. A leftover bin.js is not evidence of a valid install.
+    const repairPartialInstall =
+      this.harnessPhase === "failed" && this.harnessDetail === "install_failed";
     this.harnessDetail = undefined;
     try {
       let cli = managedHarnessBin(this.appRoot);
-      if (!(await exists(cli))) {
+      if (repairPartialInstall || !(await exists(cli))) {
         const globalCli = process.platform === "win32"
           ? path.join(process.env.APPDATA ?? "", "npm", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js")
           : "/usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js";
-        if (await exists(globalCli)) {
+        if (!repairPartialInstall && await exists(globalCli)) {
           cli = globalCli;
         } else {
           this.harnessPhase = "installing";
@@ -207,6 +211,7 @@ export class ManagedWebApps {
             return;
           }
           const prefix = path.join(this.appRoot, "harness");
+          if (repairPartialInstall) await rm(prefix, { recursive: true, force: true });
           await mkdir(prefix, { recursive: true, mode: 0o700 });
           const result = await runBoundedProcess({
             executable: process.execPath,
@@ -302,16 +307,25 @@ export class ManagedWebApps {
   async close(): Promise<void> {
     this.closed = true;
     this.installerAbort.abort();
-    // Only stop processes this Agent itself spawned; never kill adopted or
-    // discovered installations, VS Code tasks, arbitrary PIDs or port owners.
+    // Only stop processes this Agent spawned; never kill discovered
+    // installations, code-server, arbitrary PIDs or port owners.
     const child = this.harnessProcess;
     if (child && child.exitCode === null && child.signalCode === null) {
       child.kill();
-      // Wait for the owned child, but bound Agent shutdown if it does not exit.
-      await Promise.race([
-        new Promise<void>((resolve) => child.once("close", () => resolve())),
-        new Promise<void>((resolve) => setTimeout(resolve, 2500))
-      ]);
+      // Cancel the watchdog on normal exit so it never keeps the event loop
+      // alive after the child has already closed.
+      await new Promise<void>((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          child.off("close", finish);
+          resolve();
+        };
+        const timer = setTimeout(finish, 2500);
+        child.once("close", finish);
+      });
     }
     this.harnessProcess = undefined;
     this.harnessStartupUrl = undefined;
