@@ -37,6 +37,6 @@ integrations:
 
 ## Workspace upgrade / 工作区升级
 
-Back up the v3 store, stop the Agent and run `pnpm --filter @palmtty/protocol build` to build the canonical schema. Then run `node scripts/migrate-workspaces-v4.mjs --from <v3-path> --to <v4-path>`. It never overwrites existing output, does not delete the source, and omits removed Remote App profiles. The runtime reads only v4.
+Back up the v3 store, stop the Agent and run `pnpm --filter @palmtty/protocol build` to build the canonical schema. Then run `node scripts/migrate-workspaces-v4.mjs --from <v3-path> --to <v4-path>`. It atomically publishes fully written output via an exclusive same-directory hard link (requires hard-link support), never overwrites existing output, does not delete the source, and omits removed Remote App profiles. The runtime reads only v4.
 
 升级前关闭 Agent 并备份，先构建 `@palmtty/protocol`，再离线运行转换工具，保留原 V3，不覆盖已有 V4；新运行时只读取 V4。

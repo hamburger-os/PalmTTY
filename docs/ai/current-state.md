@@ -21,17 +21,17 @@
 
 - pnpm/TypeScript monorepo
 - Agent/Web/protocol/config packages
-- reviewed combined toolchain: TypeScript 7.0.2, Vitest 5.0.2 and Vite 8.3.1 plus updated tsx/@fastify/static/ws, validated together against a single frozen pnpm lockfile (Windows/Ubuntu CI, installed Windows/Linux smoke and security/CodeQL gates); actual Node runtime and @types/node remain major 22.
+- reviewed toolchain versions are defined by the root/workspace package manifests and the single frozen `pnpm-lock.yaml` (rather than copied into this status report). Windows/Ubuntu CI, installed Windows/Linux distribution smoke, Security Audit and CodeQL validate changes; bundled Node runtime and `@types/node` remain major 22.
 - committed pnpm lockfile with frozen-lockfile CI installs; the repository targets Node.js 22 for CI and release, and Dependabot excludes @types/node 23+ until the runtime baseline is intentionally upgraded. Dependency majors are validated individually on up-to-date main, including Windows/Linux installed distribution smoke. Windows native lifecycle smoke waits for surviving Worker/Agent close and bounds transient temp-directory deletion retries.
 - Windows + Ubuntu CI passing
 - root-script syntax checks plus Node built-in tests for private-LAN address/origin discovery
 - Windows ConPTY smoke coverage that prefers PowerShell 7 locally, falls back to Windows PowerShell for generic host checks, and is forced to PowerShell 7 in repository Windows CI
 - end-to-end Fastify HTTP/WebSocket/Worker IPC lifecycle coverage with deterministic PTY adapters
 - detached-process integration coverage proving a Worker survives the creator Agent process exit and can be rediscovered with replay intact
-- production dependency vulnerability audit, fail-closed production dependency license-policy review (including an exact version-pinned DOMPurify 3.4.17 Apache-2.0 alternative exception for its dual-license metadata), and CodeQL
+- production dependency vulnerability audit, fail-closed license-policy review (including the exact DOMPurify package/version dual-license exception maintained only in `scripts/release-tools.mjs`), and CodeQL
 - CODEOWNERS, PR/Issue templates, contribution/security/governance/release documentation
 - root `package.json` is the single release/runtime version source; private workspace manifests intentionally omit duplicate versions and the Agent health endpoint reads the root version
-- the source tree targets `0.2.0`; `CHANGELOG.md` keeps `[Unreleased]` empty at publication time and carries the explicit `0.1.0` → `0.2.0` exposure-profile migration note instead of compatibility code
+- the source tree uses the root `package.json` version; `CHANGELOG.md` documents current `[Unreleased]` changes plus historical releases. The changelog, not this status report, owns versioned migration notes.
 - guarded manual Release workflow locks an exact `main` SHA, reuses the Windows/Ubuntu CI + Security Audit + CodeQL workflows against that SHA, rejects tag/release reuse, aborts if `main` advances, and publishes an annotated tag plus verified GitHub Release with rollback before finalization; reusable gates consume `inputs.ref` directly and use separate CI/Security/CodeQL concurrency namespaces so sibling release gates cannot cancel one another; publication binds source authority through the remote peeled annotated tag, creates the draft through the Release REST API and retains its returned ID directly, and does not treat either list-enumeration visibility or Release `target_commitish` as source proof once the tag exists; it intentionally has no manual acceptance checkbox
 - Apache-2.0 licensing
 - self-contained installed distribution layout with bundled Node.js, production-only deployed Agent dependencies, compiled Web/PWA assets and an immutable `release-manifest.json`; installed runtime discovery does not depend on repository layout or on preserving `PALMTTY_INSTALL_ROOT` into Session Workers
@@ -43,7 +43,7 @@
 ### Agent and security
 
 - Fastify HTTP/WebSocket service
-- versioned per-user persistent Workspace store managed through authenticated + exact-Origin CRUD API; the typed Win32/MSIX launch schema uses store generation v3 (`workspaces-v3.json`); v1/v2 catalogs are intentionally not read or migrated and remain available for manual reference
+- versioned per-user Workspace store v4 (`workspaces-v4.json`) managed through authenticated + exact-Origin CRUD API; the canonical `WorkspaceDefinitionSchema` contains the Workspace root and Terminal launch settings only. No Remote App profiles or runtime compatibility reads exist. An explicit offline v3→v4 exporter preserves the original file and validates output with the canonical schema.
 - built-in single-user bootstrap-token login
 - random in-memory login session cookie with bounded active-session count
 - explicit `local` / `lan` / `reverseProxy` / direct `https` exposure profiles: bind host, trusted Origins and Secure-cookie behavior are derived from the profile; `lan` additionally rejects non-private client source addresses; legacy low-level exposure switches are rejected
