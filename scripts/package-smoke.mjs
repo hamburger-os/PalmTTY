@@ -106,6 +106,16 @@ async function main() {
     );
     const env = { ...process.env };
     delete env.PALMTTY_INSTALL_ROOT;
+    const bundledRuntimeVersion = run(node, ["--version"], { cwd: root, env }).stdout.trim();
+    const expectedNode = (await readFile(path.resolve(".node-version"), "utf8")).trim();
+    const [expectedMajor, expectedMinor, expectedPatch] = expectedNode.split(".").map(Number);
+    const [actualMajor, actualMinor, actualPatch] =
+      bundledRuntimeVersion.slice(1).split(".").map(Number);
+    if (bundledRuntimeVersion !== manifest.nodeVersion ||
+        actualMajor !== expectedMajor || actualMinor < expectedMinor ||
+        (actualMinor === expectedMinor && actualPatch < expectedPatch)) {
+      throw new Error(`Bundled Node version mismatch: binary ${bundledRuntimeVersion}, manifest ${manifest.nodeVersion}, baseline ${expectedNode}`);
+    }
     const version = run(node, [cli, "version"], { cwd: root, env }).stdout.trim();
     if (version !== manifest.version) {
       throw new Error(

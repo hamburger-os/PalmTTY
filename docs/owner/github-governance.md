@@ -158,5 +158,10 @@ khroma 2.1.0 的 npm 包没有 license 元数据，pnpm 报告 Unknown；但上�
 - 可正常通过 Windows/Ubuntu CI、安装包 smoke、生产依赖漏洞与许可证、CodeQL 的例行更新，按 PR 独立验证并 squash 合入。
 - `terminal-stack.json` 是五个 xterm 依赖的版本单一来源。暂时忽略 Dependabot 对 `@xterm/*` 的逐包更新；升级必须一次性修改权威锁定文件、browser/Worker 组件、lockfile，并完成移动端 TUI、scrollback、WebGL 降级以及 Worker 恢复实测。
 - Mermaid 12 会带来 `elkjs@0.9.3`（EPL-2.0），现有许可证策略未放行。暂时忽略 Mermaid 主版本更新；先做许可证合规审查和预览沙箱兼容性验证。不得简单把 EPL-2.0 加入全局允许列表。
-- jsdom 30 要求 Node ≥22.22.2，当前工程声明 Node ≥22.11.0。暂时忽略 jsdom / @types/jsdom 主版本；在明确升级整个 Node 运行、开发和打包基线之前不把它们合入。
+- Node 24 已满足 jsdom 30 的最低 Node 要求，但 jsdom / @types/jsdom 主版本仍需独立验收浏览器测试行为与 API，不能在 Node 运行时迁移 PR 中混入。
 - 被替代的失败 Dependabot PR 关闭并注明原因。关闭并不等于 GitHub 已删除未合并分支；合并的分支可由仓库的 auto-delete-head-branches 设置自动清理。仓库无用户功能开发遗留分支。
+
+
+### Node 24 统一发布基线
+
+CI、Security Audit、Distribution 和 Release 均通过 `.node-version` 获取精确 Node 版本；`package.json` 独立描述允许的 Node 24 范围与类型依赖。升级 Node 主版本需一起检查 Windows ConPTY、Linux PTY、native `node-pty`、发行 manifest、安装态 smoke、Task Scheduler 自启动路径及四层文档。严禁只修改 `@types/node` 或只修改 CI。

@@ -16,6 +16,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Changed
 
+- Upgrade the supported source and bundled release runtime to Node.js 24 LTS, use `.node-version` (24.22.1) as the one CI/Release security baseline, align `@types/node` and frozen lockfile, verify embedded runtime/native PTY on Windows/Linux, and drop Node 22 support.
 - Remove the unreleased Windows Remote App, WebRTC/AppWorker, native capture host and planned unattended RDP diagnostic code paths, package dependencies, UI, CI smoke and release assets. Terminal Session Worker remains the sole runtime activity; Git, Files and Artifacts continue to use their existing scopes.
 - Increment Workspace storage generation to v4 without automatic legacy reads. External third-party Web apps have their own authentication, processes and workspaces; Codex, Pi and other CLI agents remain Terminal workloads.
 - Add enhanced, sanitized Markdown file previews with GFM, syntax highlighting, KaTeX, Mermaid sandboxing and bounded safe local images; preserve existing text, history, copy/export and speech actions.

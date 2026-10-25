@@ -10,7 +10,7 @@ Mobile-first · self-hosted · Windows-first · Host + WSL runtimes · xterm.js
 [![CI](https://github.com/hamburger-os/PalmTTY/actions/workflows/ci.yml/badge.svg)](https://github.com/hamburger-os/PalmTTY/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/hamburger-os/PalmTTY/actions/workflows/codeql.yml/badge.svg)](https://github.com/hamburger-os/PalmTTY/actions/workflows/codeql.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D22.11-339933?logo=node.js&logoColor=white)](package.json)
+[![Node](https://img.shields.io/badge/node-24%20LTS-339933?logo=node.js&logoColor=white)](package.json)
 [![Status](https://img.shields.io/badge/status-alpha-orange.svg)](docs/owner/roadmap.md)
 
 </div>
@@ -114,7 +114,7 @@ Linux `.deb` installation places the runtime under `/usr/lib/palmtty` and the CL
 Requirements:
 
 - Windows 11
-- Node.js 22.11+
+- Node.js 24.22.1+ (Node 24 LTS only, with the CI baseline pinned in `.node-version`).
 - Corepack / pnpm
 - PowerShell 7 (`pwsh`) is the preferred Windows host shell; the Workspace editor exposes one terminal-profile selector containing detected Host shells plus registered WSL distributions, with a Custom fallback for explicit runtime/shell details
 

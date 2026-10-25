@@ -31,6 +31,18 @@ const explicitVersion = releaseMode
   : args.find((arg) => !arg.startsWith("--"));
 
 const rootPackage = readJson("package.json");
+const pinnedRuntime = readFileSync(resolve(root, ".node-version"), "utf8").trim();
+const runtimeParts = /^(\d+)\.(\d+)\.(\d+)$/.exec(pinnedRuntime);
+const major = runtimeParts ? Number(runtimeParts[1]) : null;
+const types = /^\^(\d+)\./.exec(rootPackage.devDependencies?.["@types/node"] ?? "");
+if (major === null ||
+    rootPackage.engines?.node !== `>=${pinnedRuntime} <${major + 1}` ||
+    !types || Number(types[1]) !== major) {
+  fail("Node runtime, engine range and @types/node must use one coordinated major");
+} else {
+  pass(`Node.js runtime contract is consistent: ${pinnedRuntime}`);
+}
+
 let expected;
 try {
   expected = normalizeVersion(explicitVersion ?? rootPackage.version);

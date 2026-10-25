@@ -134,3 +134,8 @@ Git 已完成从只读 status/diff 到受控 Source Control 工作台，并补�
 ## 2026-10 增量可靠性改进
 
 已实现并测试：手机短暂 socket 断线复用 xterm/seq，长后台或渲染拥堵改用最新有界快照；replay 具备字节与帧数量双预算；本地 Worker IPC 增量帧解析并收紧单帧预算；单终端输入/resize 控制租约与只读观察者；小说章节导航和仅记录匿名全文签名/段落字符偏移的本地进度。仍待推进：PTY→headless 背压闭环的真机压力验证、文件路径原子约束强化、真实手机长时测试，以及超出 8 MiB 小说的分块阅读。不集成额外的云端 TTS API；浏览器自身提供的在线音色以显式授权为隐私边界。
+
+
+## Node 24 LTS 运行时升级（2026-10）
+
+PalmTTY 源码与发行版本统一迁移至 Node 24 LTS：CI 使用 `.node-version`，Windows/Linux 原生构建、类型定义与发行包一致。此阶段不开发 Harness 自动安装管理，也不改变 VS Code Web/Harness 外部入口架构。

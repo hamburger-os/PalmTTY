@@ -224,6 +224,9 @@ async function main() {
     throw new Error(`Distribution packaging is not implemented for ${platform}`);
   }
 
+  // Never ship a PTY native-addon bundle from the wrong Node ABI.
+  run(process.execPath, [path.join(repoRoot, "scripts", "node-runtime-check.mjs")]);
+
   const outputRoot = path.resolve(outputValue);
   const rootPackage = JSON.parse(
     await readFile(path.join(repoRoot, "package.json"), "utf8")
