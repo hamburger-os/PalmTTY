@@ -273,3 +273,5 @@ export function lanAgentUrls(
   return privateIpv4Addresses(networkInterfaces)
     .map((address) => `http://${address}:${config.server.port}`);
 }
+
+export { findOfficialVSCodeCli, officialVSCodeCliCandidates } from "./vscode-cli.js";
