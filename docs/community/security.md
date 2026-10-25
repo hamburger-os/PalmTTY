@@ -113,9 +113,9 @@ PalmTTY 自启动始终属于当前用户：Windows Task Scheduler 使用交互�
 
 ### Third-party Web service boundary / 第三方 Web 服务边界
 
-External VS Code Web and Harness links are optional operator-managed URLs. PalmTTY cannot verify ownership of an external process and therefore never issues arbitrary process termination or proxies credential-bearing URLs. Use separate secure origins and independent application authentication.
+External code-server and Harness links are optional operator-managed URLs. PalmTTY never adopts or terminates unverified external processes: the only managed upstream child is the Harness process it directly spawned. Neither UI is proxied into PalmTTY's login Origin. Use separate secure origins and independent application authentication.
 
-外部 VS Code/Harness 由部署者管理，不通过 PalmTTY 共享 Cookie、代码执行权限或远程地址代理。请避免保存令牌 URL，跨设备访问必须另行完成可信 HTTPS/私有网络部署。
+code-server 由部署者独立管理；PalmTTY 只管理自有的 Harness 安装和子进程，不接管未知进程，也不通过 PalmTTY 共享 Cookie、代码执行权限或远程地址代理。请避免保存令牌 URL，跨设备访问必须另行完成可信 HTTPS/私有网络部署。
 
 ### Single terminal controller (October 2026)
 

@@ -29,10 +29,10 @@ sessions:
   replayBytes: 2097152
   maxSocketBufferedBytes: 2097152
 
-# Optional independently managed VS Code Web / DeepSeek Harness links.
+# Optional independently managed code-server / DeepSeek Harness links.
 # URLs must use HTTPS (or loopback HTTP) and must NOT contain connection tokens.
 # integrations:
-#   vscodeWeb: https://code.example.test/
+#   codeServer: https://code.example.test/
 #   harness: https://harness.example.test/
 
 # Optional high-quality local novel reader. Start the separate Python sidecar,

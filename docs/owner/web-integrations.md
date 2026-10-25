@@ -1,44 +1,23 @@
-# 本机 Web 应用管理架构
+# 本机 Web 开发应用管理
 
 ## 管理边界
 
-PalmTTY 为 VS Code Web 与 DeepSeek Harness 提供始终可见的一等状态入口，不增加 Terminal Session 或 Workspace 类型，也不重建远程桌面/应用画面。唯一管理者为 Agent 的有界受控应用管理器：发现安装、按需尝试安装、启动自己拥有的子进程、跟踪状态和失败诊断，禁止对未知 PID、已运行但未验证身份的端口或其他用户进程采取动作。
+PalmTTY 首页固定展示 **code-server** 和 **DeepSeek Harness**，与 Workspace、Terminal Session 独立。应用 ID、状态与响应结构统一定义在 `@palmtty/protocol`，Agent 是状态所有者，前端只展示 API 状态。
 
-- VS Code：仅发现官方安装与向用户提供手动启动说明。微软的 VS Code Server License 不允许服务托管，所以不得把官方 `code serve-web` 包装成 Windows Service、后台 Agent 子进程，也不能擅自用端口占用结果判断服务身份。
-- Harness：复用已知 CLI；缺失时调用本机 npm 安装锁定 `@deepseek-ai/dsh@0.2.1-rc.2` 至当前用户目录，然后以固定参数启动 `127.0.0.1:0` 的 Web 服务。安装不提权、不修改系统 PATH，也不创建长期系统服务。Windows/Linux 安装版同步打包官方 Node 24 附带的 npm CLI，源码模式找不到可用 npm 时才报告 npm_unavailable。
-- 单次认证登录可触发自动尝试，重试由显式按钮执行；管理器做 single-flight，状态来自 Agent 内部权威，前端只展示。退出 Agent 时仅结束它自己启动的 Harness 子进程。
+- **code-server**：只扫描当前主机已知目录与 PATH 的现有 CLI。它是独立部署和认证的开源 Web IDE；PalmTTY 不下载、不启动、不监督 code-server，不声明配置了访问地址就代表服务运行。与微软官方 `code serve-web` 无关，旧 `vscodeWeb` 配置键直接删除，没有兼容分支。
+- **Harness**：复用已知 CLI，或通过本机 npm（发行版捆绑官方 Node/npm）在当前用户目录安装锁定的 `@deepseek-ai/dsh@0.2.1-rc.2`。Agent 仅启动和管理自己持有的回环随机端口子进程；不采用未知 PID 或端口，也不允许来自浏览器的任意软件版本和启动参数。
+- **检测与失败**：受认证的轮询刷新安装检测；即使安装失败留下 CLI 文件，失败状态也不会被后续轮询自动清除；管理器在独立临时目录安装并校验包名、版本和入口文件，只有成功才发布到正式位置；重试不会把半成品当作可运行 CLI。Harness 只认可官方 `dsh web:` 回环启动公告，并要求所拥有的子进程仍然存活。关闭监听在就绪等待前注册；Agent 停止时发出终止信号并有界等待。Windows 孙进程树彻底清理仍须实机验收。
 
-## 访问安全
+## API 和 Origin
 
-现有 NAS 仅反向代理 `https://haha.example.test/` → PalmTTY Agent 时，无条件增加 `/_apps/harness/` 路由会使第三方 JS 获得与已登录 PalmTTY 同等的浏览器 Origin 权限。严禁这种默认做法。不同端口也不隔离同主机 Cookie。第三方进程不继承 `PALMTTY_*` 或 PalmTTY 登录 token 环境。
+`GET /api/v1/integrations` 需登录、no-store；`POST /api/v1/integrations/:id/ensure` 另需严格 Origin 并只接受规范 ID。对 code-server 的 ensure 只重扫安装位置；仅 Harness 能启动/安装。客户端不能指定可执行文件、npm 包、端口和代理目标。
 
-- 管理 API 要求 PalmTTY 登录，POST 同时校验严格 Origin；拒绝客户端传入程序路径/命令/任意代理 URL。GET no-store。
-- 本机浏览器在真正 local exposure 时可获得 DSH 一次性启动 URL。经 NAS 或 LAN 访问的浏览器不得收到回环的令牌 URL，也不能把一个外部电话浏览器的回环当成 Agent 地址。
-- 手机的零额外配置 HTTPS 访问尚未实现；必须是单独 Origin 的受保护代理，并尊重上游 Cookie/Host/WebSocket/令牌安全机制。可选 `integrations` URL 仅代表独立外部访问地址。
-- 上游软件升级和下载策略需固定版本、校验、单独安全复核；不得在每次启动时追随 `latest`。
+第三方 Web UI 不能代理到已登录 PalmTTY 的相同 Origin，不得共享 Cookie、Token 或 Worker 密钥。可选 `integrations.codeServer` / `integrations.harness` 只记录无凭据的 HTTPS 或本机回环 HTTP 地址。它们是访问入口，不负责安全代理配置、服务可用性和认证验证。
 
-## 现实验收边界
-
-源码模式 npm 与官方 VS Code CLI 的发现路径、Harness Web 登录与长期运行、手机独立 HTTPS Origin、Codex VS Code 扩展和退出后子进程树仍需实测。完成进程探测不等于完成跨网络安全访问。
-
-Workspace V4 删除 Remote App 数据；运行时不读取旧 V3。卸载旧 WebRTC/RDP 仅是功能取消，不削弱终端 Worker 的恢复/认证约束。
+DSH 官方首次登录使用一次性进程令牌 URL 换取自己的 Cookie；仅在受认证的同机 `local` 浏览器可以看到。远端 LAN/NAS 不得获取该 URL；不能持久化或输出到日志。若在独立 HTTPS Origin 后部署 DSH，还需按官方要求正确配置 `--public-url`、`--trusted-host`、上游认证和 WebSocket。当前托管回环实例**不会自动完成远程配置**。手机端零配置使用、code-server 自动安装、Codex 浏览器扩展均不在已验证交付范围内。
 
 ## 验收缺口
-VS Code Codex 扩展、浏览器文件夹深链接、真实手机访问、DSH 登录会话和独立服务长期运行仍需实机验收。完成链接入口不等于完成这些外围能力。
 
-## 一次性升级
+需要 Windows/Linux 真实主机验收：首次在线下载、DSH Web 登录与长期会话、关闭后的进程树、手机上独立 HTTPS 访问、code-server 编辑和 Codex 扩展兼容性。发行态 smoke 验证捆绑 npm CLI 可执行，并未真实访问 npm Registry。
 
-关闭 PalmTTY Agent 并备份工作区存储后，用 `node scripts/migrate-workspaces-v4.mjs --from <v3-file> --to <v4-file>` 离线转换。先执行 `pnpm --filter @palmtty/protocol build`，确保转换工具使用当前版本的唯一 Workspace Schema 校验。数据不合法或 ID 重复时拒绝创建 V4 文件。导出时先写入并同步同目录临时文件，再用独占硬链接原子发布，拒绝覆盖已有 V4；要求目标文件系统支持硬链接，临时文件始终清理。输出文件必须不存在，V3 原件保留，V4 只保存现有 Workspace/Terminal 字段，移除旧 Remote App Profile。运行时不提供自动 V3 回退。
-
-
-### 上游 DSH 一次性启动令牌的例外
-
-PalmTTY 自身的登录、Worker IPC 令牌始终不得写 URL。DSH 官方 Web 在首次登录时使用短时进程令牌 URL 换取自身 Cookie，这属于独立第三方认证协议。管理器只在 `local` exposure 且请求确实来自同机回环浏览器时通过已认证的 no-store API 返回该临时 URL；不会持久化、记录日志或返回给 LAN/NAS 远端浏览器。不能混用两款产品的 Cookie 或认为一次 DSH 授权就是 PalmTTY 授权。
-
-## 就绪检查与发现刷新（2026-10-25）
-
-CLI 安装检测随状态查询刷新。Harness 只有在读取到上游官方 `dsh web:` 就绪行、确认回环地址且当前子进程仍存活时才报告运行中；其它日志 URL 不算就绪。本轮不改变独立 HTTPS Origin 与 npm 可用性的部署限制。
-
-## 发行包 npm 交付与来源
-
-Windows/Linux 发行脚本从与捆绑 Node 24 同一官方安装目录复制 npm CLI 至 `runtime/npm`，保留其 `LICENSE` 和依赖文件。发行 manifest 记录 `npmVersion`，SBOM 收录 npm 及其依赖，安装态 smoke 使用捆绑 Node 执行 `npm-cli.js --version`。因此安装版不需要用户另装 npm；源码版仍需环境中的 npm，自动安装 DSH 还需要能够访问 npm Registry。NAS 的独立 HTTPS Origin 问题未改变。
+Workspace V4 只存核心 Workspace 与 Terminal Profile。旧 V3 不自动读取；如需转换，先备份并关闭 Agent，构建协议包后运行 `node scripts/migrate-workspaces-v4.mjs --from <v3-file> --to <v4-file>`，仅显式离线导出、不覆盖现有 V4。

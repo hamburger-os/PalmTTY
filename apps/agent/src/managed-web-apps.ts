@@ -1,21 +1,10 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { access, mkdir } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { PalmTTYConfig } from "@palmtty/config";
+import type { WebAppCatalog, WebAppId, WebAppPhase, WebAppStatus } from "@palmtty/protocol";
 import { runBoundedProcess } from "./bounded-process.js";
-
-export type WebAppId = "vscodeWeb" | "harness";
-export type WebAppPhase =
-  | "detecting" | "not_installed" | "installed" | "installing"
-  | "starting" | "running" | "manual_required" | "failed";
-export type WebAppStatus = {
-  id: WebAppId;
-  phase: WebAppPhase;
-  accessUrl?: string;
-  detail?: string;
-};
-export type WebAppCatalog = { apps: Record<WebAppId, WebAppStatus> };
 
 export const HARNESS_PIN = "0.2.1-rc.2";
 const MAX_LOG_BYTES = 8192;
@@ -47,15 +36,27 @@ function personalAppRoot(): string {
   return path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), ".local", "share"), "PalmTTY", "web-apps");
 }
 
-function vscodeCandidates(): string[] {
+function codeServerCandidates(): string[] {
+  // Discovery only. code-server independently owns its lifecycle and auth.
   if (process.platform === "win32") {
     return [
-      path.join(process.env.LOCALAPPDATA ?? "", "Programs", "Microsoft VS Code", "bin", "code.cmd"),
-      path.join(process.env.ProgramFiles ?? "C:\\Program Files", "Microsoft VS Code", "bin", "code.cmd"),
-      path.join(process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)", "Microsoft VS Code", "bin", "code.cmd")
+      ...(process.env.APPDATA ? [
+        path.join(process.env.APPDATA, "npm", "code-server.cmd")
+      ] : []),
+      ...(process.env.LOCALAPPDATA ? [
+        path.join(process.env.LOCALAPPDATA, "Programs", "code-server", "bin", "code-server.cmd")
+      ] : []),
+      ...(process.env.PATH ?? "").split(path.delimiter).filter(Boolean)
+        .flatMap((dir) => [path.join(dir, "code-server.exe"), path.join(dir, "code-server.cmd")])
     ];
   }
-  return ["/usr/local/bin/code", "/usr/bin/code"];
+  return [
+    path.join(os.homedir(), ".local", "bin", "code-server"),
+    "/usr/local/bin/code-server",
+    "/usr/bin/code-server",
+    ...(process.env.PATH ?? "").split(path.delimiter).filter(Boolean)
+      .map((dir) => path.join(dir, "code-server"))
+  ];
 }
 
 function npmCliCandidates(): string[] {
@@ -81,8 +82,25 @@ async function firstExisting(paths: string[]): Promise<string | undefined> {
   return undefined;
 }
 
+function harnessBinAt(prefix: string): string {
+  return path.join(prefix, "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js");
+}
 function managedHarnessBin(root: string): string {
-  return path.join(root, "harness", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js");
+  return harnessBinAt(path.join(root, "harness"));
+}
+
+/** Reject an abandoned or wrong-version npm install before exposing a CLI. */
+export async function isPinnedHarnessPackage(prefix: string): Promise<boolean> {
+  try {
+    const manifest = path.join(prefix, "node_modules", "@deepseek-ai", "dsh", "package.json");
+    const info: unknown = JSON.parse(await readFile(manifest, "utf8"));
+    return typeof info === "object" && info !== null &&
+      "name" in info && info.name === "@deepseek-ai/dsh" &&
+      "version" in info && info.version === HARNESS_PIN &&
+      await exists(harnessBinAt(prefix));
+  } catch {
+    return false;
+  }
 }
 
 // Never copy PalmTTY's bootstrap token, cookie or control credentials into an
@@ -111,7 +129,7 @@ export class ManagedWebApps {
   private harnessDetail: string | undefined;
   private closed = false;
   private readonly installerAbort = new AbortController();
-  private vscodePresent: boolean | undefined;
+  private codeServerPresent: boolean | undefined;
   private harnessPresent: boolean | undefined;
 
   constructor(config: PalmTTYConfig, appRoot = personalAppRoot()) {
@@ -121,17 +139,18 @@ export class ManagedWebApps {
 
   async discover(): Promise<void> {
     // Status is polled; a newly installed program must appear without an Agent restart.
-    this.vscodePresent = Boolean(await firstExisting(vscodeCandidates()));
+    this.codeServerPresent = Boolean(await firstExisting(codeServerCandidates()));
     if (!["installing", "starting", "running"].includes(this.harnessPhase)) {
-      const managed = managedHarnessBin(this.appRoot);
       // A user-installed dsh remains outside PalmTTY ownership. Do not attach
       // to an unknown process or guess an existing service from an open port.
       const globalBins = process.platform === "win32"
         ? [path.join(process.env.APPDATA ?? "", "npm", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js")]
         : ["/usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js"];
-      this.harnessPresent = Boolean(await firstExisting([managed, ...globalBins]));
-      if (["detecting", "not_installed", "installed"].includes(this.harnessPhase) ||
-          (this.harnessPhase === "failed" && this.harnessPresent)) {
+      this.harnessPresent =
+        await isPinnedHarnessPackage(path.join(this.appRoot, "harness")) ||
+        Boolean(await firstExisting(globalBins));
+      // An incomplete install must never erase a failure on the next status poll.
+      if (["detecting", "not_installed", "installed"].includes(this.harnessPhase)) {
         this.harnessPhase = this.harnessPresent ? "installed" : "not_installed";
         this.harnessDetail = undefined;
       }
@@ -149,13 +168,14 @@ export class ManagedWebApps {
       }
       return candidate;
     };
-    const externalVscode = allowExternal(this.config.integrations.vscodeWeb);
+    const externalCodeServer = allowExternal(this.config.integrations.codeServer);
     const externalHarness = allowExternal(this.config.integrations.harness);
-    const vscode: WebAppStatus = {
-      id: "vscodeWeb",
-      phase: this.vscodePresent ? "manual_required" : "not_installed",
-      detail: this.vscodePresent ? "vscode_server_license" : "vscode_not_detected",
-      ...(externalVscode ? { accessUrl: externalVscode } : {})
+    const codeServer: WebAppStatus = {
+      id: "codeServer",
+      phase: externalCodeServer || this.codeServerPresent ? "manual_required" : "not_installed",
+      detail: externalCodeServer ? "code_server_external" :
+        this.codeServerPresent ? "code_server_manual_start" : "code_server_not_detected",
+      ...(externalCodeServer ? { accessUrl: externalCodeServer } : {})
     };
     const harness: WebAppStatus = {
       id: "harness",
@@ -168,13 +188,12 @@ export class ManagedWebApps {
     if (harness.phase === "running" && !harness.accessUrl) {
       harness.detail = "separate_https_origin_required";
     }
-    return { apps: { vscodeWeb: vscode, harness } };
+    return { apps: { codeServer, harness } };
   }
 
-  // The official VS Code Server license disallows service hosting; installing
-  // or daemonizing it inside the Agent is not an allowed managed-app action.
+  // code-server remains independently hosted and authenticated.
   ensure(id: WebAppId): Promise<void> {
-    if (id === "vscodeWeb") return this.discover();
+    if (id === "codeServer") return this.discover();
     if (this.harnessPhase === "running" && this.harnessProcess?.exitCode === null) {
       return Promise.resolve();
     }
@@ -191,7 +210,7 @@ export class ManagedWebApps {
     this.harnessDetail = undefined;
     try {
       let cli = managedHarnessBin(this.appRoot);
-      if (!(await exists(cli))) {
+      if (!(await isPinnedHarnessPackage(path.join(this.appRoot, "harness")))) {
         const globalCli = process.platform === "win32"
           ? path.join(process.env.APPDATA ?? "", "npm", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js")
           : "/usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js";
@@ -206,21 +225,32 @@ export class ManagedWebApps {
             return;
           }
           const prefix = path.join(this.appRoot, "harness");
-          await mkdir(prefix, { recursive: true, mode: 0o700 });
-          const result = await runBoundedProcess({
-            executable: process.execPath,
-            args: [npm, "install", "--prefix", prefix, "--no-audit",
-              "--no-fund", "--save=false", `@deepseek-ai/dsh@${HARNESS_PIN}`],
-            env: thirdPartyEnvironment(this.config.auth.tokenEnv),
-            timeoutMs: INSTALL_TIMEOUT_MS,
-            signal: this.installerAbort.signal,
-            maxStdoutBytes: MAX_LOG_BYTES,
-            maxStderrBytes: MAX_LOG_BYTES
-          });
-          if (result.code !== 0 || !(await exists(cli))) {
-            this.harnessPhase = "failed";
-            this.harnessDetail = "install_failed";
-            return;
+          await mkdir(this.appRoot, { recursive: true, mode: 0o700 });
+          // Never expose an incomplete npm tree as an installed CLI after a
+          // crash. A private sibling staging directory is on the same volume.
+          const staging = await mkdtemp(path.join(this.appRoot, "harness-install-"));
+          try {
+            const result = await runBoundedProcess({
+              executable: process.execPath,
+              args: [npm, "install", "--prefix", staging, "--no-audit",
+                "--no-fund", "--save=false", `@deepseek-ai/dsh@${HARNESS_PIN}`],
+              env: thirdPartyEnvironment(this.config.auth.tokenEnv),
+              timeoutMs: INSTALL_TIMEOUT_MS,
+              signal: this.installerAbort.signal,
+              maxStdoutBytes: MAX_LOG_BYTES,
+              maxStderrBytes: MAX_LOG_BYTES
+            });
+            if (result.code !== 0 || !(await isPinnedHarnessPackage(staging))) {
+              this.harnessPhase = "failed";
+              this.harnessDetail = "install_failed";
+              return;
+            }
+            if (this.closed) return;
+            // The managed prefix contains only PalmTTY-installed package bytes.
+            await rm(prefix, { recursive: true, force: true });
+            await rename(staging, prefix);
+          } finally {
+            await rm(staging, { recursive: true, force: true });
           }
         }
       }
@@ -243,6 +273,16 @@ export class ManagedWebApps {
       }
     );
     this.harnessProcess = child;
+    child.once("close", () => {
+      if (this.harnessProcess === child) {
+        this.harnessProcess = undefined;
+        this.harnessStartupUrl = undefined;
+        if (!this.closed) {
+          this.harnessPhase = "failed";
+          this.harnessDetail = "process_exited";
+        }
+      }
+    });
     child.stdin.end();
     let output = "";
     try {
@@ -279,14 +319,6 @@ export class ManagedWebApps {
       this.harnessStartupUrl = url;
       this.harnessPhase = "running";
       this.harnessPresent = true;
-      child.once("close", () => {
-        if (this.harnessProcess === child) {
-          this.harnessProcess = undefined;
-          this.harnessStartupUrl = undefined;
-          this.harnessPhase = "failed";
-          this.harnessDetail = "process_exited";
-        }
-      });
     } catch (error) {
       if (child.exitCode === null) child.kill();
       if (this.harnessProcess === child) this.harnessProcess = undefined;
@@ -299,10 +331,25 @@ export class ManagedWebApps {
   async close(): Promise<void> {
     this.closed = true;
     this.installerAbort.abort();
-    // Only stop processes this Agent itself spawned; never kill adopted or
-    // discovered installations, VS Code tasks, arbitrary PIDs or port owners.
-    if (this.harnessProcess && this.harnessProcess.exitCode === null) {
-      this.harnessProcess.kill();
+    // Only stop processes this Agent spawned; never kill discovered
+    // installations, code-server, arbitrary PIDs or port owners.
+    const child = this.harnessProcess;
+    if (child && child.exitCode === null && child.signalCode === null) {
+      child.kill();
+      // Cancel the watchdog on normal exit so it never keeps the event loop
+      // alive after the child has already closed.
+      await new Promise<void>((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          child.off("close", finish);
+          resolve();
+        };
+        const timer = setTimeout(finish, 2500);
+        child.once("close", finish);
+      });
     }
     this.harnessProcess = undefined;
     this.harnessStartupUrl = undefined;
