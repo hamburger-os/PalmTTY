@@ -153,3 +153,10 @@ Mouse tracking (DECSET 9/1000/1002/1003) and event *encoding* (1006 SGR and 1016
 ### WebGL custom glyphs and fullscreen scrollbar ownership (2026-10-17)
 
 Upstream references: https://github.com/xtermjs/xterm.js/issues/6224 and https://github.com/xtermjs/xterm.js/blob/master/addons/addon-webgl/typings/addon-webgl.d.ts. The default DOM renderer relies on font-provided block and box glyphs, which can leave inter-row gaps on some font/DPR combinations; xterm's WebGL addon supports custom drawing for U+2500–U+257F and U+2580–U+259F, including `│`, `┃` and `█`. The paired WebGL beta has a peer dependency on browser xterm 6.1.0-beta.304. Renderer availability is presentation-only: xterm remains the same buffer/input/resize owner and WebGL can be disposed for DOM fallback after GPU loss. A TUI's text-cell scrollbar is distinct from xterm's own browser scrollbar. In an alternate-buffer mouse-tracking TUI, wheel scrolling involves application-directed SGR input, so smooth native DOM pixel momentum cannot be guaranteed or manufactured by the terminal host without changing TUI semantics.
+
+
+## Node.js 24 release and native ABI (2026-10)
+
+- Node.js official schedule: <https://github.com/nodejs/Release#release-schedule>. Node 24 receives maintenance support until April 2028.
+- Node 24.22.1 security release: <https://nodejs.org/en/blog/release/v24.22.1>. `.node-version` is PalmTTY's exact CI/release pin; root `engines.node` declares the accepted range.
+- `node-pty` upstream native binding: <https://github.com/microsoft/node-pty>. Windows/Linux platform-native builds must validate ConPTY/PTY and the packaged Node ABI. Automated smoke is not proof of real-owner-host keyboard, power-state or startup visuals.

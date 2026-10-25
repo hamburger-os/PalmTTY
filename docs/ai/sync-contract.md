@@ -17,6 +17,7 @@ Use this map after every implementation change.
 | `apps/web` | `web-mobile.md`, possibly `reconnect.md` | architecture/getting-started as needed | xterm upstream only if assumptions changed; visual/theme changes also follow `.agents/skills/palmtty-theme/SKILL.md` and its review skill |
 | deployment/reverse proxy/autostart | `deployment.md`, `security.md` | `security.md`, `getting-started.md`, `autostart.md` | OS service-management/security references |
 | session worker lifecycle / IPC / recovery metadata | `session.md`, `reconnect.md`, `security.md`, `roadmap.md` | `architecture.md`, `security.md` | Windows/Node runtime references |
+| `.node-version`, Node engines/typings, bundled native runtime and PTY distribution | `deployment.md`, `github-governance.md`, `session.md` | `getting-started.md`, `development.md`, `autostart.md` | Node LTS and node-pty/ConPTY upstream |
 | GitHub workflows, dependency policy, release/governance files | `github-governance.md`, `roadmap.md` | `development.md` if contributor-visible | normally none |
 | roadmap/completion status | `roadmap.md` | README if contributor-facing | none |
 

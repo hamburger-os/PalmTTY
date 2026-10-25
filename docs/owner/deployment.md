@@ -157,3 +157,12 @@ QNAP 规则的目标协议必须选择其“HTTP + WebSocket”一类组合，�
 - Windows LocalSystem/预登录服务模式；
 - 自动修改 Linux linger/系统级 service；
 - 把 autostart 描述成 OS reboot PTY persistence。
+
+
+## Node 24 LTS 运行环境（2026-10）
+
+- `.node-version` 固定 CI、Release 的 Node 24.22.1 安全基线；`package.json` 允许不低于该版本、且主版本为 24 的运行时。Node 22、25+ 不再受支持。
+- `@types/node`、frozen lockfile、Windows/Ubuntu CI、Release、Security Audit 与发行包内置 Node 保持 Node 24 一致。安装版不需要系统 Node。
+- 源码部署切换 Node 后重新安装 `node-pty` 原生依赖；若源码自启动记录的 Node 可执行文件路径变化，重新安装自启动。打包 smoke 会实际执行内置 `node --version` 并核对发行 manifest。
+- 升级前结束旧 Node 22 下的 Terminal Worker，避免新 Agent 和旧 ABI Worker 混合运行。不增加 Node 22 兼容逻辑。ConPTY 实机、自启动视觉效果仍需真实主机验证。
+- Harness 的自动发现/安装/启动不是这次 Node 迁移的交付内容，属于后续独立集成阶段。
