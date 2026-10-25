@@ -104,9 +104,20 @@ async function main() {
     const manifest = JSON.parse(
       await readFile(path.join(root, "release-manifest.json"), "utf8")
     );
+    const npmCli = path.join(root, "runtime", "npm", "bin", "npm-cli.js");
+    const npmPackage = JSON.parse(await readFile(
+      path.join(root, "runtime", "npm", "package.json"), "utf8"
+    ));
+    if (npmPackage.name !== "npm" || npmPackage.version !== manifest.npmVersion) {
+      throw new Error("Bundled npm metadata does not match the release manifest");
+    }
     const env = { ...process.env };
     delete env.PALMTTY_INSTALL_ROOT;
     const bundledRuntimeVersion = run(node, ["--version"], { cwd: root, env }).stdout.trim();
+    const bundledNpmVersion = run(node, [npmCli, "--version"], { cwd: root, env }).stdout.trim();
+    if (bundledNpmVersion !== manifest.npmVersion) {
+      throw new Error(`Bundled npm version mismatch: ${bundledNpmVersion} vs ${manifest.npmVersion}`);
+    }
     const expectedNode = (await readFile(path.resolve(".node-version"), "utf8")).trim();
     const [expectedMajor, expectedMinor, expectedPatch] = expectedNode.split(".").map(Number);
     const [actualMajor, actualMinor, actualPatch] =

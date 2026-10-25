@@ -5,7 +5,7 @@
 PalmTTY 为 VS Code Web 与 DeepSeek Harness 提供始终可见的一等状态入口，不增加 Terminal Session 或 Workspace 类型，也不重建远程桌面/应用画面。唯一管理者为 Agent 的有界受控应用管理器：发现安装、按需尝试安装、启动自己拥有的子进程、跟踪状态和失败诊断，禁止对未知 PID、已运行但未验证身份的端口或其他用户进程采取动作。
 
 - VS Code：仅发现官方安装与向用户提供手动启动说明。微软的 VS Code Server License 不允许服务托管，所以不得把官方 `code serve-web` 包装成 Windows Service、后台 Agent 子进程，也不能擅自用端口占用结果判断服务身份。
-- Harness：复用已知 CLI；缺失时调用本机 npm 安装锁定 `@deepseek-ai/dsh@0.2.1-rc.2` 至当前用户目录，然后以固定参数启动 `127.0.0.1:0` 的 Web 服务。安装不提权、不修改系统 PATH，也不创建长期系统服务。发行版仅打包 Node，不包含 npm 时呈现 npm_unavailable 状态。
+- Harness：复用已知 CLI；缺失时调用本机 npm 安装锁定 `@deepseek-ai/dsh@0.2.1-rc.2` 至当前用户目录，然后以固定参数启动 `127.0.0.1:0` 的 Web 服务。安装不提权、不修改系统 PATH，也不创建长期系统服务。Windows/Linux 安装版同步打包官方 Node 24 附带的 npm CLI，源码模式找不到可用 npm 时才报告 npm_unavailable。
 - 单次认证登录可触发自动尝试，重试由显式按钮执行；管理器做 single-flight，状态来自 Agent 内部权威，前端只展示。退出 Agent 时仅结束它自己启动的 Harness 子进程。
 
 ## 访问安全
@@ -19,7 +19,7 @@ PalmTTY 为 VS Code Web 与 DeepSeek Harness 提供始终可见的一等状态�
 
 ## 现实验收边界
 
-用户 Windows 主机是否安装 npm、官方 VS Code CLI 的准确位置、Harness Web 登录与长期运行、手机独立 HTTPS Origin、Codex VS Code 扩展和退出后子进程树仍需实测。完成进程探测不等于完成跨网络安全访问。
+源码模式 npm 与官方 VS Code CLI 的发现路径、Harness Web 登录与长期运行、手机独立 HTTPS Origin、Codex VS Code 扩展和退出后子进程树仍需实测。完成进程探测不等于完成跨网络安全访问。
 
 Workspace V4 删除 Remote App 数据；运行时不读取旧 V3。卸载旧 WebRTC/RDP 仅是功能取消，不削弱终端 Worker 的恢复/认证约束。
 
@@ -38,3 +38,7 @@ PalmTTY 自身的登录、Worker IPC 令牌始终不得写 URL。DSH 官方 Web 
 ## 就绪检查与发现刷新（2026-10-25）
 
 CLI 安装检测随状态查询刷新。Harness 只有在读取到上游官方 `dsh web:` 就绪行、确认回环地址且当前子进程仍存活时才报告运行中；其它日志 URL 不算就绪。本轮不改变独立 HTTPS Origin 与 npm 可用性的部署限制。
+
+## 发行包 npm 交付与来源
+
+Windows/Linux 发行脚本从与捆绑 Node 24 同一官方安装目录复制 npm CLI 至 `runtime/npm`，保留其 `LICENSE` 和依赖文件。发行 manifest 记录 `npmVersion`，SBOM 收录 npm 及其依赖，安装态 smoke 使用捆绑 Node 执行 `npm-cli.js --version`。因此安装版不需要用户另装 npm；源码版仍需环境中的 npm，自动安装 DSH 还需要能够访问 npm Registry。NAS 的独立 HTTPS Origin 问题未改变。

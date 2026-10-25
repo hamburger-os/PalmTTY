@@ -61,6 +61,7 @@ function vscodeCandidates(): string[] {
 function npmCliCandidates(): string[] {
   const base = path.dirname(process.execPath);
   return [
+    path.join(base, "npm", "bin", "npm-cli.js"),
     ...(process.env.npm_execpath?.endsWith("npm-cli.js")
       ? [process.env.npm_execpath] : []),
     path.join(base, "node_modules", "npm", "bin", "npm-cli.js"),
