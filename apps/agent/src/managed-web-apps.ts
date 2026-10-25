@@ -115,8 +115,17 @@ export class ManagedWebApps {
 
   async catalog(localBrowser: boolean): Promise<WebAppCatalog> {
     await this.discover();
-    const externalVscode = this.config.integrations.vscodeWeb;
-    const externalHarness = this.config.integrations.harness;
+    const allowExternal = (candidate?: string) => {
+      if (!candidate) return undefined;
+      const url = new URL(candidate);
+      // The browser's localhost is not the Agent host behind a NAS/LAN.
+      if (!localBrowser && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) {
+        return undefined;
+      }
+      return candidate;
+    };
+    const externalVscode = allowExternal(this.config.integrations.vscodeWeb);
+    const externalHarness = allowExternal(this.config.integrations.harness);
     const vscode: WebAppStatus = {
       id: "vscodeWeb",
       phase: this.vscodePresent ? "manual_required" : "not_installed",
