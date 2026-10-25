@@ -5,14 +5,14 @@ import path from "node:path";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const pinned = readFileSync(path.join(root, ".node-version"), "utf8").trim();
-const parsed = /^(\d+)\\.(\d+)\\.(\d+)$/.exec(pinned);
+const parsed = /^(\d+)\.(\d+)\.(\d+)$/.exec(pinned);
 if (!parsed) throw new Error(".node-version must contain an exact semantic version");
 const [major, minor, patch] = parsed.slice(1).map(Number);
 const nodeRange = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).engines?.node;
 if (nodeRange !== `>=${pinned} <${major + 1}`) {
   throw new Error("package.json engines.node must match the Node 24 pin and supported major");
 }
-const current = /^v(\d+)\\.(\d+)\\.(\d+)$/.exec(process.version);
+const current = /^v(\d+)\.(\d+)\.(\d+)$/.exec(process.version);
 if (!current) throw new Error("Unable to parse running Node.js version");
 const [actualMajor, actualMinor, actualPatch] = current.slice(1).map(Number);
 if (actualMajor !== major || actualMinor < minor ||
