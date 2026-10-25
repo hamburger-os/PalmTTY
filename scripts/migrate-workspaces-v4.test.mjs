@@ -31,7 +31,7 @@ test("exports schema-valid v4 with no obsolete app profiles and never overwrites
     const bytesBefore = await readFile(to);
     assert.notEqual(invoke(from, to).status, 0, "refuse overwrite");
     assert.deepEqual(await readFile(to), bytesBefore, "failed migration must not replace v4");
-    assert.deepEqual(await readdir(dir), ["v3.json", "v4.json"], "no temporary files survive");
+    assert.deepEqual((await readdir(dir)).sort(), ["v3.json", "v4.json"], "no temporary files survive");
     assert.deepEqual(JSON.parse(await readFile(from, "utf8")), fixture);
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -57,7 +57,7 @@ test("refuses malformed or duplicate v3 records before writing v4", async () => 
       await writeFile(from, JSON.stringify({ version: 3, workspaces }));
       assert.notEqual(invoke(from, to).status, 0);
       await assert.rejects(access(to), { code: "ENOENT" });
-      assert.deepEqual(await readdir(dir), ["v3.json"]);
+      assert.deepEqual((await readdir(dir)).sort(), ["v3.json"]);
     }
   } finally {
     await rm(dir, { recursive: true, force: true });
