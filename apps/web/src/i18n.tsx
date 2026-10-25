@@ -448,7 +448,7 @@ const zhCN: Record<MessageKey, string> = {
     "sessions.state.exited": "已退出",
     "sessions.state.failed": "失败",
     "activities.title": "活动",
-    "activities.empty": "还没有终端或远程 App 活动。",
+    "activities.empty": "还没有终端会话。",
     "activities.terminal": "终端",
     "workspace.addTitle": "新建工作区",
     "workspace.editTitle": "编辑工作区",

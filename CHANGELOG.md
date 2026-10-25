@@ -8,112 +8,24 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
-### Complete Markdown preview
-
-- Add safe explicit HTML line breaks/formatting, local Workspace image embeds, footnotes, heading fragments, GFM alerts, syntax highlighting, local KaTeX and lazy Mermaid with restricted scriptless sandboxing. The existing read-only file API, transcript lifecycles, single preview vertical scroll and file export/reader contracts are unchanged.
-
-### Workspace Markdown preview
-
-- Render `.md`/`.markdown` as sanitized, read-only GFM with a source toggle; keep relative file links within Workspace authority and prevent implicit remote image loads. Preserve existing bounded reads, copy/share, speech and history workflows.
-- Keep Markdown tables in native intrinsic layout, use bounded horizontal table scrolling instead of squeezing columns into one-character stacks, and show keyboard-accessible sideways-scroll affordance only for overflowing tables.
-
-### Mobile Pi/TUI scroll and reconnect mouse state
-
-- Let Browse mode forward only validated SGR wheel events to mouse-tracking TUIs; continue blocking clicks/drags and malformed/legacy events, without adding another touch-scroll owner.
-- Restore negotiated mouse encoding when a paused mobile browser reattaches: the Worker observes canonical CSI mode changes and appends the missing encoding mode to its bounded serialized snapshot, avoiding an unexpected fallback to untransportable X10 mouse reports.
-- Add mode/reset/OSC/split-sequence regression tests. Real-device Pi/TUI testing is still required.
-
-### Safe mobile terminal touch input
-
-- Introduce Browse / Interact modes on touch clients. Browse initially blocked all mouse reports (now revised above to allow validated wheel reports for TUI scrolling); Interact sends only valid complete SGR mouse reports.
-- Fail closed for malformed/NaN mouse reports and X10 prefixes. Disable legacy xterm.onBinary forwarding over the UTF-8 PTY string boundary. Preserve xterm's native gesture ownership, terminal IME, bounded paste queue, Session Worker and reconnect pipeline; expand focused protocol tests.
-
-
-### Compact mobile terminal scrollbar
-
-- Use xterm's own scrollbar width as the shared scrollable-area/FitAddon geometry source (4 CSS px for coarse pointers, 8 CSS px for precise pointers) instead of reserving a second CSS gutter.
-- Tighten mobile terminal-frame padding without changing the padding-free FitAddon mount, scroll physics, mouse modes, or Session transport; add targeted policy tests and iOS/Android visual acceptance criteria.
-
-
-### Pi CLI and deterministic terminal startup
-
-- Add Pi to startup presets and provide generic Shift+Enter, Alt+Enter, Ctrl+Q mobile shortcuts plus the xterm Kitty keyboard extension.
-- Run persisted CLI startup commands through supported interactive shell argv, not fixed-delay simulated PTY typing; cover host and WSL launch assembly with tests.
-- Synchronize setup, architecture and AI documentation, workspace-store generation and invariant numbering.
-
-
-
-### Mobile TUI touch wheel integrity (unreleased)
-
-- Initial fix for malformed SGR touch-inertia wheel reports; superseded in this unreleased cycle by strict fail-closed routing and explicit Browse / Interact semantics above.
-
-
-
-### Terminal TUI input and long-paste reliability (unreleased)
-
-- Preserve SGR mouse/terminal control reports across virtual Ctrl/Alt and IME handling; legacy binary mouse forwarding has been removed in favor of validated SGR-only input.
-- Stream large xterm bracketed pastes via an ordered, <=12 KiB UTF-8 framed, 8 MiB-bounded browser input queue with WebSocket backpressure, explicit interruption/overflow feedback and no unsent-input replay after disconnect.
-
-
-### Unattended browser RDP foundation
-
-- Switch the read-only Windows 11 Pro/RDP/NLA diagnostic to the native Windows Devolutions Gateway service, Custom standalone authentication and loopback-only configuration; remove the Hyper-V VM requirement. Document the revised IronRDP/RDCleanPath architecture. Machine Service, integrated browser desktop and unattended login remain unimplemented.
-
-
-### Windows headless Remote App input and desktop-safe geometry
-
-- Discard pending Agent input on unsafe desktop/session/display transitions and gate fresh control until the native desktop is available, without replaying FIFO contents; already accepted pipe bytes remain subject to native revalidation.
-- Distinguish disconnected user sessions, locked/secure desktops, missing active physical or virtual displays, unavailable app windows, foreground denial, taskbar/window occlusion and rejected Windows input without changing window-only video capture. Phone adaptation constrains the verified app to its monitor's work area and restores original position and size; full-window PrintWindow output is cropped to the same DWM-visible geometry used by cursor/touch input. Mouse and wheel fail closed when their hit target is not the captured top-level HWND. Add strict native/Agent/protocol/mobile status contracts, theme checks and shipped-host native geometry smoke. No pre-login service, lock-screen bypass, elevation or driver installation.
-
-### Invisible Remote App keyboard and faster deletion (unreleased)
-
-- Fix helper-stdin backpressure handling: wait for drain using a 64KiB/128-message ordered, disposable queue rather than silently dropping subsequent typed controls.
-
-- Replace the obstructive extra mobile keyboard textarea with an in-viewport, focusable, nearly invisible 1px Safari input bridge. Keep 16px computed font, composition-aware Unicode and separate deliberate Long Text composer. Batch text into ordered <=2KiB packets, combine held Backspace/Delete into native-validated <=32-key batches and skip redundant Windows focus activation for already-foreground owned apps. Preserve unsent drafts during DataChannel congestion. Add queue/protocol/IME/theme regressions; perceived latency still requires real iPhone Safari and Windows validation.
-
-### Shared Remote App keyboard and Long Text (unreleased)
-
-- Make the first two Remote App and CLI dock buttons identical: Keyboard → Long Text. On iPhone, Remote App Keyboard synchronously focuses an immediate Unicode input with composition-aware delivery and allowlisted navigation; Long Text retains explicit send and receives failed live-input drafts. Share button UI and add IME/structure/theme regression checks.
-
-### Remote App phone adaptation (unreleased)
-
-- Remove the separate Fill screen option. Compensate bounded invisible DWM resize margins when adapting the owned Windows app, automatically eliminate residual ≤4% video letterbox gaps without stretching, and keep unresizable apps fully visible with correctly aligned touch/cursor input.
-
-<!-- Add changes here after the latest release. Publishing requires this section to be empty. -->
-
-### Mobile cursor and CLI dock (unreleased)
-
-- Add bounded owned-window cursor and native input-status telemetry over the existing authenticated WebRTC peer; render a tiny 5.667×8 high-contrast mobile Trackpad cursor with long-press drag and two-finger right tap, unify Remote App key docks under the shared glass theme, share Keyboard and Long Text as the first two Terminal and Remote App keys, and decouple native cursor sampling from video frame capture with RAF-coalesced input and local cursor prediction.
-- Simplify the always-visible mobile terminal key dock: Keyboard and Long Text first, one pinned direct More/Collapse button for secondary keys, no redundant full/hidden modes, and a single-row on-demand Tools header.
-
 ### Added
 
-- Introduce portrait-first Remote App immersion: outside-video mode/options/diagnostics, single-row phone header with on-demand Git/Files, default full-window view and opt-in bounded current-window resize with automatic tiny-edge fill, and a pinned expandable key dock.
-- Add independent two-finger centroid gesture tests and detection of video stalls after first-frame success.
-
-- Detect current-user Microsoft Store/MSIX apps by registered AUMID with a typed Win32/packaged launch model; packaged activation verifies a fresh PID, exact package family and mandatory PalmTTY Job ownership before remote control.
-- Add Remote App video-stage diagnostics (native/Worker received and submitted frames, conversion failures, browser decoded-frame watchdog) and a Windows installed native WebRTC round-trip smoke.
-
-- Add Windows x64 Remote Apps alpha as a terminal-independent Activity: persisted Workspace App profiles launch through a detached authenticated AppWorker and a PalmTTY-owned native Windows app host, stream one owned application window over WebRTC, and accept only bounded typed mobile pointer/key/text/display control. Full-desktop capture, browser-selected PID/HWND, elevation/UAC bypass, clipboard, audio, camera, microphone and file-drag channels are intentionally absent.
-- Replace the terminal-specific SessionWorkbench shell with an activity-aware WorkspaceWorkbench so live Terminal and Remote App activities can be switched in place and share Git/Files without being unmounted; Terminal Artifacts remain Session-scoped.
-- Add mobile Remote App View / direct-touch / trackpad modes, two-finger scrolling, special keys, Unicode text/IME/dictation input, automatic viewport/DPR capture sizing and explicit capture/network diagnostics.
+- Add two optional self-hosted Web navigation entries: one independently operated VS Code `serve-web` origin shared across Workspace cards, and an independent DeepSeek Harness Web origin on the home page. PalmTTY does not proxy or supervise either application, store their connection tokens, or assume automatic folder deep links.
+- Provide authenticated, no-store integration-link discovery. Operator URLs require HTTPS (or loopback HTTP for local testing) and cannot include embedded credentials, queries or fragments.
+- Provide an explicit, one-way Workspace v3 → v4 offline conversion command. It uses the canonical Workspace schema, validates records and unique IDs, never overwrites an existing v4 file, and retains the v3 source.
 
 ### Changed
 
-- Stabilize phone Remote App layout and media status: scope homepage section spacing, allocate the full content row in immersive mode, dismiss initial waiting UI after the browser's first decoded frame (including Safari media-readiness fallback), and show later stream warnings without blocking application controls.
+- Remove the unreleased Windows Remote App, WebRTC/AppWorker, native capture host and planned unattended RDP diagnostic code paths, package dependencies, UI, CI smoke and release assets. Terminal Session Worker remains the sole runtime activity; Git, Files and Artifacts continue to use their existing scopes.
+- Increment Workspace storage generation to v4 without automatic legacy reads. External third-party Web apps have their own authentication, processes and workspaces; Codex, Pi and other CLI agents remain Terminal workloads.
+- Add enhanced, sanitized Markdown file previews with GFM, syntax highlighting, KaTeX, Mermaid sandboxing and bounded safe local images; preserve existing text, history, copy/export and speech actions.
+- Refine Pi/TUI mobile scroll behavior and recovery: validated SGR wheel routing with Browse/Interact semantics, canonical mouse-mode snapshot recovery, compact xterm-owned scrollbars and touch input guards.
+- Improve deterministic interactive-shell startup for CLI agents and add Pi/mobile key presets. Keep bracketed paste ordered and bounded, with IME and terminal control semantics intact.
 
-- Consolidate reviewed toolchain upgrades (TypeScript 7, Vitest 5, Vite 8) and current tsx/@fastify/static/ws patches under one consistent pnpm lockfile while keeping Node.js 22 typings and runtime aligned.
+### Security
 
-- Recompile the source-mode Windows Remote App Host automatically after native C# or compiler-option changes using a content-addressed private EXE and exact source snapshot; avoid silently reusing stale native helpers after updating the checkout.
-
-- Initialize native WebRTC only after the Windows host verifies a launched app and emits READY. MSIX startup failures retain a bounded stage/type/HRESULT instead of being masked by native teardown; never terminate a PID before package verification.
-
-- Replace the Remote App executable-only profile with a typed Win32/MSIX launch identity and increment the persistence generation to `workspaces-v3.json`; v1/v2 catalogs are left untouched and Workspaces must be recreated. This intentionally breaks the pre-release profile format. The native AppWorker receives bounded single-allocation PTF1 frames rather than repeatedly concatenating large stdout chunks.
-
-- Separate Workspace basics, nested Terminal launch settings and Remote App profiles. Remote App profiles now persist only app identity/executable/argv; capture size is automatically adapted from the live phone surface inside a 320×240–1600×1000 envelope, with a 1280×800 @ 12 fps runtime default and 4096×4096 / 12 MP source-window allocation ceiling.
-- Windows packages now include a precompiled GUI-subsystem Remote App host; source mode compiles the same helper into the private per-user App runtime on first use.
-- Add bounded detected-app / Windows `.exe` browsing and optional operator-supplied STUN/TURN ICE configuration. ICE is applied per authenticated negotiation so a durable AppWorker can use updated Agent network configuration after an Agent restart; PalmTTY does not operate a cloud relay.
-- Move the breaking layered Workspace catalog to persistence generation v2 (`workspaces-v2.json`). PalmTTY intentionally does not migrate/read the v1 catalog; the old file is left untouched for manual reference while Workspaces are recreated through the new UI.
+- Upgrade DOMPurify and Zod to patched versions; retain production dependency security and license checks.
+- Preserve Terminal Worker authentication, bounded buffers, single input controller, Workspace/Git/file containment and exact-Origin protections. External links do not grant additional PalmTTY API or process authority.
 
 ## [0.2.0]
 
