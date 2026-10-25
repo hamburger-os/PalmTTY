@@ -23,4 +23,4 @@ VS Code Codex 扩展、浏览器文件夹深链接、真实手机访问、DSH �
 
 ## 一次性升级
 
-关闭 PalmTTY Agent 并备份工作区存储后，用 `node scripts/migrate-workspaces-v4.mjs --from <v3-file> --to <v4-file>` 离线转换。输出文件必须不存在，V3 原件保留，V4 只保存现有 Workspace/Terminal 字段，移除旧 Remote App Profile。运行时不提供自动 V3 回退。
+关闭 PalmTTY Agent 并备份工作区存储后，用 `node scripts/migrate-workspaces-v4.mjs --from <v3-file> --to <v4-file>` 离线转换。先执行 `pnpm --filter @palmtty/protocol build`，确保转换工具使用当前版本的唯一 Workspace Schema 校验。数据不合法或 ID 重复时拒绝创建 V4 文件。输出文件必须不存在，V3 原件保留，V4 只保存现有 Workspace/Terminal 字段，移除旧 Remote App Profile。运行时不提供自动 V3 回退。

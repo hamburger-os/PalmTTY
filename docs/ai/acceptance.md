@@ -5,7 +5,7 @@ A coding agent should not declare a repository-wide task complete before the rel
 ## External integration acceptance
 
 - No leftover Remote App/RDP endpoints, AppWorker, WebRTC, native capture, ICE configuration or release smoke dependencies.
-- V4 Workspaces contain only core and Terminal settings. Integration URLs require HTTPS or loopback HTTP, reject username/password/query/fragment, and are returned only after authentication with no-store.
+- V4 Workspaces contain only core and Terminal settings. The optional one-shot v3 converter validates every projected record with the canonical WorkspaceDefinitionSchema, rejects duplicate IDs and malformed records without writing output, and never overwrites an existing v4 file. Integration URLs require HTTPS or loopback HTTP, reject username/password/query/fragment, and are returned only after authentication with no-store.
 - VS Code Web and Harness own authentication, sessions and processes; PalmTTY provides only optional independent links. No automatic workspace-folder switching is claimed.
 - Preserve all terminal reconnect, Session Worker, Git/Files/Artifacts, speech and mobile presentation tests.
 - Phone remote HTTPS, Codex extension behavior and Windows Ctrl+C server shutdown need real-host acceptance.
