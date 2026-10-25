@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  isActiveAppSessionState,
   isActiveSessionState,
-  isTerminalAppSessionState,
   isTerminalSessionState,
-  type AppSessionPublic,
   type CreateWorkspaceInput,
-  type RemoteAppCapabilities,
   type RuntimeCapabilities,
   type SessionPublic,
   type WorkspacePublic
@@ -14,21 +10,18 @@ import {
 import {
   ApiError,
   authStatus,
-  createAppSession,
+  integrationLinks,
+  type IntegrationLinks,
   createSession,
   createWorkspace,
-  deleteAppSession,
   deleteSession,
   deleteWorkspace,
-  listAppSessions,
   listSessions,
   listWorkspaces,
   login,
   logout,
-  remoteAppCapabilities,
   restartSession,
   runtimeCapabilities,
-  terminateAppSession,
   terminateSession,
   updateWorkspace
 } from "./api.js";
@@ -45,11 +38,6 @@ type WorkspaceEditor = WorkspacePublic | "new" | null;
 type SessionAction =
   | { kind: "terminate"; session: SessionPublic }
   | { kind: "clear"; session: SessionPublic }
-  | null;
-
-type AppSessionAction =
-  | { kind: "terminate"; session: AppSessionPublic }
-  | { kind: "clear"; session: AppSessionPublic }
   | null;
 
 function formatError(
@@ -69,31 +57,24 @@ export function App() {
   const { t, error: translateError, connections } = useI18n();
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null);
-  const [appCapabilities, setAppCapabilities] = useState<RemoteAppCapabilities | null>(null);
+  const [integrations, setIntegrations] = useState<IntegrationLinks>({});
   const [workspaces, setWorkspaces] = useState<WorkspacePublic[]>([]);
   const [sessions, setSessions] = useState<SessionPublic[]>([]);
-  const [appSessions, setAppSessions] = useState<AppSessionPublic[]>([]);
   const [activeSession, setActiveSession] = useState<SessionPublic | null>(null);
-  const [activeAppSession, setActiveAppSession] = useState<AppSessionPublic | null>(null);
   const [workspaceEditor, setWorkspaceEditor] = useState<WorkspaceEditor>(null);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [sessionBusyId, setSessionBusyId] = useState<string | null>(null);
   const [sessionAction, setSessionAction] = useState<SessionAction>(null);
-  const [appSessionBusyId, setAppSessionBusyId] = useState<string | null>(null);
-  const [appSessionAction, setAppSessionAction] = useState<AppSessionAction>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshCatalog = useCallback(async () => {
-    const [workspaceResult, sessionResult, appSessionResult] = await Promise.all([
-      listWorkspaces(),
-      listSessions(),
-      listAppSessions()
+    const [workspaceResult, sessionResult] = await Promise.all([
+      listWorkspaces(), listSessions()
     ]);
     setWorkspaces(workspaceResult.workspaces);
     setSessions(sessionResult.sessions);
-    setAppSessions(appSessionResult.sessions);
   }, []);
 
   const loadAuthenticatedState = useCallback(async () => {
@@ -105,9 +86,7 @@ export function App() {
         setCapabilities(null);
         setError(translateError("runtime_capabilities_failed"));
       });
-    void remoteAppCapabilities()
-      .then(setAppCapabilities)
-      .catch(() => setAppCapabilities(null));
+    void integrationLinks().then(setIntegrations).catch(() => setIntegrations({}));
     await refreshCatalog();
   }, [refreshCatalog, translateError]);
 
@@ -124,13 +103,13 @@ export function App() {
   }, [loadAuthenticatedState, translateError]);
 
   useEffect(() => {
-    if (!auth?.authenticated || activeSession || activeAppSession) return;
+    if (!auth?.authenticated || activeSession) return;
     const timer = window.setInterval(
       () => void refreshCatalog().catch(() => undefined),
       3000
     );
     return () => window.clearInterval(timer);
-  }, [auth?.authenticated, activeAppSession, activeSession, refreshCatalog]);
+  }, [auth?.authenticated, activeSession, refreshCatalog]);
 
   if (auth === null) {
     return (
@@ -177,33 +156,14 @@ export function App() {
         value: "terminal:" + session.id,
         label: t("workbench.terminal") + " · " + session.id.slice(0, 6)
       })),
-    ...appSessions
-      .filter((session) =>
-        session.workspaceId === workspaceId &&
-        (
-          isActiveAppSessionState(session.state) ||
-          "app:" + session.id === currentValue
-        )
-      )
-      .map((session) => ({
-        value: "app:" + session.id,
-        label: session.profileName
-      }))
   ];
 
   const switchActivity = (value: string) => {
     if (value.startsWith("terminal:")) {
       const next = sessions.find((session) => "terminal:" + session.id === value);
       if (!next) return;
-      setActiveAppSession(null);
       setActiveSession(next);
       return;
-    }
-    if (value.startsWith("app:")) {
-      const next = appSessions.find((session) => "app:" + session.id === value);
-      if (!next) return;
-      setActiveSession(null);
-      setActiveAppSession(next);
     }
   };
 
@@ -238,32 +198,9 @@ export function App() {
           activeSession.workspaceId,
           "terminal:" + activeSession.id
         )}
-        appCapabilities={appCapabilities}
         onSwitchActivity={switchActivity}
         onBack={() => {
           setActiveSession(null);
-          void refreshCatalog();
-        }}
-      />
-    );
-  }
-
-  if (activeAppSession) {
-    const activeWorkspace = workspaces.find(
-      (workspace) => workspace.id === activeAppSession.workspaceId
-    );
-    return (
-      <WorkspaceWorkbench
-        {...(activeWorkspace ? { workspace: activeWorkspace } : {})}
-        activity={{ kind: "remoteApp", session: activeAppSession }}
-        activityOptions={activityOptionsFor(
-          activeAppSession.workspaceId,
-          "app:" + activeAppSession.id
-        )}
-        appCapabilities={appCapabilities}
-        onSwitchActivity={switchActivity}
-        onBack={() => {
-          setActiveAppSession(null);
           void refreshCatalog();
         }}
       />
@@ -282,17 +219,6 @@ export function App() {
 
   const sessionDetail = (session: SessionPublic) => {
     if (isTerminalSessionState(session.state)) {
-      return session.exitCode === undefined
-        ? stateLabel(session.state)
-        : `${stateLabel(session.state)} · ${t("sessions.exitCode", {
-            code: session.exitCode
-          })}`;
-    }
-    return `${stateLabel(session.state)} · ${connections(session.connections)}`;
-  };
-
-  const appSessionDetail = (session: AppSessionPublic) => {
-    if (isTerminalAppSessionState(session.state)) {
       return session.exitCode === undefined
         ? stateLabel(session.state)
         : `${stateLabel(session.state)} · ${t("sessions.exitCode", {
@@ -333,40 +259,6 @@ export function App() {
       return false;
     } finally {
       setSessionBusyId(null);
-    }
-  };
-
-  const stopAppSession = async (session: AppSessionPublic) => {
-    if (!isActiveAppSessionState(session.state) || session.state === "stopping") return false;
-
-    setAppSessionBusyId(session.id);
-    setActionError(null);
-    try {
-      await terminateAppSession(session.id);
-      await refreshCatalog();
-      return true;
-    } catch (cause) {
-      setActionError(formatError(cause, "app_session_action_failed", translateError));
-      return false;
-    } finally {
-      setAppSessionBusyId(null);
-    }
-  };
-
-  const clearAppSession = async (session: AppSessionPublic) => {
-    if (!isTerminalAppSessionState(session.state)) return false;
-
-    setAppSessionBusyId(session.id);
-    setActionError(null);
-    try {
-      await deleteAppSession(session.id);
-      setAppSessions((current) => current.filter((item) => item.id !== session.id));
-      return true;
-    } catch (cause) {
-      setActionError(formatError(cause, "app_session_action_failed", translateError));
-      return false;
-    } finally {
-      setAppSessionBusyId(null);
     }
   };
 
@@ -413,18 +305,7 @@ export function App() {
     }
   };
 
-  const activities = [
-    ...sessions.map((session) => ({
-      kind: "terminal" as const,
-      createdAt: session.createdAt,
-      session
-    })),
-    ...appSessions.map((session) => ({
-      kind: "remoteApp" as const,
-      createdAt: session.createdAt,
-      session
-    }))
-  ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const activities = [...sessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   return (
     <main className="app-shell">
@@ -440,10 +321,8 @@ export function App() {
                 await logout();
                 setAuth({ enabled: true, authenticated: false });
                 setCapabilities(null);
-                setAppCapabilities(null);
                 setWorkspaces([]);
                 setSessions([]);
-                setAppSessions([]);
               })()}
             >
               {t("auth.signOut")}
@@ -453,6 +332,14 @@ export function App() {
       </header>
 
       {error && <div className="error-banner">{error}</div>}
+      {integrations.harness && (
+        <section className="glass-card integration-entry">
+          <strong>{t("integrations.harness")}</strong>
+          <a className="ghost compact" href={integrations.harness} target="_blank" rel="noopener noreferrer">
+            {t("integrations.open")} ↗
+          </a>
+        </section>
+      )}
 
       <section>
         <div className="section-heading">
@@ -520,52 +407,11 @@ export function App() {
                 >
                   {t("workspaces.newSession")} →
                 </button>
-                {workspace.remoteApps.length > 0 && (
-                  <div className="workspace-remote-apps">
-                    <small className="workspace-remote-apps-label">
-                      {t("workspaces.remoteApps")}
-                    </small>
-                    <div className="workspace-remote-app-buttons">
-                      {workspace.remoteApps.map((profile) => (
-                        <button
-                          type="button"
-                          className="ghost workspace-remote-app-launch"
-                          key={profile.id}
-                          disabled={appCapabilities?.supported !== true}
-                          title={
-                            appCapabilities?.supported === false
-                              ? appCapabilities.reason
-                              : undefined
-                          }
-                          onClick={() => void (async () => {
-                            setError(null);
-                            try {
-                              const result = await createAppSession(
-                                workspace.id,
-                                profile.id
-                              );
-                              setActiveAppSession(result.session);
-                            } catch (cause) {
-                              setError(
-                                formatError(
-                                  cause,
-                                  "app_session_create_failed",
-                                  translateError
-                                )
-                              );
-                            }
-                          })()}
-                        >
-                          {profile.name} →
-                        </button>
-                      ))}
-                    </div>
-                    {appCapabilities?.supported === false && (
-                      <small className="workspace-remote-app-unavailable">
-                        {appCapabilities.reason ?? t("remoteApps.unavailable")}
-                      </small>
-                    )}
-                  </div>
+                {integrations.vscodeWeb && (
+                  <a className="ghost compact integration-link" href={integrations.vscodeWeb}
+                    target="_blank" rel="noopener noreferrer" title={t("integrations.folderHint")}>
+                    {t("integrations.vscodeWeb")} ↗
+                  </a>
                 )}
               </article>
             ))}
@@ -588,101 +434,29 @@ export function App() {
         </div>
         <div className="session-list">
           {activities.length === 0 && (
-            <div className="empty session-empty glass-content">
-              {t("activities.empty")}
-            </div>
+            <div className="empty session-empty glass-content">{t("activities.empty")}</div>
           )}
-          {activities.map((activity) => {
-            if (activity.kind === "terminal") {
-              const session = activity.session;
-              const active = isActiveSessionState(session.state);
-              const busy = sessionBusyId === session.id;
-              const workspaceName = workspaces.find(
-                (workspace) => workspace.id === session.workspaceId
-              )?.name ?? session.workspaceId;
-              return (
-                <div className="session-row glass-card" key={"terminal:" + session.id}>
-                  <button
-                    className="session-main"
-                    onClick={() => setActiveSession(session)}
-                  >
-                    <span className={"status-dot " + session.state} />
-                    <span>
-                      <strong>{workspaceName}</strong>
-                      <small>
-                        {t("activities.terminal")} · {sessionDetail(session)}
-                      </small>
-                    </span>
-                  </button>
-                  {active ? (
-                    <button
-                      type="button"
-                      className="session-action danger-outline compact"
-                      disabled={sessionBusyId !== null || session.state === "stopping"}
-                      onClick={() => { setActionError(null); setSessionAction({ kind: "terminate", session }); }}
-                    >
-                      {busy || session.state === "stopping"
-                        ? t("sessions.terminating")
-                        : t("sessions.terminate")}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="session-action danger-outline compact"
-                      disabled={sessionBusyId !== null}
-                      onClick={() => { setActionError(null); setSessionAction({ kind: "clear", session }); }}
-                    >
-                      {busy ? t("sessions.clearing") : t("sessions.clear")}
-                    </button>
-                  )}
-                </div>
-              );
-            }
-
-            const session = activity.session;
-            const active = isActiveAppSessionState(session.state);
-            const busy = appSessionBusyId === session.id;
+          {activities.map((session) => {
+            const active = isActiveSessionState(session.state);
+            const busy = sessionBusyId === session.id;
             const workspaceName = workspaces.find(
               (workspace) => workspace.id === session.workspaceId
             )?.name ?? session.workspaceId;
             return (
-              <div className="session-row glass-card" key={"app:" + session.id}>
-                <button
-                  className="session-main"
-                  disabled={!active}
-                  onClick={() => {
-                    if (active) setActiveAppSession(session);
-                  }}
-                >
+              <div className="session-row glass-card" key={session.id}>
+                <button className="session-main" onClick={() => setActiveSession(session)}>
                   <span className={"status-dot " + session.state} />
                   <span>
-                    <strong>{workspaceName} · {session.profileName}</strong>
-                    <small>
-                      {t("activities.remoteApp")} · {appSessionDetail(session)}
-                    </small>
+                    <strong>{workspaceName}</strong>
+                    <small>{t("activities.terminal")} · {sessionDetail(session)}</small>
                   </span>
                 </button>
-                {active ? (
-                  <button
-                    type="button"
-                    className="session-action danger-outline compact"
-                    disabled={appSessionBusyId !== null || session.state === "stopping"}
-                    onClick={() => { setActionError(null); setAppSessionAction({ kind: "terminate", session }); }}
-                  >
-                    {busy || session.state === "stopping"
-                      ? t("sessions.terminating")
-                      : t("sessions.terminate")}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="session-action danger-outline compact"
-                    disabled={appSessionBusyId !== null}
-                    onClick={() => { setActionError(null); setAppSessionAction({ kind: "clear", session }); }}
-                  >
-                    {busy ? t("sessions.clearing") : t("sessions.clear")}
-                  </button>
-                )}
+                <button type="button" className="session-action danger-outline compact"
+                  disabled={sessionBusyId !== null || session.state === "stopping"}
+                  onClick={() => { setActionError(null); setSessionAction({kind: active ? "terminate" : "clear", session}); }}>
+                  {busy ? (active ? t("sessions.terminating") : t("sessions.clearing")) :
+                    (active ? t("sessions.terminate") : t("sessions.clear"))}
+                </button>
               </div>
             );
           })}
@@ -699,33 +473,6 @@ export function App() {
           error={workspaceError}
           onClose={closeWorkspaceEditor}
           onSave={saveWorkspace}
-        />
-      )}
-
-      {appSessionAction && (
-        <ConfirmDialog
-          title={appSessionAction.kind === "terminate"
-            ? t("remoteApps.terminateTitle")
-            : t("remoteApps.clearTitle")}
-          message={appSessionAction.kind === "terminate"
-            ? t("remoteApps.terminateConfirm")
-            : t("remoteApps.clearConfirm")}
-          confirmLabel={appSessionAction.kind === "terminate"
-            ? t("sessions.terminate")
-            : t("sessions.clear")}
-          danger
-          busy={appSessionBusyId === appSessionAction.session.id}
-          error={actionError}
-          onCancel={() => setAppSessionAction(null)}
-          onConfirm={() => {
-            const action = appSessionAction;
-            void (async () => {
-              const success = action.kind === "terminate"
-                ? await stopAppSession(action.session)
-                : await clearAppSession(action.session);
-              if (success) setAppSessionAction(null);
-            })();
-          }}
         />
       )}
 

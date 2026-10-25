@@ -19,7 +19,7 @@ export const APPROVED_LICENSE_IDS = new Set([
 // DOMPurify publishes an Apache-2.0 alternative. This exception does not
 // approve MPL-2.0 as a general license for other production dependencies.
 const REVIEWED_PACKAGE_LICENSES = new Map([
-  ["dompurify@3.4.16", "(MPL-2.0 OR Apache-2.0)"],
+  ["dompurify@3.4.17", "(MPL-2.0 OR Apache-2.0)"],
   // khroma 2.1.0 npm omits SPDX, but upstream /license contains the MIT grant.
   ["khroma@2.1.0", "Unknown"]
 ]);

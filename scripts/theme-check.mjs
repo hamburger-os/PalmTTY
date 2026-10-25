@@ -81,9 +81,6 @@ const filesPanePath = path.join(webSource, "FilesPane.tsx");
 const terminalView = await readFile(terminalViewPath, "utf8");
 const terminalKeyBar = await readFile(terminalKeyBarPath, "utf8");
 const mobilePrimaryInputs = await readFile(path.join(webSource, "MobilePrimaryInputActions.tsx"), "utf8");
-const remoteAppKeybar = await readFile(path.join(webSource, "RemoteAppKeybar.tsx"), "utf8");
-const remoteAppLiveKeyboard = await readFile(path.join(webSource, "remote-app-live-keyboard.ts"), "utf8");
-const remoteAppPresentation = await readFile(path.join(webSource, "remote-app-presentation.ts"), "utf8");
 const terminalImeInput = await readFile(terminalImeInputPath, "utf8");
 const terminalKeyInput = await readFile(terminalKeyInputPath, "utf8");
 const terminalPreferences = await readFile(terminalPreferencesPath, "utf8");
@@ -100,7 +97,6 @@ if (/\bposition\s*:/.test(glassModalBlock) ||
   failures.push("apps/web [modal-viewport] dialogs must own their viewport positioning");
 }
 const workspaceWorkbench = await readFile(workspaceWorkbenchPath, "utf8");
-const remoteAppView = await readFile(path.join(webSource, "RemoteAppView.tsx"), "utf8");
 const workspaceDialog = await readFile(workspaceDialogPath, "utf8");
 const gitPane = await readFile(gitPanePath, "utf8");
 const filesPane = await readFile(filesPanePath, "utf8");
@@ -108,8 +104,6 @@ const filesPane = await readFile(filesPanePath, "utf8");
 for (const marker of [
   '<TerminalView',
   'active={pane === "terminal"}',
-  '<RemoteAppView',
-  'active={pane === "remoteApp"}',
   'workbench-pane',
   'pane === "git"',
   'pane === "files"',
@@ -122,8 +116,7 @@ for (const marker of [
 }
 
 for (const forbidden of [
-  'pane === "terminal" ? <TerminalView',
-  'pane === "remoteApp" ? <RemoteAppView'
+  'pane === "terminal" ? <TerminalView'
 ]) {
   if (workspaceWorkbench.includes(forbidden)) {
     failures.push(`apps/web/src/WorkspaceWorkbench.tsx [workbench-lifecycle-contract] forbidden ${forbidden}`);
@@ -271,13 +264,6 @@ if (
   );
 }
 
-// Remote App video and controls must never inherit a global section margin or collapse in immersive mode.
-if (/^section\s*\{/m.test(styles) || !styles.includes(".app-shell > section {")) {
-  failures.push("apps/web/src/styles.css [remote-app-spacing] unscoped section margin");
-}
-if (!/\.workbench-page\.is-remote-app\.remote-app-immersive\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\);/.test(styles)) {
-  failures.push("apps/web/src/styles.css [remote-app-immersive] missing single-row content grid");
-}
 if (!terminalKeyBar.includes('className="keybar-pinned"') ||
     !terminalKeyBar.includes('onClick={onToggleMore}') ||
     !terminalKeyBar.includes('onLongText={onLongInput}') ||
@@ -290,46 +276,6 @@ if (!terminalKeyBar.includes('className="keybar-pinned"') ||
     !workspaceWorkbench.includes('mobile-workbench-tools') ||
     !workspaceWorkbench.includes('is-terminal')) {
   failures.push("apps/web [terminal-mobile-dock] direct More or primary Long Text missing");
-}
-if (!remoteAppView.includes('className="remote-app-dock"') ||
-    !remoteAppView.includes('className="remote-app-toolbar glass-panel"') ||
-    !remoteAppView.includes('visualState === "waiting"') ||
-    !remoteAppView.includes('visualState === "interrupted"') ||
-    remoteAppView.includes('className="remote-app-waiting"') ||
-    !remoteAppView.includes('<details className="remote-app-diagnostics">') ||
-    !remoteAppView.includes('className="remote-app-cursor"') ||
-    !remoteAppKeybar.includes('className="remote-app-keybar-shell glass-panel"') ||
-    !remoteAppKeybar.includes('<MobilePrimaryInputActions') ||
-    !remoteAppView.includes('onKeyboard={toggleKeyboard}') ||
-    !remoteAppView.includes('onLongText={toggleLongText}') ||
-    !remoteAppView.includes('ref={liveKeyboardRef}') ||
-    !remoteAppView.includes('liveKeyboardRef.current?.focus') ||
-    !remoteAppView.includes('onCompositionEnd=') ||
-    !remoteAppLiveKeyboard.includes('shouldCommitRemoteLiveText(') ||
-    !remoteAppLiveKeyboard.includes('class RemoteLiveInputQueue') ||
-    !remoteAppView.includes('onBeforeInput=') ||
-    !remoteAppView.includes('onInput=') ||
-    !remoteAppView.includes('keyboardQueueRef.current.enqueueDelete(') ||
-    !remoteAppView.includes('LIVE_KEYBOARD_SENTINEL') ||
-    !styles.includes('.remote-app-live-bridge {') ||
-    !styles.includes('opacity: 0.01;') ||
-    styles.includes('.remote-app-live-keyboard textarea {') ||
-    !remoteAppView.includes('className="remote-app-extra-keys glass-panel"') ||
-    !remoteAppView.includes('ref={cursorOverlayRef}') ||
-    !remoteAppView.includes('queueRelativeMotion(relative)') ||
-    !remoteAppView.includes('remoteAdaptedVideoFit(adaptWindow, surfaceSize, videoSize)') ||
-    !remoteAppView.includes('nativeInputStatus !== "ready"') ||
-    !remoteAppView.includes('remoteAppInputStatusKey(nativeInputStatus)') ||
-    !remoteAppView.includes('setNativeInputStatus(sample.state)') ||
-    remoteAppView.includes('setFit(') ||
-    remoteAppView.includes('t("remoteApp.fillScreen")') ||
-    !styles.includes('.remote-app-surface.is-adapted { border: 0; }') ||
-    !styles.includes('video.fit-adapted { object-fit: cover; }') ||
-    !styles.includes('width: 5.667px;') ||
-    !styles.includes('height: 8px;') ||
-    !remoteAppPresentation.includes('remoteVideoCursorPosition(') ||
-    !styles.includes('.remote-app-cursor {')) {
-  failures.push("apps/web/src/RemoteAppView.tsx [remote-app-video-first] loading states or dock controls regressed");
 }
 
 if (!visualViewport.includes("return null;")) {
@@ -502,11 +448,6 @@ for (const marker of [
   }
 }
 
-if (!remoteAppKeybar.includes('keyboardOpen, textOpen, moreKeysOpen') ||
-    !remoteAppKeybar.includes('onKeyboard={onKeyboard} onLongText={onLongText}') ||
-    remoteAppView.split('<div className="remote-app-options">')[1]?.split('</div>')[0]?.includes('t("remoteApp.text")')) {
-  failures.push("apps/web [remote-app-primary-inputs] Keyboard and Long Text must share the CLI ordering; do not duplicate Text in options");
-}
 
 if (failures.length) {
   console.error("Theme contract check failed:");

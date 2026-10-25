@@ -7,8 +7,6 @@ import {
 } from "react";
 import type {
   CreateWorkspaceInput,
-  RemoteAppCatalogEntry,
-  RemoteAppProfile,
   RuntimeCapabilities,
   TerminalProfile,
   WorkspacePublic
@@ -18,7 +16,6 @@ import { ConfirmDialog } from "./ConfirmDialog.js";
 import { DirectoryPicker } from "./DirectoryPicker.js";
 import { ensureModalDialogOpen } from "./dialog-controller.js";
 import { useI18n } from "./i18n.js";
-import { RemoteAppExecutablePicker } from "./RemoteAppExecutablePicker.js";
 import {
   formatWorkspaceEnvironment,
   parseWorkspaceEnvironment,
@@ -37,16 +34,7 @@ type Props = {
   onDelete?: () => Promise<void>;
 };
 
-type View = "workspace" | "terminal" | "apps" | "app" | "picker";
-
-function appId(): string {
-  return "app-" + Date.now().toString(36) + "-" +
-    Math.random().toString(36).slice(2, 7);
-}
-
-function suggestedAppName(entry: RemoteAppCatalogEntry): string {
-  return entry.name.trim() || "Application";
-}
+type View = "workspace" | "terminal";
 
 export function WorkspaceDialog({
   capabilities,
@@ -86,10 +74,6 @@ export function WorkspaceDialog({
   const [startupCommand, setStartupCommand] = useState(
     workspace?.terminal.startupCommand ?? ""
   );
-  const [remoteApps, setRemoteApps] = useState<RemoteAppProfile[]>(
-    workspace?.remoteApps ?? []
-  );
-  const [appDraft, setAppDraft] = useState<RemoteAppProfile | null>(null);
   const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const cwdDraftsRef = useRef(new Map<string, string>([
@@ -262,61 +246,9 @@ export function WorkspaceDialog({
         ...(startupCommand.trim()
           ? { startupCommand: startupCommand.trim() }
           : {})
-      },
-      remoteApps
+      }
     };
     await onSave(input);
-  };
-
-  const openNewApp = () => {
-    setAppDraft({
-      id: appId(),
-      name: "",
-      launch: { kind: "win32", executable: "" },
-      args: []
-    });
-    setView("app");
-  };
-
-  const openExistingApp = (profile: RemoteAppProfile) => {
-    setAppDraft({
-      ...profile,
-      args: [...profile.args]
-    });
-    setView("app");
-  };
-
-  const commitAppDraft = () => {
-    if (!appDraft || !appDraft.name.trim() ||
-      (appDraft.launch.kind === "win32" && !appDraft.launch.executable.trim())) return;
-    const normalized: RemoteAppProfile = {
-      ...appDraft,
-      name: appDraft.name.trim(),
-      launch: appDraft.launch.kind === "win32"
-        ? { kind: "win32", executable: appDraft.launch.executable.trim() }
-        : appDraft.launch
-    };
-    setRemoteApps((current) => {
-      const index = current.findIndex((profile) => profile.id === normalized.id);
-      if (index < 0) return [...current, normalized];
-      return current.map((profile) =>
-        profile.id === normalized.id ? normalized : profile
-      );
-    });
-    setAppDraft(null);
-    setView("apps");
-  };
-
-  const chooseExecutable = (entry: RemoteAppCatalogEntry) => {
-    setAppDraft((current) => current
-      ? {
-          ...current,
-          launch: entry.launch,
-          name: current.name.trim() ? current.name : suggestedAppName(entry)
-        }
-      : current
-    );
-    setView("app");
   };
 
   const terminalSummary = (
@@ -329,13 +261,7 @@ export function WorkspaceDialog({
 
   const title = view === "workspace"
     ? (workspace ? t("workspace.editTitle") : t("workspace.addTitle"))
-    : view === "terminal"
-      ? t("workspace.terminalSettingsTitle")
-      : view === "apps"
-        ? t("workspace.remoteAppsManageTitle")
-        : view === "picker"
-          ? t("workspace.remoteAppChooseTitle")
-          : t("workspace.remoteAppEditTitle");
+    : t("workspace.terminalSettingsTitle");
 
   return (
     <>
@@ -347,8 +273,6 @@ export function WorkspaceDialog({
           event.preventDefault();
           if (busy) return;
           if (view === "workspace") onClose();
-          else if (view === "picker") setView("app");
-          else if (view === "app") setView("apps");
           else setView("workspace");
         }}
       >
@@ -361,9 +285,7 @@ export function WorkspaceDialog({
                   className="ghost compact icon-button"
                   aria-label={t("workspace.back")}
                   onClick={() => {
-                    if (view === "picker") setView("app");
-                    else if (view === "app") setView("apps");
-                    else setView("workspace");
+                    setView("workspace");
                   }}
                 >
                   ←
@@ -492,41 +414,6 @@ export function WorkspaceDialog({
                       {t("workspace.configure")} ›
                     </button>
                   </div>
-                </section>
-
-                <section className="workspace-settings-card glass-content">
-                  <div className="settings-section-heading">
-                    <div>
-                      <strong>{t("workspace.remoteApps")}</strong>
-                      <small>
-                        {remoteApps.length === 0
-                          ? t("workspace.remoteAppsEmpty")
-                          : t("workspace.remoteAppsCount", { count: remoteApps.length })}
-                      </small>
-                    </div>
-                    <button
-                      type="button"
-                      className="ghost compact"
-                      onClick={() => setView("apps")}
-                    >
-                      {t("workspace.manage")} ›
-                    </button>
-                  </div>
-                  {remoteApps.length > 0 && (
-                    <div className="settings-chip-row">
-                      {remoteApps.slice(0, 4).map((profile) => (
-                        <span className="chip" key={profile.id}>{profile.name}</span>
-                      ))}
-                      {remoteApps.length > 4 && (
-                        <span className="chip">+{remoteApps.length - 4}</span>
-                      )}
-                    </div>
-                  )}
-                  {kind === "wsl" && remoteApps.length > 0 && (
-                    <small className="settings-note">
-                      {t("workspace.remoteAppsWslIndependent")}
-                    </small>
-                  )}
                 </section>
 
                 {error && <div className="error-banner">{error}</div>}
@@ -692,144 +579,6 @@ export function WorkspaceDialog({
               </>
             )}
 
-            {view === "apps" && (
-              <div className="settings-page">
-                <div className="settings-section-heading">
-                  <div>
-                    <strong>{t("workspace.remoteApps")}</strong>
-                    <small>{t("workspace.remoteAppsManageHelp")}</small>
-                  </div>
-                </div>
-                {remoteApps.length === 0 ? (
-                  <div className="settings-empty glass-content">
-                    {t("workspace.remoteAppsEmpty")}
-                  </div>
-                ) : (
-                  <div className="settings-list">
-                    {remoteApps.map((profile) => (
-                      <div className="settings-list-row remote-app-list-row" key={profile.id}>
-                        <button
-                          type="button"
-                          className="settings-list-main"
-                          onClick={() => openExistingApp(profile)}
-                        >
-                          <span>
-                            <strong>{profile.name}</strong>
-                            <small>{profile.launch.kind === "win32" ? profile.launch.executable : profile.launch.appUserModelId}</small>
-                          </span>
-                          <span aria-hidden="true">›</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="danger-outline compact"
-                          onClick={() => setRemoteApps((current) =>
-                            current.filter((candidate) => candidate.id !== profile.id)
-                          )}
-                        >
-                          {t("workspace.remoteAppRemove")}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className="workspace-add-app"
-                  disabled={remoteApps.length >= 16}
-                  onClick={openNewApp}
-                >
-                  + {t("workspace.remoteAppAdd")}
-                </button>
-              </div>
-            )}
-
-            {view === "app" && appDraft && (
-              <div className="settings-page">
-                <label>
-                  <span>{t("workspace.remoteAppName")}</span>
-                  <input
-                    className="glass-input"
-                    value={appDraft.name}
-                    maxLength={100}
-                    onChange={(event) => setAppDraft({
-                      ...appDraft,
-                      name: event.target.value
-                    })}
-                    placeholder={t("workspace.remoteAppNamePlaceholder")}
-                  />
-                </label>
-
-                <div className="workspace-field">
-                  <label>{t("workspace.remoteAppExecutable")}</label>
-                  {(appDraft.launch.kind === "packaged" ||
-                    appDraft.launch.executable) ? (
-                    <div className="selected-executable glass-content">
-                      <span>
-                        <strong>{appDraft.name || t("workspace.remoteAppSelected")}</strong>
-                        <small>{appDraft.launch.kind === "win32" ? appDraft.launch.executable : appDraft.launch.appUserModelId}</small>
-                      </span>
-                      <button
-                        type="button"
-                        className="ghost compact"
-                        onClick={() => setView("picker")}
-                      >
-                        {t("workspace.remoteAppReselect")}
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="workspace-select-app"
-                      onClick={() => setView("picker")}
-                    >
-                      {t("workspace.remoteAppChoose")} ›
-                    </button>
-                  )}
-                  <small>{t("workspace.remoteAppExecutableHelp")}</small>
-                </div>
-
-                <details className="workspace-advanced remote-app-manual-path">
-                  <summary>{t("workspace.remoteAppManualAdvanced")}</summary>
-                  <label>
-                    <span>{t("workspace.remoteAppManualPath")}</span>
-                    <input
-                      className="glass-input"
-                      value={appDraft.launch.kind === "win32" ? appDraft.launch.executable : ""}
-                      maxLength={4096}
-                      onChange={(event) => setAppDraft({
-                        ...appDraft,
-                        launch: { kind: "win32", executable: event.target.value }
-                      })}
-                      placeholder={t("workspace.remoteAppExecutablePlaceholder")}
-                    />
-                  </label>
-                </details>
-
-                <label>
-                  <span>{t("workspace.remoteAppArgs")}</span>
-                  <textarea
-                    className="glass-input"
-                    value={appDraft.args.join("\n")}
-                    rows={3}
-                    maxLength={8192}
-                    onChange={(event) => setAppDraft({
-                      ...appDraft,
-                      args: event.target.value
-                        .split(/\r?\n/)
-                        .map((value) => value.trim())
-                        .filter(Boolean)
-                        .slice(0, 32)
-                    })}
-                    placeholder={t("workspace.remoteAppArgsPlaceholder")}
-                  />
-                  <small>{t("workspace.remoteAppArgsHelp")}</small>
-                </label>
-              </div>
-            )}
-
-            {view === "picker" && (
-              <RemoteAppExecutablePicker onChoose={chooseExecutable} />
-            )}
           </div>
 
           <div className="dialog-actions workspace-dialog-footer">
@@ -860,37 +609,10 @@ export function WorkspaceDialog({
                     disabled={
                       busy ||
                       !name.trim() ||
-                      !cwd.trim() ||
-                      remoteApps.some(
-                        (profile) => !profile.name.trim() || (profile.launch.kind === "win32" && !profile.launch.executable.trim())
-                      )
+                      !cwd.trim()
                     }
                   >
                     {busy ? t("workspace.saving") : t("workspace.save")}
-                  </button>
-                </div>
-              </>
-            ) : view === "app" ? (
-              <>
-                <span />
-                <div className="dialog-primary-actions">
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={() => {
-                      setAppDraft(null);
-                      setView("apps");
-                    }}
-                  >
-                    {t("workspace.cancel")}
-                  </button>
-                  <button
-                    type="button"
-                    className="prism-primary"
-                    disabled={!appDraft?.name.trim() || (appDraft?.launch.kind === "win32" && !appDraft.launch.executable.trim())}
-                    onClick={commitAppDraft}
-                  >
-                    {t("workspace.done")}
                   </button>
                 </div>
               </>
@@ -901,8 +623,7 @@ export function WorkspaceDialog({
                   type="button"
                   className="ghost"
                   onClick={() => {
-                    if (view === "picker") setView("app");
-                    else setView("workspace");
+                    setView("workspace");
                   }}
                 >
                   ← {t("workspace.back")}

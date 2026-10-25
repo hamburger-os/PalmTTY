@@ -47,66 +47,18 @@ pnpm start
 
 `PALMTTY_ACCESS_TOKEN` must contain at least 16 characters; use a long random secret for real deployments. `pnpm run preflight` validates authentication/security settings and the configured Agent TCP endpoint. Workspace launch targets are no longer stored in the YAML configuration, so host startup is not blocked by a stale project path.
 
-Open the configured Agent URL, sign in, and create the first workspace in the Web UI. Workspace editing is split into basic Workspace fields plus separate **Terminal** and **Remote Apps** settings. After `pnpm build`, both `pnpm start` and autostart serve the compiled Web UI from the Agent itself; with the example config (`server.exposure.mode: local`) the URL is `http://127.0.0.1:17688/`. Port `5173` is development-only and is available only while `pnpm dev` is running. For explicit private-LAN HTTP access, use `examples/palmtty.lan.example.yaml` or set `server.exposure.mode: lan`; the Agent then binds IPv4 `0.0.0.0`, requires authentication, rejects non-private client source addresses, and accepts only exact detected private/overlay IPv4 Origins. Windows Firewall should still scope the Agent port to the trusted Private network profile. PalmTTY stores the workspace catalog in per-user application data. The browser can create/edit/delete this persistent catalog only through authenticated, exact-Origin-protected API calls; starting a Session still sends only the selected workspace ID.
 
 ### Runtime choices
 
 - Open **Terminal** settings for the single **Terminal environment** selector. Known Host shells appear directly, and each registered WSL distribution appears as its own profile (for example `Ubuntu-22.04` or `Debian`). Host/WSL runtime details are exposed only under **Custom**.
 - WSL profile discovery uses `wsl.exe --list --quiet`; it does not start distributions merely to populate the selector. A selected WSL profile uses that distribution's default shell unless Custom overrides it, and its working directory remains a Linux path.
-- Workspace creation/update validates the working directory, nested Terminal runtime/shell and supported saved Remote App executables before persistence. Terminal Session creation/restart and Remote App creation each revalidate their own persisted launch authority before Worker bootstrap.
 - Workspace environment uses one `NAME=value` entry per line and is applied before the shell starts. Balanced outer single/double quotes are accepted and removed, so both `HTTP_PROXY=http://127.0.0.1:10808` and `HTTP_PROXY="http://127.0.0.1:10808"` persist the same URL; unmatched outer quotes are rejected. On Windows, each new/restarted terminal also refreshes the current Machine/User environment and PATH, so CLIs installed after the PalmTTY Agent started can be discovered by a new PTY. WSL workspace variables are forwarded through `WSLENV`.
 - Shell arguments remain explicit argv values. Startup command is a persisted shell-launch command in `workspace.terminal` and now runs via shell argv rather than fixed-delay PTY typing. Supported shells: PowerShell, cmd, bash, zsh, fish, sh, dash, ksh, Nu. Explicit WSL shells use the same model; the default WSL profile chooses `$SHELL` through `/bin/sh`. Unknown shell launch configurations with a startup command are rejected. Startup commands may appear in OS process arguments: never embed passwords or API keys. Workspace environment is persistent local configuration, not a secret vault.
 - In **Terminal → Startup command**, choose **Pi** to fill `pi` (alongside Codex, Claude Code and other CLI presets). Install Pi in the selected Host/WSL environment first (`npm install -g --ignore-scripts @earendil-works/pi-coding-agent`), (npm install requires Node.js 22.19+) and ensure the `pi` command is available on that shell's PATH. A preset only fills the field; it does not install the CLI. The mobile keybar offers Shift+Enter, Alt+Enter and Ctrl+Q, and xterm explicitly enables Kitty keyboard support. Real mobile/browser/IME compatibility must still be validated.
 
-### Windows source dependency check
+### External Windows VS Code and Harness
 
-When running PalmTTY from a source checkout after pulling Remote App changes,
-run `pnpm install --frozen-lockfile` again before `pnpm build` and restart the
-Agent. Remote Apps require the platform-specific native `@roamhq/wrtc`
-dependency in addition to the compiled Web UI. PalmTTY checks that the
-WebRTC native module actually loads before creating an App Session; a missing
-module produces an actionable message instead of crashing the detached worker.
-Windows distribution smoke separately loads the packaged native module.
-
-### Windows Remote Apps
-
-On Windows x64, open **Remote Apps** in the Workspace editor and choose **Add application**. The normal path is:
-
-1. pick a detected application, or browse the PalmTTY host for an `.exe`;
-2. optionally add argv values;
-3. save the Workspace;
-4. launch the saved App from the Workspace card.
-
-Manual executable entry is kept under Advanced. Remote App profiles do not contain FPS or resolution settings; the phone surface automatically requests a bounded capture size.
-
-Remote Apps are Windows-host activities even when the Workspace Terminal uses WSL. This means Terminal/Git/Files can stay WSL-scoped while a saved desktop App launches as the current Windows user.
-
-Directly routable LAN/VPN WebRTC may work with the default empty `remoteApps.webrtc.iceServers`. Reverse-proxy or public deployments may need operator-supplied STUN/TURN:
-
-~~~yaml
-remoteApps:
-  enabled: true
-  maxSessions: 4
-  exitedRetentionMinutes: 30
-  webrtc:
-    iceServers:
-      - urls:
-          - "stun:stun.example.com:3478"
-          - "turns:turn.example.com:5349"
-        username: "palmtty"
-        credential: "replace-me"
-~~~
-
-PalmTTY does not provide a hosted relay. Treat TURN credentials as sensitive deployment configuration. See [Remote Apps / 远程 App](remote-apps.md) and [Security / 安全](security.md).
-
-If Windows reports `EACCES/WSAEACCES` while probing the Agent port, distinguish an existing listener from a reserved/excluded port:
-
-~~~powershell
-Get-NetTCPConnection -LocalPort 17688 -ErrorAction SilentlyContinue
-netsh interface ipv4 show excludedportrange protocol=tcp
-~~~
-
-If the configured port is unavailable, change `server.port` in `palmtty.local.yaml` and rerun `pnpm run preflight`.
+After running `code serve-web --host 127.0.0.1 --port 8000` separately, configure the operator YAML `integrations.vscodeWeb` with a safe, token-free origin. Use the full token-bearing URL from the upstream server only directly in the local browser; never persist that token in PalmTTY YAML. `integrations.harness` optionally links to a separately started DSH Web instance. Neither is a PalmTTY Session.
 
 ### Linux host quick start
 

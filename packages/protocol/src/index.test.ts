@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   BrowseDirectoryRequestSchema,
-  CreateAppSessionSchema,
   CreateSessionSchema,
   GitCommitDiffRequestSchema,
   GitCommitRequestSchema,
@@ -20,12 +19,6 @@ import {
   MAX_INPUT_BYTES,
   WorkspaceDefinitionSchema,
   WorkspaceEnvironmentSchema,
-  BrowseRemoteAppExecutableRequestSchema,
-  RemoteAppCapabilitiesSchema,
-  RemoteAppControlMessageSchema,
-  RemoteAppExecutableListingSchema,
-  isActiveAppSessionState,
-  isTerminalAppSessionState,
   isActiveSessionState,
   isTerminalSessionState,
   parseClientMessage
@@ -38,152 +31,6 @@ describe("protocol", () => {
       cols: 80,
       rows: 24
     });
-  });
-
-  it("parses bounded Remote App profiles and control messages", () => {
-    const workspace = WorkspaceDefinitionSchema.parse({
-      id: "host-apps",
-      name: "Host apps",
-      cwd: "C:\\workspace",
-      terminal: { runtime: { kind: "host" } },
-      remoteApps: [{
-        id: "codex-desktop",
-        name: "Codex Desktop",
-        launch: { kind: "win32", executable: "codex.exe" }
-      }]
-    });
-    expect(workspace.remoteApps[0]).toEqual({
-      id: "codex-desktop",
-      name: "Codex Desktop",
-      launch: { kind: "win32", executable: "codex.exe" },
-      args: []
-    });
-    expect(() => WorkspaceDefinitionSchema.parse({
-      id: "duplicates",
-      name: "Duplicates",
-      cwd: "C:\\workspace",
-      terminal: { runtime: { kind: "host" } },
-      remoteApps: [
-        { id: "app", name: "One", launch: { kind: "win32", executable: "one.exe" } },
-        { id: "app", name: "Two", launch: { kind: "win32", executable: "two.exe" } }
-      ]
-    })).toThrow();
-
-    expect(() => WorkspaceDefinitionSchema.parse({
-      id: "oversized-app-argv",
-      name: "Oversized app argv",
-      cwd: "C:\\workspace",
-      terminal: { runtime: { kind: "host" } },
-      remoteApps: [{
-        id: "app",
-        name: "App",
-        launch: { kind: "win32", executable: "app.exe" },
-        args: Array.from({ length: 8 }, () => "x".repeat(4096))
-      }]
-    })).toThrow();
-
-    expect(WorkspaceDefinitionSchema.parse({
-      id: "store", name: "Store", cwd: "C:\\workspace",
-      terminal: { runtime: { kind: "host" } },
-      remoteApps: [{
-        id: "store-codex", name: "Codex",
-        launch: {
-          kind: "packaged",
-          packageFamilyName: "Codex_123abc",
-          appUserModelId: "Codex_123abc!App"
-        }
-      }]
-    }).remoteApps[0]?.launch.kind).toBe("packaged");
-    expect(() => WorkspaceDefinitionSchema.parse({
-      id: "wrong-package", name: "Invalid", cwd: "C:\\workspace",
-      terminal: { runtime: { kind: "host" } },
-      remoteApps: [{
-        id: "app", name: "Invalid",
-        launch: {
-          kind: "packaged", packageFamilyName: "Other_123",
-          appUserModelId: "Codex_123!App"
-        }
-      }]
-    })).toThrow();
-    expect(CreateAppSessionSchema.parse({
-      workspaceId: "host-apps",
-      profileId: "codex-desktop"
-    })).toEqual({
-      workspaceId: "host-apps",
-      profileId: "codex-desktop"
-    });
-    expect(RemoteAppControlMessageSchema.parse({
-      type: "pointer",
-      action: "move",
-      x: 0.5,
-      y: 0.25
-    })).toMatchObject({ type: "pointer", button: 0 });
-    expect(() => RemoteAppControlMessageSchema.parse({
-      type: "pointer",
-      action: "move",
-      x: 2,
-      y: 0
-    })).toThrow();
-    expect(RemoteAppControlMessageSchema.parse({
-      type: "keyRepeat", key: "Backspace", count: 32
-    })).toEqual({ type: "keyRepeat", key: "Backspace", count: 32 });
-    for (const invalid of [
-      { type: "keyRepeat", key: "Tab", count: 3 },
-      { type: "keyRepeat", key: "Backspace", count: 0 },
-      { type: "keyRepeat", key: "Delete", count: 33 },
-      { type: "keyRepeat", key: "Backspace", count: 1, ctrl: true }
-    ]) expect(() => RemoteAppControlMessageSchema.parse(invalid)).toThrow();
-    expect(RemoteAppControlMessageSchema.parse({
-      type: "display",
-      width: 844,
-      height: 390,
-      adaptWindow: true
-    })).toEqual({
-      type: "display",
-      width: 844,
-      height: 390,
-      adaptWindow: true
-    });
-    expect(() => RemoteAppControlMessageSchema.parse({
-      type: "display",
-      width: 4000,
-      height: 390,
-      adaptWindow: false
-    })).toThrow();
-    expect(() => RemoteAppControlMessageSchema.parse({
-      type: "display",
-      width: 844,
-      height: 390,
-      adaptWindow: "true"
-    })).toThrow();
-    expect(RemoteAppCapabilitiesSchema.parse({
-      supported: true,
-      platform: "win32",
-      transport: "webrtc",
-      capture: "window",
-      input: "restricted",
-      iceServers: [{
-        urls: ["turns:relay.example.test:5349"],
-        username: "user",
-        credential: "credential"
-      }],
-      relayConfigured: true
-    }).relayConfigured).toBe(true);
-    expect(BrowseRemoteAppExecutableRequestSchema.parse({})).toEqual({});
-    expect(RemoteAppExecutableListingSchema.parse({
-      currentPath: "C:\\Tools",
-      parentPath: "C:\\",
-      locations: [],
-      directories: [],
-      executables: [{
-        name: "Tool",
-        launch: { kind: "win32", executable: "C:\\Tools\\Tool.exe" },
-        source: "path"
-      }],
-      truncated: false
-    }).executables).toHaveLength(1);
-    expect(isActiveAppSessionState("running")).toBe(true);
-    expect(isTerminalAppSessionState("exited")).toBe(true);
   });
 
   it("parses host and WSL workspace definitions", () => {

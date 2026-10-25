@@ -200,29 +200,6 @@ function quotePowerShellLiteral(value) {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-async function compileWindowsRemoteAppHost(outputPath) {
-  const sourcePath = path.join(repoRoot, "scripts", "windows-remote-app-host.cs");
-  await requireFile(sourcePath, "Windows Remote App host source");
-  const powershell = defaultWindowsPowerShellPath();
-  await requireFile(powershell, "Windows PowerShell");
-  const command = [
-    "$ErrorActionPreference = 'Stop'",
-    "Add-Type `",
-    `  -Path ${quotePowerShellLiteral(sourcePath)} \``,
-    `  -OutputAssembly ${quotePowerShellLiteral(outputPath)} \``,
-    "  -OutputType WindowsApplication `",
-    "  -ReferencedAssemblies 'System.dll','System.Core.dll','System.Drawing.dll','System.Runtime.Serialization.dll','System.Xml.dll'"
-  ].join("\n");
-  run(powershell, [
-    "-NoLogo",
-    "-NoProfile",
-    "-NonInteractive",
-    "-EncodedCommand",
-    encodePowerShellCommand(command)
-  ]);
-  await requireFile(outputPath, "Compiled Windows Remote App host");
-}
-
 async function main() {
   const args = process.argv.slice(2);
   const outputValue = option(args, "--out");
@@ -310,14 +287,6 @@ async function main() {
       path.join(toolsDir, "installed-cli.mjs")
     ),
     copyFile(
-      path.join(repoRoot, "scripts", "remote-app-video-smoke.mjs"),
-      path.join(toolsDir, "remote-app-video-smoke.mjs")
-    ),
-    copyFile(
-      path.join(repoRoot, "scripts", "remote-app-host-smoke.mjs"),
-      path.join(toolsDir, "remote-app-host-smoke.mjs")
-    ),
-    copyFile(
       path.join(repoRoot, "scripts", "autostart-core.mjs"),
       path.join(toolsDir, "autostart-core.mjs")
     ),
@@ -358,9 +327,6 @@ async function main() {
   if (platform === "win32") {
     await compileWindowsServiceHost(
       path.join(binDir, "palmtty-autostart-host.exe")
-    );
-    await compileWindowsRemoteAppHost(
-      path.join(binDir, "palmtty-remote-app-host.exe")
     );
     await writeFile(
       path.join(binDir, "palmtty.cmd"),

@@ -2,9 +2,13 @@
 
 A coding agent should not declare a repository-wide task complete before the relevant gates pass.
 
-## Planned unattended RDP qualification (not satisfied by current CI)
+## External integration acceptance
 
-Before declaring v0.3.0 unattended RDP complete, meet every gate in [unattended-rdp-plan.md](unattended-rdp-plan.md): real Windows 11 Pro monitor-free cold boot, signed-in pre-login browser entrypoint, authenticated interactive NLA Windows login in iPhone Safari, RDP-active Remote App input, lock/RDP-disconnect fail-closed input, separate Machine/User identities, isolated and version-pinned Windows-native Devolutions Gateway and IronRDP client, HTTPS/WS, credentials/ACL isolation, installed-runtime/upgrade rollback, Windows/Linux CI/Distribution/CodeQL/Audit. `pnpm unattended:check` is a diagnostic only and does not satisfy these gates.
+- No leftover Remote App/RDP endpoints, AppWorker, WebRTC, native capture, ICE configuration or release smoke dependencies.
+- V4 Workspaces contain only core and Terminal settings. The optional one-shot v3 converter validates every projected record with the canonical WorkspaceDefinitionSchema, rejects duplicate IDs and malformed records without writing output, and never overwrites an existing v4 file. Integration URLs require HTTPS or loopback HTTP, reject username/password/query/fragment, and are returned only after authentication with no-store.
+- VS Code Web and Harness own authentication, sessions and processes; PalmTTY provides only optional independent links. No automatic workspace-folder switching is claimed.
+- Preserve all terminal reconnect, Session Worker, Git/Files/Artifacts, speech and mobile presentation tests.
+- Phone remote HTTPS, Codex extension behavior and Windows Ctrl+C server shutdown need real-host acceptance.
 
 ## Static/documentation
 
@@ -157,54 +161,6 @@ For theme or broad Web UI changes, `pnpm lint` includes `pnpm theme:check`; then
 - portrait and short landscape layouts;
 - a live terminal while changing appearance, confirming there is no xterm/WebSocket recreation or recovery reset;
 - static theme contract checks confirming locale/presentation state is not a terminal transport-lifecycle dependency.
-
-## Remote App acceptance
-
-Additional mobile/Windows release review:
-- Host startup failure must expose bounded stage/type/HRESULT even when the helper exits before READY. AppWorker must not load native WebRTC before ownership and readiness and must not kill an unverified MSIX PID.
-- Explicit typed adaptWindow may adjust only the session-owned HWND within native/protocol limits, respect application minimum sizes and restore dimensions on disable/exit. The live display hint keeps portrait aspect ratio with one clamp factor and cannot select an HWND, desktop or executable.
-- Unit tests cover single-finger tap, two-finger centroid scroll, partial finger release and pointercancel without phantom clicks. Control modes claim active-surface scroll from Safari; View mode must keep browser pinch.
-- Verify mobile header, on-demand Git/Files, immersive exit, complete/cropped video mapping, bottom key dock and text panel in portrait, short landscape and keyboard-open VisualViewport. Test 8-second first-frame timeout and post-first-frame stall separately.
-- Solid-dark successful capture stays ambiguous and must continue streaming after the bounded authorized-window retry; do not declare an application compatible without real Windows + browser tests.
-
-Automated/static acceptance for any Remote App change:
-
-- protocol tests prove App profile id/name/executable/argv bounds, unique IDs, App Session/media-state classification, signaling bounds, ICE server bounds and typed pointer/key/text/display-hint control bounds;
-- Workspace protocol tests prove Terminal launch settings live under `workspace.terminal`; removed top-level runtime/startupCommand shapes are rejected rather than compatibility-migrated;
-- Remote App recovery storage generation stays independent from Terminal Worker state and aligned with the Remote App Worker protocol version;
-- App Session creation accepts only persisted workspaceId + profileId. It rejects unknown profiles/unsupported platforms and never accepts browser executable/argv/environment/PID/HWND;
-- a Workspace using WSL for its Terminal profile may still retain/launch Windows Remote App profiles; Git/Files continue to interpret the nested Terminal runtime;
-- Remote App discovery endpoints require authentication + exact Origin and rate limiting. Detection covers verified Get-StartApps/Get-AppxPackage current-user MSIX identities plus known PATH/install locations, App Paths and bounded Start Menu shortcuts. Store entries are prioritized, typed launch identities are deduplicated and the public catalog remains capped at 64 entries; browsing exposes only directories + `.exe`, not file contents or command execution;
-- Workspace mutation and App Session creation both revalidate executable resolution;
-- Workspace deletion is blocked by active Terminal **or** active Remote App Sessions;
-- AppWorker bootstrap removes PalmTTY control/auth environment keys, requires authenticated adoption, retains recovery authority across Agent reconnect and never treats persisted PID as kill authority;
-- Windows packaging compiles the GUI-subsystem Remote App helper and installed-runtime smoke verifies a native helper is present; source-mode native Host caching is content-addressed by the C# source and compiler settings, tested for stable reuse with unchanged inputs and a different filename when source changes. Compilation must use a private source snapshot matching the fingerprint, and a failed compilation must be retryable without silently using an old helper. Windows CI must compile the fingerprinted source helper (not just the packaged EXE), run an invalid-profile bootstrap, and assert its bounded startup stage/type/HRESULT output;
-- Linux/Ubuntu build/test paths do not initialize Windows capture/WebRTC native runtime merely because schemas/control-plane routes exist;
-- browser WebRTC configuration maps only bounded authenticated `remoteApps.webrtc.iceServers`; empty ICE config is valid, TURN presence is reported without implying PalmTTY operates a relay;
-- browser display hints are derived from live App-surface geometry/DPR, clamped to protocol bounds, and native code clamps again; FPS/width/height must not reappear in persisted Remote App profiles;
-- App media diagnostics distinguish capture state and a bounded reason code for no-owned-window/oversized/PrintWindow-failed/blank/error, native received/converted frame counters and actual browser-decoded video; Web must not treat ICE connection alone as video readiness. A bounded single-allocation PTF1 parser must pass every split boundary, multiple-frame and invalid-frame tests; Windows installed smoke must complete a synthetic RGBA → I420 → WebRTC → video sink round trip;
-- Web keeps active Terminal/App surfaces mounted while switching Git/Files and supports direct switching among live Activities for the same Workspace;
-- View mode sends no pointer controls; Touch/Trackpad use bounded typed control messages; text stays bounded Unicode; special keys stay allowlisted;
-- no terminal protocol/schema is expanded with Remote App video/input messages and there is no full-desktop capture fallback.
-
-Real Windows + phone acceptance before claiming a specific desktop application is supported:
-
-- create/edit a Workspace and confirm the root page stays short: name/cwd/environment plus separate Terminal/Remote Apps navigation;
-- choose a Remote App from detected applications or the bounded `.exe` browser, save it, and confirm the normal path does not require typing an executable path; manual path remains Advanced;
-- test a WSL Terminal Workspace with a Windows Remote App profile and confirm Terminal/Git/Files remain WSL-scoped while the App launches as current-user Windows;
-- launch the saved profile and confirm the create request contains only workspaceId + profileId;
-- resize/rotate the phone and confirm capture adapts automatically without a manual FPS/resolution setting and without spawning a second app;
-- verify the helper captures only a window whose process is in the PalmTTY-owned Job and never falls back to desktop when capture fails;
-- force/observe a no-window or incompatible-capture case and confirm the Web surface shows a meaningful state rather than only a black frame;
-- test View / Touch / Trackpad, two-finger scroll, Ctrl/Alt/Shift/common keys, Chinese IME/voice text and rotation;
-- verify direct LAN/VPN media with empty ICE config where routable; for reverse-proxy/public testing, configure operator-owned STUN/TURN and confirm repeated media failure produces the relay/network diagnostic rather than creating a broader capture path;
-- background/foreground or switch phone network and confirm reconnect does not create a second application process;
-- restart only the Agent and confirm the adopted AppWorker/application remain alive and are rediscovered;
-- switch from the App to another live Terminal/App Activity in the same Workspace and back without returning home;
-- terminate the App Session and confirm the PalmTTY Job closes all member processes;
-- kill the AppWorker/control path during a disposable test and confirm the helper closes its Job instead of leaving an orphan application;
-- confirm an elevated/UAC application cannot be controlled from normal-user PalmTTY and do **not** bypass UIPI;
-- test intended apps such as Codex Desktop/VS Code individually. If PrintWindow returns blank/protected/GPU-incompatible frames, record that app as unvalidated/unsupported instead of enabling desktop capture.
 
 ## Manual Windows validation before a release
 

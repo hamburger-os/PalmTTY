@@ -164,7 +164,6 @@ async function buildHarness() {
         args: []
       }
     },
-    remoteApps: []
   }]);
   const app = await buildApp(config, {
     sessionManager: { runtimeDir, workerSpawner: spawner },
@@ -350,7 +349,6 @@ describe("session lifecycle API", () => {
           args: []
         }
       },
-      remoteApps: []
     });
 
     const restarted = await app.inject({

@@ -71,7 +71,6 @@ function workspace(): WorkspaceDefinition {
         args: []
       }
     },
-    remoteApps: []
   };
 }
 
