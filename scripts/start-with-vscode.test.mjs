@@ -59,7 +59,7 @@ test("shared discovery resolves user-installed CLI and does not execute it", asy
   const dir = await mkdtemp(path.join(os.tmpdir(), "palmtty-vscode-cli-"));
   try {
     const cli = path.join(dir, "code");
-    await writeFile(cli, "#!/bin/sh\\nexit 99\\n", { mode: 0o755 });
+    await writeFile(cli, "#!/bin/sh\nexit 99\n", { mode: 0o755 });
     assert.equal(await findOfficialVSCodeCli("linux", { PATH: dir }, "/missing/home"), cli);
   } finally {
     await rm(dir, { recursive: true, force: true });

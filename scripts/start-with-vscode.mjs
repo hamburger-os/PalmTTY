@@ -90,10 +90,20 @@ async function stopOwnedChild(child) {
   } catch {
     try { child.kill("SIGTERM"); } catch { /* already exited */ }
   }
-  await Promise.race([
-    new Promise((resolve) => child.once("close", resolve)),
-    new Promise((resolve) => setTimeout(resolve, 2500))
-  ]);
+  // No stale timers/listeners: finish promptly after the child exits.
+  await new Promise((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve();
+      return;
+    }
+    const done = () => {
+      clearTimeout(timer);
+      child.off("close", done);
+      resolve();
+    };
+    const timer = setTimeout(done, 2500);
+    child.once("close", done);
+  });
   try { process.kill(-child.pid, "SIGKILL"); } catch { /* group exited */ }
 }
 
