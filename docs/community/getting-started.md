@@ -56,9 +56,9 @@ pnpm start
 - Shell arguments remain explicit argv values. Startup command is a persisted shell-launch command in `workspace.terminal` and now runs via shell argv rather than fixed-delay PTY typing. Supported shells: PowerShell, cmd, bash, zsh, fish, sh, dash, ksh, Nu. Explicit WSL shells use the same model; the default WSL profile chooses `$SHELL` through `/bin/sh`. Unknown shell launch configurations with a startup command are rejected. Startup commands may appear in OS process arguments: never embed passwords or API keys. Workspace environment is persistent local configuration, not a secret vault.
 - In **Terminal → Startup command**, choose **Pi** to fill `pi` (alongside Codex, Claude Code and other CLI presets). Install Pi in the selected Host/WSL environment first (`npm install -g --ignore-scripts @earendil-works/pi-coding-agent`), (npm install requires Node.js 22.19+) and ensure the `pi` command is available on that shell's PATH. A preset only fills the field; it does not install the CLI. The mobile keybar offers Shift+Enter, Alt+Enter and Ctrl+Q, and xterm explicitly enables Kitty keyboard support. Real mobile/browser/IME compatibility must still be validated.
 
-### External Windows VS Code and Harness
+### Independent code-server and Harness
 
-After running `code serve-web --host 127.0.0.1 --port 8000` separately, configure the operator YAML `integrations.vscodeWeb` with a safe, token-free origin. Use the full token-bearing URL from the upstream server only directly in the local browser; never persist that token in PalmTTY YAML. `integrations.harness` optionally links to a separately started DSH Web instance. Neither is a PalmTTY Session.
+Install and start code-server independently using its upstream guide. Protect it with password authentication and a separate HTTPS Origin, then set `integrations.codeServer` to the token-free base URL. Detecting the CLI does not mean code-server is running. A managed Harness child is loopback-only; remote DSH requires independently protected HTTPS, upstream `--public-url` / `--trusted-host` and authentication.
 
 ### Linux host quick start
 
@@ -161,6 +161,10 @@ netsh interface ipv4 show excludedportrange protocol=tcp
 ~~~
 
 如果配置端口不可用，请修改 `palmtty.local.yaml` 中的 `server.port`，重新执行 `pnpm run preflight`。
+
+### 独立 code-server 和 Harness
+
+code-server 须按照上游文档自行安装、启动并设置密码认证和独立 HTTPS Origin，然后把不含令牌的地址填入 `integrations.codeServer`。检测到 CLI 不等于服务已经运行。Harness 托管子进程只监听主机回环；远程部署还需要独立 HTTPS、上游 `--public-url` 与 `--trusted-host` 和登录认证。
 
 ### Linux 宿主快速开始
 

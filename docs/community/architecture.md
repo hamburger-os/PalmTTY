@@ -112,9 +112,9 @@ PTY 输出、headless mirror、seq 与 replay 都在 Worker 内按同一有序�
 
 ### External Web applications / 独立 Web 应用
 
-Optional operator-configured URLs expose a standalone DeepSeek Harness Web home entry and a host-level official VS Code Web link on each Workspace. Browser requests navigate to external services; the Agent does not proxy or own their identity, sessions, workspaces or process lifecycle. Codex CLI remains a Terminal workload. HTTPS is required except for loopback testing, and credential-bearing URLs are forbidden.
+Optional operator-configured URLs expose independent code-server and DeepSeek Harness entries on the home page. Both UIs and their sessions remain independently authenticated and outside PalmTTY's Origin. The Agent owns only its managed Harness child, never the code-server lifecycle. Codex CLI remains a Terminal workload. HTTPS is required except for loopback testing, and credential-bearing URLs are forbidden.
 
-可选的外部应用入口只保存不含凭据的 URL。DSH 作为独立一级入口自行管理工作区与会话；每个 PalmTTY 工作区显示同一个 Windows 主机 VS Code Web 地址，文件夹由 VS Code 自己选择。PalmTTY 不反代第三方，也不提供 Azure 隧道或管理第三方进程。
+可选外部入口仅保存不含凭据的 URL。首页独立展示 code-server 与 Harness；code-server 由部署者管理安装、进程和认证，Harness 可固定版本安装到本机回环并由 Agent 管理自有进程。PalmTTY 不提供第三方同源代理或 Azure 隧道。
 
 ### Mobile recovery and browser read-aloud (October 2026)
 
