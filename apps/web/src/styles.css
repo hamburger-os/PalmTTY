@@ -2449,7 +2449,6 @@ button.settings-list-row:hover:not(:disabled),
 }
 
 .integration-entry { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); }
-.integration-link { display: inline-flex; align-items: center; justify-content: center; min-height: var(--touch-target-compact); }
 
 /* Managed apps remain visible even when installation/access is unavailable. */
 .integration-entry { flex-wrap: wrap; min-height: var(--touch-target-compact); }
