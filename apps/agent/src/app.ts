@@ -118,6 +118,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   const workspaceMutationLimiter = new FixedWindowLimiter(60, 60_000);
   const directoryBrowseLimiter = new FixedWindowLimiter(120, 60_000);
   const terminalProfileLimiter = new FixedWindowLimiter(60, 60_000);
+  const managedAppLimiter = new FixedWindowLimiter(6, 10 * 60_000);
 
   function authenticated(request: FastifyRequest): boolean {
     return auth.isAuthenticated(request.cookies[AUTH_COOKIE]);
@@ -275,6 +276,9 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   app.post("/api/v1/integrations/:id/ensure",
     { preHandler: [requireOrigin, requireAuth] }, async (request, reply) => {
       const id = (request.params as { id: string }).id;
+      if (!managedAppLimiter.allow(request.ip)) {
+        return reply.code(429).send({ error: "too_many_web_app_requests" });
+      }
       if (id !== "vscodeWeb" && id !== "harness") {
         return reply.code(404).send({ error: "unknown_web_app" });
       }

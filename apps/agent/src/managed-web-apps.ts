@@ -92,6 +92,7 @@ export class ManagedWebApps {
   private harnessPhase: WebAppPhase = "detecting";
   private harnessDetail: string | undefined;
   private closed = false;
+  private readonly installerAbort = new AbortController();
   private vscodePresent: boolean | undefined;
   private harnessPresent: boolean | undefined;
 
@@ -193,6 +194,7 @@ export class ManagedWebApps {
               "--no-fund", "--save=false", `@deepseek-ai/dsh@${HARNESS_PIN}`],
             env: thirdPartyEnvironment(this.config.auth.tokenEnv),
             timeoutMs: INSTALL_TIMEOUT_MS,
+            signal: this.installerAbort.signal,
             maxStdoutBytes: MAX_LOG_BYTES,
             maxStderrBytes: MAX_LOG_BYTES
           });
@@ -274,6 +276,7 @@ export class ManagedWebApps {
 
   async close(): Promise<void> {
     this.closed = true;
+    this.installerAbort.abort();
     // Only stop processes this Agent itself spawned; never kill adopted or
     // discovered installations, VS Code tasks, arbitrary PIDs or port owners.
     if (this.harnessProcess && this.harnessProcess.exitCode === null) {
