@@ -245,3 +245,5 @@ The task summary should identify:
 - Harness single-flight ensure accepts no client path/URL/package/port parameters. npm provisioning targets a fixed user directory, pinned RC release, no admin privileges, no automatic latest. Failure does not mutate Workspace or terminal sessions.
 - Agent never logs or returns DSH process-token URLs to LAN/reverse-proxy clients, never attaches to an unknown port/PID, and kills only processes it created. An HTTPS URL in an operator config is a navigation entry, not a managed-service trust assertion.
 - VS Code Server service hosting is disabled under Microsoft license; a running backend does not imply remote-phone accessibility. Real-host Windows, NAS, mobile and upstream auth remain separate acceptance.
+
+- Web app tests must reject arbitrary stdout URLs and accept only the validated official DSH readiness URL on loopback.

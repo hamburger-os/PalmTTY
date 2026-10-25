@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { parseConfig } from "@palmtty/config";
-import { ManagedWebApps, HARNESS_PIN } from "./managed-web-apps.js";
+import { ManagedWebApps, HARNESS_PIN, parseHarnessReadyUrl } from "./managed-web-apps.js";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -43,4 +43,20 @@ it("never exposes configured loopback links to remote clients", async () => {
 
 it("uses one pinned Harness package version and rejects request-controlled versions", () => {
   expect(HARNESS_PIN).toMatch(/^\d+\.\d+\.\d+-rc\.\d+$/);
+});
+
+// Only the official readiness line establishes that DSH booted its Web UI.
+it("requires the official DSH readiness announcement", () => {
+  const valid = "dsh web: http://127.0.0.1:3080/?token=one-time";
+  expect(parseHarnessReadyUrl(valid)).toBe("http://127.0.0.1:3080/?token=one-time");
+  for (const line of [
+    "warning: http://127.0.0.1:3080/?token=wrong",
+    "dsh web: http://localhost:3080/?token=x",
+    "dsh web: http://127.0.0.2:3080/?token=x",
+    "dsh web: http://127.0.0.1:99999/?token=x",
+    "dsh web: http://127.0.0.1:0/?token=x",
+    "dsh web: https://127.0.0.1:3080/?token=x"
+  ]) expect(parseHarnessReadyUrl(line)).toBeUndefined();
+  expect(parseHarnessReadyUrl("unrelated URL\n" + valid + "\n"))
+    .toBe("http://127.0.0.1:3080/?token=one-time");
 });
