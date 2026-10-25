@@ -123,6 +123,17 @@ describe("HTTP security boundary", () => {
     expect(forbidden.statusCode).toBe(403);
     const invalid = await app.inject({ method: "POST", url: "/api/v1/integrations/unknown/ensure", headers: { cookie, origin: ORIGIN } });
     expect(invalid.statusCode).toBe(404);
+    // No compatibility path for the discarded alternative IDE identity.
+    const obsolete = await app.inject({
+      method: "POST", url: "/api/v1/integrations/codeServer/ensure",
+      headers: { cookie, origin: ORIGIN }
+    });
+    expect(obsolete.statusCode).toBe(404);
+    const official = await app.inject({
+      method: "POST", url: "/api/v1/integrations/vscodeWeb/ensure",
+      headers: { cookie, origin: ORIGIN }
+    });
+    expect(official.statusCode).toBe(202);
     await app.close();
   });
 

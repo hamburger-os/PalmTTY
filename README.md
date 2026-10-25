@@ -20,7 +20,7 @@ Mobile-first · self-hosted · Windows-first · Host + WSL runtimes · xterm.js
 
 PalmTTY is a mobile-first self-hosted remote development workbench centered on durable Terminal Sessions, workspace Git/Files/Artifacts, and optional external links to official VS Code Web and DeepSeek Harness. Codex/Claude/Pi CLIs remain ordinary terminal workloads.
 
-PalmTTY 是一个面向手机的自托管远程开发工作台。Windows Host、WSL、Linux Host 使用独立持久的 Terminal Worker；Git/Files/Artifacts 保持工作区工具。微软官方 VS Code Web 和独立的 DeepSeek Harness 只提供可选外部入口，不接管第三方进程、认证与会话。Codex CLI 仍是终端启动命令。
+PalmTTY 是一个面向手机的自托管远程开发工作台。Windows Host、WSL、Linux Host 使用独立持久的 Terminal Worker；Git/Files/Artifacts 保持工作区工具。微软官方 VS Code Web 由用户独立启动；DeepSeek Harness 可由 Agent 在当前用户目录安装并管理自有进程。两款应用都使用独立认证与 Web Origin。Codex CLI 仍是终端启动命令。
 
 ## Terminal touch controls / 手机终端触摸控制
 

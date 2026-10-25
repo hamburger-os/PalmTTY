@@ -7,7 +7,7 @@
 
 - `.node-version` is the exact CI/release security pin; root `engines.node` bounds supported runtime versions within major 24. `@types/node` and frozen pnpm lockfile use major 24.
 - Windows/Ubuntu CI, Security Audit, Distribution and Release select `.node-version`. Native PTY/ConPTY tests verify their host runtime; installed package smoke checks its Node binary against the release manifest and pinned baseline.
-- Node 22 is not a supported runtime, and there is no dual-ABI fallback. Real-host autostart / ConPTY visual tests remain separate owner-host acceptance. Harness managed provisioning is described below as later work.
+- Node 22 is not a supported runtime, and there is no dual-ABI fallback. Real-host autostart / ConPTY visual tests remain separate owner-host acceptance. Managed Harness provisioning is documented in the current Web application section; the Node runtime migration was an earlier independent change.
 
 
 
