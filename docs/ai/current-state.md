@@ -270,3 +270,8 @@ Do not claim persistence beyond what is tested: browser disconnect and Agent res
 - Dependabot only proposes routine compatible upgrades automatically. The verified `terminal-stack.json` pin set is owner-approved and must not be upgraded package-by-package.
 - Mermaid and jsdom major upgrades remain blocked pending license/rendering review and Node runtime-minimum compatibility respectively; do not treat all-green CI as proof a newly raised transitive `engines.node` requirement matches the documented minimum.
 - Safe dependency changes require fresh, up-to-date Windows/Ubuntu CI, Windows/Linux installed runtime smoke, Security Audit (including license review), and CodeQL before squash merge.
+
+## Managed Web readiness follow-up (2026-10-25)
+
+- Status refreshes installed CLI discovery instead of caching it until Agent restart.
+- Harness readiness is established only by official `dsh web:` startup announcement and a still-live owned child; arbitrary diagnostic URLs do not count.

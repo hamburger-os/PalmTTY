@@ -21,6 +21,23 @@ export const HARNESS_PIN = "0.2.1-rc.2";
 const MAX_LOG_BYTES = 8192;
 const STARTUP_TIMEOUT_MS = 75_000;
 const INSTALL_TIMEOUT_MS = 180_000;
+const HARNESS_STARTUP_URL = /(?:^|[\r\n])dsh web:\s+(http:\/\/127\.0\.0\.1:\d{1,5}\/[^\s"'<>]*)/u;
+
+/** Only the official DSH readiness announcement is an authoritative URL. */
+export function parseHarnessReadyUrl(output: string): string | undefined {
+  const candidate = HARNESS_STARTUP_URL.exec(output)?.[1];
+  if (!candidate) return undefined;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" ||
+        !url.port || Number(url.port) < 1 || Number(url.port) > 65535 ||
+        url.username || url.password) return undefined;
+    return candidate;
+  } catch {
+    return undefined;
+  }
+}
+
 
 async function exists(filename: string): Promise<boolean> {
   try { await access(filename); return true; } catch { return false; }
@@ -102,10 +119,9 @@ export class ManagedWebApps {
   }
 
   async discover(): Promise<void> {
-    if (this.vscodePresent === undefined) {
-      this.vscodePresent = Boolean(await firstExisting(vscodeCandidates()));
-    }
-    if (this.harnessPresent === undefined) {
+    // Status is polled; a newly installed program must appear without an Agent restart.
+    this.vscodePresent = Boolean(await firstExisting(vscodeCandidates()));
+    if (!["installing", "starting", "running"].includes(this.harnessPhase)) {
       const managed = managedHarnessBin(this.appRoot);
       // A user-installed dsh remains outside PalmTTY ownership. Do not attach
       // to an unknown process or guess an existing service from an open port.
@@ -113,8 +129,10 @@ export class ManagedWebApps {
         ? [path.join(process.env.APPDATA ?? "", "npm", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js")]
         : ["/usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js"];
       this.harnessPresent = Boolean(await firstExisting([managed, ...globalBins]));
-      if (this.harnessPhase === "detecting") {
+      if (["detecting", "not_installed", "installed"].includes(this.harnessPhase) ||
+          (this.harnessPhase === "failed" && this.harnessPresent)) {
         this.harnessPhase = this.harnessPresent ? "installed" : "not_installed";
+        this.harnessDetail = undefined;
       }
     }
   }
@@ -244,8 +262,8 @@ export class ManagedWebApps {
         // Upstream prints a one-time process-token URL. Never send this to logs.
         const append = (chunk: Buffer) => {
           output = (output + chunk.toString("utf8")).slice(-MAX_LOG_BYTES);
-          const match = /http:\/\/127\.0\.0\.1:\d{2,5}\/[^\s"'<>]*/u.exec(output);
-          if (match) finish(undefined, match[0]);
+          const ready = parseHarnessReadyUrl(output);
+          if (ready) finish(undefined, ready);
         };
         child.stdout.on("data", append);
         child.stderr.on("data", append);
@@ -253,6 +271,9 @@ export class ManagedWebApps {
       const parsed = new URL(url);
       if (parsed.hostname !== "127.0.0.1" || !parsed.port) {
         throw new Error("Unexpected upstream URL");
+      }
+      if (child.exitCode !== null || child.signalCode !== null || this.closed) {
+        throw new Error("Upstream exited before activation");
       }
       this.harnessStartupUrl = url;
       this.harnessPhase = "running";

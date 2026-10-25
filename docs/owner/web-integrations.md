@@ -34,3 +34,7 @@ VS Code Codex 扩展、浏览器文件夹深链接、真实手机访问、DSH �
 ### 上游 DSH 一次性启动令牌的例外
 
 PalmTTY 自身的登录、Worker IPC 令牌始终不得写 URL。DSH 官方 Web 在首次登录时使用短时进程令牌 URL 换取自身 Cookie，这属于独立第三方认证协议。管理器只在 `local` exposure 且请求确实来自同机回环浏览器时通过已认证的 no-store API 返回该临时 URL；不会持久化、记录日志或返回给 LAN/NAS 远端浏览器。不能混用两款产品的 Cookie 或认为一次 DSH 授权就是 PalmTTY 授权。
+
+## 就绪检查与发现刷新（2026-10-25）
+
+CLI 安装检测随状态查询刷新。Harness 只有在读取到上游官方 `dsh web:` 就绪行、确认回环地址且当前子进程仍存活时才报告运行中；其它日志 URL 不算就绪。本轮不改变独立 HTTPS Origin 与 npm 可用性的部署限制。
