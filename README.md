@@ -62,7 +62,7 @@ PalmTTY is intentionally narrower than a browser IDE:
 
 ## Managed Web applications / 独立 Web 应用
 
-**Microsoft's official VS Code Web** (`code serve-web`) and **DeepSeek Harness** are always shown on the home screen, even without Workspaces. PalmTTY detects the official VS Code CLI, but does not install, launch, stop or service-host Microsoft's VS Code Server. The official server must be launched independently from a permitted interactive user session, subject to [Microsoft's VS Code Server terms](https://code.visualstudio.com/docs/remote/vscode-server). Detection and external links do not prove the server is running.
+**Microsoft's official VS Code Web** (`code serve-web`) and **DeepSeek Harness** are always shown on the home screen, even without Workspaces. PalmTTY detects the official VS Code CLI and offers an **explicit, interactive source-checkout joint launcher** (`pnpm start:with-vscode`) that starts PalmTTY and `code serve-web` only for the user who invokes it. It never auto-installs or service-hosts Microsoft's VS Code Server. The official server must be launched independently from a permitted interactive user session, subject to [Microsoft's VS Code Server terms](https://code.visualstudio.com/docs/remote/vscode-server). Detection and external links do not prove the server is running.
 
 Harness can be installed in current-user storage using pinned `@deepseek-ai/dsh@0.2.1-rc.2` and started on the Agent's loopback. Windows/Linux release packages bundle Node 24 and npm; source mode needs npm. The Agent verifies the pinned package in a staging directory before publishing it, preserves installation failures until explicit retry, and manages only its own DSH child.
 
@@ -74,7 +74,7 @@ integrations:
 
 Both are independent Web security principals. PalmTTY does not proxy third-party JavaScript through its authenticated Origin or leak the Harness one-time local token URL to remote clients. For phone access, deploy separate protected HTTPS Origins and each upstream's own authentication/proxy settings. Harness behind an external proxy also requires the upstream `--public-url` and `--trusted-host`. The locally managed Harness child is not a one-click remote deployment.
 
-中文：首页展示的是**微软官方 VS Code Web（`code serve-web`）**与 DeepSeek Harness。PalmTTY 仅检测官方 VS Code CLI、提供独立安全入口，不自动托管官方 Server；请按微软许可在交互式用户会话中启动。Harness 保留固定版本安装、验证和本机启动能力。手机远程访问需要分别配置受保护 HTTPS 入口与上游认证，不能把“显示入口”误认为服务已经可用。详见[Web 应用部署说明](docs/community/web-integrations.md)。
+中文：首页展示的是**微软官方 VS Code Web（`code serve-web`）**与 DeepSeek Harness。PalmTTY 检测官方 VS Code CLI、提供独立安全入口；源码构建后可以在**用户交互式终端**用 `pnpm start:with-vscode` 一次启动 PalmTTY 和官方 Web 服务，不会作为开机自启服务运行；首次仍需用户接受微软许可。Harness 保留固定版本安装、验证和本机启动能力。手机远程访问需要分别配置受保护 HTTPS 入口与上游认证，不能把“显示入口”误认为服务已经可用。详见[Web 应用部署说明](docs/community/web-integrations.md)。
 
 ## Architecture / 架构
 
@@ -135,6 +135,7 @@ $env:PALMTTY_ACCESS_TOKEN = "replace-with-a-long-random-secret"
 pnpm run preflight
 pnpm check
 pnpm start
+# Or, in an interactive user terminal only: pnpm start:with-vscode
 ```
 
 
@@ -160,9 +161,12 @@ export PALMTTY_ACCESS_TOKEN="replace-with-a-long-random-secret"
 pnpm run preflight
 pnpm check
 pnpm start
+# Or, in an interactive user terminal only: pnpm start:with-vscode
 ```
 
 With the example config, open `http://127.0.0.1:17688`. Linux uses the native Host runtime and Unix-domain-socket Worker IPC; WSL is a separate Windows runtime adapter.
+
+For the official VS Code Web joint launcher, build first (`pnpm build`), install Microsoft VS Code separately, then optionally configure `integrations.vscodeWeb: "http://127.0.0.1:8000/"` for same-machine browser access. The launcher's current-user foreground session uses VS Code's own connection token and license prompt. Remote phone access requires a **separate, protected HTTPS reverse proxy on the same host** (or a secure tunnel to loopback); a NAS on a different computer cannot directly reach `127.0.0.1` on your PC. See [Web integrations](docs/community/web-integrations.md). This optional launcher is **not included in unattended `palmtty service` or `pnpm autostart`**.
 
 ## Autostart / 开机自启
 

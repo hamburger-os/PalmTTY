@@ -85,6 +85,10 @@ Agent 的 `--env-file` 只允许从本地文件载入严格 `NAME=value`，不�
 
 systemd unit 使用 `KillMode=process` 是为了保持既有“Agent lifetime != Worker lifetime”不变量；停止/restart Agent 不应因为 service manager 的默认进程组清理而杀掉 detached Worker。该行为不表示 OS reboot 后 Worker 可存活。
 
+## 交互式官方 VS Code Web 启动边界
+
+源码模式新增显式执行的 `pnpm start:with-vscode`，不修改原 Agent 服务、自启动 Task Scheduler/systemd 或 Web API；无 TTY、官方 CLI 缺失、Agent 未构建时在启动前失败。VS Code Web 固定绑定本机回环，保留微软首次交互式许可确认与连接令牌，不以 `--without-connection-token` 关闭认证；仅清理本次创建的子进程树，禁止猜测端口反向接管。跨设备只支持独立安全 HTTPS Origin/隧道，不能把微软 Web UI 通过 PalmTTY 登录 Origin 同源反代。部署时需遵守 [微软 VS Code Server 许可](https://code.visualstudio.com/docs/remote/vscode-server)。
+
 ## 外部官方 VS Code Web / Harness 安全边界
 
 PalmTTY 只输出配置好的官方 VS Code Web/Harness 外部 URL，不传递上游认证凭据，不代理任意目标主机。官方 VS Code Server 必须由用户独立启动；仅 Harness 的自有子进程允许 Agent 管理，禁止接管未知第三方进程；用户必须自行保护官方 VS Code Web 和 DSH 的访问入口。只有 HTTPS 或本机回环 HTTP URL 可以配置，禁止 URL 中附带凭据和令牌参数。手机访问不能依赖 Windows 主机本地回环地址，跨设备的 HTTPS 部署尚需独立验证。

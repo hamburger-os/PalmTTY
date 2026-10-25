@@ -171,3 +171,9 @@ QNAP 规则的目标协议必须选择其“HTTP + WebSocket”一类组合，�
 ## 管理式 Harness 的部署限制
 
 Agent 可将固定版本 DSH 安装在当前用户应用数据目录，并以已有 Node 启动到随机回环端口。正式 Windows/Linux 发行包包含 Node 24 以及它的官方 npm CLI；源码模式缺少安装器时返回可诊断状态，不会下载运行系统安装器、提权、修改防火墙或创建 Windows 服务。当前使用微软官方 VS Code Web 的 `code` CLI 检测及外部 URL，用户须在许可允许的交互式会话中启动 `code serve-web`，Agent 不托管官方服务器进程。NAS 原先只代理 PalmTTY 的一个 HTTPS Origin，安全访问第三方 Web 仍需额外独立 Origin 及上游认证；禁止同源直接透传第三方脚本。
+
+## 个人交互式联合启动（仅源码模式）
+
+`pnpm start:with-vscode` 使用已构建的 Agent 和主机用户自行安装的官方 VS Code `code` CLI，启动同一交互式会话中的 PalmTTY Agent 与 `code serve-web` 前台子进程。入口必须有 TTY、不会自动接受微软条款、不关闭上游连接令牌。监听地址固定 `127.0.0.1`；端口为 `integrations.vscodeWeb` 指定的回环 HTTP URL 显式端口，或默认 8000；如果配置为外部 HTTPS URL，则仍使用本机 8000 作为代理上游端口。浏览器原点与认证仍完全独立。
+
+该启动器只在用户显式执行时有效，不打包微软二进制，不挂在 Windows Task Scheduler 或 systemd `--user` 的 Agent 自启动生命周期下。关联合运行只终止本次由启动器创建的进程树，不能据此声明任意 Windows 后代均完成清理。NAS 若在另一设备，不能直接反代工作站 `127.0.0.1`，必须在同机部署独立 HTTPS 代理，或通过安全隧道到工作站回环地址。用户在配置 `integrations.vscodeWeb` 时只能保存无凭据基础 URL，不保存启动令牌。 

@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { access, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { PalmTTYConfig } from "@palmtty/config";
+import { findOfficialVSCodeCli, type PalmTTYConfig } from "@palmtty/config";
 import type { WebAppCatalog, WebAppId, WebAppPhase, WebAppStatus } from "@palmtty/protocol";
 import { runBoundedProcess } from "./bounded-process.js";
 
@@ -36,30 +36,6 @@ function personalAppRoot(): string {
   return path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), ".local", "share"), "PalmTTY", "web-apps");
 }
 
-function vscodeWebCandidates(): string[] {
-  // Discover only the official Microsoft VS Code CLI. Its serve-web lifecycle
-  // and authentication stay under the interactive user's control.
-  if (process.platform === "win32") {
-    return [
-      ...(process.env.LOCALAPPDATA ? [
-        path.join(process.env.LOCALAPPDATA, "Programs", "Microsoft VS Code", "bin", "code.cmd")
-      ] : []),
-      path.join(process.env.ProgramFiles ?? "C:\\Program Files",
-        "Microsoft VS Code", "bin", "code.cmd"),
-      path.join(process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)",
-        "Microsoft VS Code", "bin", "code.cmd"),
-      ...(process.env.PATH ?? "").split(path.delimiter).filter(Boolean)
-        .flatMap((dir) => [path.join(dir, "code.cmd"), path.join(dir, "code.exe")])
-    ];
-  }
-  return [
-    "/usr/local/bin/code",
-    "/usr/bin/code",
-    path.join(os.homedir(), ".local", "bin", "code"),
-    ...(process.env.PATH ?? "").split(path.delimiter).filter(Boolean)
-      .map((dir) => path.join(dir, "code"))
-  ];
-}
 
 function npmCliCandidates(): string[] {
   const base = path.dirname(process.execPath);
@@ -141,7 +117,7 @@ export class ManagedWebApps {
 
   async discover(): Promise<void> {
     // Status is polled; a newly installed program must appear without an Agent restart.
-    this.vscodeWebPresent = Boolean(await firstExisting(vscodeWebCandidates()));
+    this.vscodeWebPresent = Boolean(await findOfficialVSCodeCli());
     if (!["installing", "starting", "running"].includes(this.harnessPhase)) {
       // A user-installed dsh remains outside PalmTTY ownership. Do not attach
       // to an unknown process or guess an existing service from an open port.
