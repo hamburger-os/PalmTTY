@@ -40,6 +40,8 @@ import { registerSpeechRoutes } from "./speech-routes.js";
 import { defaultWebRoot } from "./runtime-layout.js";
 import { PALMTTY_VERSION } from "./version.js";
 import { defaultRuntimeDir } from "./worker-storage.js";
+import { ManagedWebApps } from "./managed-web-apps.js";
+import { isLoopbackHost } from "@palmtty/config";
 
 const LoginSchema = z.object({ token: z.string().min(1).max(4096) });
 
@@ -101,6 +103,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   const workspaceStore = options.workspaceStore ?? new FileWorkspaceStore();
   const runtimeDir = options.sessionManager?.runtimeDir ?? defaultRuntimeDir();
   const artifacts = new SessionArtifactStore(runtimeDir);
+  const managedWebApps = new ManagedWebApps(config);
   const sessions = new SessionManager(config, {
     ...options.sessionManager,
     runtimeDir,
@@ -259,10 +262,29 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     requireOrigin,
     sensitiveEnvironmentKeys
   });
-  app.get("/api/v1/integrations", { preHandler: requireAuth }, async (_request, reply) => {
+  app.get("/api/v1/integrations", { preHandler: requireAuth }, async (request, reply) => {
     reply.header("Cache-Control", "private, no-store");
-    return config.integrations;
+    // In reverseProxy/lan mode a browser's loopback refers to its own device,
+    // not the Agent host. Do not release DSH's one-time launch token remotely.
+    const localBrowser = config.server.exposure.mode === "local" &&
+      isLoopbackHost(request.ip) &&
+      isLoopbackHost((request.headers.host ?? "").split(":")[0] ?? "");
+    return managedWebApps.catalog(localBrowser);
   });
+
+  app.post("/api/v1/integrations/:id/ensure",
+    { preHandler: [requireOrigin, requireAuth] }, async (request, reply) => {
+      const id = (request.params as { id: string }).id;
+      if (id !== "vscodeWeb" && id !== "harness") {
+        return reply.code(404).send({ error: "unknown_web_app" });
+      }
+      // A single-flight task is owned by the Agent. No untrusted URLs, ports,
+      // shell commands or install versions come from HTTP request bodies.
+      void managedWebApps.ensure(id).catch(() => undefined);
+      reply.header("Cache-Control", "private, no-store");
+      return reply.code(202).send({ accepted: true });
+    }
+  );
 
   app.get("/api/v1/workspaces", { preHandler: requireAuth }, async () => ({
     workspaces: workspaceStore.list()
@@ -594,6 +616,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   app.addHook("onClose", async () => {
+    await managedWebApps.close();
     await sessions.close();
   });
 

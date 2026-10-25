@@ -86,6 +86,7 @@ export class ManagedWebApps {
   private activeEnsure: Promise<void> | undefined;
   private harnessPhase: WebAppPhase = "detecting";
   private harnessDetail: string | undefined;
+  private closed = false;
   private vscodePresent: boolean | undefined;
   private harnessPresent: boolean | undefined;
 
@@ -152,6 +153,7 @@ export class ManagedWebApps {
 
   private async ensureHarness(): Promise<void> {
     await this.discover();
+    if (this.closed) return;
     this.harnessDetail = undefined;
     try {
       let cli = managedHarnessBin(this.appRoot);
@@ -187,7 +189,7 @@ export class ManagedWebApps {
           }
         }
       }
-      await this.startHarness(cli);
+      if (!this.closed) await this.startHarness(cli);
     } catch (error) {
       this.harnessPhase = "failed";
       this.harnessDetail = safeError(error);
@@ -202,10 +204,11 @@ export class ManagedWebApps {
       {
         cwd: os.homedir(), // Harness owns its own workspace selection.
         env: thirdPartyEnvironment(this.config.auth.tokenEnv),
-        shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"]
+        shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"]
       }
     );
     this.harnessProcess = child;
+    child.stdin.end();
     let output = "";
     try {
       const url = await new Promise<string>((resolve, reject) => {
@@ -256,6 +259,7 @@ export class ManagedWebApps {
   }
 
   async close(): Promise<void> {
+    this.closed = true;
     // Only stop processes this Agent itself spawned; never kill adopted or
     // discovered installations, VS Code tasks, arbitrary PIDs or port owners.
     if (this.harnessProcess && this.harnessProcess.exitCode === null) {
