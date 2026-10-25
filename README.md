@@ -62,7 +62,7 @@ PalmTTY is intentionally narrower than a browser IDE:
 
 ## Managed Web applications / 受管理的 Web 应用
 
-VS Code Web and DeepSeek Harness are always visible in PalmTTY, even when installation or remote access is unavailable. No separate application URLs are required for local discovery. On authenticated login PalmTTY detects official Windows VS Code installations and attempts an isolated, pinned DSH Web user-local install/start (`@deepseek-ai/dsh@0.2.1-rc.2`) using the host's npm installation. `npm` may not be present in standalone PalmTTY release packages; that condition is diagnosed rather than silently installing OS tools or escalating privileges.
+VS Code Web and DeepSeek Harness are always visible as independent applications on PalmTTY's home screen, even when no Workspace exists or installation/remote access is unavailable. No separate application URLs are required for local discovery. On authenticated login PalmTTY detects official Windows VS Code installations and attempts an isolated, pinned DSH Web user-local install/start (`@deepseek-ai/dsh@0.2.1-rc.2`) using the host's npm installation. `npm` may not be present in standalone PalmTTY release packages; that condition is diagnosed rather than silently installing OS tools or escalating privileges.
 
 Microsoft does **not permit hosting the official VS Code Server as a service**. PalmTTY detects VS Code but deliberately does not install/start/stop a VS Code Server daemon; launch it under an interactive Windows user session in accordance with its terms. Codex CLI remains a Terminal command. Harness independently owns its workspaces, sessions, credentials and model authentication.
 

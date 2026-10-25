@@ -383,7 +383,10 @@ export function App() {
       </header>
 
       {error && <div className="error-banner">{error}</div>}
-      {renderWebApp("harness")}
+      <div className="card-grid" aria-label={t("integrations.applications")}>
+        {renderWebApp("vscodeWeb")}
+        {renderWebApp("harness")}
+      </div>
 
       <section>
         <div className="section-heading">
@@ -451,7 +454,6 @@ export function App() {
                 >
                   {t("workspaces.newSession")} →
                 </button>
-                {renderWebApp("vscodeWeb")}
               </article>
             ))}
           </div>
