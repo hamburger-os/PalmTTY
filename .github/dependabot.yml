@@ -10,6 +10,20 @@ updates:
     ignore:
       - dependency-name: "@types/node"
         versions: [">=23"]
+      # All five xterm packages are a tested, precisely-pinned stack governed by
+      # terminal-stack.json. Individually proposed updates always break the
+      # single source of truth; upgrade the family together in a reviewed PR.
+      - dependency-name: "@xterm/*"
+      # Major Mermaid upgrades change rendering/sandbox integration and can
+      # introduce licenses outside the reviewed production policy.
+      - dependency-name: "mermaid"
+        update-types: ["version-update:semver-major"]
+      # jsdom 30 requires Node >=22.22.2, while our supported minimum is
+      # Node >=22.11.0. Review this major with a deliberate Node baseline bump.
+      - dependency-name: "jsdom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/jsdom"
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-patch:
         patterns:

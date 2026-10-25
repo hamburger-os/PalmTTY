@@ -137,3 +137,8 @@ When editing terminal recovery, test the single input owner, rejected read-only 
 ### Markdown extension dependency review
 
 The Mermaid dependency graph includes khroma 2.1.0, whose npm metadata reports Unknown though the upstream license file is MIT; license-check grants only the exact package/version/metadata exception with regression tests. The Markdown preview uses no public rendering/CDN services. / Mermaid 间接依赖 khroma 2.1.0 的 npm 许可证字段缺失，上游文本为 MIT；只允许精确包名/版本/Unknown 组合并验证负样例，不全局放宽。Markdown 图像/公式/图表均不依赖远程渲染服务。
+## Dependency update workflow / 依赖升级流程
+
+Automatic dependency PRs must pass Windows and Ubuntu CI, packaging smoke, security/license policy, and CodeQL at the current `main` head. The xterm browser/worker family is version-locked by `terminal-stack.json` and upgraded as one reviewed group, not one package at a time. Mermaid major upgrades need license and renderer/security review. jsdom major upgrades must remain compatible with the supported Node minimum.
+
+依赖更新 PR 需要基于最新 `main` 完成 Windows/Ubuntu CI、发行包烟测、漏洞和许可证检查及 CodeQL。xterm 的浏览器端和 Worker 版本以 `terminal-stack.json` 为唯一来源，必须整组升级；Mermaid 主版本要审查间接依赖许可证与安全渲染；jsdom 主版本不能突破公开声明的 Node 最低版本。
