@@ -32,3 +32,6 @@ VS Code Web 和 DeepSeek Harness 始终展示，不再因没有配置 URL 而隐
 Back up the v3 store, stop the Agent and run `pnpm --filter @palmtty/protocol build` to build the canonical schema. Then run `node scripts/migrate-workspaces-v4.mjs --from <v3-path> --to <v4-path>`. It atomically publishes fully written output via an exclusive same-directory hard link (requires hard-link support), never overwrites existing output, does not delete the source, and omits removed Remote App profiles. The runtime reads only v4.
 
 升级前关闭 Agent 并备份，先构建 `@palmtty/protocol`，再离线运行转换工具，保留原 V3，不覆盖已有 V4；新运行时只读取 V4。
+
+
+**Upstream token scope / 上游令牌作用域：** PalmTTY itself never puts its login or Worker secrets in URLs. DSH requires an upstream one-time process-token URL to exchange for its own browser cookie; this is exposed only on authenticated same-host `local` access and is neither persisted/logged nor returned to LAN/NAS clients. PalmTTY login and DSH login remain separate. / PalmTTY 的登录、Worker 密钥绝不使用 URL；只有 DSH 官方首次授权采用的一次性令牌 URL 在受认证本机 `local` 模式下开放，远端不提供，也不记录日志和持久化。

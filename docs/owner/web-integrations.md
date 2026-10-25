@@ -29,3 +29,8 @@ VS Code Codex 扩展、浏览器文件夹深链接、真实手机访问、DSH �
 ## 一次性升级
 
 关闭 PalmTTY Agent 并备份工作区存储后，用 `node scripts/migrate-workspaces-v4.mjs --from <v3-file> --to <v4-file>` 离线转换。先执行 `pnpm --filter @palmtty/protocol build`，确保转换工具使用当前版本的唯一 Workspace Schema 校验。数据不合法或 ID 重复时拒绝创建 V4 文件。导出时先写入并同步同目录临时文件，再用独占硬链接原子发布，拒绝覆盖已有 V4；要求目标文件系统支持硬链接，临时文件始终清理。输出文件必须不存在，V3 原件保留，V4 只保存现有 Workspace/Terminal 字段，移除旧 Remote App Profile。运行时不提供自动 V3 回退。
+
+
+### 上游 DSH 一次性启动令牌的例外
+
+PalmTTY 自身的登录、Worker IPC 令牌始终不得写 URL。DSH 官方 Web 在首次登录时使用短时进程令牌 URL 换取自身 Cookie，这属于独立第三方认证协议。管理器只在 `local` exposure 且请求确实来自同机回环浏览器时通过已认证的 no-store API 返回该临时 URL；不会持久化、记录日志或返回给 LAN/NAS 远端浏览器。不能混用两款产品的 Cookie 或认为一次 DSH 授权就是 PalmTTY 授权。
