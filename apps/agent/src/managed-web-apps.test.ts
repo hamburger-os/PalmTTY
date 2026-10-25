@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { parseConfig } from "@palmtty/config";
+import { WEB_APP_IDS } from "@palmtty/protocol";
 import { ManagedWebApps, HARNESS_PIN, isPinnedHarnessPackage, parseHarnessReadyUrl } from "./managed-web-apps.js";
 
 const roots: string[] = [];
@@ -16,7 +17,7 @@ it("always returns two managed app identities without startup side effects", asy
   roots.push(root);
   const mgr = new ManagedWebApps(parseConfig({}), root);
   const result = await mgr.catalog(false);
-  expect(Object.keys(result.apps).sort()).toEqual(["harness", "codeServer"]);
+  expect(Object.keys(result.apps).sort()).toEqual([...WEB_APP_IDS].sort());
   expect(result.apps.harness.accessUrl).toBeUndefined();
   expect(["not_installed", "installed"]).toContain(result.apps.harness.phase);
   await mgr.ensure("codeServer"); // official VS Code server is not hosted.
