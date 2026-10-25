@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { access, mkdir, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { PalmTTYConfig } from "@palmtty/config";
@@ -82,8 +82,25 @@ async function firstExisting(paths: string[]): Promise<string | undefined> {
   return undefined;
 }
 
+function harnessBinAt(prefix: string): string {
+  return path.join(prefix, "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js");
+}
 function managedHarnessBin(root: string): string {
-  return path.join(root, "harness", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js");
+  return harnessBinAt(path.join(root, "harness"));
+}
+
+/** Reject an abandoned or wrong-version npm install before exposing a CLI. */
+export async function isPinnedHarnessPackage(prefix: string): Promise<boolean> {
+  try {
+    const manifest = path.join(prefix, "node_modules", "@deepseek-ai", "dsh", "package.json");
+    const info: unknown = JSON.parse(await readFile(manifest, "utf8"));
+    return typeof info === "object" && info !== null &&
+      "name" in info && info.name === "@deepseek-ai/dsh" &&
+      "version" in info && info.version === HARNESS_PIN &&
+      await exists(harnessBinAt(prefix));
+  } catch {
+    return false;
+  }
 }
 
 // Never copy PalmTTY's bootstrap token, cookie or control credentials into an
@@ -124,13 +141,14 @@ export class ManagedWebApps {
     // Status is polled; a newly installed program must appear without an Agent restart.
     this.codeServerPresent = Boolean(await firstExisting(codeServerCandidates()));
     if (!["installing", "starting", "running"].includes(this.harnessPhase)) {
-      const managed = managedHarnessBin(this.appRoot);
       // A user-installed dsh remains outside PalmTTY ownership. Do not attach
       // to an unknown process or guess an existing service from an open port.
       const globalBins = process.platform === "win32"
         ? [path.join(process.env.APPDATA ?? "", "npm", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js")]
         : ["/usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js"];
-      this.harnessPresent = Boolean(await firstExisting([managed, ...globalBins]));
+      this.harnessPresent =
+        await isPinnedHarnessPackage(path.join(this.appRoot, "harness")) ||
+        Boolean(await firstExisting(globalBins));
       // An incomplete install must never erase a failure on the next status poll.
       if (["detecting", "not_installed", "installed"].includes(this.harnessPhase)) {
         this.harnessPhase = this.harnessPresent ? "installed" : "not_installed";
@@ -189,18 +207,14 @@ export class ManagedWebApps {
   private async ensureHarness(): Promise<void> {
     await this.discover();
     if (this.closed) return;
-    // Retry an interrupted installation by replacing only PalmTTY's managed
-    // package directory. A leftover bin.js is not evidence of a valid install.
-    const repairPartialInstall =
-      this.harnessPhase === "failed" && this.harnessDetail === "install_failed";
     this.harnessDetail = undefined;
     try {
       let cli = managedHarnessBin(this.appRoot);
-      if (repairPartialInstall || !(await exists(cli))) {
+      if (!(await isPinnedHarnessPackage(path.join(this.appRoot, "harness")))) {
         const globalCli = process.platform === "win32"
           ? path.join(process.env.APPDATA ?? "", "npm", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js")
           : "/usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js";
-        if (!repairPartialInstall && await exists(globalCli)) {
+        if (await exists(globalCli)) {
           cli = globalCli;
         } else {
           this.harnessPhase = "installing";
@@ -211,22 +225,32 @@ export class ManagedWebApps {
             return;
           }
           const prefix = path.join(this.appRoot, "harness");
-          if (repairPartialInstall) await rm(prefix, { recursive: true, force: true });
-          await mkdir(prefix, { recursive: true, mode: 0o700 });
-          const result = await runBoundedProcess({
-            executable: process.execPath,
-            args: [npm, "install", "--prefix", prefix, "--no-audit",
-              "--no-fund", "--save=false", `@deepseek-ai/dsh@${HARNESS_PIN}`],
-            env: thirdPartyEnvironment(this.config.auth.tokenEnv),
-            timeoutMs: INSTALL_TIMEOUT_MS,
-            signal: this.installerAbort.signal,
-            maxStdoutBytes: MAX_LOG_BYTES,
-            maxStderrBytes: MAX_LOG_BYTES
-          });
-          if (result.code !== 0 || !(await exists(cli))) {
-            this.harnessPhase = "failed";
-            this.harnessDetail = "install_failed";
-            return;
+          await mkdir(this.appRoot, { recursive: true, mode: 0o700 });
+          // Never expose an incomplete npm tree as an installed CLI after a
+          // crash. A private sibling staging directory is on the same volume.
+          const staging = await mkdtemp(path.join(this.appRoot, "harness-install-"));
+          try {
+            const result = await runBoundedProcess({
+              executable: process.execPath,
+              args: [npm, "install", "--prefix", staging, "--no-audit",
+                "--no-fund", "--save=false", `@deepseek-ai/dsh@${HARNESS_PIN}`],
+              env: thirdPartyEnvironment(this.config.auth.tokenEnv),
+              timeoutMs: INSTALL_TIMEOUT_MS,
+              signal: this.installerAbort.signal,
+              maxStdoutBytes: MAX_LOG_BYTES,
+              maxStderrBytes: MAX_LOG_BYTES
+            });
+            if (result.code !== 0 || !(await isPinnedHarnessPackage(staging))) {
+              this.harnessPhase = "failed";
+              this.harnessDetail = "install_failed";
+              return;
+            }
+            if (this.closed) return;
+            // The managed prefix contains only PalmTTY-installed package bytes.
+            await rm(prefix, { recursive: true, force: true });
+            await rename(staging, prefix);
+          } finally {
+            await rm(staging, { recursive: true, force: true });
           }
         }
       }

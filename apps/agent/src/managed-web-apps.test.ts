@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { parseConfig } from "@palmtty/config";
-import { ManagedWebApps, HARNESS_PIN, parseHarnessReadyUrl } from "./managed-web-apps.js";
+import { ManagedWebApps, HARNESS_PIN, isPinnedHarnessPackage, parseHarnessReadyUrl } from "./managed-web-apps.js";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -89,4 +89,20 @@ it("terminates an owned Harness child and returns from close", async () => {
   internal.harnessProcess = child;
   await mgr.close();
   expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
+});
+
+it("rejects wrong-version or half-installed managed Harness packages", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-managed-"));
+  roots.push(root);
+  const prefix = path.join(root, "harness");
+  const pkg = path.join(prefix, "node_modules", "@deepseek-ai", "dsh");
+  await mkdir(path.join(pkg, "lib"), { recursive: true });
+  await writeFile(path.join(pkg, "lib", "bin.js"), "entry");
+  expect(await isPinnedHarnessPackage(prefix)).toBe(false);
+  await writeFile(path.join(pkg, "package.json"),
+    JSON.stringify({ name: "@deepseek-ai/dsh", version: "0.0.0" }));
+  expect(await isPinnedHarnessPackage(prefix)).toBe(false);
+  await writeFile(path.join(pkg, "package.json"),
+    JSON.stringify({ name: "@deepseek-ai/dsh", version: HARNESS_PIN }));
+  expect(await isPinnedHarnessPackage(prefix)).toBe(true);
 });
