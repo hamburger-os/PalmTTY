@@ -11,10 +11,10 @@
 
 
 
-### Independent code-server and managed Harness (2026-10-25)
+### Official VS Code Web and managed Harness (2026-10-25)
 
 - Authenticated no-store `GET /api/v1/integrations` returns both always-visible app statuses, with bounded detection and sanitized diagnostics; `POST /api/v1/integrations/:id/ensure` requires exact Origin and authentication and uses a single-flight manager.
-- code-server CLI candidates are discovered and displayed on the independent home shelf even with zero Workspaces. It is externally installed/launched/authenticated and is not an Agent-owned process. Harness is an independent managed process: existing CLI preferred, otherwise pinned `@deepseek-ai/dsh@0.2.1-rc.2` installed through an available host npm in a current-user directory; run with Node 24, fixed loopback host and random port.
+- Microsoft's official `code` CLI candidates are discovered and displayed for VS Code Web even with zero Workspaces. `code serve-web` must be launched by an interactive user according to Microsoft's server license; PalmTTY does not install, spawn or service-host it. Harness is an independent managed process: existing CLI preferred, otherwise pinned `@deepseek-ai/dsh@0.2.1-rc.2` installed through an available host npm in a current-user directory; run with Node 24, fixed loopback host and random port.
 - Windows/Linux installed runtime bundles Node 24 plus npm from the same official distribution. Automatic Harness install no longer requires system npm in installed mode; source mode may still report `npm_unavailable`. Neither system elevation nor random third-party executable launch occurs.
 - The Web-app ID/status types have one definition in @palmtty/protocol. Harness installs stage privately and verify pinned package identity before publication; failed status remains failed even if a partial CLI appears; owned-child close is observed before readiness and Agent close has a bounded exit wait, not proven Windows process-tree cleanup.
 - No same-origin proxy or cloud relay exists. Captured DSH process-token URL is withheld from LAN/reverse-proxy clients. Remote browser access needs a dedicated trusted external HTTPS Origin; without it, running local service does not imply phone accessibility.
