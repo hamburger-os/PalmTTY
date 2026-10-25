@@ -32,12 +32,15 @@ const explicitVersion = releaseMode
 
 const rootPackage = readJson("package.json");
 const pinnedRuntime = readFileSync(resolve(root, ".node-version"), "utf8").trim();
-if (!/^24\.\d+\.\d+$/.test(pinnedRuntime) ||
-    rootPackage.engines?.node !== `>=${pinnedRuntime} <25` ||
-    !/^\^24\./.test(rootPackage.devDependencies?.["@types/node"] ?? "")) {
-  fail("Node runtime, engine range and @types/node must use the coordinated Node 24 contract");
+const runtimeParts = /^(\d+)\.(\d+)\.(\d+)$/.exec(pinnedRuntime);
+const major = runtimeParts ? Number(runtimeParts[1]) : null;
+const types = /^\^(\d+)\./.exec(rootPackage.devDependencies?.["@types/node"] ?? "");
+if (major === null ||
+    rootPackage.engines?.node !== `>=${pinnedRuntime} <${major + 1}` ||
+    !types || Number(types[1]) !== major) {
+  fail("Node runtime, engine range and @types/node must use one coordinated major");
 } else {
-  pass(`Node 24 LTS runtime contract is consistent: ${pinnedRuntime}`);
+  pass(`Node.js runtime contract is consistent: ${pinnedRuntime}`);
 }
 
 let expected;

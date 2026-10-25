@@ -10,7 +10,7 @@ if (!parsed) throw new Error(".node-version must contain an exact semantic versi
 const [major, minor, patch] = parsed.slice(1).map(Number);
 const nodeRange = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).engines?.node;
 if (nodeRange !== `>=${pinned} <${major + 1}`) {
-  throw new Error("package.json engines.node must match the Node 24 pin and supported major");
+  throw new Error("package.json engines.node must match the pinned Node runtime and supported major");
 }
 const current = /^v(\d+)\.(\d+)\.(\d+)$/.exec(process.version);
 if (!current) throw new Error("Unable to parse running Node.js version");
