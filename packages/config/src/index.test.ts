@@ -44,11 +44,13 @@ describe("configuration", () => {
   it("validates credential-free integration origins", () => {
     const config = parseConfig({
       integrations: {
-        codeServer: "http://127.0.0.1:8000/",
+        vscodeWeb: "http://127.0.0.1:8000/",
         harness: "https://dsh.example.test/"
       }
     });
-    expect(config.integrations.codeServer).toBe("http://127.0.0.1:8000/");
+    expect(config.integrations.vscodeWeb).toBe("http://127.0.0.1:8000/");
+    // The abandoned third-party code-server key is not a compatibility alias.
+    expect(() => parseConfig({ integrations: { codeServer: "https://code.example.test/" } })).toThrow();
     for (const value of [
       "http://192.168.0.2:8000",
       "javascript:alert(1)",

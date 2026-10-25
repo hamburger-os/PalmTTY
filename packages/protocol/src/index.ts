@@ -4,7 +4,7 @@ export const PROTOCOL_VERSION = 4 as const;
 export const WS_SUBPROTOCOL = "palmtty.v4";
 
 // Shared wire contract for independently hosted Web application catalogues.
-export const WEB_APP_IDS = ["codeServer", "harness"] as const;
+export const WEB_APP_IDS = ["vscodeWeb", "harness"] as const;
 export type WebAppId = (typeof WEB_APP_IDS)[number];
 export type WebAppPhase =
   | "detecting" | "not_installed" | "installed" | "installing"
