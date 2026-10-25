@@ -170,4 +170,4 @@ QNAP 规则的目标协议必须选择其“HTTP + WebSocket”一类组合，�
 
 ## 管理式 Harness 的部署限制
 
-Agent 可将固定版本 DSH 安装在当前用户应用数据目录，并以已有 Node 启动到随机回环端口。正式 Windows/Linux 发行包包含 Node 24 以及它的官方 npm CLI；源码模式缺少安装器时返回可诊断状态，不会下载运行系统安装器、提权、修改防火墙或创建 Windows 服务。VS Code 官方 Server 不允许被 PalmTTY 作为服务托管。NAS 原先只代理 PalmTTY 的一个 HTTPS Origin，安全访问第三方 Web 仍需额外独立 Origin 及上游认证；禁止同源直接透传第三方脚本。
+Agent 可将固定版本 DSH 安装在当前用户应用数据目录，并以已有 Node 启动到随机回环端口。正式 Windows/Linux 发行包包含 Node 24 以及它的官方 npm CLI；源码模式缺少安装器时返回可诊断状态，不会下载运行系统安装器、提权、修改防火墙或创建 Windows 服务。当前采用开源 code-server 独立发现与外部 URL，Agent 不托管其进程；不再将微软官方 VS Code Server 当作实现。NAS 原先只代理 PalmTTY 的一个 HTTPS Origin，安全访问第三方 Web 仍需额外独立 Origin 及上游认证；禁止同源直接透传第三方脚本。

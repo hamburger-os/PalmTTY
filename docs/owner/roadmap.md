@@ -79,9 +79,9 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 
 ## 2026-10 架构重构：取消桌面远控
 
-已取消 Remote App/WebRTC 和无人值守 Windows RDP 路线，不保留运行时兼容分支。Workspace Store 升级 V4，仅包含核心 Workspace 与 Terminal Profile；旧 V3 不自动加载。Windows VS Code `serve-web` 以主机级独立服务运行，各 Workspace 只显示链接，文件夹仍由 VS Code 选择。Harness 作为与 Workspace 平行的独立首页入口。Codex CLI 仍是 Terminal 启动命令。
+已取消 Remote App/WebRTC 和无人值守 Windows RDP 路线，不保留运行时兼容分支。Workspace Store 升级 V4，仅包含核心 Workspace 与 Terminal Profile；旧 V3 不自动加载。code-server 作为独立 Web IDE，由部署者维护安装、服务和认证，首页提供单一外部入口。Harness 作为与 Workspace 平行的独立首页入口。Codex CLI 仍是 Terminal 启动命令。
 
-实际产品状态：本机 Windows VS Code Web 已由用户验证启动并显示项目，但 Codex 扩展、手机跨设备 HTTPS、第三方服务生命周期与 Ctrl+C 进程树清理仍待实机验收；不实现 Azure Tunnel、Caddy/VPN 配置、SSO 或通用插件框架。
+实际产品状态：原先本机微软 VS Code Web 曾验证启动并显示项目，但当前 code-server 集成仍待实机验收，但 Codex 扩展、手机跨设备 HTTPS、第三方服务生命周期与 Ctrl+C 进程树清理仍待实机验收；不实现 Azure Tunnel、Caddy/VPN 配置、SSO 或通用插件框架。
 
 ## 下一阶段优先级
 
@@ -143,4 +143,4 @@ PalmTTY 源码与发行版本统一迁移至 Node 24 LTS：CI 使用 `.node-vers
 
 ## 2026-10 Web 应用可见性与有界管理
 
-已实现两款工具状态入口；Harness 可以复用已有 CLI 或尝试经主机 npm 在当前用户目录安装固定版本并启动回环 Web 服务；VS Code 因官方许可禁止 Server 服务托管，只检测 CLI 并保留用户启动边界。下一阶段仍需解决 NAS 上不同浏览器 Origin 的安全远程 HTTPS 访问、Windows 实机软件发现范围与 Harness 安装网络可用性。未经实测不能把「安装并启动」解释为「手机已能打开」。
+已实现两款工具状态入口；Harness 可以复用已有 CLI 或尝试经主机 npm 在当前用户目录安装固定版本并启动回环 Web 服务；现已调整为开源 code-server 的独立发现与外部 URL，不自动安装或管理其服务；Harness 失败状态不被轮询擦除，并提前注册启动进程退出监听。下一阶段仍需解决 NAS 上不同浏览器 Origin 的安全远程 HTTPS 访问、Windows 实机软件发现范围与 Harness 安装网络可用性。未经实测不能把「安装并启动」解释为「手机已能打开」。
