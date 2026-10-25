@@ -117,7 +117,7 @@ GitHub Dependency Review 曾因 Dependency graph 未开启而无法运行，因�
 - GitHub Release 只在 Tag 已验证后通过 Create Release REST API 创建；workflow 直接持有 API 返回的 Release ID，不依赖 List Releases 重新发现 Draft；对于已存在 Tag，Release 的 `target_commitish` 不作为源码 SHA 证明；
 - finalization 之前失败会按该 Release ID 删除本次 Draft/Release，再删除本次 Tag，避免半发布状态。
 
-这套流程沿用 TauTerm 的“锁定源码 → 重新资格验证 → 原子化发布”原则，但 PalmTTY 当前没有桌面安装包，因此只发布 Git Tag / GitHub Release 与 GitHub 自动生成的源码归档，不引入无意义的平台打包步骤。
+这套流程沿用 TauTerm 的“锁定源码 → 重新资格验证 → 原子化发布”原则，当前发行流程提供 Windows 安装包/便携版及 Linux deb/便携包，不再只发布源码归档；下方安装资产门禁是唯一发布交付依据。
 
 ### 发行资产门禁
 
@@ -153,3 +153,10 @@ Windows 原生进程和病毒扫描程序可能在子进程退出后短暂占用
 ## 新增 Mermaid 间接依赖许可证审查（2026-10）
 
 khroma 2.1.0 的 npm 包没有 license 元数据，pnpm 报告 Unknown；但上游 https://github.com/fabiospampinato/khroma/blob/master/license 是 MIT 完整许可证文本。仓库只对 khroma@2.1.0 + Unknown 精确放行，并有版本/包名负测试，绝不全局允许 Unknown。原 DOMPurify 双许可证 Apache-2.0 选项精确例外仍保持独立。
+## 2026-10-25 Dependabot 收敛规则
+
+- 可正常通过 Windows/Ubuntu CI、安装包 smoke、生产依赖漏洞与许可证、CodeQL 的例行更新，按 PR 独立验证并 squash 合入。
+- `terminal-stack.json` 是五个 xterm 依赖的版本单一来源。暂时忽略 Dependabot 对 `@xterm/*` 的逐包更新；升级必须一次性修改权威锁定文件、browser/Worker 组件、lockfile，并完成移动端 TUI、scrollback、WebGL 降级以及 Worker 恢复实测。
+- Mermaid 12 会带来 `elkjs@0.9.3`（EPL-2.0），现有许可证策略未放行。暂时忽略 Mermaid 主版本更新；先做许可证合规审查和预览沙箱兼容性验证。不得简单把 EPL-2.0 加入全局允许列表。
+- jsdom 30 要求 Node ≥22.22.2，当前工程声明 Node ≥22.11.0。暂时忽略 jsdom / @types/jsdom 主版本；在明确升级整个 Node 运行、开发和打包基线之前不把它们合入。
+- 被替代的失败 Dependabot PR 关闭并注明原因。关闭并不等于 GitHub 已删除未合并分支；合并的分支可由仓库的 auto-delete-head-branches 设置自动清理。仓库无用户功能开发遗留分支。
