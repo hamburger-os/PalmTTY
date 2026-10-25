@@ -1,36 +1,36 @@
 <!-- bilingual -->
-# Independent Web applications / 独立 Web 应用
+# Official VS Code Web and DeepSeek Harness / 官方 VS Code Web 与 Harness
 
 ## English
 
-PalmTTY always displays **code-server** and **DeepSeek Harness** on the home screen. Their status types are defined once in `@palmtty/protocol`. The no-store `GET /api/v1/integrations` needs authentication, and the single-purpose `POST /api/v1/integrations/:id/ensure` additionally requires an exact trusted Origin.
+PalmTTY always displays **Microsoft's official VS Code Web** (`code serve-web`) and **DeepSeek Harness** on the home screen. Both are independent of PalmTTY Workspace and Terminal Sessions. Application IDs and status types are defined once in `@palmtty/protocol`. Authenticated `GET /api/v1/integrations` returns no-store status. `POST /api/v1/integrations/:id/ensure` also requires exact trusted Origin and never accepts client-supplied executables, versions, ports, URLs or shell commands.
 
-- **code-server**: The Agent detects known CLI paths and PATH entries. code-server remains an independently installed, launched and authenticated service. A configured external URL creates a navigation entry, not a health check or a process manager. This integration is for the open-source code-server, **not** Microsoft's official `code serve-web`.
-- **Harness**: The Agent may install pinned `@deepseek-ai/dsh@0.2.1-rc.2` in user data using npm, then launch its own child on `127.0.0.1:0`. Native Windows/Linux packages bundle npm with Node 24; source installations need host npm. Readiness requires an official `dsh web:` line and a live owned child. A partial installation does not erase a failed state during status polling; retry is explicit.
-- **Security**: Both are independent browser security principals. Never route third-party JavaScript through the PalmTTY login Origin. Only authenticated same-machine `local` access can receive Harness's upstream one-time launch token. Remote browsers get neither this token nor the workstation loopback URL. The URL config does not create a safe remote proxy or upstream session.
-- **Remote DSH**: Independently served DSH behind an HTTPS proxy needs its upstream `--public-url` and `--trusted-host` setup, plus authenticated access. PalmTTY's managed loopback instance does not provision that proxy.
+- **Official VS Code Web**: The Agent detects the official `code` CLI from standard installation and PATH locations. It does not install or run `code serve-web` as a managed service, adopt unknown listeners or terminate official VS Code processes. Microsoft's official VS Code Server terms prohibit service hosting; start it separately in a permitted interactive user session. A configured external link is only navigation, not proof the Web server is running or authenticated.
+- **Harness**: The Agent reuses a known DSH CLI or installs pinned `@deepseek-ai/dsh@0.2.1-rc.2` in current-user storage. Native Windows/Linux distributions bundle official Node 24 and npm; source mode requires npm. Installation stages to a private directory and validates package name, version and entry point before publication. Startup uses a bounded owned child on random loopback port. Failure survives polling until explicit retry; only the owned child may be stopped.
+- **Security**: Upstream pages are never proxied into PalmTTY's authenticated Origin or given its cookies, Worker secrets or terminal authority. A local DSH one-time token URL is released only to an authenticated browser in the Agent host's `local` exposure mode; remote NAS/LAN clients never receive it.
+- **Mobile**: Access requires independent protected HTTPS Origins and upstream authentication/proxy support. Remote DSH deployments also require upstream `--public-url` and `--trusted-host`. PalmTTY's managed local Harness launch does not automatically provision these settings.
 
 ```yaml
 integrations:
-  codeServer: "https://code.example.test/"
+  vscodeWeb: "https://code.example.test/"
   harness: "https://harness.example.test/"
 ```
 
-Use HTTPS except loopback HTTP, without credentials, query or fragment. Real phone HTTPS use, browser Codex extensions, online Harness provisioning and full Windows process-tree shutdown require real-host validation.
+Only HTTPS or loopback HTTP base URLs are accepted, without credentials, query or fragment. `vscodeWeb` ensure performs discovery only; Harness ensure may install/start. Official VS Code Web browser extensions (including Codex), interactive host launch, real-device mobile access, and Windows process-tree cleanup still need host acceptance.
 
 ## 中文
 
-PalmTTY 首页展示独立的 **code-server** 和 **DeepSeek Harness**，不依赖 Workspace。服务端身份和状态结构以协议包为唯一来源；只读状态需要认证，安装/重试还要校验 Origin。
+PalmTTY 首页固定展示**微软官方 VS Code Web（`code serve-web`）**和 DeepSeek Harness。它们与 Workspace、Terminal Session 独立，应用 ID 和状态类型统一位于 `@palmtty/protocol`。只读状态接口需登录、禁止缓存；安装/重试接口还要求精确 Origin，不接收浏览器指定的可执行程序、端口或代理目标。
 
-- **code-server**：扫描常见安装位置，只展示检测结果和部署者提供的安全外部 URL。不会自动安装、启动或接管服务；自己的认证、工作区与 HTTPS 由上游和部署者负责，不再把微软官方 `code serve-web` 当成 code-server。
-- **Harness**：自动寻找 CLI；缺失时使用锁定版本和用户目录安装、启动回环 Web。安装版自带 Node 24 与 npm，源码版需额外 npm。失败状态不会因留下部分文件被轮询覆盖；启动要求官方 `dsh web:` 就绪行和存活子进程。
-- **跨设备安全**：两款上游绝不代理进 PalmTTY 登录 Origin，也不共用 Cookie 或密钥。DSH 的一次性本机授权链接只发给已登录的同机 local 浏览器，手机/NAS 不会收到。
-- **远程使用**：需分别部署受保护 HTTPS Origin，并完成上游认证和反向代理。DSH 额外需要官方 `--public-url` 与 `--trusted-host` 设置。配置外部 URL 只是提供入口，不代表手机已能直接使用。
+- **官方 VS Code Web**：检测主机上官方 `code` CLI 的标准安装位置与 PATH；PalmTTY 不自动安装、启动或终止微软 VS Code Server。官方许可禁止托管为后台服务，需要用户在符合许可的交互式会话中独立运行。配置 URL 只是入口，不是在线检查。
+- **Harness**：复用已知 CLI；缺失时用固定 npm 版本安装到当前用户目录。Windows/Linux 安装版自带 Node/npm；源码版需可用 npm。在隔离临时目录安装并验证包版本、入口后才发布；启动随机回环端口，仅管理自有进程。失败状态不被轮询覆盖，显式重试才重新准备。
+- **安全**：第三方 UI 不通过 PalmTTY 已登录 Origin 反代，不共享认证信息。同机 local 浏览器可以取得 DSH 官方一次性启动 URL，LAN/NAS/手机远端浏览器绝不获取该地址或令牌。
+- **远程访问**：手机需要各自受保护的独立 HTTPS Origin、上游认证和代理配置。DSH 还需配置官方 `--public-url` / `--trusted-host`；内置回环启动不会自动完成手机访问配置。
 
-## Workspace upgrade / 工作区迁移
+## Workspace upgrade / 工作区升级
 
-Stop the Agent, back up V3, build `@palmtty/protocol`, then run `node scripts/migrate-workspaces-v4.mjs --from <v3-path> --to <v4-path>`. The tool validates the canonical schema, publishes output atomically without overwriting V4, and retains V3. / 旧 V3 需备份后手动离线导出为 V4；运行时没有双版本兼容。
+Stop the Agent, back up V3, build `@palmtty/protocol`, then run `node scripts/migrate-workspaces-v4.mjs --from <v3-path> --to <v4-path>`. Output is validated against the canonical schema, atomically published without overwriting V4, and original V3 remains intact. / 旧 V3 只支持关闭 Agent 后备份并离线导出 V4，不保留运行时兼容。
 
 ## Distribution / 发行包
 
-Windows/Linux releases include npm copied from the same official Node 24 distribution with license, SBOM and installed-runtime smoke verification. Registry access, a separate HTTPS Origin and independent authentication are not covered by this smoke. / 正式安装包已验证自带 npm 可以执行，但真实 DSH 下载安装和手机端访问仍需人工验收。
+Native Windows/Linux releases include npm copied from official Node 24 with matching license, manifest/SBOM and installed-runtime smoke checks. Actual DSH Registry installation, authenticated remote HTTPS and independent VS Code Web user-session startup remain real-device acceptance requirements. / 正式发行包包含已验证可执行的 Node/npm，但上游安装、手机访问和官方 VS Code Web 仍需实机验收。

@@ -36,26 +36,28 @@ function personalAppRoot(): string {
   return path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), ".local", "share"), "PalmTTY", "web-apps");
 }
 
-function codeServerCandidates(): string[] {
-  // Discovery only. code-server independently owns its lifecycle and auth.
+function vscodeWebCandidates(): string[] {
+  // Discover only the official Microsoft VS Code CLI. Its serve-web lifecycle
+  // and authentication stay under the interactive user's control.
   if (process.platform === "win32") {
     return [
-      ...(process.env.APPDATA ? [
-        path.join(process.env.APPDATA, "npm", "code-server.cmd")
-      ] : []),
       ...(process.env.LOCALAPPDATA ? [
-        path.join(process.env.LOCALAPPDATA, "Programs", "code-server", "bin", "code-server.cmd")
+        path.join(process.env.LOCALAPPDATA, "Programs", "Microsoft VS Code", "bin", "code.cmd")
       ] : []),
+      path.join(process.env.ProgramFiles ?? "C:\\Program Files",
+        "Microsoft VS Code", "bin", "code.cmd"),
+      path.join(process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)",
+        "Microsoft VS Code", "bin", "code.cmd"),
       ...(process.env.PATH ?? "").split(path.delimiter).filter(Boolean)
-        .flatMap((dir) => [path.join(dir, "code-server.exe"), path.join(dir, "code-server.cmd")])
+        .flatMap((dir) => [path.join(dir, "code.cmd"), path.join(dir, "code.exe")])
     ];
   }
   return [
-    path.join(os.homedir(), ".local", "bin", "code-server"),
-    "/usr/local/bin/code-server",
-    "/usr/bin/code-server",
+    "/usr/local/bin/code",
+    "/usr/bin/code",
+    path.join(os.homedir(), ".local", "bin", "code"),
     ...(process.env.PATH ?? "").split(path.delimiter).filter(Boolean)
-      .map((dir) => path.join(dir, "code-server"))
+      .map((dir) => path.join(dir, "code"))
   ];
 }
 
@@ -129,7 +131,7 @@ export class ManagedWebApps {
   private harnessDetail: string | undefined;
   private closed = false;
   private readonly installerAbort = new AbortController();
-  private codeServerPresent: boolean | undefined;
+  private vscodeWebPresent: boolean | undefined;
   private harnessPresent: boolean | undefined;
 
   constructor(config: PalmTTYConfig, appRoot = personalAppRoot()) {
@@ -139,7 +141,7 @@ export class ManagedWebApps {
 
   async discover(): Promise<void> {
     // Status is polled; a newly installed program must appear without an Agent restart.
-    this.codeServerPresent = Boolean(await firstExisting(codeServerCandidates()));
+    this.vscodeWebPresent = Boolean(await firstExisting(vscodeWebCandidates()));
     if (!["installing", "starting", "running"].includes(this.harnessPhase)) {
       // A user-installed dsh remains outside PalmTTY ownership. Do not attach
       // to an unknown process or guess an existing service from an open port.
@@ -168,14 +170,14 @@ export class ManagedWebApps {
       }
       return candidate;
     };
-    const externalCodeServer = allowExternal(this.config.integrations.codeServer);
+    const externalVscodeWeb = allowExternal(this.config.integrations.vscodeWeb);
     const externalHarness = allowExternal(this.config.integrations.harness);
-    const codeServer: WebAppStatus = {
-      id: "codeServer",
-      phase: externalCodeServer || this.codeServerPresent ? "manual_required" : "not_installed",
-      detail: externalCodeServer ? "code_server_external" :
-        this.codeServerPresent ? "code_server_manual_start" : "code_server_not_detected",
-      ...(externalCodeServer ? { accessUrl: externalCodeServer } : {})
+    const vscodeWeb: WebAppStatus = {
+      id: "vscodeWeb",
+      phase: externalVscodeWeb || this.vscodeWebPresent ? "manual_required" : "not_installed",
+      detail: externalVscodeWeb ? "vscode_external" :
+        this.vscodeWebPresent ? "vscode_server_license" : "vscode_not_detected",
+      ...(externalVscodeWeb ? { accessUrl: externalVscodeWeb } : {})
     };
     const harness: WebAppStatus = {
       id: "harness",
@@ -188,12 +190,13 @@ export class ManagedWebApps {
     if (harness.phase === "running" && !harness.accessUrl) {
       harness.detail = "separate_https_origin_required";
     }
-    return { apps: { codeServer, harness } };
+    return { apps: { vscodeWeb, harness } };
   }
 
-  // code-server remains independently hosted and authenticated.
+  // Microsoft's VS Code Server license prohibits service hosting. Never
+  // spawn or supervise code serve-web from PalmTTY's background Agent.
   ensure(id: WebAppId): Promise<void> {
-    if (id === "codeServer") return this.discover();
+    if (id === "vscodeWeb") return this.discover();
     if (this.harnessPhase === "running" && this.harnessProcess?.exitCode === null) {
       return Promise.resolve();
     }
@@ -332,7 +335,7 @@ export class ManagedWebApps {
     this.closed = true;
     this.installerAbort.abort();
     // Only stop processes this Agent spawned; never kill discovered
-    // installations, code-server, arbitrary PIDs or port owners.
+    // installations, official VS Code tasks, arbitrary PIDs or port owners.
     const child = this.harnessProcess;
     if (child && child.exitCode === null && child.signalCode === null) {
       child.kill();

@@ -56,9 +56,11 @@ pnpm start
 - Shell arguments remain explicit argv values. Startup command is a persisted shell-launch command in `workspace.terminal` and now runs via shell argv rather than fixed-delay PTY typing. Supported shells: PowerShell, cmd, bash, zsh, fish, sh, dash, ksh, Nu. Explicit WSL shells use the same model; the default WSL profile chooses `$SHELL` through `/bin/sh`. Unknown shell launch configurations with a startup command are rejected. Startup commands may appear in OS process arguments: never embed passwords or API keys. Workspace environment is persistent local configuration, not a secret vault.
 - In **Terminal → Startup command**, choose **Pi** to fill `pi` (alongside Codex, Claude Code and other CLI presets). Install Pi in the selected Host/WSL environment first (`npm install -g --ignore-scripts @earendil-works/pi-coding-agent`), (npm install requires Node.js 22.19+) and ensure the `pi` command is available on that shell's PATH. A preset only fills the field; it does not install the CLI. The mobile keybar offers Shift+Enter, Alt+Enter and Ctrl+Q, and xterm explicitly enables Kitty keyboard support. Real mobile/browser/IME compatibility must still be validated.
 
-### Independent code-server and Harness
+### Official VS Code Web and Harness
 
-Install and start code-server independently using its upstream guide. Protect it with password authentication and a separate HTTPS Origin, then set `integrations.codeServer` to the token-free base URL. Detecting the CLI does not mean code-server is running. A managed Harness child is loopback-only; remote DSH requires independently protected HTTPS, upstream `--public-url` / `--trusted-host` and authentication.
+Install the official Microsoft VS Code desktop/CLI on the Agent host. In a permitted interactive user session, start `code serve-web --host 127.0.0.1 --port 8000` separately. Follow the official VS Code Server license and upstream authentication instructions; do not host it through PalmTTY as a background service. Optionally configure a credential-free, separately protected Web URL under `integrations.vscodeWeb`. Detection does not establish the server is running.
+
+Harness may launch on the Agent's loopback. Cross-device DSH still requires separate protected HTTPS, upstream `--public-url` and `--trusted-host`, and independent authentication.
 
 ### Linux host quick start
 
@@ -162,9 +164,11 @@ netsh interface ipv4 show excludedportrange protocol=tcp
 
 如果配置端口不可用，请修改 `palmtty.local.yaml` 中的 `server.port`，重新执行 `pnpm run preflight`。
 
-### 独立 code-server 和 Harness
+### 官方 VS Code Web 与 Harness
 
-code-server 须按照上游文档自行安装、启动并设置密码认证和独立 HTTPS Origin，然后把不含令牌的地址填入 `integrations.codeServer`。检测到 CLI 不等于服务已经运行。Harness 托管子进程只监听主机回环；远程部署还需要独立 HTTPS、上游 `--public-url` 与 `--trusted-host` 和登录认证。
+在 Agent 主机安装微软官方 VS Code，并在许可允许的交互式用户会话中独立运行 `code serve-web --host 127.0.0.1 --port 8000`。PalmTTY 不作为后台服务托管官方 VS Code Server；可以在 `integrations.vscodeWeb` 配置已部署、受保护且不含令牌的访问地址。检测到 CLI 不等于 Web Server 已启动。
+
+Harness 可由 Agent 在回环地址启动；手机跨设备访问仍需独立安全 HTTPS、DSH `--public-url` / `--trusted-host` 与上游登录认证。
 
 ### Linux 宿主快速开始
 

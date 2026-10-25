@@ -20,8 +20,8 @@ it("always returns two managed app identities without startup side effects", asy
   expect(Object.keys(result.apps).sort()).toEqual([...WEB_APP_IDS].sort());
   expect(result.apps.harness.accessUrl).toBeUndefined();
   expect(["not_installed", "installed"]).toContain(result.apps.harness.phase);
-  await mgr.ensure("codeServer"); // official VS Code server is not hosted.
-  expect((await mgr.catalog(false)).apps.codeServer.phase).not.toBe("running");
+  await mgr.ensure("vscodeWeb"); // official VS Code server is never service hosted.
+  expect((await mgr.catalog(false)).apps.vscodeWeb.phase).not.toBe("running");
   await mgr.close();
 });
 
@@ -30,15 +30,15 @@ it("never exposes configured loopback links to remote clients", async () => {
   roots.push(root);
   const mgr = new ManagedWebApps(parseConfig({
     integrations: {
-      codeServer: "http://127.0.0.1:8000/",
+      vscodeWeb: "http://127.0.0.1:8000/",
       harness: "http://127.0.0.1:3080/"
     }
   }), root);
   const remote = await mgr.catalog(false);
-  expect(remote.apps.codeServer.accessUrl).toBeUndefined();
+  expect(remote.apps.vscodeWeb.accessUrl).toBeUndefined();
   expect(remote.apps.harness.accessUrl).toBeUndefined();
   const local = await mgr.catalog(true);
-  expect(local.apps.codeServer.accessUrl).toBe("http://127.0.0.1:8000/");
+  expect(local.apps.vscodeWeb.accessUrl).toBe("http://127.0.0.1:8000/");
   expect(local.apps.harness.accessUrl).toBe("http://127.0.0.1:3080/");
   await mgr.close();
 });
