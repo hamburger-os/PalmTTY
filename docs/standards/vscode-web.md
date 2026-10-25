@@ -4,3 +4,10 @@
 - Self-hosted VS Code Web security advisory: <https://github.com/microsoft/vscode/security/advisories/GHSA-v282-cxqj-xgj4>. Preserve connection-token protection and apply patched versions.
 - Official DeepSeek Harness Web: <https://github.com/deepseek-ai/deepseek-harness>. Its own Web implementation maintains workspaces, sessions and authentication.
 - Browser mobile support, optional Codex extension, link deep routing and Windows `serve-web` Ctrl+C child-process cleanup require actual-host verification; they are not upstream guarantees assumed by PalmTTY.
+
+
+## Managed app constraints (2026-10)
+
+- Microsoft VS Code Server official FAQ: <https://code.visualstudio.com/docs/remote/vscode-server>. It explicitly prohibits hosting the server as a service; discovery does not grant permission to daemonize it.
+- DeepSeek Harness official CLI help: <https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cli-help.md>. Web supports `--host`, `--port 0` and `--no-open`; it prints a token-bearing launch URL for first-party browser authentication. Host/trusted-host controls are not substitutes for authentication.
+- Managed DSH installer targets a verified pinned npm release, not mutable `latest`; remote access with an isolated Origin is an independent trust boundary.

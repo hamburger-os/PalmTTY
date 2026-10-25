@@ -10,6 +10,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
+- Add always-visible first-class VS Code Web and Harness status with authenticated no-store discovery and bounded managed-DSH installation/launch, retry and failure diagnostics. DSH pin is 0.2.1-rc.2 and owns its own data; no unsafe same-Origin reverse proxy or remote loopback token leakage. Official VS Code Server is not automatically service-hosted because its license prohibits that.
 - Add two optional self-hosted Web navigation entries: one independently operated VS Code `serve-web` origin shared across Workspace cards, and an independent DeepSeek Harness Web origin on the home page. PalmTTY does not proxy or supervise either application, store their connection tokens, or assume automatic folder deep links.
 - Provide authenticated, no-store integration-link discovery. Operator URLs require HTTPS (or loopback HTTP for local testing) and cannot include embedded credentials, queries or fragments.
 - Provide an explicit, one-way Workspace v3 → v4 offline conversion command. It uses the canonical Workspace schema, validates records and unique IDs, never overwrites an existing v4 file, and retains the v3 source.

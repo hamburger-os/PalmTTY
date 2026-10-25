@@ -139,3 +139,8 @@ Git 已完成从只读 status/diff 到受控 Source Control 工作台，并补�
 ## Node 24 LTS 运行时升级（2026-10）
 
 PalmTTY 源码与发行版本统一迁移至 Node 24 LTS：CI 使用 `.node-version`，Windows/Linux 原生构建、类型定义与发行包一致。此阶段不开发 Harness 自动安装管理，也不改变 VS Code Web/Harness 外部入口架构。
+
+
+## 2026-10 Web 应用可见性与有界管理
+
+已实现两款工具状态入口；Harness 可以复用已有 CLI 或尝试经主机 npm 在当前用户目录安装固定版本并启动回环 Web 服务；VS Code 因官方许可禁止 Server 服务托管，只检测 CLI 并保留用户启动边界。下一阶段仍需解决 NAS 上不同浏览器 Origin 的安全远程 HTTPS 访问、Windows 实机软件发现范围与 Harness 安装网络可用性。未经实测不能把「安装并启动」解释为「手机已能打开」。

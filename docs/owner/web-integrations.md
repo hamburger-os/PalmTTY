@@ -1,20 +1,25 @@
-# 自托管 Web 工具架构
+# 本机 Web 应用管理架构
 
-PalmTTY 仅提供外部入口，不代理 VS Code/Harness 的 HTTP/WebSocket，不复制第三方会话，也不接管其启动、退出或登录。
+## 管理边界
 
-## VS Code Web
-Windows 主机可单独运行微软官方 `code serve-web`。所有 PalmTTY Workspace 共用单一主机级入口；初版进入 VS Code 后手动选择工作目录，不自动生成带工作区路径的 URL。VS Code 自己管理编辑器、扩展、Shell 和连接令牌。Codex CLI 仍只是 Terminal 的 startupCommand。
+PalmTTY 为 VS Code Web 与 DeepSeek Harness 提供始终可见的一等状态入口，不增加 Terminal Session 或 Workspace 类型，也不重建远程桌面/应用画面。唯一管理者为 Agent 的有界受控应用管理器：发现安装、按需尝试安装、启动自己拥有的子进程、跟踪状态和失败诊断，禁止对未知 PID、已运行但未验证身份的端口或其他用户进程采取动作。
 
-用户实测表明 Windows 本机 serve-web 可打开项目，但 Ctrl+C 后可能残留服务端子进程及端口；因此当前不由 PalmTTY 管理程序生命周期。不得猜测 PID 后强制结束其他 VS Code 进程。
+- VS Code：仅发现官方安装与向用户提供手动启动说明。微软的 VS Code Server License 不允许服务托管，所以不得把官方 `code serve-web` 包装成 Windows Service、后台 Agent 子进程，也不能擅自用端口占用结果判断服务身份。
+- Harness：复用已知 CLI；缺失时调用本机 npm 安装锁定 `@deepseek-ai/dsh@0.2.1-rc.2` 至当前用户目录，然后以固定参数启动 `127.0.0.1:0` 的 Web 服务。安装不提权、不修改系统 PATH，也不创建长期系统服务。发行版仅打包 Node，不包含 npm 时呈现 npm_unavailable 状态。
+- 单次认证登录可触发自动尝试，重试由显式按钮执行；管理器做 single-flight，状态来自 Agent 内部权威，前端只展示。退出 Agent 时仅结束它自己启动的 Harness 子进程。
 
-## 独立 Harness
-Harness 在首页与 Workspace 平行。DSH 的 Workspace、Session、模型和认证全部由 DSH 管理；PalmTTY 不保存第二份。
+## 访问安全
 
-## 配置与安全
-- `integrations.vscodeWeb` / `integrations.harness` 为可选的服务器运营者 URL。只允许 HTTPS 或 loopback HTTP，拒绝用户名密码、查询和片段。
-- 经 PalmTTY 登录认证才可从 `GET /api/v1/integrations` 获取这些公开入口。接口不缓存、不接受浏览器任意代理 URL。
-- `?tkn=` 和 `?token=` 属于上游登录秘密，不写 PalmTTY 配置和日志；上游认证不关闭。
-- 手机的 loopback 地址不指向 Windows；移动端跨设备 HTTPS 访问需要独立安全部署，本轮不提供 Caddy、VPN、Azure Tunnel 或 SSO。
+现有 NAS 仅反向代理 `https://haha.example.test/` → PalmTTY Agent 时，无条件增加 `/_apps/harness/` 路由会使第三方 JS 获得与已登录 PalmTTY 同等的浏览器 Origin 权限。严禁这种默认做法。不同端口也不隔离同主机 Cookie。第三方进程不继承 `PALMTTY_*` 或 PalmTTY 登录 token 环境。
+
+- 管理 API 要求 PalmTTY 登录，POST 同时校验严格 Origin；拒绝客户端传入程序路径/命令/任意代理 URL。GET no-store。
+- 本机浏览器在真正 local exposure 时可获得 DSH 一次性启动 URL。经 NAS 或 LAN 访问的浏览器不得收到回环的令牌 URL，也不能把一个外部电话浏览器的回环当成 Agent 地址。
+- 手机的零额外配置 HTTPS 访问尚未实现；必须是单独 Origin 的受保护代理，并尊重上游 Cookie/Host/WebSocket/令牌安全机制。可选 `integrations` URL 仅代表独立外部访问地址。
+- 上游软件升级和下载策略需固定版本、校验、单独安全复核；不得在每次启动时追随 `latest`。
+
+## 现实验收边界
+
+用户 Windows 主机是否安装 npm、官方 VS Code CLI 的准确位置、Harness Web 登录与长期运行、手机独立 HTTPS Origin、Codex VS Code 扩展和退出后子进程树仍需实测。完成进程探测不等于完成跨网络安全访问。
 
 Workspace V4 删除 Remote App 数据；运行时不读取旧 V3。卸载旧 WebRTC/RDP 仅是功能取消，不削弱终端 Worker 的恢复/认证约束。
 

@@ -60,9 +60,13 @@ PalmTTY is intentionally narrower than a browser IDE:
 - **Keep remote authority explicit.** Workspace changes are persistent authenticated mutations, not ad-hoc Session parameters. A Workspace may contain bounded environment variables, but Session creation/restart cannot inject temporary cwd/shell/env overrides.
 - **Stay AI-vendor-neutral.** Codex, Claude Code, OpenCode and other terminal tools are workloads, not protocol dependencies.
 
-## External Web integrations / 外部 Web 工具
+## Managed Web applications / 受管理的 Web 应用
 
-`code serve-web` runs separately as a Windows-local VS Code Web Server. PalmTTY can show its safe external link on Workspace cards without managing the IDE lifecycle or choosing its folders. DeepSeek Harness has its own independent home entry; its workspaces and sessions remain its own. Neither uses Azure Tunnel.
+VS Code Web and DeepSeek Harness are always visible in PalmTTY, even when installation or remote access is unavailable. No separate application URLs are required for local discovery. On authenticated login PalmTTY detects official Windows VS Code installations and attempts an isolated, pinned DSH Web user-local install/start (`@deepseek-ai/dsh@0.2.1-rc.2`) using the host's npm installation. `npm` may not be present in standalone PalmTTY release packages; that condition is diagnosed rather than silently installing OS tools or escalating privileges.
+
+Microsoft does **not permit hosting the official VS Code Server as a service**. PalmTTY detects VS Code but deliberately does not install/start/stop a VS Code Server daemon; launch it under an interactive Windows user session in accordance with its terms. Codex CLI remains a Terminal command. Harness independently owns its workspaces, sessions, credentials and model authentication.
+
+Both applications are separate security principals. For an iPhone behind an existing NAS single-origin reverse proxy, a running local service is **not yet a safely accessible remote service**. PalmTTY does not route third-party JavaScript through its authenticated Origin or transmit loopback token links to remote browsers. An optional dedicated external HTTPS entry can be configured only after the operator has provisioned a separate trusted origin:
 
 ```yaml
 integrations:
@@ -70,9 +74,9 @@ integrations:
   harness: "https://harness.example.test/"
 ```
 
-Only HTTPS or loopback HTTP URLs without credentials, query strings or fragments are accepted. The upstream connection-token URL is not a safe configuration URL. Mobile remote access requires a separately protected HTTPS/private connection; a phone's 127.0.0.1 is not the Windows host. See [external Web integrations](docs/community/web-integrations.md).
+The same YAML without an `integrations` section remains valid: it automatically discovers local tools and shows diagnostics. See [Web application management](docs/community/web-integrations.md).
 
-VS Code Web 由 Windows 本机独立运行；PalmTTY 只保存不含令牌的外部入口。Harness 与工作区平行，由 DSH 自行管理其工作区/会话。本轮不提供反代/VPN/单点登录，也不自动代管第三方进程。
+VS Code Web 和 Harness 在 UI 始终可见。登录后自动检测工具，并尝试使用主机上已有 npm 在当前用户目录安装和启动固定版本 Harness；安装版不保证系统中已装 npm，失败会显示明确状态。官方 VS Code Server 不允许作为服务托管，故 PalmTTY 只检测安装，不代替用户后台托管。手机通过现有 NAS 单 HTTPS 地址访问时，回环服务不会自动变成安全的远端页面；需要独立 HTTPS Origin，不能直接在已登录 PalmTTY 同源代理第三方代码。
 
 ## Architecture / 架构
 

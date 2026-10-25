@@ -166,3 +166,8 @@ QNAP 规则的目标协议必须选择其“HTTP + WebSocket”一类组合，�
 - 源码部署切换 Node 后重新安装 `node-pty` 原生依赖；若源码自启动记录的 Node 可执行文件路径变化，重新安装自启动。打包 smoke 会实际执行内置 `node --version` 并核对发行 manifest。
 - 升级前结束旧 Node 22 下的 Terminal Worker，避免新 Agent 和旧 ABI Worker 混合运行。不增加 Node 22 兼容逻辑。ConPTY 实机、自启动视觉效果仍需真实主机验证。
 - Harness 的自动发现/安装/启动不是这次 Node 迁移的交付内容，属于后续独立集成阶段。
+
+
+## 管理式 Harness 的部署限制
+
+Agent 可将固定版本 DSH 安装在当前用户应用数据目录，并以已有 Node 启动到随机回环端口。正式 PalmTTY 发行包包含 Node 24 但未必有 npm；缺少安装器时返回可诊断状态，不会下载运行系统安装器、提权、修改防火墙或创建 Windows 服务。VS Code 官方 Server 不允许被 PalmTTY 作为服务托管。NAS 原先只代理 PalmTTY 的一个 HTTPS Origin，安全访问第三方 Web 仍需额外独立 Origin 及上游认证；禁止同源直接透传第三方脚本。

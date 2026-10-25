@@ -11,12 +11,13 @@
 
 
 
-### Optional external web links (2026-10-25)
+### Managed Web application entry (2026-10-25)
 
-- Authenticated no-store API returns operator-configured VS Code Web and independent Harness URL without embedded credentials/query tokens. HTTPS is required except loopback HTTP.
-- VS Code Web link is host-level, shown on Workspace cards without automatic folder selection; Harness is standalone on the home page. No web proxy, cloud tunnel, new Session kind, or managed third-party process lifecycle.
-- Codex CLI remains a Terminal startup command. Codex IDE extension, phone access and Windows serve-web process-tree shutdown still require real-device validation.
-- Workspace Store v4 drops Remote App profiles; older stores are not read automatically.
+- Authenticated no-store `GET /api/v1/integrations` returns both always-visible app statuses, with bounded detection and sanitized diagnostics; `POST /api/v1/integrations/:id/ensure` requires exact Origin and authentication and uses a single-flight manager.
+- VS Code CLI is discovered but not hosted as a service because upstream licensing prohibits it. Harness is an independent managed process: existing CLI preferred, otherwise pinned `@deepseek-ai/dsh@0.2.1-rc.2` installed through an available host npm in a current-user directory; run with Node 24, fixed loopback host and random port.
+- Bundled PalmTTY runtime contains Node but not necessarily npm. Automatic Harness install can fail with `npm_unavailable`; neither system elevation nor random third-party executable launch occurs.
+- No same-origin proxy or cloud relay exists. Captured DSH process-token URL is withheld from LAN/reverse-proxy clients. Remote browser access needs a dedicated trusted external HTTPS Origin; without it, running local service does not imply phone accessibility.
+- DSH continues to own its workspaces/sessions/authentication, Codex CLI is a Terminal launch command. Workspace Store v4 remains unchanged; no Remote App profiles or worker reintroduced.
 
 
 
