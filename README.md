@@ -18,9 +18,9 @@ Mobile-first · self-hosted · Windows-first · Host + WSL runtimes · xterm.js
 > [!WARNING]
 > PalmTTY exposes an interactive shell with the privileges of the OS user running the Agent. Treat compromise as workstation compromise. Use a private HTTPS entry point or an authenticated HTTPS reverse proxy; do not expose an unauthenticated Agent port to the Internet.
 
-PalmTTY is a mobile-first self-hosted remote development workbench centered on durable Terminal Sessions, workspace Git/Files/Artifacts, and optional external links to official VS Code Web and DeepSeek Harness. Codex/Claude/Pi CLIs remain ordinary terminal workloads.
+PalmTTY is a mobile-first self-hosted remote development workbench centered on durable Terminal Sessions, workspace Git/Files/Artifacts, and optional external links to code-server and DeepSeek Harness. Codex/Claude/Pi CLIs remain ordinary terminal workloads.
 
-PalmTTY 是一个面向手机的自托管远程开发工作台。Windows Host、WSL、Linux Host 使用独立持久的 Terminal Worker；Git/Files/Artifacts 保持工作区工具。VS Code Web 和独立的 DeepSeek Harness 只提供可选外部入口，不接管第三方进程、认证与会话。Codex CLI 仍是终端启动命令。
+PalmTTY 是一个面向手机的自托管远程开发工作台。Windows Host、WSL、Linux Host 使用独立持久的 Terminal Worker；Git/Files/Artifacts 保持工作区工具。code-server 和独立的 DeepSeek Harness 只提供可选外部入口，不接管第三方进程、认证与会话。Codex CLI 仍是终端启动命令。
 
 ## Terminal touch controls / 手机终端触摸控制
 
@@ -60,30 +60,28 @@ PalmTTY is intentionally narrower than a browser IDE:
 - **Keep remote authority explicit.** Workspace changes are persistent authenticated mutations, not ad-hoc Session parameters. A Workspace may contain bounded environment variables, but Session creation/restart cannot inject temporary cwd/shell/env overrides.
 - **Stay AI-vendor-neutral.** Codex, Claude Code, OpenCode and other terminal tools are workloads, not protocol dependencies.
 
-## Managed Web applications / 受管理的 Web 应用
+## Managed Web applications / 独立 Web 应用
 
-VS Code Web and DeepSeek Harness are always visible as independent applications on PalmTTY's home screen, even when no Workspace exists or installation/remote access is unavailable. No separate application URLs are required for local discovery. On authenticated login PalmTTY detects official Windows VS Code installations and attempts an isolated, pinned DSH Web user-local install/start (`@deepseek-ai/dsh@0.2.1-rc.2`). The Windows/Linux release packages include the npm CLI from their pinned official Node 24 runtime, so no separate host npm installation is needed. Source mode uses an existing npm installation; network registry access remains necessary.
+**code-server** and **DeepSeek Harness** appear on PalmTTY's home screen without requiring Workspaces. code-server is a separate, operator-managed open-source Web IDE: PalmTTY discovers known CLI locations and optionally links to a protected external instance, but does **not** automatically install, launch or authenticate code-server. CLI detection alone does not prove the IDE is running. This is not Microsoft's `code serve-web` service.
 
-Microsoft does **not permit hosting the official VS Code Server as a service**. PalmTTY detects VS Code but deliberately does not install/start/stop a VS Code Server daemon; launch it under an interactive Windows user session in accordance with its terms. Codex CLI remains a Terminal command. Harness independently owns its workspaces, sessions, credentials and model authentication.
-
-Both applications are separate security principals. For an iPhone behind an existing NAS single-origin reverse proxy, a running local service is **not yet a safely accessible remote service**. PalmTTY does not route third-party JavaScript through its authenticated Origin or transmit loopback token links to remote browsers. An optional dedicated external HTTPS entry can be configured only after the operator has provisioned a separate trusted origin:
+Harness can be provisioned with pinned `@deepseek-ai/dsh@0.2.1-rc.2` and launched on the Agent's loopback. Windows/Linux release packages bundle npm alongside Node 24, while source mode needs npm. Failures require an explicit retry. Upstream DSH owns its workspaces, credentials and browser session.
 
 ```yaml
 integrations:
-  vscodeWeb: "https://code.example.test/"
+  codeServer: "https://code.example.test/"
   harness: "https://harness.example.test/"
 ```
 
-The same YAML without an `integrations` section remains valid: it automatically discovers local tools and shows diagnostics. See [Web application management](docs/community/web-integrations.md).
+Neither application is proxied into PalmTTY's authenticated Origin. For phone access, deploy independently protected HTTPS Origins and set up each upstream's own authentication. External DSH proxies additionally require correct `--public-url` and `--trusted-host`; managed local startup does **not** configure remote access. PalmTTY never sends the local token-bearing DSH startup URL to remote clients.
 
-VS Code Web 和 Harness 在 UI 始终可见。登录后自动检测工具，并尝试通过内置官方 npm 在当前用户目录安装和启动固定版本 Harness；Windows/Linux 安装版已自带与 Node 24 一致的 npm CLI，无需系统另装 npm。源码版仍需要 npm，安装过程中网络失败会显示诊断。官方 VS Code Server 不允许作为服务托管，故 PalmTTY 只检测安装，不代替用户后台托管。手机通过现有 NAS 单 HTTPS 地址访问时，回环服务不会自动变成安全的远端页面；需要独立 HTTPS Origin，不能直接在已登录 PalmTTY 同源代理第三方代码。
+中文：首页固定展示 code-server 和 Harness。code-server 已接入独立入口与 CLI 探测，但安装、进程运行和认证仍由部署者负责；Harness 提供固定版本本机安装和启动。手机访问两者都需要额外独立 HTTPS 代理和上游登录，不能把“看到入口”当成远程 IDE 已可用。详见[部署说明](docs/community/web-integrations.md)。
 
 ## Architecture / 架构
 
 ```text
 Browser/PWA -> PalmTTY Agent (auth, Workspace, Git, Files)
                     -> detached per-session Terminal Worker -> Host/WSL PTY
-External browser links -> separately running VS Code Web / DSH Web
+External browser links -> separately running code-server / DSH Web
 ```
 
 ## Install / 安装

@@ -7,15 +7,16 @@
 
 - `.node-version` is the exact CI/release security pin; root `engines.node` bounds supported runtime versions within major 24. `@types/node` and frozen pnpm lockfile use major 24.
 - Windows/Ubuntu CI, Security Audit, Distribution and Release select `.node-version`. Native PTY/ConPTY tests verify their host runtime; installed package smoke checks its Node binary against the release manifest and pinned baseline.
-- Node 22 is not a supported runtime, and there is no dual-ABI fallback. Real-host autostart / ConPTY visual tests remain separate owner-host acceptance. Harness automatic deployment is not included.
+- Node 22 is not a supported runtime, and there is no dual-ABI fallback. Real-host autostart / ConPTY visual tests remain separate owner-host acceptance. Harness managed provisioning is described below as later work.
 
 
 
-### Managed Web application entry (2026-10-25)
+### Independent code-server and managed Harness (2026-10-25)
 
 - Authenticated no-store `GET /api/v1/integrations` returns both always-visible app statuses, with bounded detection and sanitized diagnostics; `POST /api/v1/integrations/:id/ensure` requires exact Origin and authentication and uses a single-flight manager.
-- VS Code CLI is discovered and displayed on the independent home app shelf even with zero Workspaces, but not hosted as a service because upstream licensing prohibits it. Harness is an independent managed process: existing CLI preferred, otherwise pinned `@deepseek-ai/dsh@0.2.1-rc.2` installed through an available host npm in a current-user directory; run with Node 24, fixed loopback host and random port.
+- code-server CLI candidates are discovered and displayed on the independent home shelf even with zero Workspaces. It is externally installed/launched/authenticated and is not an Agent-owned process. Harness is an independent managed process: existing CLI preferred, otherwise pinned `@deepseek-ai/dsh@0.2.1-rc.2` installed through an available host npm in a current-user directory; run with Node 24, fixed loopback host and random port.
 - Windows/Linux installed runtime bundles Node 24 plus npm from the same official distribution. Automatic Harness install no longer requires system npm in installed mode; source mode may still report `npm_unavailable`. Neither system elevation nor random third-party executable launch occurs.
+- The Web-app ID/status types have one definition in @palmtty/protocol. Failed Harness installation remains failed even if a partial CLI appears; owned-child close is observed before readiness and Agent close has a bounded exit wait, not proven Windows process-tree cleanup.
 - No same-origin proxy or cloud relay exists. Captured DSH process-token URL is withheld from LAN/reverse-proxy clients. Remote browser access needs a dedicated trusted external HTTPS Origin; without it, running local service does not imply phone accessibility.
 - DSH continues to own its workspaces/sessions/authentication, Codex CLI is a Terminal launch command. Workspace Store v4 remains unchanged; no Remote App profiles or worker reintroduced.
 
