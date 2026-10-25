@@ -108,7 +108,7 @@ describe("HTTP security boundary", () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
     const app = await buildTestApp(parseConfig({
       auth: { tokenEnv: "PALMTTY_TEST_TOKEN" },
-      integrations: { vscodeWeb: "http://127.0.0.1:8000/" }
+      integrations: { codeServer: "http://127.0.0.1:8000/" }
     }));
     const unauthorized = await app.inject({ method: "GET", url: "/api/v1/integrations" });
     expect(unauthorized.statusCode).toBe(401);
@@ -116,7 +116,7 @@ describe("HTTP security boundary", () => {
     const response = await app.inject({ method: "GET", url: "/api/v1/integrations", headers: { cookie } });
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("private, no-store");
-    expect(response.json().apps.vscodeWeb.accessUrl).toBe("http://127.0.0.1:8000/");
+    expect(response.json().apps.codeServer.accessUrl).toBe("http://127.0.0.1:8000/");
     expect(response.json().apps.harness.id).toBe("harness");
     expect(response.json().apps.harness.accessUrl).toBeUndefined();
     const forbidden = await app.inject({ method: "POST", url: "/api/v1/integrations/harness/ensure", headers: { cookie, origin: "https://evil.invalid" } });
