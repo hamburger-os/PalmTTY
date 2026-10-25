@@ -64,6 +64,28 @@ function gitCommit() {
   return value;
 }
 
+async function findBundledNpm() {
+  const base = path.dirname(process.execPath);
+  const candidates = [
+    path.join(base, "node_modules", "npm"),
+    path.resolve(base, "..", "lib", "node_modules", "npm")
+  ];
+  for (const directory of candidates) {
+    const cli = path.join(directory, "bin", "npm-cli.js");
+    const manifest = path.join(directory, "package.json");
+    const license = path.join(directory, "LICENSE");
+    if (!(await stat(cli).then((s) => s.isFile(), () => false)) ||
+        !(await stat(license).then((s) => s.isFile(), () => false))) continue;
+    const meta = JSON.parse(await readFile(manifest, "utf8"));
+    if (meta.name !== "npm" || typeof meta.version !== "string" ||
+        !/^\d+\.\d+\.\d+$/.test(meta.version)) {
+      throw new Error("Node distribution npm is not an official npm package");
+    }
+    return { directory, version: meta.version };
+  }
+  throw new Error("Node distribution npm CLI missing; packaging requires full Node.js 24 installation");
+}
+
 async function findNodeLicense() {
   const base = path.dirname(process.execPath);
   const candidates = [
@@ -136,10 +158,15 @@ async function collectPackageComponents(nodeModulesRoot, palmttyVersion) {
 }
 
 async function writeSbom(root, manifest) {
-  const components = await collectPackageComponents(
-    path.join(root, "app", "node_modules"),
-    manifest.version
+  const application = await collectPackageComponents(
+    path.join(root, "app", "node_modules"), manifest.version
   );
+  const npm = await collectPackageComponents(
+    path.join(root, "runtime", "npm"), manifest.version
+  );
+  const components = [...new Map(
+    [...application, ...npm].map((component) => [component["bom-ref"], component])
+  ).values()].sort((a, b) => a["bom-ref"].localeCompare(b["bom-ref"]));
   const rootRef = `pkg:generic/palmtty@${encodeURIComponent(manifest.version)}`;
   const sbom = {
     bomFormat: "CycloneDX",
@@ -283,6 +310,10 @@ async function main() {
   );
   await copyFile(process.execPath, bundledNode);
   if (platform !== "win32") await chmod(bundledNode, 0o755);
+  // Copy the official npm CLI distributed with this Node runtime.
+  // Never rely on an unrelated npm found in the installed host's PATH.
+  const npm = await findBundledNpm();
+  await cp(npm.directory, path.join(runtimeDir, "npm"), { recursive: true });
 
   await Promise.all([
     copyFile(
@@ -319,7 +350,8 @@ async function main() {
     channel: version.includes("-") ? "prerelease" : "stable",
     platform,
     arch,
-    nodeVersion: process.version
+    nodeVersion: process.version,
+    npmVersion: npm.version
   };
   await writeFile(
     path.join(outputRoot, "release-manifest.json"),
