@@ -3,6 +3,14 @@
 
 ## Implemented
 
+### Node.js 24 LTS runtime baseline (2026-10-25)
+
+- `.node-version` is the exact CI/release security pin; root `engines.node` bounds supported runtime versions within major 24. `@types/node` and frozen pnpm lockfile use major 24.
+- Windows/Ubuntu CI, Security Audit, Distribution and Release select `.node-version`. Native PTY/ConPTY tests verify their host runtime; installed package smoke checks its Node binary against the release manifest and pinned baseline.
+- Node 22 is not a supported runtime, and there is no dual-ABI fallback. Real-host autostart / ConPTY visual tests remain separate owner-host acceptance. Harness automatic deployment is not included.
+
+
+
 ### Optional external web links (2026-10-25)
 
 - Authenticated no-store API returns operator-configured VS Code Web and independent Harness URL without embedded credentials/query tokens. HTTPS is required except loopback HTTP.
@@ -21,8 +29,8 @@
 
 - pnpm/TypeScript monorepo
 - Agent/Web/protocol/config packages
-- reviewed toolchain versions are defined by the root/workspace package manifests and the single frozen `pnpm-lock.yaml` (rather than copied into this status report). Windows/Ubuntu CI, installed Windows/Linux distribution smoke, Security Audit and CodeQL validate changes; bundled Node runtime and `@types/node` remain major 22.
-- committed pnpm lockfile with frozen-lockfile CI installs; the repository targets Node.js 22 for CI and release, and Dependabot excludes @types/node 23+ until the runtime baseline is intentionally upgraded. Dependency majors are validated individually on up-to-date main, including Windows/Linux installed distribution smoke. Windows native lifecycle smoke waits for surviving Worker/Agent close and bounds transient temp-directory deletion retries.
+- reviewed toolchain versions are defined by the root/workspace package manifests and the single frozen `pnpm-lock.yaml` (rather than copied into this status report). Windows/Ubuntu CI, installed Windows/Linux distribution smoke, Security Audit and CodeQL validate changes; bundled Node runtime and `@types/node` use major 24.
+- committed pnpm lockfile with frozen-lockfile CI installs; the repository pins Node.js 24 LTS for CI/release via `.node-version`, constrains accepted Node engines to major 24, and Dependabot excludes `@types/node` 25+. Dependency majors are validated individually on up-to-date main, including Windows/Linux installed distribution smoke. Windows native lifecycle smoke waits for surviving Worker/Agent close and bounds transient temp-directory deletion retries.
 - Windows + Ubuntu CI passing
 - root-script syntax checks plus Node built-in tests for private-LAN address/origin discovery
 - Windows ConPTY smoke coverage that prefers PowerShell 7 locally, falls back to Windows PowerShell for generic host checks, and is forced to PowerShell 7 in repository Windows CI

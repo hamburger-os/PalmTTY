@@ -21,7 +21,7 @@ pnpm terminal:check
 
 ## Dependency update and Windows test hygiene
 
-- Dependency PRs must include a lockfile synchronized with their manifests and must rerun frozen-lockfile Windows/Ubuntu CI, Windows/Linux installed distribution smoke, Security Audit and CodeQL after merging current main. Do not infer compatibility from stale green checks. Keep @types/node on major 22 while the runtime/release workflows target Node 22.
+- Dependency PRs must include a lockfile synchronized with their manifests and must rerun frozen-lockfile Windows/Ubuntu CI, Windows/Linux installed distribution smoke, Security Audit and CodeQL after merging current main. Do not infer compatibility from stale green checks. Keep `@types/node` on major 24 and require CI/security/release steps to read `.node-version`; Node 22 is unsupported.
 - The Windows autostart lifecycle smoke must prove the detached Worker survives the native host and finishes before temp cleanup. Installed-runtime smoke must await Agent stdio close before removing its copy; Windows-only EBUSY/EPERM/ENOTEMPTY after bounded cleanup retries is reported as deferred cleanup, never misclassified as a failed application smoke.
 
 ## Tests
@@ -229,3 +229,11 @@ The task summary should identify:
 - Reader: paragraph/chapter navigation, full-text signature invalidation, 20,000 paragraph/120 visible row bounds, 8 MiB complete-file cap, no text storage/logging, shared playback state across browser/Qwen and cancellation on file switch.
 - Qwen: configuration strict validation, disabled-by-default behavior, status authentication, POST authenticated exact Origin, token absent, invalid and oversized text, speaker/style allowlist, fixed 127.0.0.1 upstream, 8 MiB audio cap and WAV header validation, model unavailable/timeout, single inflight inference and cache bounds; fake service tests cannot prove actual Qwen output quality or GPU load.
 - Deployment: packaged optional Python sidecar script, no model bundled, pinned operator-downloaded model, private PALMTTY_QWEN_TOKEN env, ordinary Windows/Linux Agent packaging unchanged; native iOS Safari/Android Chrome voice availability, media activation, lock screen and background playback require real-device checks.
+
+
+## Node 24 runtime acceptance
+
+- Run the runtime checker against `.node-version` and `package.json` engine range; Node types must be major 24 and frozen-lockfile installation must succeed.
+- Windows PowerShell/ConPTY and Linux `node-pty` worker tests must pass on Node 24, including spawn, exit, resize, restart/replay and recovery.
+- Native Windows/Linux distribution smoke must run the bundled Node binary and match `release-manifest.nodeVersion` and `.node-version`; Security Audit and CodeQL must pass at the final head.
+- Owner-host autostart and old detached Worker cleanup need real-device confirmation; no Node 22 fallback or Harness auto-installer is in this PR.

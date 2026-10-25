@@ -7,7 +7,7 @@
 
 For normal use, download a packaged Release instead of cloning the repository.
 
-- Windows x64: use `PalmTTY-Setup-X.Y.Z-win-x64.exe`. The per-user installer bundles Node.js, production dependencies and the compiled Web UI, initializes a user config/token when absent, and registers the current-user startup task.
+- Windows x64: use `PalmTTY-Setup-X.Y.Z-win-x64.exe`. The per-user installer bundles Node.js 24 LTS, production dependencies and the compiled Web UI, initializes a user config/token when absent, and registers the current-user startup task.
 - Debian/Ubuntu x64: install `palmtty_X.Y.Z_amd64.deb`, then run `palmtty init --install-service` as the intended PalmTTY user.
 - Portable users can extract the Windows `.zip` or Linux `.tar.gz` and use the bundled `bin/palmtty` command.
 
@@ -27,7 +27,7 @@ Release assets include per-platform CycloneDX SBOM files plus `SHA256SUMS`; GitH
 ### Source-build requirements
 
 
-- Node.js 22 or newer.
+- Node.js >=24.22.1 within major 24; `.node-version` pins the tested development and CI baseline.
 - pnpm through Corepack.
 - Windows 11 is the primary host target. PowerShell 7 is the default Windows host-shell experience.
 - WSL is optional. Linux host runtime is exercised on Ubuntu CI. macOS uses the same host-runtime design but is not covered by repository CI yet.
@@ -101,7 +101,7 @@ For QNAP/Caddy-style TLS termination, start from `examples/qnap-reverse-proxy.ya
 
 正常使用时优先下载 Release 发行包，不需要克隆仓库。
 
-- Windows x64：使用 `PalmTTY-Setup-X.Y.Z-win-x64.exe`。这是当前用户安装器，已包含 Node.js、生产依赖与 Web UI；首次安装会在用户配置不存在时初始化 config/token，并注册当前用户启动任务。
+- Windows x64：使用 `PalmTTY-Setup-X.Y.Z-win-x64.exe`。这是当前用户安装器，已包含 Node.js 24 LTS、生产依赖与 Web UI；首次安装会在用户配置不存在时初始化 config/token，并注册当前用户启动任务。
 - Debian/Ubuntu x64：安装 `palmtty_X.Y.Z_amd64.deb` 后，以真正运行 PalmTTY 的用户执行 `palmtty init --install-service`。
 - Portable 用户可以解压 Windows `.zip` 或 Linux `.tar.gz`，直接使用其中的 `bin/palmtty`。
 
@@ -121,7 +121,7 @@ Release 同时提供每个平台的 CycloneDX SBOM 与 `SHA256SUMS`，并在正�
 ### 源码构建环境要求
 
 
-- Node.js 22 或更高版本。
+- Node.js 24.22.1 或更高的 Node 24 版本（不支持 Node 22 或 25+）；`.node-version` 是测试的 CI 版本来源。
 - 通过 Corepack 使用 pnpm。
 - Windows 11 仍是首要宿主平台；Windows 宿主 Shell 默认使用 PowerShell 7。
 - WSL 为可选运行环境。Linux 宿主运行时已经在 Ubuntu CI 中执行；macOS 使用同一宿主运行时设计，但仓库当前没有 macOS CI。
@@ -235,3 +235,10 @@ Restart the Agent, then select **Qwen3-TTS** in Files → Read aloud. The model 
 Qwen3-TTS 使用**单独的 Python 3.12 虚拟环境**，从官方来源安装 `qwen-tts`，并手工下载匹配的 `Qwen3-TTS-12Hz-0.6B-CustomVoice` 或 `1.7B-CustomVoice` 模型到宿主机私有目录。参考上述命令。为 Python 服务和 PalmTTY Agent 设置同一个独立随机 `PALMTTY_QWEN_TOKEN`（32–512 字符），建议存放于仓库外的用户私有环境文件，严禁写入 YAML、Workspace environment 或命令行参数。运行 `scripts/qwen3-tts-server.py`，打包安装版为安装目录下的 `tools/qwen3-tts-server.py`；显卡运行用 `--device cuda`，CPU 使用 `--device cpu`，0.6B/1.7B 的 `--model` 必须匹配已下载目录。依上方 YAML 启用 `speech.qwen`，重启 Agent 后在「文件 → 朗读」选择 Qwen3-TTS。
 
 Qwen 模型及 Python 依赖是可选独立安装，不随主安装包分发或自动下载。服务只能监听本机回环地址，需要自行管理其启动和生命周期；Windows 主机和 WSL 不是自动共享同一个回环地址。手机只接收音频，不运行模型；iOS Safari 首次媒体解锁及后台播放可能需要额外手动操作或无法持续。
+
+
+### Node 24 host upgrade / Node 24 主机升级
+
+**English:** Source mode requires Node 24 LTS (at least the `.node-version` security baseline). Switch the host Node binary and rerun `pnpm install --frozen-lockfile` to rebuild native `node-pty` for the current ABI; validate with `pnpm check`. If the source-mode autostart recorded an older absolute Node path, reinstall it. Windows/Linux release archives bundle Node 24. End existing Node 22 Terminal Sessions before upgrade rather than leave detached old Workers alongside the new Agent. No dual-Node compatibility layer is provided.
+
+**中文：** 源码部署只支持 Node 24 LTS（不低于 `.node-version` 版本）。切换本机 Node 后重新运行 frozen-lockfile 安装，重建原生 `node-pty`，完成 `pnpm check`；如源码自启动记录的 Node 绝对路径变化，需重装自启动。正式安装包已内置 Node 24。升级前建议结束旧 Node 22 的终端 Worker，避免旧版 Worker 与新 Agent 混跑；不增加双版本兼容层。

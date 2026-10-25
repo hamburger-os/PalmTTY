@@ -43,7 +43,7 @@ Do not add repository paths or globally installed Node/pnpm assumptions to insta
 
 ### Dependency maintenance
 
-PalmTTY's release/CI runtime is Node.js 22. Dependabot intentionally keeps `@types/node` on the compatible 22.x major until a coordinated runtime upgrade. The reviewed October 2026 toolchain uses TypeScript 7, Vitest 5 and Vite 8 alongside bounded patch updates for `tsx`, `@fastify/static` and `ws`. Do not merge multiple stale lockfiles independently: refresh `pnpm-lock.yaml` against the combined manifests, then run frozen-lockfile Windows/Ubuntu CI, installed Windows/Linux distribution smoke, Security Audit and CodeQL on the exact combined PR head. Windows process shutdown and antivirus scanners can briefly retain test-runtime directories; the native smoke tests wait for process/stdio closure and retry recognized temporary locks without ignoring product failures.
+PalmTTY's release/CI runtime is Node.js 24 LTS. `.node-version` pins the exact tested security baseline; root `engines.node` restricts the accepted Node 24 range, and `@types/node` uses major 24. Node 22 and Node 25+ are unsupported. The reviewed October 2026 toolchain uses TypeScript 7, Vitest 5 and Vite 8 alongside bounded patch updates for `tsx`, `@fastify/static` and `ws`. Do not merge multiple stale lockfiles independently: refresh `pnpm-lock.yaml` against the combined manifests, then run frozen-lockfile Windows/Ubuntu CI, installed Windows/Linux distribution smoke, Security Audit and CodeQL on the exact combined PR head. Windows process shutdown and antivirus scanners can briefly retain test-runtime directories; the native smoke tests wait for process/stdio closure and retry recognized temporary locks without ignoring product failures.
 
 ### Terminal dependency policy
 
@@ -142,3 +142,10 @@ The Mermaid dependency graph includes khroma 2.1.0, whose npm metadata reports U
 Automatic dependency PRs must pass Windows and Ubuntu CI, packaging smoke, security/license policy, and CodeQL at the current `main` head. The xterm browser/worker family is version-locked by `terminal-stack.json` and upgraded as one reviewed group, not one package at a time. Mermaid major upgrades need license and renderer/security review. jsdom major upgrades must remain compatible with the supported Node minimum.
 
 依赖更新 PR 需要基于最新 `main` 完成 Windows/Ubuntu CI、发行包烟测、漏洞和许可证检查及 CodeQL。xterm 的浏览器端和 Worker 版本以 `terminal-stack.json` 为唯一来源，必须整组升级；Mermaid 主版本要审查间接依赖许可证与安全渲染；jsdom 主版本不能突破公开声明的 Node 最低版本。
+
+
+### Node 24 toolchain contract / Node 24 工具链契约
+
+**English:** CI, Distribution, Security Audit, and Release read `.node-version` through `actions/setup-node`. The runtime checker validates the Node executable and declared engine range; `@types/node` and the frozen lockfile match major 24. Native Windows/Linux jobs compile and test `node-pty`. Installed-runtime smoke executes the bundled Node binary and checks its version against the release manifest and the pinned minimum. Harness automatic installation is a separate feature, not part of this migration.
+
+**中文：** `.node-version` 统一 CI/发布的精确 Node 版本，`package.json` 规定受支持的 Node 24 范围。类型与 frozen 锁文件一致，Windows/Linux 原生 runner 验证 `node-pty`，安装态 smoke 核对内置 Node 和发行 manifest。Harness 自动部署属于独立阶段。
