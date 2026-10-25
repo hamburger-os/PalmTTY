@@ -5,11 +5,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 8
-    # Runtime and all release gates target Node 22; do not let type definitions
-    # drift to a newer major until the supported runtime is upgraded together.
+    # @types/node follows the supported Node 24 runtime major. Keep newer
+    # majors out until CI, native PTY and bundled distribution move together.
     ignore:
       - dependency-name: "@types/node"
-        versions: [">=23"]
+        versions: [">=25"]
       # All five xterm packages are a tested, precisely-pinned stack governed by
       # terminal-stack.json. Individually proposed updates always break the
       # single source of truth; upgrade the family together in a reviewed PR.
@@ -18,8 +18,8 @@ updates:
       # introduce licenses outside the reviewed production policy.
       - dependency-name: "mermaid"
         update-types: ["version-update:semver-major"]
-      # jsdom 30 requires Node >=22.22.2, while our supported minimum is
-      # Node >=22.11.0. Review this major with a deliberate Node baseline bump.
+      # Keep jsdom major transitions separate from the Node runtime migration:
+      # browser simulation and DOM API changes require their own qualification.
       - dependency-name: "jsdom"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/jsdom"
