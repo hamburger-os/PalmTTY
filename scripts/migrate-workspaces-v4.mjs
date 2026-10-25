@@ -1,4 +1,5 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { link, open, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { WorkspaceDefinitionSchema } from "../packages/protocol/dist/index.js";
 
@@ -38,8 +39,23 @@ const workspaces = input.workspaces.map((entry) => {
   ids.add(workspace.id);
   return workspace;
 });
-await writeFile(to, JSON.stringify({ version: 4, workspaces }, null, 2) + "\n", {
-  flag: "wx",
-  mode: 0o600
-});
+// Publish a fully written file atomically. Hard-link creation is exclusive:
+// unlike rename(), link() never silently replaces an existing destination.
+// Keep the temporary file in the destination directory (same filesystem).
+const temporary = path.join(
+  path.dirname(to),
+  `.${path.basename(to)}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`
+);
+try {
+  const handle = await open(temporary, "wx", 0o600);
+  try {
+    await handle.writeFile(JSON.stringify({ version: 4, workspaces }, null, 2) + "\n");
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  await link(temporary, to);
+} finally {
+  await rm(temporary, { force: true }).catch(() => undefined);
+}
 console.log("Converted Workspace store to v4; original v3 retained");
