@@ -71,6 +71,8 @@ This path is for development and repository validation. It may compile the Windo
 
 ### Persistence boundary
 
+The optional `pnpm start:with-vscode` is an **interactive source-only** foreground command and is never installed into Task Scheduler or systemd. Microsoft's VS Code Server license prohibits service hosting; this helper does not change unattended startup. / `pnpm start:with-vscode` 仅适用于源码部署下的用户交互式前台启动，不加入 Windows/Linux 自启动服务，也不自动接受微软许可。
+
 Autostart restores the **Agent service**, not the old PTY after an OS reboot. Browser disconnect and Agent-only restart persistence continue through independent Session Workers. OS reboot/logoff terminates the old Worker/PTY; after boot PalmTTY starts cleanly and persisted Workspaces remain available for new Sessions.
 
 ## 中文

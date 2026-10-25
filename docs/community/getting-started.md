@@ -58,7 +58,7 @@ pnpm start
 
 ### Official VS Code Web and Harness
 
-Install the official Microsoft VS Code desktop/CLI on the Agent host. In a permitted interactive user session, start `code serve-web --host 127.0.0.1 --port 8000` separately. Follow the official VS Code Server license and upstream authentication instructions; do not host it through PalmTTY as a background service. Optionally configure a credential-free, separately protected Web URL under `integrations.vscodeWeb`. Detection does not establish the server is running.
+Install the official Microsoft VS Code desktop/CLI on the Agent host. After `pnpm build`, either manually start `code serve-web --host 127.0.0.1 --port 8000`, or in an interactive user terminal run `pnpm start:with-vscode` to start the CLI together with the built PalmTTY Agent. Follow the official VS Code Server license and upstream authentication instructions; do not host it through PalmTTY as a background service. Optionally configure a credential-free, separately protected Web URL under `integrations.vscodeWeb`. Detection does not establish the server is running.
 
 Harness may launch on the Agent's loopback. Cross-device DSH still requires separate protected HTTPS, upstream `--public-url` and `--trusted-host`, and independent authentication.
 
@@ -166,7 +166,7 @@ netsh interface ipv4 show excludedportrange protocol=tcp
 
 ### 官方 VS Code Web 与 Harness
 
-在 Agent 主机安装微软官方 VS Code，并在许可允许的交互式用户会话中独立运行 `code serve-web --host 127.0.0.1 --port 8000`。PalmTTY 不作为后台服务托管官方 VS Code Server；可以在 `integrations.vscodeWeb` 配置已部署、受保护且不含令牌的访问地址。检测到 CLI 不等于 Web Server 已启动。
+在 Agent 主机安装微软官方 VS Code。源码模式完成 `pnpm build` 后，可以在许可允许的交互式用户终端中独立运行 `code serve-web --host 127.0.0.1 --port 8000`，也可以执行 `pnpm start:with-vscode` 联合启动它与 PalmTTY Agent。PalmTTY 不作为后台服务托管官方 VS Code Server；可以在 `integrations.vscodeWeb` 配置已部署、受保护且不含令牌的访问地址。检测到 CLI 不等于 Web Server 已启动。
 
 Harness 可由 Agent 在回环地址启动；手机跨设备访问仍需独立安全 HTTPS、DSH `--public-url` / `--trusted-host` 与上游登录认证。
 
