@@ -2449,4 +2449,10 @@ button.settings-list-row:hover:not(:disabled),
 }
 
 .integration-entry { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); }
-.integration-link { display: inline-flex; align-items: center; justify-content: center; min-height: var(--touch-target-compact); }
+
+/* Managed apps remain visible even when installation/access is unavailable. */
+.integration-entry { flex-wrap: wrap; min-height: var(--touch-target-compact); }
+.integration-detail { min-width: 0; flex: 1 1 180px; display: flex; flex-direction: column; gap: 3px; }
+.integration-detail small { overflow-wrap: anywhere; }
+.integration-actions { display: flex; align-items: center; gap: var(--space-2); }
+.workspace-card .integration-entry { margin-top: var(--space-2); padding: var(--space-2); }

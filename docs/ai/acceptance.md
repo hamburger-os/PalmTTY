@@ -6,9 +6,9 @@ A coding agent should not declare a repository-wide task complete before the rel
 
 - No leftover Remote App/RDP endpoints, AppWorker, WebRTC, native capture, ICE configuration or release smoke dependencies.
 - V4 Workspaces contain only core and Terminal settings. The optional one-shot v3 converter validates every projected record with the canonical WorkspaceDefinitionSchema, rejects duplicate IDs and malformed records without writing output, and never overwrites an existing v4 file. Integration URLs require HTTPS or loopback HTTP, reject username/password/query/fragment, and are returned only after authentication with no-store.
-- VS Code Web and Harness own authentication, sessions and processes; PalmTTY provides only optional independent links. No automatic workspace-folder switching is claimed.
+- Both app entries remain visible without YAML integration URLs. Harness may be installed via a fixed version/host npm and started only on loopback; process ownership and error statuses stay in Agent, with no automatic Workspace deep links. VS Code discovery never starts an unauthorized VS Code Server background service.
 - Preserve all terminal reconnect, Session Worker, Git/Files/Artifacts, speech and mobile presentation tests.
-- Phone remote HTTPS, Codex extension behavior and Windows Ctrl+C server shutdown need real-host acceptance.
+- Reject same-origin third-party app proxy and remote loopback/token URL disclosure. Phone separate HTTPS origin, Codex extension and Windows Ctrl+C behavior still require real-host acceptance.
 
 ## Static/documentation
 
@@ -237,3 +237,11 @@ The task summary should identify:
 - Windows PowerShell/ConPTY and Linux `node-pty` worker tests must pass on Node 24, including spawn, exit, resize, restart/replay and recovery.
 - Native Windows/Linux distribution smoke must run the bundled Node binary and match `release-manifest.nodeVersion` and `.node-version`; Security Audit and CodeQL must pass at the final head.
 - Owner-host autostart and old detached Worker cleanup need real-device confirmation; no Node 22 fallback or Harness auto-installer is in this PR.
+
+
+## Managed Web application acceptance
+
+- For local/no-integration YAML, authenticated `GET /api/v1/integrations` returns both known IDs with explicit states; unauthorized clients get 401; mutation without exact Origin gets 403.
+- Harness single-flight ensure accepts no client path/URL/package/port parameters. npm provisioning targets a fixed user directory, pinned RC release, no admin privileges, no automatic latest. Failure does not mutate Workspace or terminal sessions.
+- Agent never logs or returns DSH process-token URLs to LAN/reverse-proxy clients, never attaches to an unknown port/PID, and kills only processes it created. An HTTPS URL in an operator config is a navigation entry, not a managed-service trust assertion.
+- VS Code Server service hosting is disabled under Microsoft license; a running backend does not imply remote-phone accessibility. Real-host Windows, NAS, mobile and upstream auth remain separate acceptance.

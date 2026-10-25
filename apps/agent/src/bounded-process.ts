@@ -6,6 +6,7 @@ export type BoundedProcessOptions = {
   cwd?: string;
   env?: NodeJS.ProcessEnv | Record<string, string>;
   timeoutMs?: number;
+  signal?: AbortSignal;
   maxStdoutBytes?: number;
   maxStderrBytes?: number;
 };
@@ -30,6 +31,7 @@ export async function runBoundedProcess(
       shell: false,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
+      ...(options.signal ? { signal: options.signal } : {}),
       ...(options.cwd ? { cwd: options.cwd } : {}),
       ...(options.env ? { env: options.env } : {})
     });

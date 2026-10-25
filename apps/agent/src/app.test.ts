@@ -104,7 +104,7 @@ describe("HTTP security boundary", () => {
     await app.close();
   });
 
-  it("returns only configured integration links behind authentication", async () => {
+  it("exposes visible managed app states without leaking local tokens", async () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
     const app = await buildTestApp(parseConfig({
       auth: { tokenEnv: "PALMTTY_TEST_TOKEN" },
@@ -116,7 +116,13 @@ describe("HTTP security boundary", () => {
     const response = await app.inject({ method: "GET", url: "/api/v1/integrations", headers: { cookie } });
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("private, no-store");
-    expect(response.json()).toEqual({ vscodeWeb: "http://127.0.0.1:8000/" });
+    expect(response.json().apps.vscodeWeb.accessUrl).toBe("http://127.0.0.1:8000/");
+    expect(response.json().apps.harness.id).toBe("harness");
+    expect(response.json().apps.harness.accessUrl).toBeUndefined();
+    const forbidden = await app.inject({ method: "POST", url: "/api/v1/integrations/harness/ensure", headers: { cookie, origin: "https://evil.invalid" } });
+    expect(forbidden.statusCode).toBe(403);
+    const invalid = await app.inject({ method: "POST", url: "/api/v1/integrations/unknown/ensure", headers: { cookie, origin: ORIGIN } });
+    expect(invalid.statusCode).toBe(404);
     await app.close();
   });
 

@@ -1,8 +1,14 @@
 <!-- bilingual -->
-# External Web tools / 外部 Web 工具
+# Managed local Web applications / 本机 Web 应用管理
 
 ## English
-PalmTTY can expose two optional external, self-hosted application links. It does not proxy, install, supervise or authenticate these applications.
+
+VS Code and DeepSeek Harness are always shown, including their discovery/install/start/access status. Authenticated status is `GET /api/v1/integrations` (no-store). A strict-origin, authenticated `POST /api/v1/integrations/harness/ensure` performs a single-flight attempt; the Web UI requests this automatically once on login and provides retry. It never accepts client-supplied binaries, package versions, URLs or shell commands.
+
+- **VS Code**: Discover an existing official Windows VS Code CLI. Microsoft prohibits hosting official VS Code Server as a service. PalmTTY does **not** manage its Server lifecycle or kill arbitrary VS Code/Node processes. Start the official `code serve-web` from an interactive session if allowed by your applicable license. A separate valid link can be configured.
+- **Harness**: Reuse an existing managed or globally installed official DSH CLI. If unavailable, attempt a pinned `@deepseek-ai/dsh@0.2.1-rc.2` npm installation under the current user in a separate PalmTTY-managed directory. This requires the host to provide an npm CLI; the bundled PalmTTY Node binary alone does not include npm. No silent OS-level installation or administrative elevation occurs. Run `dsh web --no-open --host 127.0.0.1 --port 0` with a non-shell Node invocation; PalmTTY controls only the process it spawned. DSH still owns credentials, model choice, workspaces and sessions.
+- **Diagnostics**: Installing, starting, running, missing software, npm unavailable, failed installation, process exited and remote access not configured are distinct states. No upstream stderr or token-bearing startup URL is logged.
+- **Security**: Third-party UI is never proxied into the authenticated PalmTTY origin. Access from the Agent host's local browser can use the captured one-time DSH token URL; remote clients never receive it or a host-loopback link. A protected **separate** HTTPS origin is needed for your NAS/phone setup. The current version cannot automatically provision the external DNS/proxy/certificate solely from the PalmTTY YAML. The user may optionally provide externally secured URLs:
 
 ```yaml
 integrations:
@@ -10,33 +16,22 @@ integrations:
   harness: "https://harness.example.test/"
 ```
 
-URLs must be HTTPS, except loopback HTTP for host-local testing. Passwords, usernames, queries, fragments and bearer-token links are rejected. Keep upstream authentication enabled.
-
-**VS Code Web**: Start the official Windows `code serve-web --host 127.0.0.1 --port 8000` separately. Each PalmTTY Workspace exposes the same host-level link; select the directory inside VS Code. Codex CLI stays an ordinary Terminal startup command. Codex VS Code extension compatibility has not been qualified.
-
-**Harness**: The independent home link opens DeepSeek Harness Web. DSH owns workspaces, sessions, credentials and model settings.
-
-A phone cannot reach the Windows host through its own `127.0.0.1`. Secure remote HTTPS/private connectivity must be separately supplied by the operator. This change does not introduce Azure Tunnel, reverse proxy, VPN, SSO, or third-party process lifecycle management. On Windows Ctrl+C may leave `serve-web` child processes; do not indiscriminately kill all Code/Node tasks.
+Only HTTPS or loopback HTTP is accepted, without credentials, query or fragment. The upstream Web service retains its own authentication; these fields are **access addresses**, not executables or auto-install configuration.
 
 ## 中文
-PalmTTY 仅提供两个可选的自托管外部应用链接，不代理、不安装、不管理第三方进程及其身份认证。
 
-```yaml
-integrations:
-  vscodeWeb: "https://code.example.test/"
-  harness: "https://harness.example.test/"
-```
+VS Code Web 和 DeepSeek Harness 始终展示，不再因没有配置 URL 而隐藏。登录后通过只读受认证 API 检测安装与状态；前端自动触发一次 `POST /api/v1/integrations/harness/ensure`，并提供失败重试。服务端固定可运行的命令、版本及参数，不允许浏览器任意输入程序名或目标端口。
 
-仅允许 HTTPS 或主机回环 HTTP，禁止账号密码、查询参数和含令牌的 URL。保持第三方原生认证。
-
-**VS Code Web**：在 Windows 上独立启动官方 `code serve-web --host 127.0.0.1 --port 8000`。每个 PalmTTY 工作区显示同一个主机级入口，进入 VS Code 后自己选择项目目录。Codex CLI 仍是 Terminal 启动命令，Codex 扩展兼容性尚未完成实测。
-
-**Harness**：独立首页入口，直接进入官方 DSH Web，由 DSH 自行管理其工作区、会话、模型和登录。
-
-手机上的 `127.0.0.1` 不指向 Windows。手机远程访问需要另行配置可信 HTTPS/私有网络，本轮不实现 Azure Tunnel、反代/VPN、单点登录或第三方程序进程管理。Windows 中 Ctrl+C 退出 serve-web 可能留有子进程，不可盲目结束所有 VS Code/Node 进程。
+- **VS Code**：自动检测官方 Windows VS Code CLI。微软禁止将官方 VS Code Server 作为服务托管，因此 PalmTTY 不代替用户创建 Server 守护进程，不按未知 PID 清理其他 Code/Node 进程。官方 CLI 须在许可允许的交互式用户会话中运行。
+- **Harness**：先复用现有官方 CLI；若不存在，使用主机的 npm 在当前用户隔离目录安装固定的 `@deepseek-ai/dsh@0.2.1-rc.2`，并以 Node 直接启动回环随机端口服务。PalmTTY 发行包只自带 Node，不一定有 npm；缺少安装器时只显示明确诊断，不暗中安装系统软件或提权。
+- **边界**：Harness 的工作区、会话、模型、认证仍由 Harness 管理，PalmTTY 不复制。只保管当前 Agent 启动进程的临时启动地址，不在日志中打印它。
+- **NAS/手机**：`127.0.0.1` 在手机上指向手机，并非 Windows 主机；现有一个 HTTPS Origin 的 NAS 代理不足以让第三方 UI 安全接入。PalmTTY 不将第三方脚本代理到已经登录的同源页面，也不向远端发送本机令牌 URL。确有独立受保护 HTTPS 入口时，可选地设置上述 URL；两款上游仍需独立认证。暂不声称自动完成额外 DNS/TLS/反代配置。
 
 ## Workspace upgrade / 工作区升级
 
 Back up the v3 store, stop the Agent and run `pnpm --filter @palmtty/protocol build` to build the canonical schema. Then run `node scripts/migrate-workspaces-v4.mjs --from <v3-path> --to <v4-path>`. It atomically publishes fully written output via an exclusive same-directory hard link (requires hard-link support), never overwrites existing output, does not delete the source, and omits removed Remote App profiles. The runtime reads only v4.
 
 升级前关闭 Agent 并备份，先构建 `@palmtty/protocol`，再离线运行转换工具，保留原 V3，不覆盖已有 V4；新运行时只读取 V4。
+
+
+**Upstream token scope / 上游令牌作用域：** PalmTTY itself never puts its login or Worker secrets in URLs. DSH requires an upstream one-time process-token URL to exchange for its own browser cookie; this is exposed only on authenticated same-host `local` access and is neither persisted/logged nor returned to LAN/NAS clients. PalmTTY login and DSH login remain separate. / PalmTTY 的登录、Worker 密钥绝不使用 URL；只有 DSH 官方首次授权采用的一次性令牌 URL 在受认证本机 `local` 模式下开放，远端不提供，也不记录日志和持久化。
