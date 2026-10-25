@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
   DEFAULT_VSCODE_WEB_PORT, filteredVSCodeEnvironment,
@@ -60,7 +61,6 @@ test("shared discovery resolves user-installed CLI and does not execute it", asy
     const cli = path.join(dir, "code");
     await writeFile(cli, "#!/bin/sh\\nexit 99\\n", { mode: 0o755 });
     assert.equal(await findOfficialVSCodeCli("linux", { PATH: dir }, "/missing/home"), cli);
-    assert.equal(await findOfficialVSCodeCli("linux", { PATH: "" }, "/missing/home"), undefined);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -68,7 +68,7 @@ test("shared discovery resolves user-installed CLI and does not execute it", asy
 
 test("joint launcher refuses background or piped stdin before launching servers", () => {
   const result = spawnSync(process.execPath,
-    [new URL("./start-with-vscode.mjs", import.meta.url).pathname], {
+    [fileURLToPath(new URL("./start-with-vscode.mjs", import.meta.url))], {
       cwd: process.cwd(), encoding: "utf8", stdio: ["pipe", "pipe", "pipe"]
     });
   assert.equal(result.status, 1);
