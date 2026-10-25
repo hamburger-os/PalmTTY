@@ -15,7 +15,7 @@
 
 - Authenticated no-store `GET /api/v1/integrations` returns both always-visible app statuses, with bounded detection and sanitized diagnostics; `POST /api/v1/integrations/:id/ensure` requires exact Origin and authentication and uses a single-flight manager.
 - VS Code CLI is discovered and displayed on the independent home app shelf even with zero Workspaces, but not hosted as a service because upstream licensing prohibits it. Harness is an independent managed process: existing CLI preferred, otherwise pinned `@deepseek-ai/dsh@0.2.1-rc.2` installed through an available host npm in a current-user directory; run with Node 24, fixed loopback host and random port.
-- Bundled PalmTTY runtime contains Node but not necessarily npm. Automatic Harness install can fail with `npm_unavailable`; neither system elevation nor random third-party executable launch occurs.
+- Windows/Linux installed runtime bundles Node 24 plus npm from the same official distribution. Automatic Harness install no longer requires system npm in installed mode; source mode may still report `npm_unavailable`. Neither system elevation nor random third-party executable launch occurs.
 - No same-origin proxy or cloud relay exists. Captured DSH process-token URL is withheld from LAN/reverse-proxy clients. Remote browser access needs a dedicated trusted external HTTPS Origin; without it, running local service does not imply phone accessibility.
 - DSH continues to own its workspaces/sessions/authentication, Codex CLI is a Terminal launch command. Workspace Store v4 remains unchanged; no Remote App profiles or worker reintroduced.
 
@@ -275,3 +275,9 @@ Do not claim persistence beyond what is tested: browser disconnect and Agent res
 
 - Status refreshes installed CLI discovery instead of caching it until Agent restart.
 - Harness readiness is established only by official `dsh web:` startup announcement and a still-live owned child; arbitrary diagnostic URLs do not count.
+
+
+### Bundled npm for Harness provisioning (2026-10-25)
+
+- Windows/Linux installed Agent packages include npm CLI from the same official Node 24 distribution. Package license file is preserved, npm packages are included in the SBOM and `npmVersion` is recorded in the release manifest. Installed smoke executes the real npm CLI under the bundled Node and matches its version.
+- Source mode may still require an available npm installation. No proxy, elevated OS installer or automatic external HTTPS Origin provisioning is added.

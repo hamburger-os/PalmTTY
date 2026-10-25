@@ -105,7 +105,7 @@ installed runtime 代码不能重新引入 repo path、全局 Node 或 pnpm 假�
 
 ### 依赖维护
 
-项目 CI 与 Release 的 Node.js 运行基线是 22，`@types/node` 的 Dependabot 自动升级暂时限制在 22.x；要升级到 Node 26，必须连运行时与构建链一同验证。2026 年 10 月工具链升级包含 TypeScript 7、Vitest 5、Vite 8，以及 `tsx`、`@fastify/static`、`ws` 的有界补丁更新。不要直接合并几份过时的 `pnpm-lock.yaml`：先按合并后的清单重新对齐锁文件，再在同一提交上完成 Windows/Ubuntu 冻结锁文件 CI、Windows/Linux 安装包 smoke、安全审计和 CodeQL。Windows 子进程关闭和防病毒程序可能短暂占用测试目录；原生 smoke 会等待进程/标准流结束、针对临时锁有限重试，但不会吞掉真实的产品故障。
+项目 CI 与 Release 的 Node.js 基线统一为 24 LTS，`.node-version` 是精确安全补丁单一来源；`@types/node` 保持 24.x。未来要升级到 Node 26，需要运行时、类型、原生 PTY 与打包链一同验证。2026 年 10 月工具链升级包含 TypeScript 7、Vitest 5、Vite 8，以及 `tsx`、`@fastify/static`、`ws` 的有界补丁更新。不要直接合并几份过时的 `pnpm-lock.yaml`：先按合并后的清单重新对齐锁文件，再在同一提交上完成 Windows/Ubuntu 冻结锁文件 CI、Windows/Linux 安装包 smoke、安全审计和 CodeQL。Windows 子进程关闭和防病毒程序可能短暂占用测试目录；原生 smoke 会等待进程/标准流结束、针对临时锁有限重试，但不会吞掉真实的产品故障。
 
 ### 终端依赖策略
 

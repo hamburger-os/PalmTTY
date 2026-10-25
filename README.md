@@ -62,7 +62,7 @@ PalmTTY is intentionally narrower than a browser IDE:
 
 ## Managed Web applications / 受管理的 Web 应用
 
-VS Code Web and DeepSeek Harness are always visible as independent applications on PalmTTY's home screen, even when no Workspace exists or installation/remote access is unavailable. No separate application URLs are required for local discovery. On authenticated login PalmTTY detects official Windows VS Code installations and attempts an isolated, pinned DSH Web user-local install/start (`@deepseek-ai/dsh@0.2.1-rc.2`) using the host's npm installation. `npm` may not be present in standalone PalmTTY release packages; that condition is diagnosed rather than silently installing OS tools or escalating privileges.
+VS Code Web and DeepSeek Harness are always visible as independent applications on PalmTTY's home screen, even when no Workspace exists or installation/remote access is unavailable. No separate application URLs are required for local discovery. On authenticated login PalmTTY detects official Windows VS Code installations and attempts an isolated, pinned DSH Web user-local install/start (`@deepseek-ai/dsh@0.2.1-rc.2`). The Windows/Linux release packages include the npm CLI from their pinned official Node 24 runtime, so no separate host npm installation is needed. Source mode uses an existing npm installation; network registry access remains necessary.
 
 Microsoft does **not permit hosting the official VS Code Server as a service**. PalmTTY detects VS Code but deliberately does not install/start/stop a VS Code Server daemon; launch it under an interactive Windows user session in accordance with its terms. Codex CLI remains a Terminal command. Harness independently owns its workspaces, sessions, credentials and model authentication.
 
@@ -76,7 +76,7 @@ integrations:
 
 The same YAML without an `integrations` section remains valid: it automatically discovers local tools and shows diagnostics. See [Web application management](docs/community/web-integrations.md).
 
-VS Code Web 和 Harness 在 UI 始终可见。登录后自动检测工具，并尝试使用主机上已有 npm 在当前用户目录安装和启动固定版本 Harness；安装版不保证系统中已装 npm，失败会显示明确状态。官方 VS Code Server 不允许作为服务托管，故 PalmTTY 只检测安装，不代替用户后台托管。手机通过现有 NAS 单 HTTPS 地址访问时，回环服务不会自动变成安全的远端页面；需要独立 HTTPS Origin，不能直接在已登录 PalmTTY 同源代理第三方代码。
+VS Code Web 和 Harness 在 UI 始终可见。登录后自动检测工具，并尝试通过内置官方 npm 在当前用户目录安装和启动固定版本 Harness；Windows/Linux 安装版已自带与 Node 24 一致的 npm CLI，无需系统另装 npm。源码版仍需要 npm，安装过程中网络失败会显示诊断。官方 VS Code Server 不允许作为服务托管，故 PalmTTY 只检测安装，不代替用户后台托管。手机通过现有 NAS 单 HTTPS 地址访问时，回环服务不会自动变成安全的远端页面；需要独立 HTTPS Origin，不能直接在已登录 PalmTTY 同源代理第三方代码。
 
 ## Architecture / 架构
 

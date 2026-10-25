@@ -17,6 +17,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Changed
 
+- Bundle official Node 24 npm CLI in installed Windows/Linux runtimes for managed Harness provisioning, record its version in the release manifest, include its package components in CycloneDX SBOM, and verify packaged npm execution in native distribution smoke.
 - Upgrade the supported source and bundled release runtime to Node.js 24 LTS, use `.node-version` (24.22.1) as the one CI/Release security baseline, align `@types/node` and frozen lockfile, verify embedded runtime/native PTY on Windows/Linux, and drop Node 22 support.
 - Remove the unreleased Windows Remote App, WebRTC/AppWorker, native capture host and planned unattended RDP diagnostic code paths, package dependencies, UI, CI smoke and release assets. Terminal Session Worker remains the sole runtime activity; Git, Files and Artifacts continue to use their existing scopes.
 - Increment Workspace storage generation to v4 without automatic legacy reads. External third-party Web apps have their own authentication, processes and workspaces; Codex, Pi and other CLI agents remain Terminal workloads.

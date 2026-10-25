@@ -247,3 +247,9 @@ The task summary should identify:
 - VS Code Server service hosting is disabled under Microsoft license; a running backend does not imply remote-phone accessibility. Real-host Windows, NAS, mobile and upstream auth remain separate acceptance.
 
 - Web app tests must reject arbitrary stdout URLs and accept only the validated official DSH readiness URL on loopback.
+
+
+### Bundled npm release acceptance
+
+- Every Windows/Linux installed runtime carries official npm CLI with its Node 24 binary. Verify the copied `runtime/npm/package.json` name and license, include npm and its redistributed dependencies in CycloneDX SBOM, record `npmVersion` in `release-manifest.json`, and execute bundled npm with the bundled Node in installed-runtime smoke.
+- Managed Harness installation in release mode must try bundled npm before source/host paths, and never require a global npm executable or administrator privileges. Registry/network availability and a dedicated phone HTTPS Origin are separate acceptance boundaries.
