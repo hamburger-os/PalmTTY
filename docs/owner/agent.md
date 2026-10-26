@@ -57,7 +57,7 @@ PalmTTY Agent
 
 ## 独立 Web 服务入口
 
-Agent 只在认证之后返回配置中的官方 VS Code Web/Harness 独立 URL，不反向代理第三方 UI。官方 VS Code Server 需由用户按微软许可独立交互式启动，不由 Agent 托管；Harness 可在当前用户目录固定版本安装并由 Agent 管理自有子进程。两类链接由服务器运营者明确配置并禁止包含连接令牌、账号密码、查询字符串或片段。
+Agent 仅按本机 managed/external 配置管理应用：显式 autoStart 在监听后启动，目录轮询无部署副作用；官方 Code 另行安装且个人启动默认关闭，Harness 校验固定私有版本。仅回收自有应用/安装器容器，不接管未知进程，不影响持久 Terminal Worker。目录与 iframe 仅含无凭据独立根 URL；首次授权通过认证、精确 Origin、no-store/no-referrer 的显式动作交接到配置的独立 HTTPS 根，直接本机操作者请求另行识别。第三方始终保留独立认证/工作区，详见 web-integrations.md。
 
 ## Terminal runtime
 

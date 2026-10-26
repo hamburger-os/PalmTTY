@@ -75,6 +75,13 @@ export async function ensureWebApp(id: WebAppId) {
   ));
 }
 
+export async function authorizeWebApp(id: WebAppId) {
+  return responseJson<{ url: string }>(await fetch(
+    `/api/v1/integrations/${encodeURIComponent(id)}/authorize`,
+    { method: "POST", credentials: "same-origin", cache: "no-store" }
+  ));
+}
+
 export async function authStatus() {
   return responseJson<{ enabled: boolean; authenticated: boolean }>(
     await fetch("/api/v1/auth/status", { credentials: "same-origin" })

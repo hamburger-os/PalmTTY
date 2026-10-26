@@ -108,7 +108,7 @@ describe("HTTP security boundary", () => {
     process.env.PALMTTY_TEST_TOKEN = TOKEN;
     const app = await buildTestApp(parseConfig({
       auth: { tokenEnv: "PALMTTY_TEST_TOKEN" },
-      integrations: { vscodeWeb: "http://127.0.0.1:8000/" }
+      integrations: { vscodeWeb: { mode: "external", url: "http://127.0.0.1:8000/" } }
     }));
     const unauthorized = await app.inject({ method: "GET", url: "/api/v1/integrations" });
     expect(unauthorized.statusCode).toBe(401);
@@ -129,6 +129,11 @@ describe("HTTP security boundary", () => {
       headers: { cookie, origin: ORIGIN }
     });
     expect(obsolete.statusCode).toBe(404);
+    const authorizeForbidden = await app.inject({ method: "POST", url: "/api/v1/integrations/harness/authorize", headers: { cookie, origin: "https://evil.invalid" } });
+    expect(authorizeForbidden.statusCode).toBe(403);
+    const authorizeUnavailable = await app.inject({ method: "POST", url: "/api/v1/integrations/vscodeWeb/authorize", headers: { cookie, origin: ORIGIN } });
+    expect(authorizeUnavailable.statusCode).toBe(409);
+    expect(authorizeUnavailable.headers["cache-control"]).toBe("private, no-store");
     const official = await app.inject({
       method: "POST", url: "/api/v1/integrations/vscodeWeb/ensure",
       headers: { cookie, origin: ORIGIN }
@@ -419,4 +424,17 @@ describe("HTTP security boundary", () => {
     expect(deleted.statusCode).toBe(204);
     await app.close();
   });
+});
+
+it("enforces the declared integration authorization budget before returning bootstrap material", async () => {
+  process.env.PALMTTY_TEST_TOKEN = TOKEN;
+  const app = await buildTestApp();
+  try {
+    const cookie = await loginCookie(app);
+    for (let i = 0; i < 7; i++) {
+      const response = await app.inject({ method: "POST", url: "/api/v1/integrations/harness/authorize", headers: { cookie, origin: ORIGIN } });
+      expect(response.statusCode).toBe(i < 6 ? 409 : 429);
+      expect(response.headers["cache-control"]).toBe("private, no-store");
+    }
+  } finally { await app.close(); }
 });

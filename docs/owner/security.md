@@ -85,13 +85,13 @@ Agent 的 `--env-file` 只允许从本地文件载入严格 `NAME=value`，不�
 
 systemd unit 使用 `KillMode=process` 是为了保持既有“Agent lifetime != Worker lifetime”不变量；停止/restart Agent 不应因为 service manager 的默认进程组清理而杀掉 detached Worker。该行为不表示 OS reboot 后 Worker 可存活。
 
-## 交互式官方 VS Code Web 启动边界
+## 独立 Web 应用边界
 
-源码模式新增显式执行的 `pnpm start:with-vscode`，不修改原 Agent 服务、自启动 Task Scheduler/systemd 或 Web API；无 TTY、官方 CLI 缺失、Agent 未构建时在启动前失败。VS Code Web 固定绑定本机回环，保留微软首次交互式许可确认与连接令牌，不以 `--without-connection-token` 关闭认证；仅清理本次创建的子进程树，禁止猜测端口反向接管。跨设备只支持独立安全 HTTPS Origin/隧道，不能把微软 Web UI 通过 PalmTTY 登录 Origin 同源反代。部署时需遵守 [微软 VS Code Server 许可](https://code.visualstudio.com/docs/remote/vscode-server)。
+本机 managed/external 配置区分应用所有权。Code 使用用户另装的官方 CLI，个人自启默认关闭且不自动接受许可/关闭令牌；Harness 使用校验固定版本。仅回收创建时拥有的应用容器，不能接管未知端口/PID，也不能树形终止 Agent 而误杀持久 Worker。
 
-## 外部官方 VS Code Web / Harness 安全边界
+第三方 HTML 始终在独立 Origin，iframe 仅整合展示。目录/src 不含凭据，普通日志、存储、argv 和 PalmTTY Cookie 不含上游引导秘密。新增显式认证 + 精确 Origin 授权动作：只交接自有实例到配置的独立 HTTPS 根；本机直接接口可返回回环地址，转发请求不能冒认本机操作者。交接 no-store/no-referrer，客户端只在用户打开的独立标签页使用，不保存至 iframe 状态。`pnpm app:authorize` 仅在明确调用的交互终端显示私有地址，此项不属于默认日志。
 
-PalmTTY 只输出配置好的官方 VS Code Web/Harness 外部 URL，不传递上游认证凭据，不代理任意目标主机。官方 VS Code Server 必须由用户独立启动；仅 Harness 的自有子进程允许 Agent 管理，禁止接管未知第三方进程；用户必须自行保护官方 VS Code Web 和 DSH 的访问入口。只有 HTTPS 或本机回环 HTTP URL 可以配置，禁止 URL 中附带凭据和令牌参数。手机访问不能依赖 Windows 主机本地回环地址，跨设备的 HTTPS 部署尚需独立验证。
+该授权动作是相对原“所有远端引导凭据一律不返回”的有意调整，目的是在保持独立认证的前提下完成首次会话交接；绝不放行任意目标或共享 PalmTTY Token。上游 frame、Cookie、HTTP/WebSocket、同站子域和手机行为仍须单独验收。
 
 ## 仍需加强
 
@@ -128,3 +128,7 @@ Host 的文本预览、完整内容导出和图片读取现在以规范路径打
 可选 Qwen3-TTS 与终端 Session Worker 完全隔离。Agent 对固定本机回环端口使用独立 `PALMTTY_QWEN_TOKEN`，不向浏览器、日志、URL 或 Workspace 环境公开。合成 POST 强制认证、精确 Origin、有限流、文本/声音/风格白名单、固定目标地址、超时及音频大小/文件头校验；服务端不接受浏览器指定文件路径、模型目录、命令、任意 URL 或环境变量。Python 侧只读取用户手工配置的已下载模型目录，关闭模型权重自动下载，音频仅在有界内存内缓存。普通 LAN HTTP 未加密，涉及未发表小说时应使用 HTTPS 或受信任的私有隧道。
 
 这不是模型沙箱：预安装模型及其 Python/PyTorch 依赖在运行用户的权限下执行，必须信任其来源。模型推理服务须单独启动和停止；CPU/GPU 压力不应波及 Agent/Worker 逻辑。真机锁屏与长时资源表现属于尚需人工验收项。
+
+## 私有 Web 网关边界
+
+不同 Origin 的端口隔离不隔离 Cookie；第三方 HTTPS 入口必须使用不同主机名。受管私有网关用同站 sibling `.home.arpa` 名称，保留各自 Host/Origin 与认证检查。父页面和子框架均需受信任 HTTPS。网关与 DNS 由 Agent 租约管理，分别绑定具体私有地址、拒绝公网来源；上游根 URL 和端口来自既有配置。固定官方工具只在操作者部署时下载并校验 SHA-256，不在浏览器轮询中安装。DNS 无查询日志且转发并发有界，工具不继承工作区/登录密钥环境。私有 CA 私钥仅留主机用户数据目录；仅导出公开根证书。证书信任、防火墙和客户端 DNS 是明确的首次操作，不自动提权。

@@ -41,8 +41,10 @@ import { registerSpeechRoutes } from "./speech-routes.js";
 import { defaultWebRoot } from "./runtime-layout.js";
 import { PALMTTY_VERSION } from "./version.js";
 import { defaultRuntimeDir } from "./worker-storage.js";
+import { PrivateGateway } from "./private-gateway.js";
 import { ManagedWebApps } from "./managed-web-apps.js";
 import { isLoopbackHost } from "@palmtty/config";
+import { isLocalOperator } from "./local-operator.js";
 
 const LoginSchema = z.object({ token: z.string().min(1).max(4096) });
 
@@ -105,6 +107,12 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   const runtimeDir = options.sessionManager?.runtimeDir ?? defaultRuntimeDir();
   const artifacts = new SessionArtifactStore(runtimeDir);
   const managedWebApps = new ManagedWebApps(config);
+  const gatewayFailed = () => {
+    app.log.error("Private gateway failed; closing Agent-owned services");
+    process.exitCode = 1;
+    void app.close().catch(() => { process.exitCode = 1; });
+  };
+  const privateGateway = new PrivateGateway(config, gatewayFailed);
   const sessions = new SessionManager(config, {
     ...options.sessionManager,
     runtimeDir,
@@ -119,7 +127,9 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   const workspaceMutationLimiter = new FixedWindowLimiter(60, 60_000);
   const directoryBrowseLimiter = new FixedWindowLimiter(120, 60_000);
   const terminalProfileLimiter = new FixedWindowLimiter(60, 60_000);
-  const managedAppLimiter = new FixedWindowLimiter(6, 10 * 60_000);
+  // One policy drives both the actual shared budget and route metadata.
+  const managedAppRateLimit = { max: 6, timeWindow: 10 * 60_000 };
+  const managedAppLimiter = new FixedWindowLimiter(managedAppRateLimit.max, managedAppRateLimit.timeWindow);
 
   function authenticated(request: FastifyRequest): boolean {
     return auth.isAuthenticated(request.cookies[AUTH_COOKIE]);
@@ -275,7 +285,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   app.post("/api/v1/integrations/:id/ensure",
-    { preHandler: [requireOrigin, requireAuth] }, async (request, reply) => {
+    { config: { rateLimit: managedAppRateLimit }, preHandler: [requireOrigin, requireAuth] }, async (request, reply) => {
       const id = (request.params as { id: string }).id;
       if (!managedAppLimiter.allow(request.ip)) {
         return reply.code(429).send({ error: "too_many_web_app_requests" });
@@ -288,6 +298,21 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       void managedWebApps.ensure(id).catch(() => undefined);
       reply.header("Cache-Control", "private, no-store");
       return reply.code(202).send({ accepted: true });
+    }
+  );
+
+  app.post("/api/v1/integrations/:id/authorize",
+    { config: { rateLimit: managedAppRateLimit }, preHandler: [requireOrigin, requireAuth] }, async (request, reply) => {
+      reply.header("Cache-Control", "private, no-store");
+      reply.header("Referrer-Policy", "no-referrer");
+      const id = (request.params as { id: string }).id;
+      if (!isWebAppId(id)) return reply.code(404).send({ error: "unknown_web_app" });
+      if (!managedAppLimiter.allow(request.ip)) return reply.code(429).send({ error: "too_many_web_app_requests" });
+      const localBrowser = isLocalOperator(request.ip, request.headers.host ?? "", config.server.port,
+        Boolean(request.headers.forwarded || request.headers["x-forwarded-for"] || request.headers["x-forwarded-host"] || request.headers["x-forwarded-proto"]));
+      const url = await managedWebApps.authorizationUrl(id, localBrowser);
+      if (!url) return reply.code(409).send({ error: "web_app_authorization_unavailable" });
+      return { url };
     }
   );
 
@@ -621,8 +646,16 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   app.addHook("onClose", async () => {
+    await privateGateway.close();
     await managedWebApps.close();
     await sessions.close();
+  });
+
+  app.server.once("listening", async () => {
+    // Process bootstrap belongs to the native listener lifecycle, not HTTP
+    // request hooks. Explicit failure closes owned services; Workers survive.
+    try { await privateGateway.start(); managedWebApps.start(); }
+    catch { gatewayFailed(); }
   });
 
   return app;

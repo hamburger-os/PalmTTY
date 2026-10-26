@@ -39,7 +39,7 @@
 
 会话工作台提供：
 
-- “终端 / Git / 文件 / 附件”四个一级视图，终端始终是核心视图；
+- “终端 / Git / 文件 / 附件 / Code”五个一级视图，终端始终是核心视图；
 - 切到 Git/文件/附件时 Terminal 组件保持 mounted，xterm、WebSocket、`lastSeq` 与重连循环不被展示状态重建；隐藏时不传播 resize，切回终端再安全 `fit`；
 - Git 视图是轻量 Source Control 工作台，并在页内提供“更改 / 历史”两个一级子视图。“更改”显式显示完整仓库作用域、分支/上游/ahead-behind、冲突、staged/unstaged/untracked；diff 使用结构化 unified diff 行渲染并支持未跟踪文件预览；支持 rename-aware 的单文件 stage/unstage、显式仓库级 stage-all/unstage-all、带 diff 快照校验的丢弃、commit、分支创建/切换、stash，以及非交互 fetch/pull/push；status 一旦被截断或解析不完整，所有写/remote 控件立即禁用。“历史”始终只读，不需要启用 Git 写权限，按需加载基于首次 HEAD snapshot 的 opaque cursor 分页；支持全仓库 history、文件级 `--follow` history、commit 元数据/changed files 与单文件 commit diff；根提交按 empty-tree 查看，普通/merge 提交统一按 first parent 作为历史审查基线，避免 merge commit 在默认 diff-tree 语义下出现空详情。Files 可直接把当前文件路径带入 History，形成“章节/文件 → 历史 → 提交 → diff”的移动端链路。进入页面、窗口重新聚焦/回到前台和可见页低频轮询都会刷新 status；Git sidebar 仍是 changes/history/tools 的唯一纵向滚动 owner，列表自身不建立第二层纵向滚动区；
 - 文件视图以持久 Workspace 根目录为边界浏览目录和文件，提供 UTF-8 文本只读预览；`.md`/`.markdown` 默认在本地按 GFM 渲染，支持「预览／源码」切换，渲染结果必须经过 HTML 净化；本地相对链接沿用 Workspace Files 接口且不允许越过根目录，外部 HTTP(S)/mailto 链接以无 referrer 的新标签打开，图片仅显示替代文字而不自动发出外部请求；Markdown 表格恢复原生表格布局，列宽至少 9rem、内容正常换行，宽表仅由独立容器横向滚动（含溢出检测、触摸提示和键盘可聚焦）；正文纵向滚动仍归文件预览区域，手机不会将宽表压成单字竖列，窄表不额外展示提示；PNG/JPEG/WebP/GIF 通过独立受保护接口按真实签名、尺寸/像素边界校验并使用稳定有界读取后直接预览，其他二进制文件只显示状态，大文本预览在 512 KiB 截断。预览与“完整文件”语义明确分离：复制完整文本、系统 Share Sheet 文件分享和下载 fallback 使用独立、同 containment 的 8 MiB 有界完整文件接口，因此不会把 512 KiB 截断预览误当成完整内容；手机预览标题优先显示 basename，把父目录作为次级信息，并可一键进入该文件 Git 历史；
@@ -151,3 +151,11 @@ GFM 提示块、常用语言代码高亮和 KaTeX 公式使用本地依赖，Mer
 Pi Fullscreen 右侧竖线由 Pi 在终端网格内以 `│`、`┃`、`█` 等字符逐行绘制，并非 xterm 自身 4px 滚动条。默认 DOM 字体字形在高 DPI、特定字体与行高下可能有断点。浏览器 xterm 在 `open()` 后优先装载与当前 xterm 版本匹配的 WebGL2 addon，开启 Box Drawing/Block Elements 自绘字形，保持当前 1.15 行高与中文阅读排版。WebGL 初始化不可用或 context loss 时仅销毁 addon，自动由同一个 xterm 实例退回 DOM；组件卸载时先清理 addon，再销毁 terminal，不重置 PTY/WebSocket/Worker。
 
 滚动手感仍按所有权区分：普通 Shell scrollback 使用 xterm 的像素滚动与惯性；Pi 等全屏鼠标跟踪 TUI 由 xterm 转换滚轮为有效 SGR 报告后远程驱动 TUI 自己的行级导航，无法无损改造成 Safari 原生 DOM 惯性。仍以 xterm 为唯一触摸手势/滚动 owner，保持浏览／交互输入筛选，不添加第二个 touch adapter、轮询或自动发送箭头。验收应覆盖 iPhone/Android 真机、WebGL2 禁用/恢复失败、后台切回、切工具页、缩放/字号变化、连续长输出与 Pi Fullscreen 线条连贯性；CI 无法证明真机滚动体感已改善。
+
+## 独立应用视图
+
+顶层应用切换器提供终端/首页、Code、Harness，独立于 Session 的 Git/Files/Artifacts 权限。第三方页面直接跨 Origin iframe 加载，首次访问挂载、切换保留；当前终端仍挂载，仅隐藏时停用尺寸传播。首次授权独立打开，完成后刷新视图，独立打开始终保留。共享卡片几何和 button/link 动作遵循主题 SSOT，不通过跨 Origin CSS 注入统一上游内部界面。相关主题/手机矩阵仍需按主题 review 技能验收。
+
+## 开发应用入口
+
+通用产品定位为“自托管远程开发工作台”，面向所有远程访问设备，仍保留移动端触摸/键盘专项优化。首页不再展示全局终端/Code/Harness 三按钮。Code 位于工作区附件右侧，打开当前主机工作区目录并与其他视图共用工作台几何；终端隐藏但不卸载。Harness 由首页卡片进入，提供单一返回入口。无访问路径与应用安装失败使用不同提示。

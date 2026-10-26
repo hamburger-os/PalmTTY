@@ -1,7 +1,7 @@
 {
   "name": "PalmTTY",
   "short_name": "PalmTTY",
-  "description": "Mobile-first, self-hosted remote development terminal.",
+  "description": "Self-hosted remote development workbench.",
   "id": "/",
   "start_url": "/",
   "scope": "/",

@@ -8,11 +8,14 @@ export const WEB_APP_IDS = ["vscodeWeb", "harness"] as const;
 export type WebAppId = (typeof WEB_APP_IDS)[number];
 export type WebAppPhase =
   | "detecting" | "not_installed" | "installed" | "installing"
-  | "starting" | "running" | "manual_required" | "failed";
+  | "starting" | "running" | "external" | "disabled" | "failed";
 export type WebAppStatus = {
   id: WebAppId;
   phase: WebAppPhase;
   accessUrl?: string;
+  embedUrl?: string;
+  canEnsure?: boolean;
+  canAuthorize?: boolean;
   detail?: string;
 };
 export type WebAppCatalog = { apps: Record<WebAppId, WebAppStatus> };

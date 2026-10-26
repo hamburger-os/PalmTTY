@@ -113,10 +113,6 @@ PalmTTY 自启动始终属于当前用户：Windows Task Scheduler 使用交互�
 
 ### Third-party Web service boundary / 第三方 Web 服务边界
 
-External official VS Code Web and Harness links are optional operator-managed URLs. PalmTTY never adopts or terminates unverified external processes: the only managed upstream child is the Harness process it directly spawned. Neither UI is proxied into PalmTTY's login Origin. Use separate secure origins and independent application authentication.
-
-微软官方 VS Code Web 由部署者在符合许可的交互式会话中独立启动；PalmTTY 只管理自有的 Harness 安装和子进程，不接管未知进程，也不通过 PalmTTY 共享 Cookie、代码执行权限或远程地址代理。请避免保存令牌 URL，跨设备访问必须另行完成可信 HTTPS/私有网络部署。
-
 ### Single terminal controller (October 2026)
 
 Each terminal WebSocket still requires authentication and exact Origin. Within an authorized Session, a single ephemeral Agent-managed client controls PTY input and geometry. Others may only watch until the active controller leaves and they explicitly request takeover. This is concurrency control, not an additional account/authorization boundary.
@@ -151,7 +147,14 @@ PalmTTY does not downgrade browser terminal protocol v4. To protect already-runn
 
 **中文：** 浏览器报告为在线或来源未知的音色，一律视为可能发送原文，需要本次阅读逐音色明确授权，不提供静默远端回退。第三方系统语音的数据保留政策不受 PalmTTY 控制。Qwen 默认关闭；启用后 Agent 合成 POST 要求登录认证、精确 Origin、固定的文本／音色／风格上限、限流与独立的本机服务 token。正文和 token 不进入默认日志。部署者必须手工选择并信任已下载的模型权重，不应把 Python 服务绑定公网地址。局域网 HTTP 传输未加密，未发表小说建议使用 HTTPS。
 
+### Managed application handoff / 受管应用授权交接
 
-Official VS Code Web optional joint start is intentionally foreground-only: the caller must have an interactive TTY, the upstream license prompt is preserved, generated connection-token auth is not disabled, and only this invocation's child processes may be stopped. The VS Code CLI is launched without PalmTTY bootstrap/token environment keys. Off-host mobile clients must reach the separate protected HTTPS origin through a same-host proxy or authenticated tunnel, never through PalmTTY's authenticated Origin.
+Host configuration explicitly chooses managed/external ownership. Code requires a separately installed official CLI and personal opt-in; no silent license acceptance or token bypass. Private leases reclaim only owned application/installer trees, preserving independent Terminal Workers. Cross-Origin iframe presentation never grants same-Origin PalmTTY access. Catalogue/frame URLs contain no bootstrap token; only authenticated exact-Origin explicit authorization can hand the owned instance to its configured independent HTTPS root. Direct local operator traffic is distinguished from forwarded browser traffic; `pnpm app:authorize` may display a private URL only in an explicitly invoked interactive terminal. Ordinary logs/storage/argv remain secret-free. No claim of universal Microsoft TTY requirements or blanket permission for service hosting is made.
 
-官方 VS Code Web 仅能由用户在源码版交互式终端显式联合启动；不关掉连接令牌、不静默接受许可、不将第三方 UI 代理进 PalmTTY 登录 Origin。跨主机 NAS 不可能直接访问 Windows 工作站回环地址，手机要使用同机 HTTPS 代理或受保护的回环隧道。
+本机配置明确应用管理方式，官方 Code 个人启动显式选择，不静默接受许可或关闭令牌。私有进程租约仅回收自有应用/安装器，保留独立终端 Worker。iframe 保持独立 Origin，目录/src 不带秘密；首次授权需认证和精确 Origin，只交接到配置的独立 HTTPS 根。本机操作者请求与代理请求分开；仅显式交互授权命令可显示私有 URL，普通日志、存储与 argv 不保存凭据。
+
+## Private HTTPS workbench / 私有 HTTPS 工作台
+
+Code is workspace-scoped after Artifacts; Harness is entered from its home card. Global application navigation is removed without unmounting live terminals. Optional Windows x64 `server.privateGateway` derives three separate same-site HTTPS hosts from the existing URLs, provisions pinned hash-verified Caddy/CoreDNS, and supervises them through owned leases. DNS is private-source-only, bounded and unlogged. Cookie hosts must differ even when ports differ. Root trust, client DNS and private firewall access require explicit initial setup; no automatic elevation. See [Web integrations](web-integrations.md).
+
+Code 入口位于工作区附件后并打开持久化主机目录；Harness 从首页卡片进入。删除全局三按钮但保留终端实例。可选 Windows x64 私有网关由既有 URL 派生三个同站不同主机名，部署固定哈希工具并由 Agent 租约管理。DNS 只接受私有来源、转发有界且不记录查询。端口不能隔离 Cookie。客户端首次信任、名称解析和私有防火墙配置需明确操作，不能静默提权；参见上述文档。

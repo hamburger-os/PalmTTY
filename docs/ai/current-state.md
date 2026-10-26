@@ -11,22 +11,27 @@
 
 
 
-### Interactive official VS Code Web joint launcher (2026-10-25)
+### Workspace Code and private HTTPS access (2026-10-26)
 
-- Root source script `pnpm start:with-vscode` (after `pnpm build`) opt-in launches `code serve-web --host 127.0.0.1 --port <local-config-port-or-8000>` and `apps/agent/dist/index.js` in the invoking user's interactive foreground terminal; no change to `pnpm start`, `palmtty service`, or `pnpm autostart`.
-- Official `code` CLI path discovery has a single Node-host source in `@palmtty/config`; Agent catalog and launcher share it. The launcher rejects non-TTY invocation, inherits VS Code license prompts and connection token, does not accept server license implicitly, does not use `--without-connection-token`, and removes PalmTTY control secrets from VS Code's environment. It supervises only children it launched, including bounded/forced cleanup on exit.
-- The launcher is source-mode only and needs a separately installed official VS Code CLI; it does not bundle VS Code binaries or turn VS Code Server into a system service. Microsoft licensing and Windows actual-host process-tree/interactive authentication remain manual acceptance. NAS off-host proxies cannot route directly to its 127.0.0.1 listener. Phone remote access needs a protected separate HTTPS Origin/tunnel; no automatic remote setup or Codex Web guarantee.
+- Product copy describes a self-hosted remote development workbench. Generic access copy is device-neutral; touch/keyboard-specific mobile documentation remains specific.
+- Global three-way application navigation is removed. Code follows Artifacts in the existing workspace tab row and opens the persisted host cwd using the upstream folder URL parameter. WSL paths are explicitly unsupported by a Windows host Code instance; no guessed mapping or process restart. Terminal stays mounted and hidden geometry is paused. Harness is entered from its home card and returns through a single back action.
+- Missing remote routes are separate from installation failures; running applications without an access URL do not offer installation retry.
+- Optional server.privateGateway is an explicit Windows x64 deployment profile adjunct: loopback reverseProxy, one PalmTTY Origin plus two managed-app URLs with distinct sibling hostnames under .home.arpa, all HTTPS port 443. Those URLs are the sole hostname source. Different HTTPS ports do not isolate authentication cookies, so shared HTTPS hostnames are rejected.
+- deploy:local provisions pinned SHA-256-verified Caddy/CoreDNS archives from official releases. Agent-owned leases supervise the HTTPS gateway and private-address-only DNS, strip unrelated environment, and reclaim both on shutdown. The HTTPS listener binds the configured private IP; DNS forwards other names to the configured private resolver with bounded concurrency and no query logging. Unknown port owners are never killed; trust-store/firewall elevation is never automatic.
+- The private CA persists in the current user's private-network directory. Deployment exports only its public root certificate and iOS profile plus client instructions. Client DNS, root trust and private firewall access remain explicit operator setup. All three browser pages must use trusted HTTPS; VPN transport alone does not establish a browser secure context. Exact iOS Safari iframe/API/WS acceptance still requires the owner's device.
 
-### Official VS Code Web and managed Harness (2026-10-25)
+### Explicit managed Web applications and embedded views (2026-10-26)
 
-- Authenticated no-store `GET /api/v1/integrations` returns both always-visible app statuses, with bounded detection and sanitized diagnostics; `POST /api/v1/integrations/:id/ensure` requires exact Origin and authentication and uses a single-flight manager.
-- Microsoft's official `code` CLI candidates are discovered and displayed for VS Code Web even with zero Workspaces. `code serve-web` must be launched by an interactive user according to Microsoft's server license; PalmTTY Agent does not install, spawn or service-host it; only the explicitly invoked interactive local joint launcher may start its owned foreground CLI. Harness is an independent managed process: existing CLI preferred, otherwise pinned `@deepseek-ai/dsh@0.2.1-rc.2` installed through an available host npm in a current-user directory; run with Node 24, fixed loopback host and random port.
-- Windows/Linux installed runtime bundles Node 24 plus npm from the same official distribution. Automatic Harness install no longer requires system npm in installed mode; source mode may still report `npm_unavailable`. Neither system elevation nor random third-party executable launch occurs.
-- The Web-app ID/status types have one definition in @palmtty/protocol. Harness installs stage privately and verify pinned package identity before publication; failed status remains failed even if a partial CLI appears; owned-child close is observed before readiness and Agent close has a bounded exit wait, not proven Windows process-tree cleanup.
-- No same-origin proxy or cloud relay exists. Captured DSH process-token URL is withheld from LAN/reverse-proxy clients. Remote browser access needs a dedicated trusted external HTTPS Origin; without it, running local service does not imply phone accessibility.
-- DSH continues to own its workspaces/sessions/authentication, Codex CLI is a Terminal launch command. Workspace Store v4 remains unchanged; no Remote App profiles or worker reintroduced.
-
-
+- Optional `integrations.vscodeWeb` / `harness` entries are discriminated objects: `managed` owns a fixed loopback port, default-off autoStart and optional independent public URL; `external` owns only its URL and never launches locally. Legacy strings and the separate interactive joint launcher are removed.
+- Agent onListen starts configured applications; browser login/catalogue polling have no installation side effects. Ensure is authenticated, exact-Origin and single-flight per app. Disabled/external states never claim local readiness.
+- Code binaries remain separately installed. Personal managed launch is a host-only opt-in; no automatic license acceptance or token-disable flags. Official tunnel service support and Server hosting restrictions are distinct; a universal TTY requirement is not asserted and no Azure tunnel is introduced.
+- Harness uses one verified pinned private npm installation. Install stages publish only after validation, retain bounded output without killing verbose successful npm, and distinguish 10-minute install timeout from 75-second startup timeout. Unverified global npm entries are not executed.
+- Managed apps/installers have a pipe lease and Windows non-breakaway kill-on-close Job or POSIX workload process group. Agent signal shutdown closes the app; forcible Agent loss closes leases. Durable Terminal Workers retain their independent lifecycle; no saved PID grants kill authority.
+- Source Windows helpers are content-addressed so rebuilding does not replace an executable held by running applications.
+- Catalogue/iframe URLs never contain bootstrap tokens. Only explicit authenticated exact-Origin POST `/api/v1/integrations/:id/authorize` may hand off the owned instance's upstream process URL to its operator-configured independent HTTPS root. Remote loopback token URLs remain withheld; credentials never enter logs, storage, iframe state or PalmTTY cookies.
+- Independent-Origin frames mount lazily and survive switching. Hidden terminal geometry is paused without remount/reconnect. First authorization opens separately. Shared card geometry and button/link actions consume existing theme tokens.
+- Explicit interactive `pnpm app:authorize <vscodeWeb|harness>` can display a private local bootstrap URL to its operator; direct numeric local authority/socket checks reject forwarded traffic. This intentional display is not a default log surface.
+- Source `pnpm deploy:local` installs frozen dependencies, builds, preflights, installs user startup and verifies autoStart apps; Windows without arguments reuses installed config/env-file paths. Upgrade preflight may stop only the registered user startup instance when its sole failure is endpoint occupancy, then retries and restores startup on failure; unknown listeners are never terminated. DNS/TLS/NAS and exact-version mobile embedded HTTP/WebSocket acceptance remain external checks. Legacy direct Windows Code leftovers have an explicit scoped cleanup script.
 
 ### Mobile terminal pointer routing (2026-10-15)
 
@@ -288,3 +293,24 @@ Do not claim persistence beyond what is tested: browser disconnect and Agent res
 
 - Windows/Linux installed Agent packages include npm CLI from the same official Node 24 distribution. Package license file is preserved, npm packages are included in the SBOM and `npmVersion` is recorded in the release manifest. Installed smoke executes the real npm CLI under the bundled Node and matches its version.
 - Source mode may still require an available npm installation. No proxy, elevated OS installer or automatic external HTTPS Origin provisioning is added.
+
+
+### Switching an operator deployment from HTTPS reverse proxy to private VPN HTTP
+
+- Existing `lan` exposure is the explicit profile for direct private/overlay IPv4 HTTP, including access routed through WireGuard. Replace the complete exposure object; do not retain strict-schema reverseProxy listenHost/origins fields. Authentication stays enabled, exact private Origins are derived from host interfaces, and Cookie Secure behavior follows the profile.
+- This is operator deployment configuration, not a new product default or Origin bypass. It does not restrict reachability to VPN peers by itself; host firewall/routing policy remains operator-owned. Deployment checks must validate trusted-Origin login plus cookie-authenticated requests, reject an unrelated Origin and unauthenticated access, and reconcile live Sessions after restart.
+
+### Windows managed-app host acceptance (2026-10-26)
+
+- Actual official Code and pinned Harness startup succeeded on isolated ports and the configured 8000/3080 defaults; upstream unauthenticated HTTP remains rejected. Temporary owned trees and listeners were reclaimed after tests; the registered startup task uses Limited/Interactive current-user execution.
+- Browser checks covered three themes by two performance modes with reduced motion active, portrait and short landscape, empty/populated workspace cards, lazy frame retention, and a connected terminal remaining mounted/connected across application and theme switches. Upstream phone HTTPS iframe authentication/WebSocket and physical-device keyboard/IME remain unverified until independent domains/proxies exist.
+
+Private gateway bootstrap / 私有网关首次配置：the old private IP HTTP address serves only the public CA certificate/profile and setup page, never login/API/workspace content. 旧私有 IP HTTP 地址仅提供公开证书、描述文件和首次配置页，不提供登录、API 或工作区内容；认证工作台只经 HTTPS 访问。
+
+### Integration closeout validation (2026-10-26)
+
+- The operator confirmed phone access through the private HTTPS/WireGuard setup. Third-party small-screen usability is limited; Terminal remains the main workflow and both embedded tools stay optional. This is general access confirmation, not a claim that all upstream extensions/OAuth/IME combinations passed.
+- Owned services start once on the native server listening event. Required private-gateway bootstrap failure explicitly sets a nonzero exit status and closes Agent-owned services. A closed gateway cannot regenerate children during asynchronous startup; independent Workers keep their existing lifetime.
+- Source deployment and interactive authorization share a bounded local Agent client. Direct HTTPS connects to the configured local listener while validating the first configured HTTPS Origin identity against the configured certificate chain, with explicit partial-chain trust and certificate/hostname verification enabled. TLS errors fail immediately; no global trust modification or certificate-validation bypass.
+
+- Managed application requests share one real per-IP budget; the same policy object supplies Fastify route metadata for static analysis. The runtime guard remains authoritative and authorization burst rejection is regression-tested. Listener lifecycle setup is distinct from HTTP request hooks; no CodeQL query is disabled or ignored.

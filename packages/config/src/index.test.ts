@@ -44,11 +44,11 @@ describe("configuration", () => {
   it("validates credential-free integration origins", () => {
     const config = parseConfig({
       integrations: {
-        vscodeWeb: "http://127.0.0.1:8000/",
-        harness: "https://dsh.example.test/"
+        vscodeWeb: { mode: "managed", port: 8000, url: "http://127.0.0.1:8000/" },
+        harness: { mode: "external", url: "https://dsh.example.test/" }
       }
     });
-    expect(config.integrations.vscodeWeb).toBe("http://127.0.0.1:8000/");
+    expect(config.integrations.vscodeWeb?.url).toBe("http://127.0.0.1:8000/");
     // The abandoned third-party code-server key is not a compatibility alias.
     expect(() => parseConfig({ integrations: { codeServer: "https://code.example.test/" } })).toThrow();
     for (const value of [
@@ -57,7 +57,7 @@ describe("configuration", () => {
       "https://dsh.example.test/?token=secret",
       "https://person:secret@dsh.example.test/"
     ]) {
-      expect(() => parseConfig({ integrations: { harness: value } })).toThrow();
+      expect(() => parseConfig({ integrations: { harness: { mode: "external", url: value } } })).toThrow();
     }
   });
 
@@ -237,4 +237,26 @@ describe("configuration", () => {
       workspaces: [{ id: "legacy", name: "Legacy", cwd: "C:\\Code" }]
     })).toThrow();
   });
+});
+
+
+it("rejects legacy integration strings, shared Origins and conflicting managed ports", () => {
+  for (const integrations of [
+    { harness: "https://harness.example.test/" },
+    { harness: { mode: "managed", port: 7688 } },
+    { harness: { mode: "external", url: "http://127.0.0.1:7688/" } },
+    { harness: { mode: "external", url: "https://app.example.test/" }, vscodeWeb: { mode: "external", url: "https://app.example.test/" } }
+  ]) expect(() => parseConfig({ integrations })).toThrow();
+  expect(parseConfig({ integrations: { vscodeWeb: { mode: "managed" } } }).integrations.vscodeWeb)
+    .toEqual({ mode: "managed", port: 8000, autoStart: false });
+});
+
+it("requires separate cookie hosts and a coherent private HTTPS gateway", () => {
+  const base = { server: { exposure: {mode:"reverseProxy", listenHost:"127.0.0.1", origins:["https://palm.palmtty.home.arpa"]}, privateGateway:{listenHost:"192.168.1.3",upstreamDns:"192.168.1.1"}}, integrations: {
+    vscodeWeb:{mode:"managed",url:"https://code.palmtty.home.arpa"}, harness:{mode:"managed",url:"https://harness.palmtty.home.arpa"}
+  }};
+  expect(parseConfig(base).server.privateGateway?.listenHost).toBe("192.168.1.3");
+  expect(() => parseConfig({...base, integrations:{...base.integrations,harness:{mode:"managed",url:"https://code.palmtty.home.arpa:8443"}}})).toThrow();
+  expect(() => parseConfig({...base, server:{...base.server,exposure:{mode:"lan"}}})).toThrow();
+  expect(() => parseConfig({...base, server:{...base.server,privateGateway:{listenHost:"0.0.0.0",upstreamDns:"192.168.1.1"}}})).toThrow();
 });

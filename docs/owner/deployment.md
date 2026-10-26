@@ -168,12 +168,36 @@ QNAP 规则的目标协议必须选择其“HTTP + WebSocket”一类组合，�
 - Harness 的自动发现/安装/启动不是这次 Node 迁移的交付内容，属于后续独立集成阶段。
 
 
-## 管理式 Harness 的部署限制
+## 受管 Web 应用与一键部署
 
-Agent 可将固定版本 DSH 安装在当前用户应用数据目录，并以已有 Node 启动到随机回环端口。正式 Windows/Linux 发行包包含 Node 24 以及它的官方 npm CLI；源码模式缺少安装器时返回可诊断状态，不会下载运行系统安装器、提权、修改防火墙或创建 Windows 服务。当前使用微软官方 VS Code Web 的 `code` CLI 检测及外部 URL，用户须在许可允许的交互式会话中启动 `code serve-web`，Agent 不托管官方服务器进程。NAS 原先只代理 PalmTTY 的一个 HTTPS Origin，安全访问第三方 Web 仍需额外独立 Origin 及上游认证；禁止同源直接透传第三方脚本。
+应用采用明确 `managed` / `external` 配置，参见 [web-integrations.md](web-integrations.md)。Code 默认回环 8000、Harness 默认回环 3080，autoStart 默认关闭，操作者明确启用后随 Agent 启动。Code 需自行安装官方 CLI 并确认条款，Harness 用固定私有安装；没有静默接受许可、提权或共享认证。
 
-## 个人交互式联合启动（仅源码模式）
+`pnpm deploy:local [--config <path>] [--env-file <path>]` 完成冻结依赖、构建、预检、自启安装和应用就绪检查；Windows 无参数复用已有 installation 的配置/环境文件路径。`pnpm app:authorize <vscodeWeb|harness>` 在操作者明确执行的交互终端显示本机私有首次登录地址，不进入默认日志或 argv，完成后使用干净根 URL。此命令从直接本机接口认证，不接受代理转发请求作为本机操作者。
 
-`pnpm start:with-vscode` 使用已构建的 Agent 和主机用户自行安装的官方 VS Code `code` CLI，启动同一交互式会话中的 PalmTTY Agent 与 `code serve-web` 前台子进程。入口必须有 TTY、不会自动接受微软条款、不关闭上游连接令牌。监听地址固定 `127.0.0.1`；端口为 `integrations.vscodeWeb` 指定的回环 HTTP URL 显式端口，或默认 8000；如果配置为外部 HTTPS URL，则仍使用本机 8000 作为代理上游端口。浏览器原点与认证仍完全独立。
+Windows 构建预编译同一个 GUI helper 的受管子进程模式，应用在恢复执行前加入不允许 breakaway 的独立 Job。Agent 强停时租约关闭回收应用/安装器树；Session Worker 继续使用原有独立持久边界。Linux 对应租约监督器和进程组，不能把 KillMode=process 当作应用清理实现。
 
-该启动器只在用户显式执行时有效，不打包微软二进制，不挂在 Windows Task Scheduler 或 systemd `--user` 的 Agent 自启动生命周期下。关联合运行只终止本次由启动器创建的进程树，不能据此声明任意 Windows 后代均完成清理。NAS 若在另一设备，不能直接反代工作站 `127.0.0.1`，必须在同机部署独立 HTTPS 代理，或通过安全隧道到工作站回环地址。用户在配置 `integrations.vscodeWeb` 时只能保存无凭据基础 URL，不保存启动令牌。 
+目前没有第三方域名时先验收本机两个回环服务；手机 127.0.0.1 指向手机自己。域名准备好后，配置同主域不同 HTTPS 子域，由主机代理到回环，NAS 再按 Host/TLS 和 WebSocket 转发，参考 `examples/web-apps.Caddyfile`。代理不共享 PalmTTY Origin、不记录查询凭据；DNS/TLS/NAS 并不由本机一键命令自动修改。
+
+
+升级时若预检唯一失败项是已有监听占用，且已注册当前用户 PalmTTY 服务，一键入口仅通过 Task Scheduler/systemd 停止该注册实例，再预检和更新；失败时尝试恢复原服务，不杀端口拥有者或猜测 PID。源模式原生应用 helper 使用内容寻址文件名，避免构建覆盖正在运行的 Windows 可执行文件。
+
+清理脚本识别活跃 PalmTTY helper 父链并保留其受管 Code 节点；它只用于旧直接启动残留。上游服务重启后可能要求重新授权，日常 iframe 地址始终不保存引导凭据。
+
+
+## 从 HTTPS 反代切换到 VPN 内网 HTTP
+
+通过 WireGuard 路由直接访问主机私有 IPv4 的 HTTP 入口时，使用现有 `server.exposure.mode: lan`。将 exposure 整个对象替换为只含 `mode: lan`，删除旧 reverseProxy 的 listenHost/origins 字段，保留端口、认证与应用配置，然后执行 `pnpm deploy:local` 生效。
+
+网络隧道不会改变浏览器 Origin，也不会让 HTTP 满足 Secure Cookie 的 HTTPS 条件。lan 配置会按当前主机私有 IPv4 生成精确来源并使用匹配 HTTP 的 Cookie；不能通过通配 Origin、关闭认证或伪造 Origin 修复登录。lan 本身面向私有网络，不等同于只允许 VPN 客户端；仅限 VPN 的访问控制仍由防火墙/路由策略负责。
+
+## WireGuard 内网 HTTPS 自启
+
+可在既有单一配置中启用 `server.privateGateway: { listenHost: <主机私有IPv4>, upstreamDns: <现有私有DNS> }`。同时使用回环 reverseProxy 和同父域 `.home.arpa` 下的三个不同 HTTPS 名称（PalmTTY exposure Origin、Code URL、Harness URL）；应用保持 managed 回环端口。仅 Windows x64 支持本机自动供应。部署脚本校验固定官方工具归档，构建后供应 Caddy/CoreDNS，再注册现有用户自启。正常或强停后工具由 Agent 租约回收，CA 保留以供重启续签。
+
+`pnpm deploy:local` 导出当前用户 `PalmTTY/private-network` 中的根证书、iOS 安装描述文件和连接说明。客户端 WireGuard DNS 指向网关 IP；iOS 需安装并完全信任根证书，Windows 可明确导入 CurrentUser Root。私钥不导出。入站 TCP 443、TCP/UDP 53 只允许私有网络；若防火墙阻止，操作者执行连接说明中的管理员命令。不自动提权，不开放公网端口，不修改 NAS。
+
+私有网关首次配置：旧私有 IP HTTP 地址仅提供公开证书、描述文件和首次配置页，不提供登录、API 或工作区内容；认证工作台只经 HTTPS 访问。
+
+### 启动失败与直接 HTTPS 检查
+
+私有网关启动失败显式设置非零退出并关闭 Agent 自有服务，使既有自启失败策略生效；不终止持久 Worker。直接 HTTPS 部署检查与本机授权复用有界请求器，以本机绑定地址连接、配置 HTTPS Origin 进行身份校验，以配置的服务器证书链作为显式本地信任锚（允许部分链），保持名称与证书验证；TLS 配置错误立即报错，不等待整个部署超时、不改系统信任。

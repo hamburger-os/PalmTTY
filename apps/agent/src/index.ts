@@ -67,6 +67,18 @@ async function main() {
     ...(tls ? { https: tls } : {})
   });
   const host = serverBindHost(config);
+  let closing = false;
+  const shutdown = () => {
+    if (closing) return;
+    closing = true;
+    void app.close().catch(() => { process.exitCode = 1; });
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+  app.addHook("onClose", async () => {
+    process.off("SIGINT", shutdown);
+    process.off("SIGTERM", shutdown);
+  });
   try {
     await app.listen({ host, port: config.server.port });
   } catch (error) {

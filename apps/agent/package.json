@@ -4,12 +4,12 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node ../../scripts/build-windows-host.mjs",
     "dev": "tsx watch src/index.ts --development",
     "preflight": "tsx src/index.ts --preflight",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "pnpm --filter @palmtty/protocol build && pnpm --filter @palmtty/config build && vitest run"
+    "test": "pnpm --filter @palmtty/protocol build && pnpm --filter @palmtty/config build && pnpm run build && vitest run"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.3",

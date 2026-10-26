@@ -58,8 +58,6 @@ pnpm start
 
 ### Official VS Code Web and Harness
 
-Install the official Microsoft VS Code desktop/CLI on the Agent host. After `pnpm build`, either manually start `code serve-web --host 127.0.0.1 --port 8000`, or in an interactive user terminal run `pnpm start:with-vscode` to start the CLI together with the built PalmTTY Agent. Follow the official VS Code Server license and upstream authentication instructions; do not host it through PalmTTY as a background service. Optionally configure a credential-free, separately protected Web URL under `integrations.vscodeWeb`. Detection does not establish the server is running.
-
 Harness may launch on the Agent's loopback. Cross-device DSH still requires separate protected HTTPS, upstream `--public-url` and `--trusted-host`, and independent authentication.
 
 ### Linux host quick start
@@ -166,8 +164,6 @@ netsh interface ipv4 show excludedportrange protocol=tcp
 
 ### 官方 VS Code Web 与 Harness
 
-在 Agent 主机安装微软官方 VS Code。源码模式完成 `pnpm build` 后，可以在许可允许的交互式用户终端中独立运行 `code serve-web --host 127.0.0.1 --port 8000`，也可以执行 `pnpm start:with-vscode` 联合启动它与 PalmTTY Agent。PalmTTY 不作为后台服务托管官方 VS Code Server；可以在 `integrations.vscodeWeb` 配置已部署、受保护且不含令牌的访问地址。检测到 CLI 不等于 Web Server 已启动。
-
 Harness 可由 Agent 在回环地址启动；手机跨设备访问仍需独立安全 HTTPS、DSH `--public-url` / `--trusted-host` 与上游登录认证。
 
 ### Linux 宿主快速开始
@@ -250,3 +246,10 @@ Qwen 模型及 Python 依赖是可选独立安装，不随主安装包分发或�
 **English:** Source mode requires Node 24 LTS (at least the `.node-version` security baseline). Switch the host Node binary and rerun `pnpm install --frozen-lockfile` to rebuild native `node-pty` for the current ABI; validate with `pnpm check`. If the source-mode autostart recorded an older absolute Node path, reinstall it. Windows/Linux release archives bundle Node 24. End existing Node 22 Terminal Sessions before upgrade rather than leave detached old Workers alongside the new Agent. No dual-Node compatibility layer is provided.
 
 **中文：** 源码部署只支持 Node 24 LTS（不低于 `.node-version` 版本）。切换本机 Node 后重新运行 frozen-lockfile 安装，重建原生 `node-pty`，完成 `pnpm check`；如源码自启动记录的 Node 绝对路径变化，需重装自启动。正式安装包已内置 Node 24。升级前建议结束旧 Node 22 的终端 Worker，避免旧版 Worker 与新 Agent 混跑；不增加双版本兼容层。
+
+
+### One-command local deployment / 一键本机部署
+
+`pnpm deploy:local [--config <path>] [--env-file <path>]` installs frozen dependencies, builds, preflights and registers current-user startup before checking configured autoStart apps. Windows can reuse an existing installation with no options. Use explicit managed/external objects from [Web integrations](web-integrations.md), not URL strings. Local ports default to Code 8000 and Harness 3080; a phone cannot reach the host through its own loopback. DNS/TLS/NAS requires separate first-time setup. Explicit interactive `pnpm app:authorize <vscodeWeb|harness>` displays the private local first-sign-in URL; do not record/share it.
+
+上述命令完成本机构建、预检、自启和就绪检查，Windows 无参数复用安装路径；应用采用明确对象配置。Code/Harness 默认回环端口为 8000/3080，手机 HTTPS 域名与代理首次单独配置。本机明确执行交互授权命令可获取私有首次登录地址，勿记录或分享。自启不表示 OS 重启后旧终端存活。

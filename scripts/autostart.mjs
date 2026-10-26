@@ -123,6 +123,16 @@ async function renameWithRetry(source, destination, attempts = 20) {
   }
 }
 
+async function removeWithRetry(target) {
+  for (let attempt = 1; ; attempt += 1) {
+    try { await rm(target, { force: true }); return; }
+    catch (error) {
+      if (process.platform !== "win32" || !WINDOWS_FILE_RETRY_CODES.has(error?.code) || attempt >= 20) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
+
 async function moveIfPresent(source, destination) {
   if (!await regularFileExists(source)) return false;
   await renameWithRetry(source, destination);
@@ -255,8 +265,8 @@ async function installWindows(inputs) {
     await rm(paths.runtime, { force: true });
     run("schtasks.exe", ["/Run", "/TN", WINDOWS_TASK_NAME]);
 
-    await rm(backupHost, { force: true });
-    await rm(backupInstallation, { force: true });
+    await removeWithRetry(backupHost);
+    await removeWithRetry(backupInstallation);
   } catch (error) {
     runRollback("end failed installation", "schtasks.exe", ["/End", "/TN", WINDOWS_TASK_NAME], {
       acceptedExitCodes: [0, 1]

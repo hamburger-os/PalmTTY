@@ -177,10 +177,11 @@ h2 {
   gap: var(--space-3);
 }
 
+.glass-card { border-radius: var(--radius-lg); }
+
 .workspace-card {
   min-height: 176px;
   padding: var(--space-4);
-  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -302,7 +303,8 @@ h2 {
   opacity: .75;
 }
 
-button.compact {
+button.compact,
+.action.compact {
   min-height: var(--touch-target-compact);
   padding: 7px 10px;
   font-size: var(--text-sm);
@@ -2448,11 +2450,22 @@ button.settings-list-row:hover:not(:disabled),
   .speech-reader-consent button, .speech-reader-advanced select { min-height: var(--touch-target); }
 }
 
-.integration-entry { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); }
-
 /* Managed apps remain visible even when installation/access is unavailable. */
-.integration-entry { flex-wrap: wrap; min-height: var(--touch-target-compact); }
+.integration-entry { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); flex-wrap: wrap; min-height: var(--touch-target-compact); }
 .integration-detail { min-width: 0; flex: 1 1 180px; display: flex; flex-direction: column; gap: 3px; }
 .integration-detail small { overflow-wrap: anywhere; }
 .integration-actions { display: flex; align-items: center; gap: var(--space-2); }
-.workspace-card .integration-entry { margin-top: var(--space-2); padding: var(--space-2); }
+.action { display: inline-flex; align-items: center; justify-content: center; min-height: var(--touch-target-compact); font: inherit; text-decoration: none; }
+.web-app-view { height: 100dvh; display: flex; flex-direction: column; gap: var(--space-2); padding: max(var(--space-2), env(safe-area-inset-top)) max(var(--space-2), env(safe-area-inset-right)) max(var(--space-2), env(safe-area-inset-bottom)) max(var(--space-2), env(safe-area-inset-left)); }
+.web-app-view[hidden] { display: none; }
+.web-app-toolbar { flex: none; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-lg); }
+.web-app-status { flex: none; font-size: var(--text-sm); color: var(--text-secondary); }
+.web-app-frame { flex: 1; min-height: 0; overflow: hidden; border-radius: var(--radius-lg); }
+.web-app-frame iframe { width: 100%; height: 100%; display: block; border: 0; }
+.web-app-unavailable { padding: var(--space-4); }
+@media (max-width: 760px) {
+  .web-app-toolbar .integration-actions { flex-wrap: wrap; }
+}
+
+.web-app-panel { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; min-height: 0; height: 100%; }
+@media (max-width: 700px) { .web-app-toolbar button, .web-app-toolbar .action { min-height: var(--touch-target); } }

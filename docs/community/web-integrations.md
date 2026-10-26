@@ -1,59 +1,76 @@
 <!-- bilingual -->
-# Official VS Code Web and DeepSeek Harness / 官方 VS Code Web 与 Harness
+# Independent Web applications / 独立 Web 应用
 
 ## English
 
-PalmTTY always displays **Microsoft's official VS Code Web** (`code serve-web`) and **DeepSeek Harness** on the home screen. Both are independent of PalmTTY Workspace and Terminal Sessions. Application IDs and status types are defined once in `@palmtty/protocol`. Authenticated `GET /api/v1/integrations` returns no-store status. `POST /api/v1/integrations/:id/ensure` also requires exact trusted Origin and never accepts client-supplied executables, versions, ports, URLs or shell commands.
-
-- **Official VS Code Web**: The Agent detects the official `code` CLI from standard installation and PATH locations. It does not install or run `code serve-web` as a managed service, adopt unknown listeners or terminate official VS Code processes. An explicit source-checkout-only `pnpm start:with-vscode` launcher can start the user's own interactive foreground CLI alongside PalmTTY; it does not run from autostart. Microsoft's official VS Code Server terms prohibit service hosting; start it separately in a permitted interactive user session. A configured external link is only navigation, not proof the Web server is running or authenticated.
-- **Harness**: The Agent reuses a known DSH CLI or installs pinned `@deepseek-ai/dsh@0.2.1-rc.2` in current-user storage. Native Windows/Linux distributions bundle official Node 24 and npm; source mode requires npm. Installation stages to a private directory and validates package name, version and entry point before publication. Startup uses a bounded owned child on random loopback port. Failure survives polling until explicit retry; only the owned child may be stopped.
-- **Security**: Upstream pages are never proxied into PalmTTY's authenticated Origin or given its cookies, Worker secrets or terminal authority. A local DSH one-time token URL is released only to an authenticated browser in the Agent host's `local` exposure mode; remote NAS/LAN clients never receive it.
-- **Mobile**: Access requires independent protected HTTPS Origins and upstream authentication/proxy support. Remote DSH deployments also require upstream `--public-url` and `--trusted-host`. PalmTTY's managed local Harness launch does not automatically provision these settings.
+Use explicit integration objects; old URL strings and the separate joint launcher are removed:
 
 ```yaml
 integrations:
-  vscodeWeb: "https://code.example.test/"
-  harness: "https://harness.example.test/"
+  vscodeWeb:
+    mode: managed
+    autoStart: false
+    port: 8000
+    url: https://code.example.test/
+  harness:
+    mode: managed
+    autoStart: true
+    port: 3080
+    url: https://harness.example.test/
 ```
 
-Only HTTPS or loopback HTTP base URLs are accepted, without credentials, query or fragment. `vscodeWeb` ensure performs discovery only; Harness ensure may install/start. Official VS Code Web browser extensions (including Codex), interactive host launch, real-device mobile access, and Windows process-tree cleanup still need host acceptance.
+Managed autoStart defaults off. `external` accepts only `mode` and `url` and never launches locally; absent entries are disabled. Ports and public Origins must be distinct. Official Code is separately installed; personal opt-in launch neither accepts terms automatically nor disables authentication. Review Microsoft's current terms; tunnel service support is separate from arbitrary Server hosting. No Azure tunnel is introduced. Harness uses one verified pinned private npm installation.
 
-### Optional interactive joint start (source checkout only)
+Agent startup owns deployment, not browser login. Owned application/installer leases reclaim descendants using Windows non-breakaway Jobs or POSIX workload groups without retiring durable Terminal Workers. No unknown process is adopted.
 
-Build the repository with `pnpm build`, install Microsoft VS Code separately on the **same Windows/Linux host**, set your validated PalmTTY config/token environment, then run `pnpm start:with-vscode` in your own interactive terminal. `pnpm start` still starts only PalmTTY Agent. The helper checks for the official `code` CLI and Agent artifacts before launching; a non-interactive shell is rejected. It starts `code serve-web --host 127.0.0.1 --port 8000` (or the explicit port in a loopback `integrations.vscodeWeb` base URL). Upstream may require the user to accept license terms and authenticate with its generated connection token. Do not insert this command into Task Scheduler or systemd services.
+Code follows Artifacts in the workspace tabs and opens its persisted host folder. WSL mappings are not guessed. Harness opens from its home card. Independent HTTPS frames mount lazily and remain mounted while hidden. First sign-in opens separately; return and reload the view. Only explicit authenticated exact-Origin POST authorization may hand an owned process bootstrap URL to its configured HTTPS root. Tokens never enter catalogue/iframe URLs, storage, logs or PalmTTY cookies. Remote loopback links are withheld. Upstream authentication remains separate; same-site HTTPS subdomains still require exact-version browser/API/WebSocket acceptance.
 
-**Same-computer local setup:**
-
-```yaml
-integrations:
-  vscodeWeb: "http://127.0.0.1:8000/"
-```
-
-Open PalmTTY on its normal configured Agent URL and VS Code Web at `http://127.0.0.1:8000/` from that computer. The official Web process is bound to loopback; a phone cannot use `127.0.0.1` to reach your computer.
-
-**Remote phone setup:** keep the VS Code Web listener bound to loopback, and place an independently authenticated TLS reverse proxy **on the same host**, forwarding only the separate `https://code.example.test/` origin to `http://127.0.0.1:8000/`. Configure `integrations.vscodeWeb: "https://code.example.test/"` in PalmTTY, then restart PalmTTY. The launcher still binds local port 8000. An NAS reverse proxy running on a **different** computer cannot directly reach the workstation's 127.0.0.1; an operator must use an authenticated secure tunnel to that loopback or terminate the HTTPS proxy on the workstation. Never disable VS Code's connection token or share PalmTTY cookies. Real phone, WebSocket proxy and Codex browser extension acceptance remain manual.
+Run `pnpm deploy:local --config <path> --env-file <path>` from source. Windows without arguments reuses the installed paths. The command installs frozen dependencies, builds, preflights, registers user startup and checks autoStart apps. Public DNS/TLS/NAS setup remains external; the optional private gateway provisions local HTTPS/DNS as described below. See `examples/web-apps.Caddyfile` for separate host-side proxies; never proxy third-party HTML under PalmTTY or log bootstrap queries. Legacy direct Windows Code leftovers can be explicitly cleaned with `powershell -File scripts/cleanup-code-web.ps1`.
 
 ## 中文
 
-PalmTTY 首页固定展示**微软官方 VS Code Web（`code serve-web`）**和 DeepSeek Harness。它们与 Workspace、Terminal Session 独立，应用 ID 和状态类型统一位于 `@palmtty/protocol`。只读状态接口需登录、禁止缓存；安装/重试接口还要求精确 Origin，不接收浏览器指定的可执行程序、端口或代理目标。
+上述对象配置是唯一来源：`managed` 管理固定本机回环监听与显式自启，`external` 只记录独立入口，缺省禁用。删除旧字符串与联合脚本，不提供兼容分支。
 
-- **官方 VS Code Web**：Agent 检测主机上官方 `code` CLI 的标准安装位置与 PATH；Agent 不自动安装、启动或终止微软 VS Code Server。**源码版**可由用户在交互式终端显式执行 `pnpm start:with-vscode`，启动当前用户拥有的 VS Code Web 前台子进程及 PalmTTY，不能放入开机自启服务。官方许可禁止托管为后台服务，需要用户在符合许可的交互式会话中独立运行。配置 URL 只是入口，不是在线检查。
-- **Harness**：复用已知 CLI；缺失时用固定 npm 版本安装到当前用户目录。Windows/Linux 安装版自带 Node/npm；源码版需可用 npm。在隔离临时目录安装并验证包版本、入口后才发布；启动随机回环端口，仅管理自有进程。失败状态不被轮询覆盖，显式重试才重新准备。
-- **安全**：第三方 UI 不通过 PalmTTY 已登录 Origin 反代，不共享认证信息。同机 local 浏览器可以取得 DSH 官方一次性启动 URL，LAN/NAS/手机远端浏览器绝不获取该地址或令牌。
-- **远程访问**：手机需要各自受保护的独立 HTTPS Origin、上游认证和代理配置。DSH 还需配置官方 `--public-url` / `--trusted-host`；内置回环启动不会自动完成手机访问配置。
+官方 Code 自行安装并确认适用条款，个人启动默认关闭，不自动接受许可或关闭认证；Harness 使用校验后的固定私有安装。受管应用随 Agent 启动，不依赖打开首页；独立容器负责退出回收，Terminal Worker 保留持久语义。
 
-### Windows / Linux 一次启动与手机部署
+同主域不同 HTTPS 子域在页内嵌入，首次授权独立打开、返回刷新。目录/iframe 不带令牌；显式认证授权动作仅交接自有实例到配置的独立 HTTPS 根，不共享 PalmTTY 登录。上游 Cookie、frame 限制、HTTP/WebSocket 和手机行为必须分别验收。
 
-1. 先安装微软**官方** VS Code（不是第三方同名工具），确保终端能执行 `code --version`；在仓库运行 `pnpm install --frozen-lockfile`、`pnpm build`，设置正常的 `PALMTTY_CONFIG` 和 `PALMTTY_ACCESS_TOKEN`，并通过 `pnpm run preflight`。
-2. 编辑 `palmtty.local.yaml` 中的 `integrations.vscodeWeb`：在主机上本机测试用 `http://127.0.0.1:8000/`；准备好安全的远端独立域名后用 `https://code.example.test/`。**不要把登录令牌保存到配置**。
-3. 在本机可交互 PowerShell 或 Linux 终端运行 `pnpm start:with-vscode`。如官方提示微软 Server 许可，请本人审阅同意；根据 VS Code 控制台显示的认证说明登录。打开 PalmTTY 原有地址即可看到 VS Code Web 入口；VS Code Web 仍是独立网站。
-4. 手机上通过独立 HTTPS 域名访问官方 VS Code Web，需要 HTTPS 代理在**Windows/Linux 工作站同机**接入回环端口，或者另一台 NAS 通过安全隧道访问该端口。仅在 NAS 上直接反向代理电脑的 `127.0.0.1:8000` **不可行**。保护上游连接令牌、WebSocket 和登录，不允许使用 PalmTTY 已登录域名下的同源反代。
-5. 停止联合前台会话将停止本次创建的两个程序。普通 `pnpm start`、发行版 `palmtty service`、源码 `pnpm autostart` 不变，只负责 Agent。Windows 后代清理、手机远程 HTTPS 与 Codex Web 扩展仍需实机测试。
+`pnpm deploy:local` 完成本机依赖安装、构建、预检、自启和就绪检查；Windows 无参数复用配置/密钥文件路径。首次单独设置 DNS/TLS/NAS，参考上述代理示例，禁止同源反代与查询凭据日志。旧直接 Code 残留可显式运行上述清理脚本。
 
-## Workspace upgrade / 工作区升级
 
-Stop the Agent, back up V3, build `@palmtty/protocol`, then run `node scripts/migrate-workspaces-v4.mjs --from <v3-path> --to <v4-path>`. Output is validated against the canonical schema, atomically published without overwriting V4, and original V3 remains intact. / 旧 V3 只支持关闭 Agent 后备份并离线导出 V4，不保留运行时兼容。
+**Local first sign-in:** `pnpm app:authorize vscodeWeb` or `pnpm app:authorize harness` explicitly displays a private bootstrap URL in an interactive operator terminal (Windows reuses installed config/env-file paths). Open it locally, then use the clean root URL. Service restarts may require fresh upstream authorization. The legacy cleanup script preserves live PalmTTY-managed Code process ancestry.
 
-## Distribution / 发行包
+**本机首次授权：** 明确执行上述命令，在操作者交互终端获取私有引导链接，本机浏览器打开后使用干净根 URL。服务重启可能需要再次授权；旧残留清理脚本会保留活跃 PalmTTY 管理的 Code 父链。
 
-Native Windows/Linux releases include npm copied from official Node 24 with matching license, manifest/SBOM and installed-runtime smoke checks. Actual DSH Registry installation, authenticated remote HTTPS and independent VS Code Web user-session startup remain real-device acceptance requirements. / 正式发行包包含已验证可执行的 Node/npm，但上游安装、手机访问和官方 VS Code Web 仍需实机验收。
+## Private WireGuard HTTPS / WireGuard 私有 HTTPS
+
+On Windows x64, add the following server settings to the same host configuration and set both integrations to managed with their corresponding URLs. Names must be distinct siblings under one `.home.arpa` parent; they are derived from these URLs. Use the host's actual private IP and existing private DNS resolver.
+
+```yaml
+server:
+  port: 17688
+  exposure:
+    mode: reverseProxy
+    listenHost: 127.0.0.1
+    origins: [https://palm.palmtty.home.arpa]
+  privateGateway:
+    listenHost: 192.168.1.10
+    upstreamDns: 192.168.1.1
+integrations:
+  vscodeWeb:
+    mode: managed
+    autoStart: true
+    port: 8000
+    url: https://code.palmtty.home.arpa/
+  harness:
+    mode: managed
+    autoStart: true
+    port: 3080
+    url: https://harness.palmtty.home.arpa/
+```
+
+`pnpm deploy:local` verifies pinned official Caddy/CoreDNS archives and supervises them through Agent-owned leases. Unknown listeners are never killed. Deployment exports the public root certificate, an iOS certificate profile and client instructions in the current-user PalmTTY private-network directory. Set WireGuard client DNS to the host IP, trust that root on each client, and permit private-source inbound TCP 443 / TCP+UDP 53 if required. No public port forwarding is needed. System trust and firewall changes are explicit operator actions; no silent elevation. CA private keys are never exported. Restart preserves the CA but upstream applications may require authorization again.
+
+Windows x64 可使用上述配置，替换实际主机 IP 和既有 DNS 地址。三个 HTTPS 主机名是唯一名称来源，不需要购买域名或公网端口。部署供应哈希校验后的固定工具、注册用户自启，并导出公开根证书、iOS 描述文件和连接说明。WireGuard 客户端 DNS 指向主机，每台设备首次信任证书；iOS 还需在证书信任设置启用完全信任。若入站被防火墙阻止，由操作者明确放行指定私有地址和端口；脚本不提权。父页和应用都必须 HTTPS，VPN 本身不改变浏览器安全上下文。不同端口不能隔离 Cookie，因此不能用同一 IP 的三个端口替代三个独立主机名。首次授权、iframe、Code webview、API/WS 仍应在实际访问设备验收。
+
+Private gateway bootstrap / 私有网关首次配置：the old private IP HTTP address serves only the public CA certificate/profile and setup page, never login/API/workspace content. 旧私有 IP HTTP 地址仅提供公开证书、描述文件和首次配置页，不提供登录、API 或工作区内容；认证工作台只经 HTTPS 访问。

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { WorkspacePublic } from "@palmtty/protocol";
+import type { WorkspacePublic, WebAppStatus } from "@palmtty/protocol";
+import { WebApplicationPanel } from "./WebApplications.js";
 import { ArtifactsPane } from "./ArtifactsPane.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { FilesPane } from "./FilesPane.js";
@@ -13,19 +14,23 @@ export type WorkbenchActivity = {
   sessionId: string;
   onRestart(): Promise<void>;
 };
-type WorkbenchPane = "terminal" | "git" | "files" | "artifacts";
+type WorkbenchPane = "terminal" | "git" | "files" | "artifacts" | "code";
 export type WorkbenchActivityOption = { value: string; label: string };
 
 export function WorkspaceWorkbench({
-  workspace, activity, activityOptions, onSwitchActivity, onBack
+  workspace, activity, activityOptions, onSwitchActivity, onBack, visible = true, codeStatus, onRefreshApps
 }: {
   workspace?: WorkspacePublic;
   activity: WorkbenchActivity;
   activityOptions: WorkbenchActivityOption[];
   onSwitchActivity(value: string): void;
   onBack(): void;
+  visible?: boolean;
+  codeStatus?: WebAppStatus | undefined;
+  onRefreshApps?(): Promise<void>;
 }) {
   const { t } = useI18n();
+  const [codeVisited, setCodeVisited] = useState(false);
   const [pane, setPane] = useState<WorkbenchPane>("terminal");
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [terminalConnection, setTerminalConnection] = useState<ConnectionState>("connecting");
@@ -101,7 +106,7 @@ export function WorkspaceWorkbench({
 
 
   const tabs: WorkbenchPane[] = [
-    "terminal", ...(workspace ? (["git", "files"] as const) : []), "artifacts"
+    "terminal", ...(workspace ? (["git", "files"] as const) : []), "artifacts", ...(workspace ? (["code"] as const) : [])
   ];
   const showFileHistory = (path: string) => {
     if (!workspace) return;
@@ -140,6 +145,7 @@ export function WorkspaceWorkbench({
               aria-selected={pane === item}
               onClick={() => {
                 if (item === "git") setGitHistoryPath(undefined);
+                if (item === "code") setCodeVisited(true);
                 setPane(item);
                 setMobileToolsOpen(false);
               }}>{t(`workbench.${item}`)}</button>
@@ -162,7 +168,7 @@ export function WorkspaceWorkbench({
       <div className="workbench-content">
         <div className={`workbench-pane${pane === "terminal" ? " is-active" : ""}`}>
           <TerminalView key={activity.sessionId} sessionId={activity.sessionId}
-            active={pane === "terminal"} insertRequest={terminalInsert}
+            active={visible && pane === "terminal"} insertRequest={terminalInsert}
             onConnectionChange={terminalConnectionChanged}/>
         </div>
         {workspace && pane === "git" && (
@@ -184,6 +190,10 @@ export function WorkspaceWorkbench({
               onInsertPath={insertArtifactPath}/>
           </div>
         )}
+        {workspace && codeVisited && <div className={`workbench-pane${pane === "code" ? " is-active" : ""}`}>
+          <WebApplicationPanel key={workspace.id} id="vscodeWeb" status={codeStatus} workspace={workspace}
+            onRefresh={onRefreshApps ?? (async () => {})}/>
+        </div>}
       </div>
       {restartConfirmOpen && (
         <ConfirmDialog title={t("terminal.restartTitle")} message={t("terminal.restartConfirm")}

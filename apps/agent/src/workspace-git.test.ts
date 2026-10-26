@@ -323,7 +323,7 @@ describe.skipIf(!gitAvailable)("workspace Git integration", () => {
         diffSnapshot: diff.snapshot
       }
     })).rejects.toMatchObject({ name: "GitStateChangedError" });
-  });
+  }, 45_000);
 
   it("reports a non-repository without treating it as an Agent failure", async () => {
     const workspace = await definition();

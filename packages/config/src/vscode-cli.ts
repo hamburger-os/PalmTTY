@@ -5,7 +5,7 @@ import path from "node:path";
 /**
  * Discover the user's official VS Code CLI. This is not a process-health check
  * or permission to host Microsoft's server as an unattended service.
- * Shared by the Agent catalog and the explicit interactive local launcher.
+ * Shared by catalogue discovery and explicit host-configured managed launch.
  */
 export function officialVSCodeCliCandidates(
   platform = process.platform,

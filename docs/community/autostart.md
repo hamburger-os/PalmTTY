@@ -71,8 +71,6 @@ This path is for development and repository validation. It may compile the Windo
 
 ### Persistence boundary
 
-The optional `pnpm start:with-vscode` is an **interactive source-only** foreground command and is never installed into Task Scheduler or systemd. Microsoft's VS Code Server license prohibits service hosting; this helper does not change unattended startup. / `pnpm start:with-vscode` 仅适用于源码部署下的用户交互式前台启动，不加入 Windows/Linux 自启动服务，也不自动接受微软许可。
-
 Autostart restores the **Agent service**, not the old PTY after an OS reboot. Browser disconnect and Agent-only restart persistence continue through independent Session Workers. OS reboot/logoff terminates the old Worker/PTY; after boot PalmTTY starts cleanly and persisted Workspaces remain available for new Sessions.
 
 ## 中文
@@ -141,3 +139,29 @@ pnpm autostart uninstall
 ### 持久化边界
 
 自启动恢复的是 **Agent 服务**，不是 OS 重启前的旧 PTY。浏览器断线与“仅 Agent 重启”仍通过独立 Worker 保持；OS reboot/用户注销会终止旧 Worker/PTY。机器回来后 Agent 会干净启动，持久化 Workspace 仍可用于创建新 Session。
+
+
+### One-command local deployment / 一键本机部署
+
+`pnpm deploy:local [--config <path>] [--env-file <path>]` installs frozen dependencies, builds, preflights and registers current-user startup before checking configured autoStart apps. Windows can reuse an existing installation with no options. Use explicit managed/external objects from [Web integrations](web-integrations.md), not URL strings. Local ports default to Code 8000 and Harness 3080; a phone cannot reach the host through its own loopback. DNS/TLS/NAS requires separate first-time setup. Explicit interactive `pnpm app:authorize <vscodeWeb|harness>` displays the private local first-sign-in URL; do not record/share it.
+
+上述命令完成本机构建、预检、自启和就绪检查，Windows 无参数复用安装路径；应用采用明确对象配置。Code/Harness 默认回环端口为 8000/3080，手机 HTTPS 域名与代理首次单独配置。本机明确执行交互授权命令可获取私有首次登录地址，勿记录或分享。自启不表示 OS 重启后旧终端存活。
+
+
+### Reverse proxy to private VPN HTTP / 反代切换到 VPN 内网 HTTP
+
+For direct private-IPv4 HTTP over a WireGuard/private route, replace the entire `server.exposure` object with `{ mode: lan }`, removing reverseProxy-only listenHost/origins fields. Preserve authentication, port and integrations, then run `pnpm deploy:local`. This selects exact host-private Origins and HTTP-compatible cookies; a VPN does not change browser Origin or HTTPS Cookie requirements. Restricting access to VPN peers still requires operator firewall/routing rules.
+
+通过 WireGuard/私网路由直接访问私有 IPv4 HTTP 时，将整个 exposure 改为仅含 `mode: lan`，删除旧反代字段，保留认证、端口和应用配置后执行一键部署。VPN 不改变浏览器来源或 HTTPS Cookie 条件；仅允许 VPN 客户端仍由防火墙/路由规则限制。
+
+## Private HTTPS workbench / 私有 HTTPS 工作台
+
+Code is workspace-scoped after Artifacts; Harness is entered from its home card. Global application navigation is removed without unmounting live terminals. Optional Windows x64 `server.privateGateway` derives three separate same-site HTTPS hosts from the existing URLs, provisions pinned hash-verified Caddy/CoreDNS, and supervises them through owned leases. DNS is private-source-only, bounded and unlogged. Cookie hosts must differ even when ports differ. Root trust, client DNS and private firewall access require explicit initial setup; no automatic elevation. See [Web integrations](web-integrations.md).
+
+Code 入口位于工作区附件后并打开持久化主机目录；Harness 从首页卡片进入。删除全局三按钮但保留终端实例。可选 Windows x64 私有网关由既有 URL 派生三个同站不同主机名，部署固定哈希工具并由 Agent 租约管理。DNS 只接受私有来源、转发有界且不记录查询。端口不能隔离 Cookie。客户端首次信任、名称解析和私有防火墙配置需明确操作，不能静默提权；参见上述文档。
+
+### Startup failure and direct TLS / 启动失败与直接 TLS
+
+Owned services start once on the native listening event. A required gateway bootstrap failure closes the Agent with nonzero exit status, while durable Terminal Workers survive. Deployment and interactive authorization share a bounded local client: direct HTTPS uses the configured Origin as its TLS identity, connects to the local listener and explicitly trusts the configured certificate chain, allowing a partial chain without disabling certificate or hostname verification. TLS validation errors fail immediately; no global trust changes are made.
+
+自有服务绑定原生 listening 事件并只启动一次；必要网关启动失败会关闭 Agent 并设置失败退出码，独立终端 Worker 保留。部署与交互授权共用有界本机客户端：直接 HTTPS 连接本机监听地址，按配置 Origin 验证 TLS 身份，以配置证书链建立显式本地信任；允许部分链但不关闭证书与主机名校验。证书错误立即失败，不修改全局信任。
