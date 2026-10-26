@@ -257,6 +257,6 @@ Qwen 模型及 Python 依赖是可选独立安装，不随主安装包分发或�
 
 ## Optional independent applications / 可选独立应用
 
-Code and Harness can keep host-configured autoStart and open as independent links without embedding. Private WireGuard setups may use PalmTTY/Harness HTTP while Code retains trusted HTTPS for secure-context features; authentication remains enabled. See [Web integrations](web-integrations.md) for the single configuration and one-command deployment.
+Code and Harness can keep host-configured autoStart and open as independent links without embedding. Private Wi-Fi/WireGuard setups use the same derived IP entries: PalmTTY/Harness HTTP and trusted Code IP HTTPS. No private DNS; authentication stays enabled. See [Web integrations](web-integrations.md) for the single configuration and one-command deployment.
 
-Code/Harness 保留主机配置自启，通过独立链接打开，不再内嵌。WireGuard 私网可采用 PalmTTY/Harness HTTP、Code 可信 HTTPS，认证继续保留。配置和一键部署见上述文档。
+Code/Harness 保留主机配置自启，通过独立链接打开，不再内嵌。Wi-Fi/WireGuard 使用同一 IP 入口：PalmTTY/Harness HTTP、Code 可信 IP HTTPS，无私有 DNS；认证保留。配置和一键部署见上述文档。

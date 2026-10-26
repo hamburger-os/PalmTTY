@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   configPathFromEnvironment,
+  integrationAccessUrl,
   exposureOrigins,
   isPrivateIpv4,
   lanAgentUrls,
@@ -44,11 +45,11 @@ describe("configuration", () => {
   it("validates credential-free integration origins", () => {
     const config = parseConfig({
       integrations: {
-        vscodeWeb: { mode: "managed", port: 8000, url: "http://127.0.0.1:8000/" },
+        vscodeWeb: { mode: "managed", port: 8000 },
         harness: { mode: "external", url: "https://dsh.example.test/" }
       }
     });
-    expect(config.integrations.vscodeWeb?.url).toBe("http://127.0.0.1:8000/");
+    expect(integrationAccessUrl(config,"vscodeWeb")).toBe("http://127.0.0.1:8000/");
     // The abandoned third-party code-server key is not a compatibility alias.
     expect(() => parseConfig({ integrations: { codeServer: "https://code.example.test/" } })).toThrow();
     for (const value of [
@@ -251,26 +252,34 @@ it("rejects legacy integration strings, shared Origins and conflicting managed p
     .toEqual({ mode: "managed", port: 8000, autoStart: false });
 });
 
-it("requires separate cookie hosts and a coherent private HTTPS gateway", () => {
-  const base = { server: { exposure: {mode:"reverseProxy", listenHost:"127.0.0.1", origins:["https://palm.palmtty.home.arpa"]}, privateGateway:{listenHost:"192.168.1.3",upstreamDns:"192.168.1.1"}}, integrations: {
-    vscodeWeb:{mode:"managed",url:"https://code.palmtty.home.arpa"}, harness:{mode:"managed",url:"https://harness.palmtty.home.arpa"}
-  }};
-  expect(parseConfig(base).server.privateGateway?.listenHost).toBe("192.168.1.3");
-  expect(() => parseConfig({...base, integrations:{...base.integrations,harness:{mode:"managed",url:"https://code.palmtty.home.arpa:8443"}}})).toThrow();
-  expect(parseConfig({...base, server:{...base.server,exposure:{mode:"lan"}}}).server.exposure.mode).toBe("lan");
-  expect(() => parseConfig({...base, server:{...base.server,privateGateway:{listenHost:"0.0.0.0",upstreamDns:"192.168.1.1"}}})).toThrow();
+it("derives IP entries from one gateway and supports independently enabled applications", () => {
+  const server = {port:17688,exposure:{mode:"lan"},privateGateway:{listenHost:"192.168.1.3"}};
+  const config = parseConfig({server,integrations:{vscodeWeb:{mode:"managed"},harness:{mode:"managed"}}});
+  expect(integrationAccessUrl(config,"vscodeWeb")).toBe("https://192.168.1.3/");
+  expect(integrationAccessUrl(config,"harness")).toBe("http://192.168.1.3:3080/");
+  const code = parseConfig({server:{...server,privateGateway:{listenHost:"192.168.1.3",httpsPort:8443}},integrations:{vscodeWeb:{mode:"managed"}}});
+  expect(integrationAccessUrl(code,"vscodeWeb")).toBe("https://192.168.1.3:8443/");
+  const harness = parseConfig({server,integrations:{harness:{mode:"managed",port:3081}}});
+  expect(integrationAccessUrl(harness,"harness")).toBe("http://192.168.1.3:3081/");
+  expect(integrationAccessUrl(harness,"vscodeWeb")).toBeUndefined();
 });
 
-it("scopes private HTTP to managed LAN Harness with a distinct hostname and matching port", () => {
-  const server = {port:17688, exposure:{mode:"lan"},privateGateway:{listenHost:"192.168.1.3",upstreamDns:"192.168.1.1"}};
-  const integrations = {vscodeWeb:{mode:"managed",url:"https://code.palmtty.home.arpa/"},harness:{mode:"managed",url:"http://harness.palmtty.home.arpa:3080/"}};
-  expect(parseConfig({server,integrations}).integrations.harness?.url).toBe(integrations.harness.url);
-  for (const value of [
-    {server:{...server,privateGateway:undefined},integrations},
-    {server,integrations:{...integrations,vscodeWeb:{mode:"managed",url:"http://code.palmtty.home.arpa:8000/"}}},
-    {server,integrations:{...integrations,harness:{mode:"external",url:integrations.harness.url}}},
-    {server,integrations:{...integrations,harness:{mode:"managed",url:"http://harness.palmtty.home.arpa:3081/"}}},
-    {server,integrations:{...integrations,harness:{mode:"managed",url:"http://code.palmtty.home.arpa:3080/"}}},
-    {server:{...server,exposure:{mode:"reverseProxy",origins:["https://palm.palmtty.home.arpa"]}},integrations}
-  ]) expect(() => parseConfig(value)).toThrow();
+it("rejects obsolete gateway DNS/managed URLs and conflicting gateway ports", () => {
+  const server={port:17688,exposure:{mode:"lan"},privateGateway:{listenHost:"192.168.1.3"}};
+  const integrations={vscodeWeb:{mode:"managed"},harness:{mode:"managed"}};
+  for(const input of [
+    {server:{...server,privateGateway:{listenHost:"192.168.1.3",upstreamDns:"192.168.1.1"}},integrations},
+    {server,integrations:{harness:{mode:"managed",url:"http://192.168.1.3:3080/"}}},
+    {server,integrations:{}},
+    {server:{...server,exposure:{mode:"local"}},integrations},
+    {server:{...server,privateGateway:{listenHost:"8.8.8.8"}},integrations},
+    ...[17688,8000,3080].map(httpsPort=>({server:{...server,privateGateway:{listenHost:"192.168.1.3",httpsPort}},integrations}))
+  ]) expect(()=>parseConfig(input)).toThrow();
+});
+
+it("checks derived and external Origins together while allowing distinct IP ports",()=>{
+  const server={port:17688,exposure:{mode:"lan"},privateGateway:{listenHost:"192.168.1.3"}};
+  expect(()=>parseConfig({server,integrations:{vscodeWeb:{mode:"managed"},harness:{mode:"external",url:"https://192.168.1.3/"}}})).toThrow();
+  const config=parseConfig({server,integrations:{vscodeWeb:{mode:"managed"},harness:{mode:"external",url:"https://192.168.1.3:8443/"}}});
+  expect(integrationAccessUrl(config,"harness")).toBe("https://192.168.1.3:8443/");
 });

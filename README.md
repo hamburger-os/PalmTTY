@@ -70,9 +70,9 @@ integrations:
   harness: { mode: managed, autoStart: true, port: 3080 }
 ```
 
-Local defaults are `127.0.0.1:8000` and `127.0.0.1:3080`. Remote access uses independent application hostnames (`url` on each entry). Code uses trusted HTTPS for secure-context features; scoped private-gateway LAN Harness may use HTTP. Both open independently with explicit sign-in handoff; catalogue/rendered links contain no bootstrap secrets. See [Web integrations](docs/community/web-integrations.md) and [proxy template](examples/web-apps.Caddyfile).
+Local defaults are `127.0.0.1:8000` and `127.0.0.1:3080`. The optional LAN gateway derives managed application IP entries from one address and ports, without private DNS or duplicated managed URLs. Code uses trusted HTTPS for secure-context features; Harness uses private HTTP. Both open independently with explicit sign-in handoff; catalogue/rendered links contain no bootstrap secrets. See [Web integrations](docs/community/web-integrations.md) and [proxy template](examples/web-apps.Caddyfile).
 
-中文：本机个人启动由配置明确选择，默认关闭；Harness 固定私有安装，受管应用有独立进程容器，停止 Agent 回收应用但保留终端 Worker。Code 从工作区附件右侧进入并打开当前主机目录；Harness 从首页卡片进入。首次单独授权，远程设备不能使用开发主机回环地址。源码一键部署使用 `pnpm deploy:local`，可选私有网关/DNS；LAN PalmTTY 和 Harness 可用 HTTP，Code 保留可信 HTTPS。名称解析与 HTTPS 证书首次信任需明确配置。
+中文：本机个人启动由配置明确选择，默认关闭；Harness 固定私有安装，受管应用有独立进程容器，停止 Agent 回收应用但保留终端 Worker。Code 从工作区附件右侧进入并打开当前主机目录；Harness 从首页卡片进入。首次单独授权，远程设备不能使用开发主机回环地址。源码一键部署使用 `pnpm deploy:local`，可选内网 IP 网关，无需私有 DNS；PalmTTY/Harness 使用 HTTP，Code 使用可信 IP HTTPS。已有根信任可复用。
 
 ## Architecture / 架构
 
@@ -164,7 +164,7 @@ pnpm start
 
 With the example config, open `http://127.0.0.1:17688`. Linux uses the native Host runtime and Unix-domain-socket Worker IPC; WSL is a separate Windows runtime adapter.
 
-Use `pnpm deploy:local` for source deployment and explicit managed/external objects in your configuration. See [Web integrations](docs/community/web-integrations.md). DNS/TLS/NAS remain separate first-time setup.
+Use `pnpm deploy:local` for source deployment and explicit managed/external objects in your configuration. See [Web integrations](docs/community/web-integrations.md). The optional IP gateway handles local proxy/certificates; device root trust and restricted firewall setup remain explicit.
 
 ## Autostart / 开机自启
 

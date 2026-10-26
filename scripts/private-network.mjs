@@ -2,6 +2,7 @@ import { createHash, X509Certificate } from "node:crypto";
 import { readFile, writeFile, mkdir, mkdtemp, rename, rm, copyFile, stat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { integrationAccessUrl } from "../packages/config/dist/index.js";
 import { PRIVATE_NETWORK_TOOLS, privateNetworkRoot, privateGatewayPorts } from "../apps/agent/dist/private-gateway.js";
 
 export async function provisionPrivateNetwork(config) {
@@ -38,12 +39,16 @@ export async function exportPrivateNetworkSetup(config) {
   const gateway = config.server.privateGateway;
   if (!gateway) return;
   const root = privateNetworkRoot();
-  const caPath = path.join(root, "pki", "pki", "authorities", "local", "root.crt");
-  const certificate = new X509Certificate(await readFile(caPath));
-  await mkdir(path.join(root, "public"), { recursive: true });
-  await copyFile(caPath, path.join(root, "PalmTTY-root.crt"));
-  // Public root certificate only: never copy CA or application private keys.
-  const profile = `<?xml version="1.0" encoding="UTF-8"?>
+  const publicRoot = path.join(root, "public");
+  await mkdir(publicRoot, { recursive: true });
+  const codeEnabled = config.integrations.vscodeWeb?.mode === "managed";
+  let certificate;
+  if (codeEnabled) {
+    const caPath = path.join(root, "pki", "pki", "authorities", "local", "root.crt");
+    certificate = new X509Certificate(await readFile(caPath));
+    for (const destination of [root, publicRoot]) await copyFile(caPath, path.join(destination, "PalmTTY-root.crt"));
+    // Preserve the existing profile identity and CA; only the new IP leaf changes.
+    const profile = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>PayloadType</key><string>Configuration</string><key>PayloadVersion</key><integer>1</integer>
@@ -57,57 +62,56 @@ export async function exportPrivateNetworkSetup(config) {
 <key>PayloadDisplayName</key><string>PalmTTY Private Root</string>
 <key>PayloadContent</key><data>${certificate.raw.toString("base64")}</data>
 </dict></array></dict></plist>`;
-  await writeFile(path.join(root, "PalmTTY-HTTPS.mobileconfig"), profile);
-  await writeFile(path.join(root, "public", "PalmTTY-HTTPS.mobileconfig"), profile);
-  await copyFile(caPath, path.join(root, "public", "PalmTTY-root.crt"));
-  const palmRoot = config.server.exposure.mode === "lan"
-    ? `http://${gateway.listenHost}:${config.server.port}/` : new URL(config.server.exposure.origins[0]).origin + "/";
-  const codeRoot = config.integrations.vscodeWeb.url, harnessRoot = config.integrations.harness.url;
-  const names = [...(config.server.exposure.mode === "reverseProxy" ? [new URL(palmRoot).hostname] : []), new URL(codeRoot).hostname, new URL(harnessRoot).hostname];
-  const setupRoot = config.server.exposure.mode === "lan" ? palmRoot + "network-setup/" : `http://${gateway.listenHost}:${config.server.port}/`;
-  const instructions = `PalmTTY 私有网络配置
+    for (const destination of [root, publicRoot]) await writeFile(path.join(destination,"PalmTTY-HTTPS.mobileconfig"),profile);
+  } else {
+    for (const name of ["PalmTTY-root.crt", "PalmTTY-HTTPS.mobileconfig"]) await rm(path.join(publicRoot,name),{force:true});
+  }
+  const palmRoot = `http://${gateway.listenHost}:${config.server.port}/`;
+  const setupRoot = palmRoot + "network-setup/";
+  const applications = Object.keys(config.integrations).filter(id=>config.integrations[id]?.mode==="managed")
+    .map(id=>({id,url:integrationAccessUrl(config,id)}));
+  const trustInstructions = certificate ? `Code HTTPS 首次使用需信任根证书；已有根信任无需重装。
+iPhone：安装 PalmTTY-HTTPS.mobileconfig，在 设置 > 通用 > 关于本机 > 证书信任设置 启用完全信任。
+Windows：certutil -user -addstore Root "${path.join(root,"PalmTTY-root.crt")}"
+根证书 SHA-256：${certificate.fingerprint256}` : "当前只有 HTTP 应用，不需要证书。";
+  await writeFile(path.join(root,"连接说明.txt"),`PalmTTY 内网 IP 访问
 
 入口：${palmRoot}
-Code：${codeRoot}
-Harness：${harnessRoot}
-证书信任仅用于上述 HTTPS 地址，HTTP 地址不需要证书。
+${applications.map(app=>app.id+"："+app.url).join("\n")}
 
-WireGuard 客户端 DNS 改为 ${gateway.listenHost}，确认 AllowedIPs 包含此地址。
-其他域名查询由主机转发到既有 DNS ${gateway.upstreamDns}。
+家中 Wi-Fi 与 5G + WireGuard 使用相同地址，无需设置私有 DNS 或 hosts。
+主机 IP 应固定；WireGuard AllowedIPs 需包含 ${gateway.listenHost}。
+若旧 WireGuard DNS 仍为此主机，请先恢复为隧道可达的正常 DNS；本软件不再提供 DNS。
+${trustInstructions}
 
-iPhone：安装 PalmTTY-HTTPS.mobileconfig，再到 设置 > 通用 > 关于本机 > 证书信任设置，启用根证书完全信任。
-Windows：certutil -user -addstore Root "${path.join(root, "PalmTTY-root.crt")}"
-Windows 可使用以下 hosts 记录，或明确将网络适配器 DNS 指向上述地址：
-${gateway.listenHost} ${names.join(" ")}
+应用仍有各自认证。同 IP 不同端口不隔离 Cookie，仅适用于同一可信主机上的自用应用。
+如需更新防火墙，请在管理员 PowerShell 明确运行：
+& "${path.join(root,"configure-firewall.ps1")}"
+脚本只更新具名、程序/私有 IP/私有来源受限的 HTTP/HTTPS 规则，并移除旧 DNS 规则；不自动提权。
 
-根证书 SHA-256：${certificate.fingerprint256}
-
-如需放行 Windows 入站防火墙，请由操作者在管理员 PowerShell 明确运行：
-& "${path.join(root, "configure-firewall.ps1")}"
-脚本只更改具名 PalmTTY 规则，限制指定网关程序、内网地址和私有来源，放行配置的 HTTP/HTTPS 入口及 TCP/UDP DNS；不自动提权。
-
-手机首次配置页：${setupRoot}
-不需要路由器公网端口转发。应用会在独立页面打开；PalmTTY 只负责入口与明确的授权交接。
-`;
-  await writeFile(path.join(root, "连接说明.txt"), instructions, "utf8");
-  await writeFile(path.join(root, "public", "index.html"), `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PalmTTY 私有网络配置</title><body><h1>PalmTTY 私有网络配置</h1><p>这是证书安装页。不要在此输入访问令牌。</p><ol><li>将 WireGuard 客户端 DNS 设置为 <strong>${gateway.listenHost}</strong>，确认隧道路由包含此地址。</li><li>iPhone：<a href="${setupRoot}PalmTTY-HTTPS.mobileconfig">安装 HTTPS 根证书描述文件</a>，随后到“设置 → 通用 → 关于本机 → 证书信任设置”启用完全信任。</li><li>其他设备：<a href="${setupRoot}PalmTTY-root.crt">下载公开根证书</a>并明确导入受信任根证书。</li><li>打开 <a href="${palmRoot}">PalmTTY 工作台</a>，点击 Code、Harness 链接独立打开。</li></ol><p>根证书 SHA-256：${certificate.fingerprint256}</p></body></html>`, "utf8");
-  const tools = Object.fromEntries(PRIVATE_NETWORK_TOOLS.map((tool) => [tool.name, path.join(root, `${tool.name}-${tool.version}.exe`)]));
-  const literal = (value) => "'" + String(value).replaceAll("'", "''") + "'";
-  const firewall = `# Requires an explicit administrator PowerShell. No elevation is requested by this script.
+公开证书配置页：${setupRoot}
+不需要公网端口转发。`,"utf8");
+  const certificateLinks = certificate ? `<li>Code HTTPS：<a href="${setupRoot}PalmTTY-HTTPS.mobileconfig">iPhone 根证书描述文件</a>；<a href="${setupRoot}PalmTTY-root.crt">公开根证书</a>。已信任无需重装。</li><li>根证书 SHA-256：${certificate.fingerprint256}</li>` : "";
+  await writeFile(path.join(publicRoot,"index.html"),`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PalmTTY 内网 IP 访问</title><body><h1>PalmTTY 内网 IP 访问</h1><p>Wi-Fi 和 WireGuard 使用相同 IP 地址，无需私有 DNS。不要在此输入访问令牌。</p><ul><li><a href="${palmRoot}">打开 PalmTTY</a></li>${applications.map(app=>`<li>${app.id}：${app.url}</li>`).join("")}${certificateLinks}</ul><p>WireGuard 路由需包含主机 IP。首次根信任需明确操作，iPhone 安装后需启用完全信任。</p></body></html>`,"utf8");
+  const caddy = path.join(root,`caddy-${PRIVATE_NETWORK_TOOLS[0].version}.exe`);
+  const literal = value=>"'"+String(value).replaceAll("'","''")+"'";
+  const firewall = `# Requires an explicit administrator PowerShell. No automatic elevation.
 $ErrorActionPreference = 'Stop'
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Run this reviewed script in an administrator PowerShell.' }
 $privateSources = @('LocalSubnet','10.0.0.0/8','172.16.0.0/12','192.168.0.0/16','100.64.0.0/10')
+foreach ($retired in @('PalmTTY-PrivateDNS-UDP','PalmTTY-PrivateDNS-TCP')) {
+  if (Get-NetFirewallRule -Name $retired -ErrorAction SilentlyContinue) { Remove-NetFirewallRule -Name $retired }
+}
 $rules = @(
-  @{ Name='PalmTTY-PrivateHTTPS'; Program=${literal(tools.caddy)}; Protocol='TCP'; Ports=@(${privateGatewayPorts(config).filter((port) => port !== 53).join(",")}) },
-  @{ Name='PalmTTY-PrivateDNS-UDP'; Program=${literal(tools.coredns)}; Protocol='UDP'; Ports=@(53) },
-  @{ Name='PalmTTY-PrivateDNS-TCP'; Program=${literal(tools.coredns)}; Protocol='TCP'; Ports=@(53) }${config.server.exposure.mode === 'lan' ? `,\n  @{ Name='PalmTTY-PrivateHTTP'; Program=${literal(process.execPath)}; Protocol='TCP'; Ports=@(${config.server.port}) }` : ''}
+  @{ Name='PalmTTY-PrivateHTTPS'; Program=${literal(caddy)}; Ports=@(${privateGatewayPorts(config).join(",")}) },
+  @{ Name='PalmTTY-PrivateHTTP'; Program=${literal(process.execPath)}; Ports=@(${config.server.port}) }
 )
 foreach ($rule in $rules) {
   if (Get-NetFirewallRule -Name $rule.Name -ErrorAction SilentlyContinue) { Remove-NetFirewallRule -Name $rule.Name }
-  New-NetFirewallRule -Name $rule.Name -DisplayName $rule.Name -Direction Inbound -Action Allow -Profile Any -Program $rule.Program -Protocol $rule.Protocol -LocalAddress ${gateway.listenHost} -LocalPort $rule.Ports -RemoteAddress $privateSources | Out-Null
+  New-NetFirewallRule -Name $rule.Name -DisplayName $rule.Name -Direction Inbound -Action Allow -Profile Any -Program $rule.Program -Protocol TCP -LocalAddress ${gateway.listenHost} -LocalPort $rule.Ports -RemoteAddress $privateSources | Out-Null
 }
-Write-Output 'PalmTTY private-source firewall rules configured.'
+Write-Output 'PalmTTY private-source HTTP/HTTPS firewall rules configured; retired DNS rules removed.'
 `;
-  await writeFile(path.join(root, "configure-firewall.ps1"), firewall, "utf8");
-  console.log(`[PalmTTY] Private network client setup: ${path.join(root, "连接说明.txt")}`);
+  await writeFile(path.join(root,"configure-firewall.ps1"),firewall,"utf8");
+  console.log(`[PalmTTY] Private IP client setup: ${path.join(root,"连接说明.txt")}`);
 }

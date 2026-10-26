@@ -31,17 +31,17 @@ sessions:
 
 # Optional independently managed official VS Code Web / DeepSeek Harness links.
 # URLs must use HTTPS (or loopback HTTP) and must NOT contain connection tokens.
+# For private IP entries add server.privateGateway: { listenHost: <private IPv4>, httpsPort: 443 }
+# with server.exposure.mode: lan. Managed access URLs are derived automatically.
 # integrations:
 #   vscodeWeb:
 #     mode: managed
 #     autoStart: false # personal opt-in; install official VS Code and accept its terms first
 #     port: 8000
-#     url: https://code.example.test/
 #   harness:
 #     mode: managed
 #     autoStart: true
 #     port: 3080
-#     url: https://harness.example.test/
 # External alternative: harness: { mode: external, url: https://harness.example.test/ }
 
 # Optional high-quality local novel reader. Start the separate Python sidecar,

@@ -4,13 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import net from "node:net";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
-import type { PalmTTYConfig } from "@palmtty/config";
+import { integrationAccessUrl, type PalmTTYConfig } from "@palmtty/config";
+import { AUTH_COOKIE } from "./auth.js";
 import { spawnOwnedProcess, stopOwnedProcess } from "./owned-process.js";
 
 // Fixed versions and hashes are also the provisioning contract. Never execute PATH discoveries.
 export const PRIVATE_NETWORK_TOOLS = [
   { name: "caddy", version: "2.11.7", repository: "caddyserver/caddy", assetId: 607244987, sha256: "0a1edc0b799512051c57071ce0e798d3f2cf67dc98171366f1d2b326072e3b06" },
-  { name: "coredns", version: "1.15.0", repository: "coredns/coredns", assetId: 661218355, sha256: "873a0a73edba0930c05ec58f4c62cf1e6d19a4564a38e7914bd305e15912f52b" }
 ] as const;
 
 export function privateNetworkRoot(): string {
@@ -18,23 +18,20 @@ export function privateNetworkRoot(): string {
 }
 
 export function privateGatewayRoutes(config: PalmTTYConfig): { url: string; port: number }[] {
-  const exposure = config.server.exposure;
-  return [
-    ...(exposure.mode === "reverseProxy" ? [{ url: exposure.origins[0]!, port: config.server.port }] : []),
-    ...Object.values(config.integrations).flatMap((entry) => entry?.mode === "managed" && entry.url
-      ? [{ url: entry.url, port: entry.port }] : [])
-  ];
+  if (!config.server.privateGateway) return [];
+  return (Object.keys(config.integrations) as (keyof PalmTTYConfig["integrations"])[]).flatMap((id) => {
+    const entry = config.integrations[id];
+    return entry?.mode === "managed" ? [{ url: integrationAccessUrl(config,id)!, port:entry.port }] : [];
+  });
 }
 
 export function privateGatewayPorts(config: PalmTTYConfig): number[] {
-  return [...new Set([443, 53, ...(config.server.exposure.mode === "reverseProxy" ? [config.server.port] : []),
-    ...privateGatewayRoutes(config).filter((route) => new URL(route.url).protocol === "http:").map((route) => Number(new URL(route.url).port || 80))])];
+  return privateGatewayRoutes(config).map((route) => Number(new URL(route.url).port || (route.url.startsWith("https:") ? 443 : 80)));
 }
 
-export function privateGatewayFiles(config: PalmTTYConfig, root: string): { caddy: string; dns: string } {
+export function privateGatewayFiles(config: PalmTTYConfig, root: string): { caddy: string } {
   const gateway = config.server.privateGateway;
-  const exposure = config.server.exposure;
-  if (!gateway || !["lan", "reverseProxy"].includes(exposure.mode)) throw new Error("private_gateway_configuration_required");
+  if (!gateway) throw new Error("private_gateway_configuration_required");
   const routes = privateGatewayRoutes(config);
   const caddy = `{
   admin off
@@ -55,19 +52,6 @@ export function privateGatewayFiles(config: PalmTTYConfig, root: string): { cadd
     }
   }
 }
-${exposure.mode === "reverseProxy" ? `http://${gateway.listenHost}:${config.server.port} {
-  bind ${gateway.listenHost}
-  @outside not remote_ip private_ranges
-  respond @outside 403
-  @setup path / /PalmTTY-root.crt /PalmTTY-HTTPS.mobileconfig
-  @profile path /PalmTTY-HTTPS.mobileconfig
-  route {
-    root * ${JSON.stringify(path.join(root, "public"))}
-    header @profile Content-Type application/x-apple-aspen-config
-    file_server @setup
-    respond 404
-  }
-}` : ""}
 ${routes.map((route) => `${new URL(route.url).origin} {
   bind ${gateway.listenHost}
   ${new URL(route.url).protocol === "https:" ? "tls internal" : ""}
@@ -75,27 +59,13 @@ ${routes.map((route) => `${new URL(route.url).origin} {
   respond @outside 403
   header Referrer-Policy no-referrer
   header +Content-Security-Policy "frame-ancestors 'self'"
-  reverse_proxy 127.0.0.1:${route.port}
+  reverse_proxy 127.0.0.1:${route.port} {
+    header_up Cookie "(^|;[[:space:]]*)${AUTH_COOKIE}=[^;]*" ""
+    header_up Cookie "^[;[:space:]]+" ""
+  }
 }`).join("\n")}
 `;
-  const dns = `.:53 {
-  bind ${gateway.listenHost}
-  acl {
-    allow net 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10 169.254.0.0/16
-    block
-  }
-  hosts {
-    ${gateway.listenHost} ${routes.map((route) => new URL(route.url).hostname).join(" ")}
-    ttl 60
-    fallthrough
-  }
-  forward . ${gateway.upstreamDns} {
-    max_concurrent 64
-  }
-  cache 30
-}
-`;
-  return { caddy, dns };
+  return { caddy };
 }
 
 async function listening(host: string, port: number): Promise<boolean> {
@@ -116,17 +86,16 @@ export class PrivateGateway {
   constructor(private readonly config: PalmTTYConfig, private readonly onFailure: () => void = () => {}) {}
   async start(): Promise<void> {
     const gateway = this.config.server.privateGateway;
-    if (!gateway || this.closed) return;
+    if (!gateway || this.closed || !privateGatewayRoutes(this.config).length) return;
     if (process.platform !== "win32" || process.arch !== "x64") throw new Error("private_gateway_requires_windows_x64");
     const root = privateNetworkRoot();
-    // Never adopt or kill an unknown HTTPS/DNS listener.
+    // Never adopt or kill an unknown gateway listener.
     const ports = privateGatewayPorts(this.config);
     for (const port of ports) if (await listening(gateway.listenHost, port)) throw new Error(`private_gateway_port_in_use:${port}`);
     if (this.closed) return;
     const files = privateGatewayFiles(this.config, root);
     await mkdir(root, { recursive: true });
     await writeFile(path.join(root, "Caddyfile"), files.caddy, { mode: 0o600 });
-    await writeFile(path.join(root, "Corefile"), files.dns, { mode: 0o600 });
     // No workstation tokens, workspace environment or unrelated application credentials.
     const env: NodeJS.ProcessEnv = {};
     for (const key of ["SystemRoot", "WINDIR", "TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA", "APPDATA"]) {
@@ -137,9 +106,7 @@ export class PrivateGateway {
       for (const tool of PRIVATE_NETWORK_TOOLS) {
         const executable = path.join(root, `${tool.name}-${tool.version}.exe`);
         if (!existsSync(executable)) throw new Error("private_gateway_tools_missing:run_deploy_local");
-        const child = spawnOwnedProcess({ executable, args: tool.name === "caddy"
-          ? ["run", "--config", path.join(root, "Caddyfile"), "--adapter", "caddyfile"]
-          : ["-conf", path.join(root, "Corefile")], cwd: root, env });
+        const child = spawnOwnedProcess({ executable, args: ["run", "--config", path.join(root, "Caddyfile"), "--adapter", "caddyfile"], cwd: root, env });
         child.on("error", () => { if (this.ready) this.onFailure(); });
         child.once("exit", () => { if (this.ready) this.onFailure(); });
         child.stdout.resume(); child.stderr.resume();
