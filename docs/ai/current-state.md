@@ -310,5 +310,7 @@ Private gateway bootstrap / 私有网关首次配置：the old private IP HTTP a
 ### Integration closeout validation (2026-10-26)
 
 - The operator confirmed phone access through the private HTTPS/WireGuard setup. Third-party small-screen usability is limited; Terminal remains the main workflow and both embedded tools stay optional. This is general access confirmation, not a claim that all upstream extensions/OAuth/IME combinations passed.
-- Required private-gateway bootstrap failure explicitly sets a nonzero exit status and closes Agent-owned services; Fastify onListen rejection alone is insufficient because Fastify only logs it. Independent Workers keep their existing lifetime.
+- Owned services start once on the native server listening event. Required private-gateway bootstrap failure explicitly sets a nonzero exit status and closes Agent-owned services. A closed gateway cannot regenerate children during asynchronous startup; independent Workers keep their existing lifetime.
 - Source deployment and interactive authorization share a bounded local Agent client. Direct HTTPS connects to the configured local listener while validating the first configured HTTPS Origin identity against the configured certificate chain, with explicit partial-chain trust and certificate/hostname verification enabled. TLS errors fail immediately; no global trust modification or certificate-validation bypass.
+
+- Managed application requests share one real per-IP budget; the same policy object supplies Fastify route metadata for static analysis. The runtime guard remains authoritative and authorization burst rejection is regression-tested. Listener lifecycle setup is distinct from HTTP request hooks; no CodeQL query is disabled or ignored.

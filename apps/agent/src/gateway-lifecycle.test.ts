@@ -16,7 +16,7 @@ vi.mock("./managed-web-apps.js", () => ({ ManagedWebApps: class {
 } }));
 import { buildApp } from "./app.js";
 
-it("closes the Agent with failure status when the onListen gateway bootstrap fails", async () => {
+it("closes the Agent with failure status when listener gateway bootstrap fails", async () => {
   const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "palmtty-gateway-lifecycle-"));
   const previousExitCode = process.exitCode;
   const app = await buildApp(parseConfig({ auth: { enabled: false } }), {

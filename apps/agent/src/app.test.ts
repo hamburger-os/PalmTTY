@@ -425,3 +425,16 @@ describe("HTTP security boundary", () => {
     await app.close();
   });
 });
+
+it("enforces the declared integration authorization budget before returning bootstrap material", async () => {
+  process.env.PALMTTY_TEST_TOKEN = TOKEN;
+  const app = await buildTestApp();
+  try {
+    const cookie = await loginCookie(app);
+    for (let i = 0; i < 7; i++) {
+      const response = await app.inject({ method: "POST", url: "/api/v1/integrations/harness/authorize", headers: { cookie, origin: ORIGIN } });
+      expect(response.statusCode).toBe(i < 6 ? 409 : 429);
+      expect(response.headers["cache-control"]).toBe("private, no-store");
+    }
+  } finally { await app.close(); }
+});

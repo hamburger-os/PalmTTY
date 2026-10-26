@@ -162,6 +162,6 @@ Code 入口位于工作区附件后并打开持久化主机目录；Harness 从�
 
 ### Startup failure and direct TLS / 启动失败与直接 TLS
 
-A required gateway bootstrap failure closes the Agent with nonzero exit status, while durable Terminal Workers survive. Deployment and interactive authorization share a bounded local client: direct HTTPS uses the configured Origin as its TLS identity, connects to the local listener and explicitly trusts the configured certificate chain, allowing a partial chain without disabling certificate or hostname verification. TLS validation errors fail immediately; no global trust changes are made.
+Owned services start once on the native listening event. A required gateway bootstrap failure closes the Agent with nonzero exit status, while durable Terminal Workers survive. Deployment and interactive authorization share a bounded local client: direct HTTPS uses the configured Origin as its TLS identity, connects to the local listener and explicitly trusts the configured certificate chain, allowing a partial chain without disabling certificate or hostname verification. TLS validation errors fail immediately; no global trust changes are made.
 
-必要网关启动失败会关闭 Agent 并设置失败退出码，独立终端 Worker 保留。部署与交互授权共用有界本机客户端：直接 HTTPS 连接本机监听地址，按配置 Origin 验证 TLS 身份，以配置证书链建立显式本地信任；允许部分链但不关闭证书与主机名校验。证书错误立即失败，不修改全局信任。
+自有服务绑定原生 listening 事件并只启动一次；必要网关启动失败会关闭 Agent 并设置失败退出码，独立终端 Worker 保留。部署与交互授权共用有界本机客户端：直接 HTTPS 连接本机监听地址，按配置 Origin 验证 TLS 身份，以配置证书链建立显式本地信任；允许部分链但不关闭证书与主机名校验。证书错误立即失败，不修改全局信任。

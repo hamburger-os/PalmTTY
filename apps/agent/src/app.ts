@@ -127,7 +127,9 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   const workspaceMutationLimiter = new FixedWindowLimiter(60, 60_000);
   const directoryBrowseLimiter = new FixedWindowLimiter(120, 60_000);
   const terminalProfileLimiter = new FixedWindowLimiter(60, 60_000);
-  const managedAppLimiter = new FixedWindowLimiter(6, 10 * 60_000);
+  // One policy drives both the actual shared budget and route metadata.
+  const managedAppRateLimit = { max: 6, timeWindow: 10 * 60_000 };
+  const managedAppLimiter = new FixedWindowLimiter(managedAppRateLimit.max, managedAppRateLimit.timeWindow);
 
   function authenticated(request: FastifyRequest): boolean {
     return auth.isAuthenticated(request.cookies[AUTH_COOKIE]);
@@ -283,7 +285,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   });
 
   app.post("/api/v1/integrations/:id/ensure",
-    { preHandler: [requireOrigin, requireAuth] }, async (request, reply) => {
+    { config: { rateLimit: managedAppRateLimit }, preHandler: [requireOrigin, requireAuth] }, async (request, reply) => {
       const id = (request.params as { id: string }).id;
       if (!managedAppLimiter.allow(request.ip)) {
         return reply.code(429).send({ error: "too_many_web_app_requests" });
@@ -300,7 +302,7 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
   );
 
   app.post("/api/v1/integrations/:id/authorize",
-    { preHandler: [requireOrigin, requireAuth] }, async (request, reply) => {
+    { config: { rateLimit: managedAppRateLimit }, preHandler: [requireOrigin, requireAuth] }, async (request, reply) => {
       reply.header("Cache-Control", "private, no-store");
       reply.header("Referrer-Policy", "no-referrer");
       const id = (request.params as { id: string }).id;
@@ -649,9 +651,9 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
     await sessions.close();
   });
 
-  app.addHook("onListen", async () => {
-    // Fastify logs and ignores onListen rejections. Close explicitly so startup
-    // cannot look healthy while its required gateway failed; Workers survive.
+  app.server.once("listening", async () => {
+    // Process bootstrap belongs to the native listener lifecycle, not HTTP
+    // request hooks. Explicit failure closes owned services; Workers survive.
     try { await privateGateway.start(); managedWebApps.start(); }
     catch { gatewayFailed(); }
   });

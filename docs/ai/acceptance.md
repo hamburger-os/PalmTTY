@@ -250,6 +250,8 @@ The task summary should identify:
 - Catalogue/iframe src never contain secrets. Authorization requires authentication + exact Origin, no-store/no-referrer, fixed configured remote HTTPS target; local operator classification rejects proxy headers and nonlocal socket addresses.
 - Lazy frame mounting and switching preserve iframe and terminal instances; hidden terminal geometry is paused. Verify 3 themes x 2 performance modes, reduced motion, portrait/short landscape, first-sign-in, HTTP/WebSocket and exact upstream frame/Cookie behavior. Local smoke is not phone HTTPS acceptance.
 
-- Required private-gateway startup failure must close the listener with nonzero exit status; Fastify onListen errors alone do not propagate.
-- Direct HTTPS local deployment/authorization verifies a DNS-only certificate while connecting over loopback; wrong Origin identity remains rejected and TLS errors do not become an 11-minute retry loop.
+- Required private-gateway startup failure must close the listener with nonzero exit status. Native listening lifecycle starts owned services once; closing during startup must prevent later process creation.
+- Direct HTTPS local deployment/authorization verifies DNS-only and IPv6-SAN certificates while connecting over loopback; wrong Origin identity remains rejected and TLS errors do not become an 11-minute retry loop.
 - Operator phone access was confirmed on 2026-10-26. Small-screen quality of third-party applications is a known upstream limitation; do not equate this confirmation with exhaustive extension/OAuth/keyboard acceptance.
+
+- The seventh integration authorization request in the shared six-request window returns 429; route metadata must remain backed by the real limiter.

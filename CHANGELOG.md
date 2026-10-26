@@ -17,7 +17,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Changed
 
-- Fail required gateway bootstrap explicitly so user startup can retry, and share a bounded local HTTPS client for deployment/authorization with configured certificate identity verification.
+- Bind owned service startup to the native listener lifecycle, fail required gateway bootstrap explicitly so user startup can retry, and share a bounded local HTTPS client for deployment/authorization with configured certificate identity verification.
 
 - Use device-neutral workbench branding, replace global application switches with workspace Code after Artifacts and a Harness home-card entry, open Code at the current host workspace folder, and distinguish missing access routes from installation failures.
 

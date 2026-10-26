@@ -103,14 +103,16 @@ async function listening(host: string, port: number): Promise<boolean> {
 export class PrivateGateway {
   private children: ChildProcessWithoutNullStreams[] = [];
   private ready = false;
+  private closed = false;
   constructor(private readonly config: PalmTTYConfig, private readonly onFailure: () => void = () => {}) {}
   async start(): Promise<void> {
     const gateway = this.config.server.privateGateway;
-    if (!gateway) return;
+    if (!gateway || this.closed) return;
     if (process.platform !== "win32" || process.arch !== "x64") throw new Error("private_gateway_requires_windows_x64");
     const root = privateNetworkRoot();
     // Never adopt or kill an unknown HTTPS/DNS listener.
     for (const port of [443, 53]) if (await listening(gateway.listenHost, port)) throw new Error(`private_gateway_port_in_use:${port}`);
+    if (this.closed) return;
     const files = privateGatewayFiles(this.config, root);
     await mkdir(root, { recursive: true });
     await writeFile(path.join(root, "Caddyfile"), files.caddy, { mode: 0o600 });
@@ -121,6 +123,7 @@ export class PrivateGateway {
       if (process.env[key]) env[key] = process.env[key];
     }
     try {
+      if (this.closed) return;
       for (const tool of PRIVATE_NETWORK_TOOLS) {
         const executable = path.join(root, `${tool.name}-${tool.version}.exe`);
         if (!existsSync(executable)) throw new Error("private_gateway_tools_missing:run_deploy_local");
@@ -133,6 +136,7 @@ export class PrivateGateway {
         this.children.push(child);
       }
       for (let attempt = 0; attempt < 80; attempt++) {
+        if (this.closed) return;
         if (this.children.some((child) => child.exitCode !== null)) throw new Error("private_gateway_start_failed");
         if (await listening(gateway.listenHost, 443) && await listening(gateway.listenHost, 53)) { this.ready = true; return; }
         await new Promise((resolve) => setTimeout(resolve, 250));
@@ -141,6 +145,7 @@ export class PrivateGateway {
     } catch (error) { await this.close(); throw error; }
   }
   async close(): Promise<void> {
+    this.closed = true;
     this.ready = false;
     await Promise.all(this.children.map((child) => stopOwnedProcess(child)));
     this.children = [];
