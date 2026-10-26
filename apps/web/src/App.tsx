@@ -27,7 +27,7 @@ import {
   terminateSession,
   updateWorkspace
 } from "./api.js";
-import { WebApplicationPanel } from "./WebApplications.js";
+import { WebApplicationLink } from "./WebApplicationLink.js";
 import { AppearanceControls } from "./AppearanceControls.js";
 import { Brand } from "./Brand.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
@@ -60,7 +60,6 @@ export function App() {
   const { t, error: translateError, connections } = useI18n();
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null);
-  const [applicationView, setApplicationView] = useState<"home" | "harness">("home");
   const [integrations, setIntegrations] = useState<WebAppCatalog | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspacePublic[]>([]);
   const [sessions, setSessions] = useState<SessionPublic[]>([]);
@@ -186,9 +185,8 @@ export function App() {
       (workspace) => workspace.id === activeSession.workspaceId
     );
     return (
-      <WorkspaceWorkbench visible={applicationView === "home"}
+      <WorkspaceWorkbench
         codeStatus={integrations?.apps.vscodeWeb}
-        onRefreshApps={async () => setIntegrations(await integrationLinks())}
         {...(activeWorkspace ? { workspace: activeWorkspace } : {})}
         activity={{
           kind: "terminal",
@@ -323,7 +321,8 @@ export function App() {
 
   const renderWebApp = (id: WebAppId) => {
     const info = integrations?.apps[id];
-    const phase = info?.phase ?? "detecting";
+    if (!info || info.phase === "disabled") return null;
+    const phase = info.phase;
     const canRetry = info?.canEnsure &&
       !["running", "installing", "starting", "detecting"].includes(phase);
     return (
@@ -339,15 +338,7 @@ export function App() {
           )}
         </div>
         <div className="integration-actions">
-          {info?.accessUrl && (
-            <button className="compact" type="button" onClick={() => setApplicationView("harness")}>{t("integrations.openEmbedded")}</button>
-          )}
-          {info?.accessUrl && (
-            <a className="action ghost compact" href={info.accessUrl}
-               target="_blank" rel="noopener noreferrer">
-              {t("integrations.open")} ↗
-            </a>
-          )}
+          <WebApplicationLink id={id} status={info}/>
           {canRetry && (
             <button className="ghost compact" type="button" onClick={() => {
               void ensureWebApp(id).then(() =>
@@ -364,7 +355,7 @@ export function App() {
 
   return (
     <>
-    <div hidden={applicationView !== "home"}>
+
     {workbench ?? <main className="app-shell">
       <header className="topbar glass-shell">
         <Brand eyebrow={t("app.eyebrow")} />
@@ -379,7 +370,6 @@ export function App() {
                 setAuth({ enabled: true, authenticated: false });
                 setCapabilities(null);
                 setIntegrations(null);
-                setApplicationView("home");
                 setWorkspaces([]);
                 setSessions([]);
               })()}
@@ -392,6 +382,7 @@ export function App() {
 
       {error && <div className="error-banner">{error}</div>}
       <div className="card-grid" aria-label={t("integrations.applications")}>
+        {renderWebApp("vscodeWeb")}
         {renderWebApp("harness")}
       </div>
 
@@ -553,25 +544,8 @@ export function App() {
         />
       )}
     </main>}
-    </div>
-    {integrations && <HarnessView visible={applicationView === "harness"} status={integrations.apps.harness}
-      onBack={() => setApplicationView("home")} onRefresh={async () => setIntegrations(await integrationLinks())}/> }
     </>
   );
-}
-
-function HarnessView({ visible, status, onBack, onRefresh }: {
-  visible: boolean; status: import("@palmtty/protocol").WebAppStatus;
-  onBack(): void; onRefresh(): Promise<void>;
-}) {
-  const { t } = useI18n();
-  const [visited, setVisited] = useState(false);
-  useEffect(() => { if (visible) setVisited(true); }, [visible]);
-  if (!visited) return null;
-  return <main className="web-app-view" hidden={!visible}>
-    <div><button className="ghost compact" onClick={onBack}>← {t("integrations.backHome")}</button></div>
-    <WebApplicationPanel id="harness" status={status} onRefresh={onRefresh}/>
-  </main>;
 }
 
 function LanguageSwitcher() {

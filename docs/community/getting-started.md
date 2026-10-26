@@ -253,3 +253,10 @@ Qwen 模型及 Python 依赖是可选独立安装，不随主安装包分发或�
 `pnpm deploy:local [--config <path>] [--env-file <path>]` installs frozen dependencies, builds, preflights and registers current-user startup before checking configured autoStart apps. Windows can reuse an existing installation with no options. Use explicit managed/external objects from [Web integrations](web-integrations.md), not URL strings. Local ports default to Code 8000 and Harness 3080; a phone cannot reach the host through its own loopback. DNS/TLS/NAS requires separate first-time setup. Explicit interactive `pnpm app:authorize <vscodeWeb|harness>` displays the private local first-sign-in URL; do not record/share it.
 
 上述命令完成本机构建、预检、自启和就绪检查，Windows 无参数复用安装路径；应用采用明确对象配置。Code/Harness 默认回环端口为 8000/3080，手机 HTTPS 域名与代理首次单独配置。本机明确执行交互授权命令可获取私有首次登录地址，勿记录或分享。自启不表示 OS 重启后旧终端存活。
+
+
+## Optional independent applications / 可选独立应用
+
+Code and Harness can keep host-configured autoStart and open as independent links without embedding. Private WireGuard setups may use PalmTTY/Harness HTTP while Code retains trusted HTTPS for secure-context features; authentication remains enabled. See [Web integrations](web-integrations.md) for the single configuration and one-command deployment.
+
+Code/Harness 保留主机配置自启，通过独立链接打开，不再内嵌。WireGuard 私网可采用 PalmTTY/Harness HTTP、Code 可信 HTTPS，认证继续保留。配置和一键部署见上述文档。

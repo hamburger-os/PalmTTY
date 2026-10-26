@@ -89,7 +89,7 @@ systemd unit 使用 `KillMode=process` 是为了保持既有“Agent lifetime !=
 
 本机 managed/external 配置区分应用所有权。Code 使用用户另装的官方 CLI，个人自启默认关闭且不自动接受许可/关闭令牌；Harness 使用校验固定版本。仅回收创建时拥有的应用容器，不能接管未知端口/PID，也不能树形终止 Agent 而误杀持久 Worker。
 
-第三方 HTML 始终在独立 Origin，iframe 仅整合展示。目录/src 不含凭据，普通日志、存储、argv 和 PalmTTY Cookie 不含上游引导秘密。新增显式认证 + 精确 Origin 授权动作：只交接自有实例到配置的独立 HTTPS 根；本机直接接口可返回回环地址，转发请求不能冒认本机操作者。交接 no-store/no-referrer，客户端只在用户打开的独立标签页使用，不保存至 iframe 状态。`pnpm app:authorize` 仅在明确调用的交互终端显示私有地址，此项不属于默认日志。
+第三方应用仅独立页面打开，不再内嵌。目录与渲染链接无凭据；认证、精确 Origin、限流的显式授权只交接自有实例到配置的独立入口，响应 no-store/no-referrer，不写日志、存储或 PalmTTY Cookie。本机授权严格区分代理请求，只有明确调用的交互命令可以显示私有引导链接。
 
 该授权动作是相对原“所有远端引导凭据一律不返回”的有意调整，目的是在保持独立认证的前提下完成首次会话交接；绝不放行任意目标或共享 PalmTTY Token。上游 frame、Cookie、HTTP/WebSocket、同站子域和手机行为仍须单独验收。
 
@@ -131,4 +131,4 @@ Host 的文本预览、完整内容导出和图片读取现在以规范路径打
 
 ## 私有 Web 网关边界
 
-不同 Origin 的端口隔离不隔离 Cookie；第三方 HTTPS 入口必须使用不同主机名。受管私有网关用同站 sibling `.home.arpa` 名称，保留各自 Host/Origin 与认证检查。父页面和子框架均需受信任 HTTPS。网关与 DNS 由 Agent 租约管理，分别绑定具体私有地址、拒绝公网来源；上游根 URL 和端口来自既有配置。固定官方工具只在操作者部署时下载并校验 SHA-256，不在浏览器轮询中安装。DNS 无查询日志且转发并发有界，工具不继承工作区/登录密钥环境。私有 CA 私钥仅留主机用户数据目录；仅导出公开根证书。证书信任、防火墙和客户端 DNS 是明确的首次操作，不自动提权。
+Cookie 不按端口隔离，应用入口必须保持独立主机名。私有网关允许 LAN PalmTTY HTTP、Code HTTPS、Harness HTTP；HTTP Harness 仅限该明确受管配置并匹配端口，自身认证保留。Code 的安全上下文功能仍使用可信 HTTPS。网关/DNS 拒绝公共来源，转发有界且不记录查询；CA 私钥留主机，仅 HTTPS 需要设备信任，DNS 仍供两个名称使用。防火墙和信任操作明确执行，不自动提权。

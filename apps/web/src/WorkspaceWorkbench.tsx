@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { WorkspacePublic, WebAppStatus } from "@palmtty/protocol";
-import { WebApplicationPanel } from "./WebApplications.js";
+import { WebApplicationLink } from "./WebApplicationLink.js";
 import { ArtifactsPane } from "./ArtifactsPane.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { FilesPane } from "./FilesPane.js";
@@ -14,23 +14,20 @@ export type WorkbenchActivity = {
   sessionId: string;
   onRestart(): Promise<void>;
 };
-type WorkbenchPane = "terminal" | "git" | "files" | "artifacts" | "code";
+type WorkbenchPane = "terminal" | "git" | "files" | "artifacts";
 export type WorkbenchActivityOption = { value: string; label: string };
 
 export function WorkspaceWorkbench({
-  workspace, activity, activityOptions, onSwitchActivity, onBack, visible = true, codeStatus, onRefreshApps
+  workspace, activity, activityOptions, onSwitchActivity, onBack, codeStatus
 }: {
   workspace?: WorkspacePublic;
   activity: WorkbenchActivity;
   activityOptions: WorkbenchActivityOption[];
   onSwitchActivity(value: string): void;
   onBack(): void;
-  visible?: boolean;
   codeStatus?: WebAppStatus | undefined;
-  onRefreshApps?(): Promise<void>;
 }) {
   const { t } = useI18n();
-  const [codeVisited, setCodeVisited] = useState(false);
   const [pane, setPane] = useState<WorkbenchPane>("terminal");
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [terminalConnection, setTerminalConnection] = useState<ConnectionState>("connecting");
@@ -106,7 +103,7 @@ export function WorkspaceWorkbench({
 
 
   const tabs: WorkbenchPane[] = [
-    "terminal", ...(workspace ? (["git", "files"] as const) : []), "artifacts", ...(workspace ? (["code"] as const) : [])
+    "terminal", ...(workspace ? (["git", "files"] as const) : []), "artifacts"
   ];
   const showFileHistory = (path: string) => {
     if (!workspace) return;
@@ -138,6 +135,7 @@ export function WorkspaceWorkbench({
             </select>
           )}
         </div>
+        <div className="workbench-navigation">
         <nav className={"workbench-tabs" + (mobileToolsOpen ? " mobile-open" : "")}
           role="tablist" aria-label={t("workbench.views")}>
           {tabs.map((item) => (
@@ -145,12 +143,13 @@ export function WorkspaceWorkbench({
               aria-selected={pane === item}
               onClick={() => {
                 if (item === "git") setGitHistoryPath(undefined);
-                if (item === "code") setCodeVisited(true);
                 setPane(item);
                 setMobileToolsOpen(false);
               }}>{t(`workbench.${item}`)}</button>
           ))}
         </nav>
+        {workspace && codeStatus && codeStatus.phase !== "disabled" && <WebApplicationLink id="vscodeWeb" status={codeStatus} workspace={workspace} label={t("workbench.code")}/>}
+        </div>
         <div className="workbench-actions">
           <button type="button" className="ghost compact mobile-workbench-tools"
             aria-label={t("workbench.tools")} aria-expanded={mobileToolsOpen}
@@ -168,7 +167,7 @@ export function WorkspaceWorkbench({
       <div className="workbench-content">
         <div className={`workbench-pane${pane === "terminal" ? " is-active" : ""}`}>
           <TerminalView key={activity.sessionId} sessionId={activity.sessionId}
-            active={visible && pane === "terminal"} insertRequest={terminalInsert}
+            active={pane === "terminal"} insertRequest={terminalInsert}
             onConnectionChange={terminalConnectionChanged}/>
         </div>
         {workspace && pane === "git" && (
@@ -190,10 +189,7 @@ export function WorkspaceWorkbench({
               onInsertPath={insertArtifactPath}/>
           </div>
         )}
-        {workspace && codeVisited && <div className={`workbench-pane${pane === "code" ? " is-active" : ""}`}>
-          <WebApplicationPanel key={workspace.id} id="vscodeWeb" status={codeStatus} workspace={workspace}
-            onRefresh={onRefreshApps ?? (async () => {})}/>
-        </div>}
+
       </div>
       {restartConfirmOpen && (
         <ConfirmDialog title={t("terminal.restartTitle")} message={t("terminal.restartConfirm")}

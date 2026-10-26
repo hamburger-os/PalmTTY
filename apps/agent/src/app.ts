@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
@@ -41,7 +42,7 @@ import { registerSpeechRoutes } from "./speech-routes.js";
 import { defaultWebRoot } from "./runtime-layout.js";
 import { PALMTTY_VERSION } from "./version.js";
 import { defaultRuntimeDir } from "./worker-storage.js";
-import { PrivateGateway } from "./private-gateway.js";
+import { privateNetworkRoot, PrivateGateway } from "./private-gateway.js";
 import { ManagedWebApps } from "./managed-web-apps.js";
 import { isLoopbackHost } from "@palmtty/config";
 import { isLocalOperator } from "./local-operator.js";
@@ -626,6 +627,19 @@ export async function buildApp(config: PalmTTYConfig, options: BuildAppOptions =
       });
     }
   );
+
+  if (config.server.privateGateway && config.server.exposure.mode === "lan") {
+    // Only public setup artifacts live here; CA keys remain outside this root.
+    const setupRoot = path.join(privateNetworkRoot(), "public");
+    await mkdir(setupRoot, { recursive: true });
+    await app.register(fastifyStatic, {
+      root: setupRoot, prefix: "/network-setup/", decorateReply: false,
+      setHeaders: (response, filename) => {
+        response.header("Cache-Control", "no-store");
+        if (filename.endsWith(".mobileconfig")) response.header("Content-Type", "application/x-apple-aspen-config");
+      }
+    });
+  }
 
   const webRoot = options.webRoot ?? defaultWebRoot();
   const hasWeb = existsSync(path.join(webRoot, "index.html"));

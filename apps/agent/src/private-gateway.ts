@@ -17,16 +17,25 @@ export function privateNetworkRoot(): string {
   return path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), "AppData", "Local"), "PalmTTY", "private-network");
 }
 
+export function privateGatewayRoutes(config: PalmTTYConfig): { url: string; port: number }[] {
+  const exposure = config.server.exposure;
+  return [
+    ...(exposure.mode === "reverseProxy" ? [{ url: exposure.origins[0]!, port: config.server.port }] : []),
+    ...Object.values(config.integrations).flatMap((entry) => entry?.mode === "managed" && entry.url
+      ? [{ url: entry.url, port: entry.port }] : [])
+  ];
+}
+
+export function privateGatewayPorts(config: PalmTTYConfig): number[] {
+  return [...new Set([443, 53, ...(config.server.exposure.mode === "reverseProxy" ? [config.server.port] : []),
+    ...privateGatewayRoutes(config).filter((route) => new URL(route.url).protocol === "http:").map((route) => Number(new URL(route.url).port || 80))])];
+}
+
 export function privateGatewayFiles(config: PalmTTYConfig, root: string): { caddy: string; dns: string } {
   const gateway = config.server.privateGateway;
   const exposure = config.server.exposure;
-  if (!gateway || exposure.mode !== "reverseProxy") throw new Error("private_gateway_configuration_required");
-  const routes = [
-    { url: exposure.origins[0]!, port: config.server.port, application: false },
-    ...Object.values(config.integrations).flatMap((entry) => entry?.mode === "managed" && entry.url
-      ? [{ url: entry.url, port: entry.port, application: true }] : [])
-  ];
-  const parent = new URL(routes[0]!.url).origin;
+  if (!gateway || !["lan", "reverseProxy"].includes(exposure.mode)) throw new Error("private_gateway_configuration_required");
+  const routes = privateGatewayRoutes(config);
   const caddy = `{
   admin off
   auto_https disable_redirects
@@ -46,7 +55,7 @@ export function privateGatewayFiles(config: PalmTTYConfig, root: string): { cadd
     }
   }
 }
-http://${gateway.listenHost}:${config.server.port} {
+${exposure.mode === "reverseProxy" ? `http://${gateway.listenHost}:${config.server.port} {
   bind ${gateway.listenHost}
   @outside not remote_ip private_ranges
   respond @outside 403
@@ -58,14 +67,14 @@ http://${gateway.listenHost}:${config.server.port} {
     file_server @setup
     respond 404
   }
-}
+}` : ""}
 ${routes.map((route) => `${new URL(route.url).origin} {
   bind ${gateway.listenHost}
-  tls internal
+  ${new URL(route.url).protocol === "https:" ? "tls internal" : ""}
   @outside not remote_ip private_ranges
   respond @outside 403
   header Referrer-Policy no-referrer
-  ${route.application ? `header +Content-Security-Policy "frame-ancestors 'self' ${parent}"` : ""}
+  header +Content-Security-Policy "frame-ancestors 'self'"
   reverse_proxy 127.0.0.1:${route.port}
 }`).join("\n")}
 `;
@@ -111,7 +120,8 @@ export class PrivateGateway {
     if (process.platform !== "win32" || process.arch !== "x64") throw new Error("private_gateway_requires_windows_x64");
     const root = privateNetworkRoot();
     // Never adopt or kill an unknown HTTPS/DNS listener.
-    for (const port of [443, 53]) if (await listening(gateway.listenHost, port)) throw new Error(`private_gateway_port_in_use:${port}`);
+    const ports = privateGatewayPorts(this.config);
+    for (const port of ports) if (await listening(gateway.listenHost, port)) throw new Error(`private_gateway_port_in_use:${port}`);
     if (this.closed) return;
     const files = privateGatewayFiles(this.config, root);
     await mkdir(root, { recursive: true });
@@ -138,7 +148,7 @@ export class PrivateGateway {
       for (let attempt = 0; attempt < 80; attempt++) {
         if (this.closed) return;
         if (this.children.some((child) => child.exitCode !== null)) throw new Error("private_gateway_start_failed");
-        if (await listening(gateway.listenHost, 443) && await listening(gateway.listenHost, 53)) { this.ready = true; return; }
+        if ((await Promise.all(ports.map((port) => listening(gateway.listenHost, port)))).every(Boolean)) { this.ready = true; return; }
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
       throw new Error("private_gateway_start_timeout");

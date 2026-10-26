@@ -257,6 +257,20 @@ it("requires separate cookie hosts and a coherent private HTTPS gateway", () => 
   }};
   expect(parseConfig(base).server.privateGateway?.listenHost).toBe("192.168.1.3");
   expect(() => parseConfig({...base, integrations:{...base.integrations,harness:{mode:"managed",url:"https://code.palmtty.home.arpa:8443"}}})).toThrow();
-  expect(() => parseConfig({...base, server:{...base.server,exposure:{mode:"lan"}}})).toThrow();
+  expect(parseConfig({...base, server:{...base.server,exposure:{mode:"lan"}}}).server.exposure.mode).toBe("lan");
   expect(() => parseConfig({...base, server:{...base.server,privateGateway:{listenHost:"0.0.0.0",upstreamDns:"192.168.1.1"}}})).toThrow();
+});
+
+it("scopes private HTTP to managed LAN Harness with a distinct hostname and matching port", () => {
+  const server = {port:17688, exposure:{mode:"lan"},privateGateway:{listenHost:"192.168.1.3",upstreamDns:"192.168.1.1"}};
+  const integrations = {vscodeWeb:{mode:"managed",url:"https://code.palmtty.home.arpa/"},harness:{mode:"managed",url:"http://harness.palmtty.home.arpa:3080/"}};
+  expect(parseConfig({server,integrations}).integrations.harness?.url).toBe(integrations.harness.url);
+  for (const value of [
+    {server:{...server,privateGateway:undefined},integrations},
+    {server,integrations:{...integrations,vscodeWeb:{mode:"managed",url:"http://code.palmtty.home.arpa:8000/"}}},
+    {server,integrations:{...integrations,harness:{mode:"external",url:integrations.harness.url}}},
+    {server,integrations:{...integrations,harness:{mode:"managed",url:"http://harness.palmtty.home.arpa:3081/"}}},
+    {server,integrations:{...integrations,harness:{mode:"managed",url:"http://code.palmtty.home.arpa:3080/"}}},
+    {server:{...server,exposure:{mode:"reverseProxy",origins:["https://palm.palmtty.home.arpa"]}},integrations}
+  ]) expect(() => parseConfig(value)).toThrow();
 });

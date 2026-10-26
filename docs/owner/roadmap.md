@@ -143,4 +143,4 @@ PalmTTY 源码与发行版本统一迁移至 Node 24 LTS：CI 使用 `.node-vers
 
 ## 2026-10 独立应用受管启动与内嵌
 
-已实现单一 managed/external 配置、本机显式 autoStart、Code/Harness 独立进程容器、固定私有 Harness 安装、独立 Origin iframe、显式首次授权、一键源码部署与共享卡片/动作几何。旧 URL 字符串和前台联合启动器已移除。当前主机先使用回环 8000/3080；独立域名尚未准备，手机 HTTPS、首次认证及 WebSocket 内嵌链路不能标记已完成，真实 iOS 键盘/长时行为仍待验收。
+已实现单一 managed/external 配置、显式自启、独立应用容器、校验固定 Harness 安装、独立页面链接、显式授权、一键部署与共享卡片/动作几何。内嵌及其状态已移除；工作区 Code 打开当前主机目录，Harness 从首页独立打开。WireGuard 方案允许 PalmTTY/Harness HTTP、Code 可信 HTTPS；实际手机键盘、扩展和长时上游体验仍需操作者验收。

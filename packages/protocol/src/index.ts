@@ -13,7 +13,6 @@ export type WebAppStatus = {
   id: WebAppId;
   phase: WebAppPhase;
   accessUrl?: string;
-  embedUrl?: string;
   canEnsure?: boolean;
   canAuthorize?: boolean;
   detail?: string;

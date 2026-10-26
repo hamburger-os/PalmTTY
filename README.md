@@ -18,7 +18,7 @@ Mobile-first · self-hosted · Windows-first · Host + WSL runtimes · xterm.js
 > [!WARNING]
 > PalmTTY exposes an interactive shell with the privileges of the OS user running the Agent. Treat compromise as workstation compromise. Use a private HTTPS entry point or an authenticated HTTPS reverse proxy; do not expose an unauthenticated Agent port to the Internet.
 
-PalmTTY is a self-hosted remote development workbench centered on durable Terminal Sessions, workspace Git/Files/Artifacts, and optional embedded views for official VS Code Web and DeepSeek Harness. Codex/Claude/Pi CLIs remain ordinary terminal workloads.
+PalmTTY is a self-hosted remote development workbench centered on durable Terminal Sessions, workspace Git/Files/Artifacts, and optional independent links to official VS Code Web and DeepSeek Harness. Codex/Claude/Pi CLIs remain ordinary terminal workloads.
 
 PalmTTY 是一个面向远程设备、针对移动端优化的自托管远程开发工作台。Windows Host、WSL、Linux Host 使用独立持久的 Terminal Worker；Git/Files/Artifacts 保持工作区工具。微软官方 VS Code Web 与 DeepSeek Harness 可按本机明确配置独立管理；Harness 在当前用户目录安装固定版本。两款应用都使用独立认证与 Web Origin。Codex CLI 仍是终端启动命令。
 
@@ -70,16 +70,16 @@ integrations:
   harness: { mode: managed, autoStart: true, port: 3080 }
 ```
 
-Local defaults are `127.0.0.1:8000` and `127.0.0.1:3080`. Remote access needs independent HTTPS subdomains (`url` on each entry) and a host-side proxy. Frames load directly from those Origins; first sign-in opens separately. Catalogue/iframe URLs contain no bootstrap secrets. See [Web integrations](docs/community/web-integrations.md) and [proxy template](examples/web-apps.Caddyfile).
+Local defaults are `127.0.0.1:8000` and `127.0.0.1:3080`. Remote access uses independent application hostnames (`url` on each entry). Code uses trusted HTTPS for secure-context features; scoped private-gateway LAN Harness may use HTTP. Both open independently with explicit sign-in handoff; catalogue/rendered links contain no bootstrap secrets. See [Web integrations](docs/community/web-integrations.md) and [proxy template](examples/web-apps.Caddyfile).
 
-中文：本机个人启动由配置明确选择，默认关闭；Harness 固定私有安装，受管应用有独立进程容器，停止 Agent 回收应用但保留终端 Worker。Code 从工作区附件右侧进入并打开当前主机目录；Harness 从首页卡片进入。首次单独授权，远程设备不能使用开发主机回环地址。源码一键部署使用 `pnpm deploy:local`，可选私有 HTTPS/DNS 网关；设备首次信任与名称解析需明确配置。
+中文：本机个人启动由配置明确选择，默认关闭；Harness 固定私有安装，受管应用有独立进程容器，停止 Agent 回收应用但保留终端 Worker。Code 从工作区附件右侧进入并打开当前主机目录；Harness 从首页卡片进入。首次单独授权，远程设备不能使用开发主机回环地址。源码一键部署使用 `pnpm deploy:local`，可选私有网关/DNS；LAN PalmTTY 和 Harness 可用 HTTP，Code 保留可信 HTTPS。名称解析与 HTTPS 证书首次信任需明确配置。
 
 ## Architecture / 架构
 
 ```text
 Browser/PWA -> PalmTTY Agent (auth, Workspace, Git, Files)
                     -> detached per-session Terminal Worker -> Host/WSL PTY
-Cross-Origin embedded views -> independent official VS Code Web / Harness Web
+Independent page links -> official VS Code Web / Harness Web
 ```
 
 ## Install / 安装

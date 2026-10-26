@@ -1,54 +1,31 @@
-# 独立 Web 应用、受管启动与页内嵌入
+# 独立 Web 应用与受管启动
 
-## 单一配置与边界
+## 单一配置与所有权
 
-`integrations.vscodeWeb` 和 `integrations.harness` 可缺省（禁用），或明确选择：
+`integrations.vscodeWeb`、`integrations.harness` 缺省禁用；`managed` 管理固定回环端口、默认关闭的 autoStart 和可选独立根 URL，`external` 只保存 URL。状态由协议包定义，配置由 config 包定义，不维护旧字符串或联合启动脚本。
 
-- `managed`：本机固定 IPv4 回环端口、默认关闭的 `autoStart` 与可选独立根 URL。显式开启后由 Agent 监听就绪时启动，网页登录/轮询不触发部署。
-- `external`：仅保存独立 URL；不安装、启动或停止本机程序，不将外部入口与本机状态混用。
+受管应用随 Agent 监听就绪后启动，网页登录与目录轮询不安装或启动程序。Code 由操作者另行安装并确认适用条款；不自动接受许可、不关闭令牌、不引入 Azure Tunnel。Harness 使用校验后的固定私有 npm 安装，先 staging 再发布，输出有界，区分安装与启动超时。
 
-旧字符串直接拒绝，删除前台联合启动器，不维护兼容路径。身份/状态只定义于协议包，配置只定义于 config 包；Code/Harness 不变成 Workspace/Terminal Session 类型。
+应用/安装器通过私有管道租约管理。Windows 使用不可 breakaway 的 kill-on-close Job，POSIX 使用工作负载进程组；Agent 正常或强停回收自有后代。持久 Terminal Worker 的生命周期独立，禁止对 Agent 进程树整体终止或凭端口/PID 接管未知程序。
 
-官方 Code 由操作者自行安装；个人启动由本机配置显式选择，网页不能提交命令、版本或路径。PalmTTY 不捆绑微软二进制、不自动接受许可、不关闭连接令牌。官方 tunnel service 与 Server 托管限制是不同问题，不再笼统宣称所有后台运行都被禁止，也不保证私人用法获得许可；参照 standards/vscode-web.md，不引入 Azure Tunnel。
+## 页面入口与授权
 
-Harness 只执行已校验固定 `@deepseek-ai/dsh@0.2.1-rc.2` 私有安装，不执行未校验全局入口。安装先 staging 后发布；输出保留有界但不因普通输出多杀掉安装器。区分安装超时与启动超时，失败保持可见、重试显式触发。
+不再内嵌第三方页面。工作区保留终端/Git/文件/附件四个视图，附件右侧的 Code 是独立打开动作，按 URL folder 参数打开当前持久化主机目录。Windows Code 不猜测 WSL 路径映射，不重启全局 Code 实例。首页 Code、Harness 卡片均提供独立链接；禁用应用不显示，无入口与安装失败分别提示。主题只管理 PalmTTY 卡片和链接。
 
-## 进程所有权
+目录与渲染 href 只含干净入口。用户点击受管应用时，同步打开独立页面，再通过认证、精确 Origin、限流的 POST 授权接口交接自有实例的上游引导 URL。响应 no-store/no-referrer，客户端不将凭据存入状态、存储、日志或目录。目标固定来自主机配置，不能由浏览器指定；远端不返回主机回环地址。第三方保留自己的认证、Cookie、Host/Origin 和 WebSocket 权限。授权预算耗尽时仅回退到干净入口，继续由上游校验已有登录，不关闭可正常使用的页面，不放宽服务端限流。
 
-应用/安装器使用私有管道租约：Windows 在恢复执行前加入不可 breakaway 的 kill-on-close Job，POSIX 使用租约监督器与工作负载进程组。包装进程先退出也清理后代；Agent 强停导致租约断开。Terminal Worker 继续独立持久，不能对 Agent 树形全杀，也不能凭端口或持久 PID 接管未知程序。
+本机显式 `pnpm app:authorize <vscodeWeb|harness>` 可在交互终端显示私有引导链接；直接本机接口与代理请求严格区分。这是明确的凭据交接，不是共享 PalmTTY 登录。
 
-Agent 正常 SIGINT/SIGTERM 调用 app.close；Windows Task Scheduler 强停由独立租约/Job 兜底，不能假设 Unix 信号语义。
+## WireGuard 私网部署
 
-## 页内展示与首次授权
+当前简化方案：PalmTTY 使用 `server.exposure.mode: lan`，通过主机 IP 的 HTTP 和原访问令牌访问；Code 使用已信任的 HTTPS；Harness 使用独立内网名称的 HTTP。WireGuard 不改变浏览器安全上下文，Code webview 的 crypto.subtle 等功能需要可信入口；Harness 本身不要求 HTTPS。HTTP 仍未端到端加密，采用该方案意味着信任局域网及隧道。
 
-三个同站、不同主机名的 HTTPS 入口保持独立 Origin 与 host-only Cookie；不同端口不能隔离 Cookie。浏览器直接 iframe 加载，PalmTTY 不代理第三方 HTML、不读取其 DOM。首次访问挂载，切换保留；隐藏终端不传播尺寸变化。主题只统一外框/导航/动作，内部主题由上游管理。
+Windows x64 可启用 `server.privateGateway`，两个 managed 应用使用同一 `.home.arpa` 父域下不同名称。Code HTTPS 默认 443；Harness HTTP 的外部端口必须等于 managed 端口，代理绑定具体内网 IP、上游绑定 127.0.0.1，允许相同端口但不同地址。不同端口不能隔离 Cookie，所以不把两个应用放到同一个 IP 主机名。完整 HTTPS 的 reverseProxy 配置也是显式支持的部署模式。
 
-目录与 iframe src 只含无凭据根 URL。本机无域名阶段可显式运行 `pnpm app:authorize <vscodeWeb|harness>`，仅在交互终端显示私有首次登录地址；它从直接本机接口认证，代理请求不能冒认本机操作者，此项不进入默认日志。首次授权是单独认证 + 精确 Origin POST，仅把自有实例的上游引导 URL 交给操作者打开的独立标签页；远端目标只能是配置的独立 HTTPS 根，不能是回环或请求参数。响应 no-store/no-referrer，凭据不进入存储、日志或目录。这是明确的上游凭据交接，不是共享 PalmTTY 登录。第三方仍独立校验自己的 Cookie、Host、Origin、HTTP/WebSocket 权限。
-
-同站子域有助于 SameSite Cookie，但上游 frame 限制、OAuth 回调、HTTP/WebSocket 与 iOS Safari 必须实测；独立打开始终保留。
+Caddy/CoreDNS 从固定官方归档校验哈希后供应，由 Agent 租约管理，拒绝公共来源、限制 DNS 转发、不记录查询或引导串。CA 私钥仅留当前用户目录，首次信任仅服务 HTTPS 应用。LAN `/network-setup/` 提供公开证书、iOS 描述文件和说明。DNS 仍用于两个应用名称，已信任证书无需重装。防火墙 helper 仅更新具名、程序/私网地址/私有来源受限的规则；不自动执行管理员操作。
 
 ## 部署与验收
 
-源码 `pnpm deploy:local [--config <path>] [--env-file <path>]` 完成冻结依赖安装、构建、预检、当前用户自启注册和受管应用检查；Windows 无参数复用既有安装路径。发行版继续使用 bundled Node/npm 与 `palmtty service`。DNS、TLS、NAS 规则首次独立配置。
+源码 `pnpm deploy:local [--config <path>] [--env-file <path>]` 完成冻结依赖、构建、预检、当前用户自启和应用就绪检查；Windows 无参数复用既有安装路径。升级仅可停止已注册自启实例，不杀未知监听者，失败尝试恢复原自启。旧直接启动的 Code 残留可显式运行 `scripts/cleanup-code-web.ps1`，活跃 PalmTTY 受管进程保留。
 
-NAS 不能直接连接另一主机回环：由主机独立 HTTPS 代理接入固定回环端口，参考 `examples/web-apps.Caddyfile`；禁止同源反代或代理记录引导查询串。显式运行 `scripts/cleanup-code-web.ps1` 仅清理当前用户官方 serve-web Node 树中的旧直接启动残留。
-
-本机就绪不等于远程设备可用。分别验收首次授权、iframe、HTTP API、WebSocket、切换不重连终端、正常/强停端口释放与独立 Worker 存活。
-
-## 工作区入口与内网 HTTPS
-
-删除全局三按钮导航。Code 位于工作区附件右侧，通过 URL folder 参数打开持久化主机 cwd；不重启全局 Code 服务，不把路径传给 Session 创建。Windows Code 不猜测 WSL 路径映射。终端保持 mounted，隐藏时停止几何传播；Code 仅在首次进入时挂载，保留当前工作区 iframe，不无限缓存历史工作区。Harness 从首页卡片进入，单一返回动作回到首页。已运行但缺入口时提示配置，不显示安装重试。
-
-可选 `server.privateGateway` 仅支持 Windows x64，包含具体内网 `listenHost` 和现有私有 `upstreamDns`。它要求 reverseProxy 监听 127.0.0.1、一个 PalmTTY HTTPS Origin 和两个受管应用 HTTPS 根 URL；三个不同同级主机名位于同一 `.home.arpa` 父域，统一 443。名称仅从现有 URL 派生，不另存域名列表。
-
-部署校验固定官方 Caddy/CoreDNS 归档哈希，Agent 使用同一进程租约管理它们。代理与 DNS 只绑定指定内网地址；拒绝公共来源，DNS 转发并发有界且不记录查询。私有 CA 保持当前用户数据目录，续签由 Caddy 管理。首次信任和防火墙操作由操作者明确完成；不自动改系统信任、不提权。服务意外退出会关闭 Agent 自有服务，独立 Terminal Worker 不受影响。
-
-WireGuard 客户端 DNS 指向该主机，信任导出的公有根证书，再访问三个 HTTPS 名称。父页 HTTP 会使 HTTPS 子框架失去安全上下文，故不能继续用 IP HTTP 作为内嵌入口。上游首次授权仍独立；真实浏览器登录、API、WebSocket 和 webview 验收不可用端口就绪替代。
-
-## 收尾验收
-
-操作者已确认手机通过私有 HTTPS/WireGuard 可以访问 Code 与 Harness；第三方小屏体验有限，终端继续作为主要工作流，两款应用保留可选入口。不把一般可用性确认扩展为所有扩展、OAuth 或输入法组合均已验收。
-
-自有服务绑定原生服务器的一次性 listening 生命周期；网关首次启动失败必须显式关闭 Agent 并设置非零退出，关闭后禁止异步启动重新生成子进程；运行时失败共用同一回收路径，独立 Worker 保留。部署与本机授权共用 HTTPS 请求器：连接本机地址、按首个配置 Origin 验证名称，并以配置证书链建立本地显式信任；响应有界，证书错误立即失败，不关闭校验或修改全局信任。
-
-集成请求共用一个实际的每 IP 预算，同一策略对象同时提供路由限流元数据；元数据不能替代运行时 allow 拒绝。授权突发请求的 429 有接口回归覆盖。生命周期启动不放在 HTTP 请求钩子中，不关闭或忽略静态安全查询。
+分别验收登录/错误 Origin、Code HTTPS 证书校验与 folder、Harness HTTP 自身鉴权、API/WebSocket、应用正常/强停清理以及原 Worker 存活。主机检查不能替代真实手机键盘、扩展和上游小屏体验验收。原私有 HTTPS 手机链路已由操作者确认可用；本次改为独立页面不承诺改善上游移动界面。
