@@ -114,7 +114,7 @@ it("external mode never installs or starts a local application", async () => {
   mgr.start(); await mgr.ensure("harness");
   const status = (await mgr.catalog(false)).apps.harness;
   expect(status.phase).toBe("external"); expect(status.canEnsure).toBe(false);
-  expect(status.embedUrl).toBe("https://harness.example.test/");
+  expect(status).not.toHaveProperty("embedUrl");
   expect(await mgr.authorizationUrl("harness", false)).toBeUndefined();
   await mgr.close();
 });
@@ -133,7 +133,7 @@ it("only explicit authorization maps a process token to the configured HTTPS ori
   internal.states.harness.launchUrl = "http://127.0.0.1:3080/?token=fixture-secret";
   const catalog = await mgr.catalog(false);
   expect(JSON.stringify(catalog)).not.toContain("fixture-secret");
-  expect(catalog.apps.harness.embedUrl).toBe("https://harness.example.test/");
+  expect(catalog.apps.harness).not.toHaveProperty("embedUrl");
   expect(await mgr.authorizationUrl("harness", false)).toBe("https://harness.example.test/?token=fixture-secret");
   await mgr.close();
 });
@@ -145,4 +145,16 @@ it("recognizes official CLI URLs without a slash or final newline, but does not 
   expect(parser.parseCodeUrl("Web UI available at http://127.0.0.1:8000?tkn=fixture", 8000))
     .toBe("http://127.0.0.1:8000/?tkn=fixture");
   expect(parser.parseCodeUrl("http://127.0.0.1:9000?tkn=fixture", 8000)).toBeUndefined();
+});
+
+it("hands off private HTTP Harness only through its configured independent LAN route", async () => {
+  const mgr = new ManagedWebApps(parseConfig({server:{exposure:{mode:"lan"},privateGateway:{listenHost:"192.168.1.3",upstreamDns:"192.168.1.1"}},integrations:{vscodeWeb:{mode:"managed",url:"https://code.palmtty.home.arpa/"},harness:{mode:"managed",url:"http://harness.palmtty.home.arpa:3080/"}}}));
+  const internal = mgr as unknown as {states:{harness:{phase:string;launchUrl:string}}};
+  internal.states.harness.phase="running";
+  internal.states.harness.launchUrl="http://127.0.0.1:3080/?token=fixture-secret";
+  const catalog = await mgr.catalog(false);
+  expect(catalog.apps.harness.accessUrl).toBe("http://harness.palmtty.home.arpa:3080/");
+  expect(JSON.stringify(catalog)).not.toContain("fixture-secret");
+  expect(await mgr.authorizationUrl("harness",false)).toBe("http://harness.palmtty.home.arpa:3080/?token=fixture-secret");
+  await mgr.close();
 });

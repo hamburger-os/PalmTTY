@@ -3,7 +3,7 @@ name: palmtty-theme
 description: "Single source of truth for PalmTTY visual themes, liquid-glass surfaces, four-color ambient field, terminal palette integration, motion, performance modes, and mobile rendering constraints."
 license: Apache-2.0
 metadata:
-  version: "1.20.0"
+  version: "1.21.0"
 ---
 
 # PalmTTY Theme System — visual SSOT
@@ -140,7 +140,7 @@ The xterm palette is owned by `theme.tsx`. The terminal host receives the active
 
 Theme work must preserve the reconnect/recovery invariants in `docs/ai/invariants.md`. Presentation state such as theme or locale must not be a dependency of the xterm/WebSocket transport lifecycle.
 
-The Session workbench's Terminal / Git / Files / Artifacts / Code selection is also presentation state. Switching away from Terminal must keep the live terminal mounted, suppress hidden-pane geometry propagation, and safely refit when Terminal becomes active again; it must not reconnect merely because another pane was viewed.
+The Session workbench's Terminal / Git / Files / Artifacts selection is presentation state. Code is a separate independent-page action after the four-tab group, not a pane or iframe; it opens the current host folder. Harness opens independently from its home card. Links and failure messages use the existing control/card tokens. Switching away from Terminal must keep the live terminal mounted, suppress hidden-pane geometry propagation, and safely refit when Terminal becomes active again; it must not reconnect merely because another pane was viewed.
 
 Browser glyph rendering prefers one version-pinned xterm WebGL2 addon with custom Box Drawing/Block Elements glyphs, improving vertically adjacent cell borders in Pi-like fullscreen TUIs. Construction/activation failure or context loss must fall back to xterm's built-in DOM renderer in the same terminal instance; WebGL disposal cannot reconnect the socket, change PTY/Worker state, add a second scrollbar or touch gesture engine, or duplicate theme palette values. The renderer lives only with its terminal instance and is disposed before xterm itself. Keep existing lineHeight and FitAddon geometry unless a separate device-tested change justifies altering typography.
 
@@ -192,7 +192,7 @@ At minimum validate:
 - empty and populated workspace/session lists;
 - workspace create/edit + directory picker + destructive confirmation;
 - terminal connected/reconnecting/closed;
-- Files text/image preview plus copy/share-download/history actions, Git Changes/History list → commit detail → file diff navigation, and Artifacts empty/list/preview/upload/delete states on wide and narrow layouts, including five workbench tabs without unreachable controls;
+- Files text/image preview plus copy/share-download/history actions, Git Changes/History list → commit detail → file diff navigation, and Artifacts empty/list/preview/upload/delete states on wide and narrow layouts, including four workbench tabs plus the independent Code action without unreachable controls;
 - portrait and short landscape;
 - theme changes while a terminal remains connected.
 

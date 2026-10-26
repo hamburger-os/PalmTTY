@@ -19,7 +19,7 @@
     tls /path/to/fullchain.pem /path/to/private-key.pem
     # Append a policy: never replace the upstream application's existing CSP.
     header {
-        +Content-Security-Policy "frame-ancestors 'self' https://palm.example.test"
+        +Content-Security-Policy "frame-ancestors 'self'"
         Referrer-Policy "no-referrer"
         defer
     }

@@ -145,12 +145,11 @@ export class ManagedWebApps {
       const candidate = entry?.url ?? (entry?.mode === "managed" ? `http://127.0.0.1:${entry.port}/` : undefined);
       if (candidate && (localBrowser || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(candidate).hostname))) {
         status.accessUrl = candidate;
-        status.embedUrl = candidate;
       }
       status.canEnsure = entry?.mode === "managed";
       // Bootstrap is an explicit authenticated action, never a catalogue/iframe token.
       status.canAuthorize = Boolean(this.config.auth.enabled && entry?.mode === "managed" && state.launchUrl && status.accessUrl);
-      if (state.phase === "running" && !status.accessUrl) status.detail = "separate_https_origin_required";
+      if (state.phase === "running" && !status.accessUrl) status.detail = "independent_access_required";
       apps[id] = status;
     }
     return { apps };
@@ -163,8 +162,10 @@ export class ManagedWebApps {
     const url = new URL(state.launchUrl);
     // Never redirect remote clients to loopback or a caller-supplied destination.
     if (localBrowser) return url.href;
-    if (!entry.url || new URL(entry.url).protocol !== "https:") return undefined;
+    if (!entry.url) return undefined;
     const destination = new URL(entry.url);
+    const privateHarnessHttp = id === "harness" && this.config.server.exposure.mode === "lan" && Boolean(this.config.server.privateGateway);
+    if (destination.protocol !== "https:" && !privateHarnessHttp) return undefined;
     destination.search = url.search;
     return destination.href;
   }
@@ -226,7 +227,7 @@ export class ManagedWebApps {
     let args: string[];
     if (id === "harness") {
       args = [cli, "web", "--host", "127.0.0.1", "--port", String(entry.port), "--no-open"];
-      if (entry.url && new URL(entry.url).protocol === "https:") {
+      if (entry.url) {
         args.push("--public-url", entry.url, "--trusted-host", new URL(entry.url).host);
       }
     } else {

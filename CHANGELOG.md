@@ -10,16 +10,16 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
-- Add explicit managed/external Code and Harness configuration, Agent-owned autoStart, pinned Harness installation, isolated embedded views and explicit first-sign-in handoff. Reclaim owned app/installer trees without terminating durable Terminal Workers; unify card/action geometry and add source one-command deployment plus scoped legacy Code cleanup. Old URL strings and the foreground joint launcher are removed.
+- Add explicit managed/external Code and Harness configuration, Agent-owned autoStart, pinned Harness installation, independent application links and explicit first-sign-in handoff. Reclaim owned app/installer trees without terminating durable Terminal Workers; unify card/action geometry and add source one-command deployment plus scoped legacy Code cleanup. Old URL strings and the foreground joint launcher are removed.
 - Add optional Windows private HTTPS/DNS gateway provisioning with pinned archive integrity, owned lifecycle, persistent private CA and explicit client setup. Reject shared HTTPS cookie hosts even across different ports.
-- Provide authenticated, no-store integration-link discovery. Operator URLs require HTTPS (or loopback HTTP for local testing) and cannot include embedded credentials, queries or fragments.
+- Provide authenticated, no-store integration-link discovery. Operator URLs require HTTPS, loopback HTTP for local testing, or explicitly scoped private-gateway LAN Harness HTTP and cannot include embedded credentials, queries or fragments.
 - Provide an explicit, one-way Workspace v3 → v4 offline conversion command. It uses the canonical Workspace schema, validates records and unique IDs, never overwrites an existing v4 file, and retains the v3 source.
 
 ### Changed
 
 - Bind owned service startup to the native listener lifecycle, fail required gateway bootstrap explicitly so user startup can retry, and share a bounded local HTTPS client for deployment/authorization with configured certificate identity verification.
 
-- Use device-neutral workbench branding, replace global application switches with workspace Code after Artifacts and a Harness home-card entry, open Code at the current host workspace folder, and distinguish missing access routes from installation failures.
+- Use device-neutral workbench branding, replace global application switches with an independent Code action after the four workspace tabs and a Harness home-card link, open Code at the current host workspace folder, and distinguish missing access routes from installation failures.
 
 - Centralize Web-app status in the protocol, validate staged Harness installations before publication, preserve failures across polling, and register owned-child exit before startup readiness.
 - Bundle official Node 24 npm CLI in installed Windows/Linux runtimes for managed Harness provisioning, record its version in the release manifest, include its package components in CycloneDX SBOM, and verify packaged npm execution in native distribution smoke.

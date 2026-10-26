@@ -2117,7 +2117,6 @@ button.directory-choose {
   }
 
   .workbench-tabs {
-    grid-area: tabs;
     width: 100%;
   }
 
@@ -2456,16 +2455,11 @@ button.settings-list-row:hover:not(:disabled),
 .integration-detail small { overflow-wrap: anywhere; }
 .integration-actions { display: flex; align-items: center; gap: var(--space-2); }
 .action { display: inline-flex; align-items: center; justify-content: center; min-height: var(--touch-target-compact); font: inherit; text-decoration: none; }
-.web-app-view { height: 100dvh; display: flex; flex-direction: column; gap: var(--space-2); padding: max(var(--space-2), env(safe-area-inset-top)) max(var(--space-2), env(safe-area-inset-right)) max(var(--space-2), env(safe-area-inset-bottom)) max(var(--space-2), env(safe-area-inset-left)); }
-.web-app-view[hidden] { display: none; }
-.web-app-toolbar { flex: none; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-lg); }
-.web-app-status { flex: none; font-size: var(--text-sm); color: var(--text-secondary); }
-.web-app-frame { flex: 1; min-height: 0; overflow: hidden; border-radius: var(--radius-lg); }
-.web-app-frame iframe { width: 100%; height: 100%; display: block; border: 0; }
-.web-app-unavailable { padding: var(--space-4); }
+/* External app links are actions alongside the four workspace tabs. */
+.workbench-navigation { display: flex; flex-wrap: wrap; align-items: center; justify-self: center; min-width: 0; gap: var(--space-2); }
+.workbench-navigation .workbench-tabs { flex: 1; }
+.web-application-link { display: inline-flex; min-width: 0; max-width: 100%; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
 @media (max-width: 760px) {
-  .web-app-toolbar .integration-actions { flex-wrap: wrap; }
+  .workbench-navigation { grid-area: tabs; width: 100%; }
+  .workbench-navigation .web-application-link { flex: 0 1 auto; }
 }
-
-.web-app-panel { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; min-height: 0; height: 100%; }
-@media (max-width: 700px) { .web-app-toolbar button, .web-app-toolbar .action { min-height: var(--touch-target); } }

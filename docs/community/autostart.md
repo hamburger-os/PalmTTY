@@ -156,7 +156,7 @@ For direct private-IPv4 HTTP over a WireGuard/private route, replace the entire 
 
 ## Private HTTPS workbench / 私有 HTTPS 工作台
 
-Code is workspace-scoped after Artifacts; Harness is entered from its home card. Global application navigation is removed without unmounting live terminals. Optional Windows x64 `server.privateGateway` derives three separate same-site HTTPS hosts from the existing URLs, provisions pinned hash-verified Caddy/CoreDNS, and supervises them through owned leases. DNS is private-source-only, bounded and unlogged. Cookie hosts must differ even when ports differ. Root trust, client DNS and private firewall access require explicit initial setup; no automatic elevation. See [Web integrations](web-integrations.md).
+Code is an independent new-page action after the four workspace tabs and opens the host folder; Harness opens from its home card. No third-party embedding remains. Optional Windows x64 privateGateway derives distinct application names from existing URLs and owns hash-verified Caddy/CoreDNS through leases. LAN PalmTTY and Harness can use HTTP, while Code retains trusted HTTPS for secure-context features. DNS is private-source-only, bounded and unlogged; cookies require distinct hostnames. Device DNS, HTTPS-only root trust and restricted firewall setup remain explicit. See [Web integrations](web-integrations.md).
 
 Code 入口位于工作区附件后并打开持久化主机目录；Harness 从首页卡片进入。删除全局三按钮但保留终端实例。可选 Windows x64 私有网关由既有 URL 派生三个同站不同主机名，部署固定哈希工具并由 Agent 租约管理。DNS 只接受私有来源、转发有界且不记录查询。端口不能隔离 Cookie。客户端首次信任、名称解析和私有防火墙配置需明确操作，不能静默提权；参见上述文档。
 

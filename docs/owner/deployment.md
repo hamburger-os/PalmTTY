@@ -145,9 +145,9 @@ QNAP / Caddy / Tailscale
 Windows/Linux PalmTTY Agent
 ```
 
-正常非 loopback 配置必须开启认证、Secure Cookie 与最终 HTTPS Origin allowlist。QNAP/Caddy 只承担 TLS、域名、WebSocket 反代和可选附加认证；真正的 Shell、Codex、Git 与文件留在开发主机。
+使用 HTTPS 反代时开启认证、Secure Cookie 与最终 HTTPS Origin allowlist；明确的 lan 模式使用私网 HTTP、认证与精确私网 Origin。QNAP/Caddy 只承担 TLS、域名、WebSocket 反代和可选附加认证；真正的 Shell、Codex、Git 与文件留在开发主机。
 
-QNAP 规则的目标协议必须选择其“HTTP + WebSocket”一类组合，而不是普通 HTTP-only 代理；浏览器入口是 HTTPS/WSS，QNAP 到 Agent 可以是受限私网 HTTP。若 Web UI/API 正常但 Session 终端持续重连，先检查代理是否允许 WebSocket Upgrade 并保留 `Sec-WebSocket-Protocol: palmtty.v1` 协商。示例 `examples/qnap-reverse-proxy.yaml` 的 `origins` 必须与浏览器地址栏的最终 HTTPS Origin（含非默认端口）精确一致，上游 17688 之类端口应通过主机/网络防火墙限制为 QNAP 或可信私网来源。
+QNAP 规则的目标协议必须选择其“HTTP + WebSocket”一类组合，而不是普通 HTTP-only 代理；浏览器入口是 HTTPS/WSS，QNAP 到 Agent 可以是受限私网 HTTP。若 Web UI/API 正常但 Session 终端持续重连，先检查代理是否允许 WebSocket Upgrade 并保留 `Sec-WebSocket-Protocol: palmtty.v4` 协商。示例 `examples/qnap-reverse-proxy.yaml` 的 `origins` 必须与浏览器地址栏的最终 HTTPS Origin（含非默认端口）精确一致，上游 17688 之类端口应通过主机/网络防火墙限制为 QNAP 或可信私网来源。
 
 ## 当前不做
 
@@ -176,12 +176,12 @@ QNAP 规则的目标协议必须选择其“HTTP + WebSocket”一类组合，�
 
 Windows 构建预编译同一个 GUI helper 的受管子进程模式，应用在恢复执行前加入不允许 breakaway 的独立 Job。Agent 强停时租约关闭回收应用/安装器树；Session Worker 继续使用原有独立持久边界。Linux 对应租约监督器和进程组，不能把 KillMode=process 当作应用清理实现。
 
-目前没有第三方域名时先验收本机两个回环服务；手机 127.0.0.1 指向手机自己。域名准备好后，配置同主域不同 HTTPS 子域，由主机代理到回环，NAS 再按 Host/TLS 和 WebSocket 转发，参考 `examples/web-apps.Caddyfile`。代理不共享 PalmTTY Origin、不记录查询凭据；DNS/TLS/NAS 并不由本机一键命令自动修改。
+无需公网域名可使用下述私有 DNS 网关。应用后端保持回环，远端设备不能用主机 127.0.0.1；使用配置的独立入口。禁止同源反代或记录引导查询串。
 
 
 升级时若预检唯一失败项是已有监听占用，且已注册当前用户 PalmTTY 服务，一键入口仅通过 Task Scheduler/systemd 停止该注册实例，再预检和更新；失败时尝试恢复原服务，不杀端口拥有者或猜测 PID。源模式原生应用 helper 使用内容寻址文件名，避免构建覆盖正在运行的 Windows 可执行文件。
 
-清理脚本识别活跃 PalmTTY helper 父链并保留其受管 Code 节点；它只用于旧直接启动残留。上游服务重启后可能要求重新授权，日常 iframe 地址始终不保存引导凭据。
+清理脚本识别并保留活跃 PalmTTY 受管 Code 父链，只清理旧直接启动残留。服务重启后独立打开动作可重新交接上游授权；渲染链接始终无引导凭据。
 
 
 ## 从 HTTPS 反代切换到 VPN 内网 HTTP
@@ -190,13 +190,13 @@ Windows 构建预编译同一个 GUI helper 的受管子进程模式，应用在
 
 网络隧道不会改变浏览器 Origin，也不会让 HTTP 满足 Secure Cookie 的 HTTPS 条件。lan 配置会按当前主机私有 IPv4 生成精确来源并使用匹配 HTTP 的 Cookie；不能通过通配 Origin、关闭认证或伪造 Origin 修复登录。lan 本身面向私有网络，不等同于只允许 VPN 客户端；仅限 VPN 的访问控制仍由防火墙/路由策略负责。
 
-## WireGuard 内网 HTTPS 自启
+## WireGuard 内网混合入口与自启
 
-可在既有单一配置中启用 `server.privateGateway: { listenHost: <主机私有IPv4>, upstreamDns: <现有私有DNS> }`。同时使用回环 reverseProxy 和同父域 `.home.arpa` 下的三个不同 HTTPS 名称（PalmTTY exposure Origin、Code URL、Harness URL）；应用保持 managed 回环端口。仅 Windows x64 支持本机自动供应。部署脚本校验固定官方工具归档，构建后供应 Caddy/CoreDNS，再注册现有用户自启。正常或强停后工具由 Agent 租约回收，CA 保留以供重启续签。
+当前简化方案采用 lan：PalmTTY 以主机 IP HTTP 和原令牌访问，Code 使用可信 HTTPS，Harness 使用独立内网名称 HTTP。可选 `server.privateGateway` 的 listenHost 是主机具体私有 IPv4，upstreamDns 是现有私有 DNS；两个受管应用 URL 使用同一 `.home.arpa` 父域下不同名称。Code HTTPS 为 443，Harness HTTP 使用其 managed 端口。完整示例见 [web-integrations.md](web-integrations.md)。
 
-`pnpm deploy:local` 导出当前用户 `PalmTTY/private-network` 中的根证书、iOS 安装描述文件和连接说明。客户端 WireGuard DNS 指向网关 IP；iOS 需安装并完全信任根证书，Windows 可明确导入 CurrentUser Root。私钥不导出。入站 TCP 443、TCP/UDP 53 只允许私有网络；若防火墙阻止，操作者执行连接说明中的管理员命令。不自动提权，不开放公网端口，不修改 NAS。
+固定校验工具由 Agent 租约管理；后端仅回环，Caddy 只绑定具体内网 IP，CoreDNS 拒绝公共来源且无查询日志。`pnpm deploy:local` 复用现有用户自启，保留 CA，LAN 的 `/network-setup/` 提供公开证书/描述文件。设备 DNS 仍用于两个应用，根信任只供 HTTPS；已有信任无需重装。完整 HTTPS reverseProxy 也是显式支持的模式。
 
-私有网关首次配置：旧私有 IP HTTP 地址仅提供公开证书、描述文件和首次配置页，不提供登录、API 或工作区内容；认证工作台只经 HTTPS 访问。
+生成的 `configure-firewall.ps1` 仅更新具名规则：Node 的 PalmTTY HTTP 端口、Caddy 的 HTTPS/HTTP 应用端口、CoreDNS 的 TCP/UDP 53，均限制程序、具体私有 IP 和私有来源。用户需明确在管理员 PowerShell 执行，不自动提权，不修改 NAS 或公网转发。HTTP 信任局域网/隧道，不能提供 Code 安全上下文；Harness 本身支持 HTTP。
 
 ### 启动失败与直接 HTTPS 检查
 

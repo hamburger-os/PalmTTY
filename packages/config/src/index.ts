@@ -85,9 +85,10 @@ const SpeechConfigSchema = z.object({
 const IntegrationUrlSchema = z.string().url().superRefine((value, ctx) => {
   const url = new URL(value);
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-  if ((url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) ||
+  const privateName = url.hostname.endsWith(".home.arpa");
+  if ((url.protocol !== "https:" && !(url.protocol === "http:" && (loopback || privateName))) ||
       url.username || url.password || url.search || url.hash) {
-    ctx.addIssue({ code: "custom", message: "Integration URL must be HTTPS (or loopback HTTP), without credentials, query or fragment" });
+    ctx.addIssue({ code: "custom", message: "Integration URL must be HTTPS or explicitly scoped private HTTP, without credentials, query or fragment" });
   }
 });
 const integrationSchema = (port: number) => z.discriminatedUnion("mode", [
@@ -127,15 +128,26 @@ export const PalmTTYConfigSchema = z.object({
 }).strict().superRefine((config, ctx) => {
   if (config.server.privateGateway) {
     const exposure = config.server.exposure;
-    const urls = exposure.mode === "reverseProxy" ? [...exposure.origins, ...Object.values(config.integrations).flatMap((entry) => entry?.url ? [entry.url] : [])] : [];
+    const applicationUrls = Object.values(config.integrations).flatMap((entry) => entry?.url ? [entry.url] : []);
+    const urls = [...(exposure.mode === "reverseProxy" ? exposure.origins : []), ...applicationUrls];
     const names = urls.map((value) => new URL(value));
     const parent = names[0]?.hostname.split(".").slice(1).join(".");
-    if (config.server.privateGateway.upstreamDns === config.server.privateGateway.listenHost || exposure.mode !== "reverseProxy" || exposure.listenHost !== "127.0.0.1" || exposure.origins.length !== 1 || names.length !== 3 ||
-        !parent?.endsWith(".home.arpa") || new Set(names.map((u) => u.hostname)).size !== 3 ||
-        names.some((u) => u.protocol !== "https:" || u.port || !/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/u.test(u.hostname) || u.hostname.split(".").slice(1).join(".") !== parent) ||
-        Object.values(config.integrations).some((entry) => entry?.mode !== "managed") || config.server.port === 443 || config.server.port === 53 ||
+    const supportedExposure = exposure.mode === "lan" || (exposure.mode === "reverseProxy" && exposure.listenHost === "127.0.0.1" && exposure.origins.length === 1);
+    const harness = config.integrations.harness;
+    const harnessHttpUrl = exposure.mode === "lan" && harness?.mode === "managed" && harness.url
+      ? new URL(harness.url) : undefined;
+    const invalidRoute = (url: URL) => {
+      const validName = /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/u.test(url.hostname) && url.hostname.split(".").slice(1).join(".") === parent;
+      const validTransport = url.protocol === "https:" ? !url.port
+        : url.protocol === "http:" && url.href === harnessHttpUrl?.href && url.port === String(harness?.mode === "managed" ? harness.port : "");
+      return !validName || !validTransport;
+    };
+    if (!supportedExposure || applicationUrls.length !== 2 || config.server.privateGateway.upstreamDns === config.server.privateGateway.listenHost ||
+        !parent?.endsWith(".home.arpa") || new Set(names.map((u) => u.hostname)).size !== names.length ||
+        names.some(invalidRoute) ||
+        Object.values(config.integrations).some((entry) => entry?.mode !== "managed") || [443, 53].includes(config.server.port) ||
         Object.values(config.integrations).some((entry) => entry?.mode === "managed" && [443, 53].includes(entry.port))) {
-      ctx.addIssue({ code: "custom", path: ["server", "privateGateway"], message: "Private gateway requires loopback reverseProxy, three distinct HTTPS sibling names under .home.arpa on port 443, and two managed applications" });
+      ctx.addIssue({ code: "custom", path: ["server", "privateGateway"], message: "Private gateway requires LAN or loopback reverseProxy and two managed applications at distinct sibling names under .home.arpa; HTTPS uses 443 and only LAN Harness may use HTTP on its managed port" });
     }
   }
   const entries = Object.entries(config.integrations);
@@ -154,8 +166,12 @@ export const PalmTTYConfigSchema = z.object({
     }
     if (entry.url) {
       const uri = new URL(entry.url);
-      if (entry.mode === "managed" && uri.protocol === "http:" && uri.origin !== `http://127.0.0.1:${entry.port}`) {
-        ctx.addIssue({ code: "custom", path: ["integrations", id, "url"], message: "Managed HTTP URL must match its IPv4 loopback listener" });
+      const privateHarnessHttp = id === "harness" && entry.mode === "managed" && Boolean(config.server.privateGateway) && exposure.mode === "lan" && uri.hostname.endsWith(".home.arpa") && uri.port === String(entry.port);
+      if (uri.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(uri.hostname) && !privateHarnessHttp) {
+        ctx.addIssue({ code: "custom", path: ["integrations", id, "url"], message: "Non-loopback HTTP is only supported for managed Harness behind the LAN private gateway" });
+      }
+      if (entry.mode === "managed" && uri.protocol === "http:" && !privateHarnessHttp && uri.origin !== `http://127.0.0.1:${entry.port}`) {
+        ctx.addIssue({ code: "custom", path: ["integrations", id, "url"], message: "Managed local HTTP URL must match its IPv4 loopback listener" });
       }
       if (uri.protocol === "https:" && httpsHosts.has(uri.hostname)) {
         ctx.addIssue({ code: "custom", path: ["integrations", id, "url"], message: "HTTPS application hosts must differ; cookies are not isolated by port" });

@@ -112,7 +112,7 @@ PTY 输出、headless mirror、seq 与 replay 都在 Worker 内按同一有序�
 
 ### External Web applications / 独立 Web 应用
 
-Explicit managed/external configuration owns lifecycle separately from Workspace/Terminal authority. Code binaries are separately installed; personal opt-in startup preserves upstream licensing/authentication. Harness uses verified pinned private installation. Independent-Origin iframe presentation and explicit authenticated authorization handoff are documented in [Web integrations](web-integrations.md). No same-Origin proxy or Azure tunnel is provided.
+Explicit managed/external configuration owns lifecycle separately from Workspace/Terminal authority. Code binaries are separately installed; personal opt-in startup preserves upstream licensing/authentication. Harness uses verified pinned private installation. Independent-page navigation and explicit authenticated authorization handoff are documented in [Web integrations](web-integrations.md). No same-Origin proxy or Azure tunnel is provided.
 
 本机明确配置应用生命周期，与 Workspace/Terminal 权限分离；官方 Code 自行安装并明确选择个人启动，Harness 校验固定私有安装。内嵌保持独立 Origin，首次授权单独认证交接，不提供同源反代或 Azure 隧道。
 
@@ -200,12 +200,12 @@ Files 通过单一 GFM 解析/净化流水线展示常用安全 HTML 排版、�
 
 ### Independent application lifecycle / 独立应用生命周期
 
-Managed applications start from Agent onListen only when host configuration opts in. External entries never launch locally. App/installer pipe leases own non-breakaway Windows Jobs or POSIX workload groups, separate from durable Terminal Workers. Catalogue reads are side-effect free; independent-Origin iframe views keep their own authentication and mount state. Explicit authorization handoff is bounded to configured upstream HTTPS roots, not shared credentials or a same-Origin proxy. See [web-integrations.md](web-integrations.md).
+Managed applications start from the Agent listening event only when host configuration opts in. External entries never launch locally. App/installer pipe leases own non-breakaway Windows Jobs or POSIX workload groups, separate from durable Terminal Workers. Catalogue reads are side-effect free; independent pages keep their own authentication. Explicit authorization handoff is bounded to configured independent roots (HTTPS or scoped LAN Harness HTTP), not shared credentials or a same-Origin proxy. See [web-integrations.md](web-integrations.md).
 
-受管应用在 Agent 启动时按配置运行，外部模式不触发安装。应用/安装器租约与持久终端 Worker 分离；目录只读、iframe 跨 Origin，首次授权显式交接到配置的独立 HTTPS 根，不共享凭据或同源反代。源码一键部署和本机显式授权分别使用 `pnpm deploy:local`、`pnpm app:authorize`。
+受管应用在 Agent 启动时按配置运行，外部模式不触发安装。应用/安装器租约与持久终端 Worker 分离；目录只读、应用在独立页面打开，首次授权显式交接到配置的独立入口（HTTPS 或限定私网 Harness HTTP），不共享凭据或同源反代。源码一键部署和本机显式授权分别使用 `pnpm deploy:local`、`pnpm app:authorize`。
 
 ## Private HTTPS workbench / 私有 HTTPS 工作台
 
-Code is workspace-scoped after Artifacts; Harness is entered from its home card. Global application navigation is removed without unmounting live terminals. Optional Windows x64 `server.privateGateway` derives three separate same-site HTTPS hosts from the existing URLs, provisions pinned hash-verified Caddy/CoreDNS, and supervises them through owned leases. DNS is private-source-only, bounded and unlogged. Cookie hosts must differ even when ports differ. Root trust, client DNS and private firewall access require explicit initial setup; no automatic elevation. See [Web integrations](web-integrations.md).
+Code is an independent new-page action after the four workspace tabs and opens the host folder; Harness opens from its home card. No third-party embedding remains. Optional Windows x64 privateGateway derives distinct application names from existing URLs and owns hash-verified Caddy/CoreDNS through leases. LAN PalmTTY and Harness can use HTTP, while Code retains trusted HTTPS for secure-context features. DNS is private-source-only, bounded and unlogged; cookies require distinct hostnames. Device DNS, HTTPS-only root trust and restricted firewall setup remain explicit. See [Web integrations](web-integrations.md).
 
 Code 入口位于工作区附件后并打开持久化主机目录；Harness 从首页卡片进入。删除全局三按钮但保留终端实例。可选 Windows x64 私有网关由既有 URL 派生三个同站不同主机名，部署固定哈希工具并由 Agent 租约管理。DNS 只接受私有来源、转发有界且不记录查询。端口不能隔离 Cookie。客户端首次信任、名称解析和私有防火墙配置需明确操作，不能静默提权；参见上述文档。
