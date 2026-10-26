@@ -176,7 +176,7 @@ QNAP 规则的目标协议必须选择其“HTTP + WebSocket”一类组合，�
 
 Windows 构建预编译同一个 GUI helper 的受管子进程模式，应用在恢复执行前加入不允许 breakaway 的独立 Job。Agent 强停时租约关闭回收应用/安装器树；Session Worker 继续使用原有独立持久边界。Linux 对应租约监督器和进程组，不能把 KillMode=process 当作应用清理实现。
 
-无需公网域名可使用下述私有 DNS 网关。应用后端保持回环，远端设备不能用主机 127.0.0.1；使用配置的独立入口。禁止同源反代或记录引导查询串。
+无需公网域名，可使用下述 IP 网关。应用后端保持回环，远端设备不能用主机 127.0.0.1；使用配置的独立入口。禁止同源反代或记录引导查询串。
 
 
 升级时若预检唯一失败项是已有监听占用，且已注册当前用户 PalmTTY 服务，一键入口仅通过 Task Scheduler/systemd 停止该注册实例，再预检和更新；失败时尝试恢复原服务，不杀端口拥有者或猜测 PID。源模式原生应用 helper 使用内容寻址文件名，避免构建覆盖正在运行的 Windows 可执行文件。
@@ -190,13 +190,17 @@ Windows 构建预编译同一个 GUI helper 的受管子进程模式，应用在
 
 网络隧道不会改变浏览器 Origin，也不会让 HTTP 满足 Secure Cookie 的 HTTPS 条件。lan 配置会按当前主机私有 IPv4 生成精确来源并使用匹配 HTTP 的 Cookie；不能通过通配 Origin、关闭认证或伪造 Origin 修复登录。lan 本身面向私有网络，不等同于只允许 VPN 客户端；仅限 VPN 的访问控制仍由防火墙/路由策略负责。
 
-## WireGuard 内网混合入口与自启
+## 同一 IP 的 Wi-Fi / WireGuard 自启
 
-当前简化方案采用 lan：PalmTTY 以主机 IP HTTP 和原令牌访问，Code 使用可信 HTTPS，Harness 使用独立内网名称 HTTP。可选 `server.privateGateway` 的 listenHost 是主机具体私有 IPv4，upstreamDns 是现有私有 DNS；两个受管应用 URL 使用同一 `.home.arpa` 父域下不同名称。Code HTTPS 为 443，Harness HTTP 使用其 managed 端口。完整示例见 [web-integrations.md](web-integrations.md)。
+`server.privateGateway` 只维护具体私有 listenHost 和 Code httpsPort（默认 443），配合 lan。managed 应用只维护回环 port/autoStart，其 URL 统一派生；不接受 upstreamDns 或受管 url。只用 Harness 时无需启用 Code 或准备 CA。示例见 [web-integrations.md](web-integrations.md)。
 
-固定校验工具由 Agent 租约管理；后端仅回环，Caddy 只绑定具体内网 IP，CoreDNS 拒绝公共来源且无查询日志。`pnpm deploy:local` 复用现有用户自启，保留 CA，LAN 的 `/network-setup/` 提供公开证书/描述文件。设备 DNS 仍用于两个应用，根信任只供 HTTPS；已有信任无需重装。完整 HTTPS reverseProxy 也是显式支持的模式。
+Wi-Fi 与 WireGuard 共用 IP 链接：PalmTTY HTTP、Code HTTPS、Harness HTTP。固定校验 Caddy 由 Agent 租约管理，后端只回环，代理只绑定指定内网 IP并拒绝公共来源；无 CoreDNS 或 53 端口。网关剔除上游 HTTP/WS 的 PalmTTY 会话 Cookie。相同 IP 不是 Cookie 主机隔离，适用于一个可信个人开发主机。
 
-生成的 `configure-firewall.ps1` 仅更新具名规则：Node 的 PalmTTY HTTP 端口、Caddy 的 HTTPS/HTTP 应用端口、CoreDNS 的 TCP/UDP 53，均限制程序、具体私有 IP 和私有来源。用户需明确在管理员 PowerShell 执行，不自动提权，不修改 NAS 或公网转发。HTTP 信任局域网/隧道，不能提供 Code 安全上下文；Harness 本身支持 HTTP。
+Code 的 IP-SAN 证书沿用原 CA 自动续签，公开 `/network-setup/` 仅提供公有根证书/描述文件/说明，已有信任无需重装。主机应固定 IP。停旧 DNS 前，先把 WireGuard DNS 恢复为隧道可达的正常解析器；不能让客户端继续指向已停服务。
+
+部署使用 `pnpm deploy:local` 更新当前用户自启，不先卸载、不杀未知监听者，保留原令牌、CA、工作区和 Worker。导出的管理员 helper 仅更新 Node HTTP 与 Caddy 应用 HTTP/HTTPS 的具名、程序/私网地址/私有来源受限规则，并移除退休 DNS 规则；不自动提权、改手机 DNS 或改 NAS。
+
+真实验收分别使用手机 Wi-Fi 关闭 WireGuard、5G 开启 WireGuard；检查相同 IP 入口、上游登录、Code 目录/webview、API/WS、IP 证书与旧终端存活。主机烟测和手机尺寸模拟必须分别报告。
 
 ### 启动失败与直接 HTTPS 检查
 

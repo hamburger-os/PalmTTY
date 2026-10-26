@@ -126,15 +126,13 @@ it("rejects partial token lines and validates configured public readiness origin
   expect(parseHarnessReadyUrl("dsh web: https://evil.example.test/?token=fixture\n", "https://harness.example.test")).toBeUndefined();
 });
 
-it("only explicit authorization maps a process token to the configured HTTPS origin", async () => {
-  const mgr = new ManagedWebApps(parseConfig({ integrations: { harness: { mode: "managed", url: "https://harness.example.test/" } } }));
-  const internal = mgr as unknown as { states: { harness: { phase: string; launchUrl: string } } };
-  internal.states.harness.phase = "running";
-  internal.states.harness.launchUrl = "http://127.0.0.1:3080/?token=fixture-secret";
-  const catalog = await mgr.catalog(false);
-  expect(JSON.stringify(catalog)).not.toContain("fixture-secret");
-  expect(catalog.apps.harness).not.toHaveProperty("embedUrl");
-  expect(await mgr.authorizationUrl("harness", false)).toBe("https://harness.example.test/?token=fixture-secret");
+it("only explicit authorization maps Code credentials to its derived HTTPS IP entry", async () => {
+  const mgr=new ManagedWebApps(parseConfig({server:{exposure:{mode:"lan"},privateGateway:{listenHost:"192.168.1.3"}},integrations:{vscodeWeb:{mode:"managed"}}}));
+  const internal=mgr as unknown as {states:{vscodeWeb:{phase:string;launchUrl:string}}};
+  internal.states.vscodeWeb.phase="running";internal.states.vscodeWeb.launchUrl="http://127.0.0.1:8000/?tkn=fixture-secret";
+  expect(JSON.stringify(await mgr.catalog(false))).not.toContain("fixture-secret");
+  expect(await mgr.authorizationUrl("vscodeWeb",false)).toBe("https://192.168.1.3/?tkn=fixture-secret");
+  expect(await mgr.authorizationUrl("vscodeWeb",true)).toBe("https://192.168.1.3/?tkn=fixture-secret");
   await mgr.close();
 });
 
@@ -148,13 +146,13 @@ it("recognizes official CLI URLs without a slash or final newline, but does not 
 });
 
 it("hands off private HTTP Harness only through its configured independent LAN route", async () => {
-  const mgr = new ManagedWebApps(parseConfig({server:{exposure:{mode:"lan"},privateGateway:{listenHost:"192.168.1.3",upstreamDns:"192.168.1.1"}},integrations:{vscodeWeb:{mode:"managed",url:"https://code.palmtty.home.arpa/"},harness:{mode:"managed",url:"http://harness.palmtty.home.arpa:3080/"}}}));
+  const mgr = new ManagedWebApps(parseConfig({server:{exposure:{mode:"lan"},privateGateway:{listenHost:"192.168.1.3"}},integrations:{harness:{mode:"managed"}}}));
   const internal = mgr as unknown as {states:{harness:{phase:string;launchUrl:string}}};
   internal.states.harness.phase="running";
   internal.states.harness.launchUrl="http://127.0.0.1:3080/?token=fixture-secret";
   const catalog = await mgr.catalog(false);
-  expect(catalog.apps.harness.accessUrl).toBe("http://harness.palmtty.home.arpa:3080/");
+  expect(catalog.apps.harness.accessUrl).toBe("http://192.168.1.3:3080/");
   expect(JSON.stringify(catalog)).not.toContain("fixture-secret");
-  expect(await mgr.authorizationUrl("harness",false)).toBe("http://harness.palmtty.home.arpa:3080/?token=fixture-secret");
+  expect(await mgr.authorizationUrl("harness",false)).toBe("http://192.168.1.3:3080/?token=fixture-secret");
   await mgr.close();
 });

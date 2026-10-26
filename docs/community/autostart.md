@@ -154,11 +154,11 @@ For direct private-IPv4 HTTP over a WireGuard/private route, replace the entire 
 
 通过 WireGuard/私网路由直接访问私有 IPv4 HTTP 时，将整个 exposure 改为仅含 `mode: lan`，删除旧反代字段，保留认证、端口和应用配置后执行一键部署。VPN 不改变浏览器来源或 HTTPS Cookie 条件；仅允许 VPN 客户端仍由防火墙/路由规则限制。
 
-## Private HTTPS workbench / 私有 HTTPS 工作台
+## Private IP workbench / 私有 IP 工作台
 
-Code is an independent new-page action after the four workspace tabs and opens the host folder; Harness opens from its home card. No third-party embedding remains. Optional Windows x64 privateGateway derives distinct application names from existing URLs and owns hash-verified Caddy/CoreDNS through leases. LAN PalmTTY and Harness can use HTTP, while Code retains trusted HTTPS for secure-context features. DNS is private-source-only, bounded and unlogged; cookies require distinct hostnames. Device DNS, HTTPS-only root trust and restricted firewall setup remain explicit. See [Web integrations](web-integrations.md).
+Managed Code/Harness use independent IP entries derived from one Windows LAN gateway address and ports; managed URLs are not stored twice. Only hash-verified Caddy runs, with no private DNS. Code uses trusted IP-SAN HTTPS; PalmTTY/Harness use authenticated HTTP. Either app can be enabled alone. Same-IP cookies share one trusted host scope; the proxy strips the PalmTTY cookie upstream. Existing CA trust and durable Workers are preserved. Before retiring old DNS, restore the tunnel resolver; verify actual Wi-Fi and WireGuard device paths. See [Web integrations](web-integrations.md).
 
-Code 入口位于工作区附件后并打开持久化主机目录；Harness 从首页卡片进入。删除全局三按钮但保留终端实例。可选 Windows x64 私有网关由既有 URL 派生三个同站不同主机名，部署固定哈希工具并由 Agent 租约管理。DNS 只接受私有来源、转发有界且不记录查询。端口不能隔离 Cookie。客户端首次信任、名称解析和私有防火墙配置需明确操作，不能静默提权；参见上述文档。
+受管应用入口从一个 LAN 网关 IP/端口派生，不重复存 URL；仅运行校验后的 Caddy，无私有 DNS。Code 使用可信 IP-SAN HTTPS，PalmTTY/Harness 使用认证 HTTP，两应用可独立启用。同 IP 端口仍共享 Cookie 主机范围，明确用于同一可信主机；代理剔除上游 PalmTTY Cookie。保留原 CA 与持久 Worker。停旧 DNS 前恢复隧道正常解析器，并分别验收实际 Wi-Fi 与 WireGuard 路径。
 
 ### Startup failure and direct TLS / 启动失败与直接 TLS
 

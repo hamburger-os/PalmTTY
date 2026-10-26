@@ -92,7 +92,7 @@ async function main() {
             if (state.phase === "failed") throw new Error("managed_application_failed:" + id + ":" + (state.detail ?? "unknown"));
             if (state.phase !== "running") ready = false;
           }
-          if (ready) { await exportPrivateNetworkSetup(config); console.log("[PalmTTY] Local deployment verified. DNS, HTTPS and NAS routes require separate external acceptance."); return; }
+          if (ready) { await exportPrivateNetworkSetup(config); console.log("[PalmTTY] Local deployment verified. Test the same IP entries over home Wi-Fi and WireGuard on the actual device."); return; }
         }
       } catch (error) {
         if (/^(managed_application_failed|deployment_authentication_failed|local_agent_tls_validation_failed)/u.test(error.message)) throw error;

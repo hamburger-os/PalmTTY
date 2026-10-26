@@ -11,8 +11,8 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 ### Added
 
 - Add explicit managed/external Code and Harness configuration, Agent-owned autoStart, pinned Harness installation, independent application links and explicit first-sign-in handoff. Reclaim owned app/installer trees without terminating durable Terminal Workers; unify card/action geometry and add source one-command deployment plus scoped legacy Code cleanup. Old URL strings and the foreground joint launcher are removed.
-- Add optional Windows private HTTPS/DNS gateway provisioning with pinned archive integrity, owned lifecycle, persistent private CA and explicit client setup. Reject shared HTTPS cookie hosts even across different ports.
-- Provide authenticated, no-store integration-link discovery. Operator URLs require HTTPS, loopback HTTP for local testing, or explicitly scoped private-gateway LAN Harness HTTP and cannot include embedded credentials, queries or fragments.
+- Provide a Windows private IP gateway with one canonical address/port source, pinned Caddy integrity, owned lifecycle and persistent CA. Remove private DNS; derive managed Code HTTPS and Harness HTTP entries, allow either app alone, strip the PalmTTY cookie upstream and document the trusted shared-IP cookie boundary.
+- Provide authenticated, no-store integration-link discovery. External URLs require HTTPS or loopback HTTP and cannot include credentials, query or fragment; managed URLs derive from the gateway and listener ports.
 - Provide an explicit, one-way Workspace v3 → v4 offline conversion command. It uses the canonical Workspace schema, validates records and unique IDs, never overwrites an existing v4 file, and retains the v3 source.
 
 ### Changed

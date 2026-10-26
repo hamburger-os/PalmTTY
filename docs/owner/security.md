@@ -91,7 +91,7 @@ systemd unit 使用 `KillMode=process` 是为了保持既有“Agent lifetime !=
 
 第三方应用仅独立页面打开，不再内嵌。目录与渲染链接无凭据；认证、精确 Origin、限流的显式授权只交接自有实例到配置的独立入口，响应 no-store/no-referrer，不写日志、存储或 PalmTTY Cookie。本机授权严格区分代理请求，只有明确调用的交互命令可以显示私有引导链接。
 
-该授权动作是相对原“所有远端引导凭据一律不返回”的有意调整，目的是在保持独立认证的前提下完成首次会话交接；绝不放行任意目标或共享 PalmTTY Token。上游 frame、Cookie、HTTP/WebSocket、同站子域和手机行为仍须单独验收。
+该授权动作是相对原“所有远端引导凭据一律不返回”的有意调整，目的是在保持独立认证的前提下完成首次会话交接；绝不放行任意目标或共享 PalmTTY Token。上游 Cookie、HTTP/WebSocket 和实际 Wi-Fi/WireGuard 手机路径仍须分别验收。
 
 ## 仍需加强
 
@@ -131,4 +131,4 @@ Host 的文本预览、完整内容导出和图片读取现在以规范路径打
 
 ## 私有 Web 网关边界
 
-Cookie 不按端口隔离，应用入口必须保持独立主机名。私有网关允许 LAN PalmTTY HTTP、Code HTTPS、Harness HTTP；HTTP Harness 仅限该明确受管配置并匹配端口，自身认证保留。Code 的安全上下文功能仍使用可信 HTTPS。网关/DNS 拒绝公共来源，转发有界且不记录查询；CA 私钥留主机，仅 HTTPS 需要设备信任，DNS 仍供两个名称使用。防火墙和信任操作明确执行，不自动提权。
+同 IP 不同端口没有 Cookie 主机隔离。受管 LAN IP 方案明确用于同一用户的可信开发应用，不能据此隔离不可信租户；保留不同 Origin、自身认证和 Host/Origin 检查。网关按规范名称剔除上游 HTTP/WS 请求的 PalmTTY 会话 Cookie，其他应用 Cookie 保留。Code 使用可信 IP-SAN HTTPS；PalmTTY/Harness 可用私网 HTTP。只有 Caddy，无 DNS/53 监听；CA 私钥保留主机，设备已有根信任可复用。防火墙修改仍须明确管理员执行。

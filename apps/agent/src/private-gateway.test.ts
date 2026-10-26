@@ -1,34 +1,29 @@
 import { expect, it } from "vitest";
 import { parseConfig } from "@palmtty/config";
+import { AUTH_COOKIE } from "./auth.js";
 import { PrivateGateway, privateGatewayFiles, privateGatewayPorts } from "./private-gateway.js";
-it("derives separate TLS routes and bounded private DNS from the single host configuration", () => {
-  const config = parseConfig({server:{port:17688,exposure:{mode:"reverseProxy",listenHost:"127.0.0.1",origins:["https://palm.palmtty.home.arpa"]},privateGateway:{listenHost:"192.168.1.3",upstreamDns:"192.168.1.1"}},integrations:{vscodeWeb:{mode:"managed",url:"https://code.palmtty.home.arpa"},harness:{mode:"managed",url:"https://harness.palmtty.home.arpa"}}});
-  const {caddy,dns} = privateGatewayFiles(config,"C:/private-network");
-  expect(caddy.match(/tls internal/gu)).toHaveLength(3);
-  for (const port of [17688,8000,3080]) expect(caddy).toContain(`reverse_proxy 127.0.0.1:${port}`);
-  expect(caddy).toContain("skip_install_trust"); expect(caddy).toContain("admin off");
-  expect(caddy).not.toContain("log { ");
-  expect(dns).toContain("block"); expect(dns).toContain("max_concurrent 64");
-  expect(dns).toContain("192.168.1.3 palm.palmtty.home.arpa code.palmtty.home.arpa harness.palmtty.home.arpa");
-  expect(dns).not.toContain("log");
+const server={port:17688,exposure:{mode:"lan"},privateGateway:{listenHost:"192.168.1.3"}};
+it("derives IP proxy routes without DNS and strips the PalmTTY cookie",()=>{
+  const config=parseConfig({server,integrations:{vscodeWeb:{mode:"managed"},harness:{mode:"managed"}}});
+  const files=privateGatewayFiles(config,"C:/private-network");
+  expect(files).not.toHaveProperty("dns");
+  expect(files.caddy).toContain("https://192.168.1.3");
+  expect(files.caddy).toContain("http://192.168.1.3:3080");
+  expect(files.caddy.match(/tls internal/gu)).toHaveLength(1);
+  expect(files.caddy).toContain("reverse_proxy 127.0.0.1:8000");
+  expect(files.caddy).toContain("reverse_proxy 127.0.0.1:3080");
+  expect(files.caddy).toContain(AUTH_COOKIE+"=[^;]*");
+  expect(files.caddy).toContain("skip_install_trust");
+  expect(files.caddy).toContain("@outside not remote_ip private_ranges");
+  expect(privateGatewayPorts(config)).toEqual([443,3080]);
+  expect(files.caddy).not.toContain("17688");
 });
-
-it("never starts services after its lifetime has closed", async () => {
-  const config = parseConfig({server:{exposure:{mode:"reverseProxy",listenHost:"127.0.0.1",origins:["https://palm.palmtty.home.arpa"]},privateGateway:{listenHost:"192.168.1.3",upstreamDns:"192.168.1.1"}},integrations:{vscodeWeb:{mode:"managed",url:"https://code.palmtty.home.arpa"},harness:{mode:"managed",url:"https://harness.palmtty.home.arpa"}}});
-  const gateway = new PrivateGateway(config);
-  await gateway.close();
-  await expect(gateway.start()).resolves.toBeUndefined();
+it("does not require TLS or Code when only Harness is enabled",()=>{
+  const config=parseConfig({server,integrations:{harness:{mode:"managed"}}});
+  expect(privateGatewayPorts(config)).toEqual([3080]);
+  expect(privateGatewayFiles(config,"C:/private-network").caddy).not.toContain("tls internal");
 });
-
-it("keeps LAN PalmTTY and Harness on HTTP with a separate trusted HTTPS Code entry", () => {
-  const config = parseConfig({server:{port:17688,exposure:{mode:"lan"},privateGateway:{listenHost:"192.168.1.3",upstreamDns:"192.168.1.1"}},integrations:{vscodeWeb:{mode:"managed",url:"https://code.palmtty.home.arpa"},harness:{mode:"managed",url:"http://harness.palmtty.home.arpa:3080/"}}});
-  const {caddy,dns} = privateGatewayFiles(config,"C:/private-network");
-  expect(caddy.match(/tls internal/gu)).toHaveLength(1);
-  expect(caddy).toContain("http://harness.palmtty.home.arpa:3080");
-  expect(caddy).toContain("reverse_proxy 127.0.0.1:3080");
-  expect(privateGatewayPorts(config)).toEqual([443,53,3080]);
-  expect(caddy).not.toContain(":17688");
-  expect(caddy).not.toContain("palm.palmtty.home.arpa");
-  expect(caddy).toContain("frame-ancestors 'self'");
-  expect(dns).toContain("192.168.1.3 code.palmtty.home.arpa harness.palmtty.home.arpa");
+it("never starts services after its lifetime has closed",async()=>{
+  const gateway=new PrivateGateway(parseConfig({server,integrations:{harness:{mode:"managed"}}}));
+  await gateway.close();await expect(gateway.start()).resolves.toBeUndefined();
 });

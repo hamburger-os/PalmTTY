@@ -4,14 +4,14 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { stripVTControlCharacters } from "node:util";
-import { findOfficialVSCodeCli, type PalmTTYConfig } from "@palmtty/config";
+import { findOfficialVSCodeCli, integrationAccessUrl, type PalmTTYConfig } from "@palmtty/config";
 import { WEB_APP_IDS, type WebAppCatalog, type WebAppId, type WebAppPhase, type WebAppStatus } from "@palmtty/protocol";
 import { runBoundedProcess } from "./bounded-process.js";
 import { spawnOwnedProcess, stopOwnedProcess } from "./owned-process.js";
 
 export const HARNESS_PIN = "0.2.1-rc.2";
 const MAX_LOG_BYTES = 8192;
-const STARTUP_TIMEOUT_MS = 75_000;
+const STARTUP_TIMEOUT_MS = { vscodeWeb: 75_000, harness: 180_000 } as const;
 const INSTALL_TIMEOUT_MS = 600_000;
 
 /** Parse only complete readiness lines: a stream chunk may split a token. */
@@ -142,7 +142,7 @@ export class ManagedWebApps {
       const state = this.states[id];
       const status: WebAppStatus = { id, phase: state.phase };
       if (state.detail) status.detail = state.detail;
-      const candidate = entry?.url ?? (entry?.mode === "managed" ? `http://127.0.0.1:${entry.port}/` : undefined);
+      const candidate = integrationAccessUrl(this.config, id);
       if (candidate && (localBrowser || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(candidate).hostname))) {
         status.accessUrl = candidate;
       }
@@ -161,9 +161,9 @@ export class ManagedWebApps {
     if (entry?.mode !== "managed" || state.phase !== "running" || !state.launchUrl) return undefined;
     const url = new URL(state.launchUrl);
     // Never redirect remote clients to loopback or a caller-supplied destination.
-    if (localBrowser) return url.href;
-    if (!entry.url) return undefined;
-    const destination = new URL(entry.url);
+    if (localBrowser && !this.config.server.privateGateway) return url.href;
+    const destination = new URL(integrationAccessUrl(this.config, id)!);
+    if (["localhost", "127.0.0.1", "[::1]"].includes(destination.hostname)) return undefined;
     const privateHarnessHttp = id === "harness" && this.config.server.exposure.mode === "lan" && Boolean(this.config.server.privateGateway);
     if (destination.protocol !== "https:" && !privateHarnessHttp) return undefined;
     destination.search = url.search;
@@ -227,8 +227,9 @@ export class ManagedWebApps {
     let args: string[];
     if (id === "harness") {
       args = [cli, "web", "--host", "127.0.0.1", "--port", String(entry.port), "--no-open"];
-      if (entry.url) {
-        args.push("--public-url", entry.url, "--trusted-host", new URL(entry.url).host);
+      const publicUrl = this.config.server.privateGateway ? integrationAccessUrl(this.config, id) : undefined;
+      if (publicUrl) {
+        args.push("--public-url", publicUrl, "--trusted-host", new URL(publicUrl).host);
       }
     } else {
       args = ["serve-web", "--host", "127.0.0.1", "--port", String(entry.port)];
@@ -250,7 +251,7 @@ export class ManagedWebApps {
           clearInterval(probeInterval);
           if (error) reject(error); else resolve();
         };
-        const timer = setTimeout(() => finish(new Error("startup_timeout")), STARTUP_TIMEOUT_MS);
+        const timer = setTimeout(() => finish(new Error("startup_timeout")), STARTUP_TIMEOUT_MS[id]);
         // The official CLI may print its final URL without a newline. Verify
         // token authentication over loopback rather than trusting a partial chunk.
         const probeInterval = setInterval(() => {
@@ -272,7 +273,7 @@ export class ManagedWebApps {
         });
         const append = (chunk: Buffer) => {
           output = stripVTControlCharacters(output + chunk.toString("utf8")).slice(-MAX_LOG_BYTES);
-          const expected = entry.url ? new URL(entry.url).origin : undefined;
+          const expected = this.config.server.privateGateway ? new URL(integrationAccessUrl(this.config, id)!).origin : undefined;
           const ready = id === "harness" ? parseHarnessReadyUrl(output, expected) : undefined;
           if (ready) { state.launchUrl = ready; finish(); }
         };

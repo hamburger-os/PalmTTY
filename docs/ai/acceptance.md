@@ -5,7 +5,7 @@ A coding agent should not declare a repository-wide task complete before the rel
 ## External integration acceptance
 
 - No leftover Remote App/RDP endpoints, AppWorker, WebRTC, native capture, ICE configuration or release smoke dependencies.
-- V4 Workspaces contain only core and Terminal settings. The optional one-shot v3 converter validates every projected record with the canonical WorkspaceDefinitionSchema, rejects duplicate IDs and malformed records without writing output, and never overwrites an existing v4 file. Integration URLs require HTTPS, loopback HTTP, or scoped managed LAN Harness HTTP, reject username/password/query/fragment, and are returned only after authentication with no-store.
+- V4 Workspaces contain only core and Terminal settings. The optional one-shot v3 converter validates every projected record with the canonical WorkspaceDefinitionSchema, rejects duplicate IDs and malformed records without writing output, and never overwrites an existing v4 file. Integration URLs require HTTPS, loopback HTTP, or derived managed LAN Harness HTTP, reject username/password/query/fragment, and are returned only after authentication with no-store.
 - Absent integrations are hidden; configured applications have independent links. Harness may be installed via a fixed version/host npm and started only on loopback; process ownership and error statuses stay in Agent, with Code opening the persisted host workspace folder. official VS Code CLI discovery never launches an unauthorized VS Code Server service; an external URL is not an availability claim.
 - Preserve all terminal reconnect, Session Worker, Git/Files/Artifacts, speech and mobile presentation tests.
 - Reject same-origin third-party app proxy and remote loopback/token URL disclosure. Independent remote access, Codex extension and Windows Ctrl+C behavior still require real-host acceptance.
@@ -243,13 +243,14 @@ The task summary should identify:
 
 ## Managed Web applications and independent links
 
-- Legacy strings, conflicting listener ports and shared PalmTTY/application Origins are rejected. External mode never installs locally; absent entries are disabled; autoStart is host-only and default off.
+- Legacy strings, obsolete managed URLs/DNS fields, conflicting listener/HTTPS entry ports and shared PalmTTY/application Origins are rejected. External mode never installs locally; absent entries are disabled; autoStart is host-only and default off.
 - Agent starts configured apps without browser login; catalogue polling has no launch side effects. Distinguish install/startup timeouts. Bounded npm output truncates without terminating successful installation.
 - Reclaim owned descendants after lease close, wrapper exit and creator termination; verify listeners release while independent Terminal Workers survive. Never kill by saved PID or unknown port.
 - Complete Harness readiness lines only; official Code URLs without trailing newline require successful token authentication, not partial-token matching.
-- Catalogue/rendered href never contain secrets. Authorization requires authentication + exact Origin, no-store/no-referrer, fixed independent target (HTTPS or scoped LAN Harness HTTP); local operator classification rejects proxy headers and nonlocal socket addresses.
+- Catalogue/rendered href never contain secrets. Authorization requires authentication + exact Origin, no-store/no-referrer, fixed derived managed IP target; local operator classification rejects proxy headers and nonlocal socket addresses.
 - No application iframe, embedUrl or visit cache remains. Four real tabs plus an independent Code action remain reachable; Code opens the persisted host folder and does not remount the terminal. Verify 3 themes x 2 modes, reduced motion, portrait/short landscape, popup failure, credential-free href and explicit handoff.
-- Mixed private gateway validates Code HTTPS, Harness HTTP at its managed port, distinct hosts, private-source fencing, public setup paths and matching firewall ports; reject remote Code HTTP, wrong Harness port and HTTP outside this scoped profile.
+- IP gateway derives Code HTTPS and Harness HTTP from one address/ports, independently enabled applications, private-source fencing, IP-SAN/CA trust, public setup MIME and matching firewall ports. It never runs DNS. Verify real Caddy HTTP/WS cookie stripping preserves upstream cookies, repeated cookies are removed and the same host is treated as trusted rather than port-isolated.
+- Actual phone Wi-Fi with WireGuard off and 5G with WireGuard on must both use the same IP links; record host smoke and physical-device acceptance separately. Restore a normal reachable tunnel DNS before retiring CoreDNS.
 
 - Required private-gateway startup failure must close the listener with nonzero exit status. Native listening lifecycle starts owned services once; closing during startup must prevent later process creation.
 - Direct HTTPS local deployment/authorization verifies DNS-only and IPv6-SAN certificates while connecting over loopback; wrong Origin identity remains rejected and TLS errors do not become an 11-minute retry loop.
