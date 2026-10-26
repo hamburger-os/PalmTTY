@@ -1,0 +1,35 @@
+# Run on the development host. Supply your existing certificate/key paths.
+# NAS should forward each independent HTTPS hostname to this host's HTTPS
+# listener, with WebSocket enabled and its upstream certificate verified.
+{
+    # Filter runtime proxy errors too; access logging stays disabled.
+    log default {
+        format filter {
+            wrap json
+            fields {
+                request>uri delete
+                request>headers delete
+                resp_headers delete
+            }
+        }
+    }
+}
+
+(application) {
+    tls /path/to/fullchain.pem /path/to/private-key.pem
+    # Append a policy: never replace the upstream application's existing CSP.
+    header {
+        +Content-Security-Policy "frame-ancestors 'self' https://palm.example.test"
+        Referrer-Policy "no-referrer"
+        defer
+    }
+    reverse_proxy 127.0.0.1:{args[0]}
+}
+
+https://code.example.test {
+    import application 8000
+}
+
+https://harness.example.test {
+    import application 3080
+}

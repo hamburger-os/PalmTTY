@@ -1,19 +1,17 @@
-# Official Microsoft VS Code Web and DeepSeek Harness references
+# Official VS Code Web and Harness references
 
-- Microsoft VS Code Server / CLI `serve-web`: <https://code.visualstudio.com/docs/remote/vscode-server>. Relevant CLI flags include `--host`, `--port`, `--default-folder`, `--server-data-dir` and `--connection-token-file`.
-- Self-hosted VS Code Web security advisory: <https://github.com/microsoft/vscode/security/advisories/GHSA-v282-cxqj-xgj4>. Preserve connection-token protection and apply patched versions.
-- Official DeepSeek Harness Web: <https://github.com/deepseek-ai/deepseek-harness>. Its own Web implementation maintains workspaces, sessions and authentication.
-- Browser mobile support, optional Codex extension, folder deep routing and Windows `serve-web` Ctrl+C child-process cleanup require actual-host verification; PalmTTY does not assume these are upstream guarantees.
+- Server terms: <https://code.visualstudio.com/license/server>. Review the actual installation/use and hosting/redistribution restrictions; private use is not a blanket permission claim.
+- Server FAQ: <https://code.visualstudio.com/docs/remote/vscode-server> says hosting as a service is not allowed.
+- Remote Tunnels: <https://code.visualstudio.com/docs/remote/tunnels#_how-can-i-ensure-i-keep-my-tunnel-running> explicitly documents `code tunnel service install`. This is a distinct command and network architecture; it neither proves arbitrary serve-web hosting is licensed nor establishes a universal TTY requirement.
+- Remote Development FAQ: <https://code.visualstudio.com/docs/remote/faq> distinguishes internal/private use from public/commercial offerings.
+- Official CLI argument contract: <https://github.com/microsoft/vscode/blob/main/cli/src/commands/args.rs>; retain upstream token protection and explicit license acceptance. No VS Code binaries are redistributed.
+- Upstream self-hosted security advisory: <https://github.com/microsoft/vscode/security/advisories/GHSA-v282-cxqj-xgj4>.
+- Harness CLI: <https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cli-help.md>; public-url advertises the route and trusted-host admits authority, neither replaces authentication. Validate the exact pinned package, not just current main documentation.
+- CSP frame ancestors: <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/frame-ancestors>. Independent-Origin framing, SameSite Cookies, OAuth callbacks and HTTP/WebSocket behavior need exact-version/device acceptance.
+- Caddy logging: <https://caddyserver.com/docs/caddyfile/directives/log> and <https://caddyserver.com/docs/caddyfile/options#log>. Access and runtime error logging are separate; proxy bootstrap queries/headers must not leak credentials. Preserve upstream CSP when adding an ancestor allowlist.
 
-
-## Managed app constraints (2026-10)
-
-- Microsoft VS Code Server official FAQ: <https://code.visualstudio.com/docs/remote/vscode-server>. It explicitly prohibits hosting the server as a service; discovery does not grant permission to daemonize it.
-- DeepSeek Harness official CLI help: <https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cli-help.md>. Web supports `--host`, `--port 0` and `--no-open`; it prints a token-bearing launch URL for first-party browser authentication. Host/trusted-host controls are not substitutes for authentication.
-- Managed DSH installer targets a verified pinned npm release in a private staging directory, not mutable `latest`; remote access with an isolated Origin is an independent trust boundary. External reverse proxies must configure upstream `--public-url` and `--trusted-host` and retain independent authentication.
-
-## Optional local interactive joint launcher
-
-- Canonical upstream Rust argument contract: <https://github.com/microsoft/vscode/blob/main/cli/src/commands/args.rs> (`serve-web`, `--host`, `--port`, `--connection-token-file`, `--default-folder`, `--accept-server-license-terms`).
-- User-initiated `pnpm start:with-vscode` launches a foreground CLI but never silently accepts Microsoft's terms or disables the connection-token requirement. It is not added to system services and does not redistribute any VS Code Server binaries.
-- Off-host NAS cannot contact the PC's `127.0.0.1`; bridge via a secure same-host reverse proxy or an authenticated tunnel. This is a deployment constraint, not a PalmTTY proxy feature.
+- Browser secure contexts: <https://www.w3.org/TR/secure-contexts/#examples-framed>. An HTTPS iframe under an HTTP ancestor is not secure; WireGuard transport does not alter the browser origin scheme. The installed Code webview checks crypto.subtle.
+- Cookie port isolation: <https://www.rfc-editor.org/rfc/rfc6265.html#section-8.5>. Separate ports are not separate cookie hosts.
+- Internal HTTPS/CA: <https://caddyserver.com/docs/automatic-https#local-https>; manual iOS trust: <https://support.apple.com/en-us/102390>.
+- Private DNS source ACL and bounded forwarding: <https://coredns.io/plugins/acl/> and <https://coredns.io/plugins/forward/>. Official release archive versions and hashes live only in private-gateway.ts.
+- Code folder URLs: <https://github.com/microsoft/vscode/blob/main/src/vs/code/browser/workbench/workbench.ts>. Host cwd is encoded as a URI folder path; Windows Code cannot infer a WSL mapping.

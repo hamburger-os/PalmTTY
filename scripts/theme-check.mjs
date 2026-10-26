@@ -103,7 +103,7 @@ const filesPane = await readFile(filesPanePath, "utf8");
 
 for (const marker of [
   '<TerminalView',
-  'active={pane === "terminal"}',
+  'active={visible && pane === "terminal"}',
   'workbench-pane',
   'pane === "git"',
   'pane === "files"',

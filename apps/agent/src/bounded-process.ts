@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { spawnOwnedProcess, stopOwnedProcess } from "./owned-process.js";
 
 export type BoundedProcessOptions = {
   executable: string;
@@ -9,6 +10,8 @@ export type BoundedProcessOptions = {
   signal?: AbortSignal;
   maxStdoutBytes?: number;
   maxStderrBytes?: number;
+  owned?: boolean;
+  truncateStdout?: boolean;
 };
 
 export type BoundedProcessResult = {
@@ -27,7 +30,10 @@ export async function runBoundedProcess(
   const maxStderrBytes = options.maxStderrBytes ?? 32 * 1024;
 
   return new Promise<BoundedProcessResult>((resolve, reject) => {
-    const child = spawn(options.executable, options.args, {
+    const child = options.owned ? spawnOwnedProcess({
+      executable: options.executable, args: options.args,
+      cwd: options.cwd ?? process.cwd(), env: options.env ?? process.env
+    }) : spawn(options.executable, options.args, {
       shell: false,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
@@ -43,11 +49,18 @@ export async function runBoundedProcess(
     let stderrTruncated = false;
     let settled = false;
     let timer: NodeJS.Timeout | undefined;
+    let failure: Error | undefined;
+    const abort = () => { failure = new Error("Process aborted"); void stopOwnedProcess(child); };
+    if (options.owned && options.signal) {
+      options.signal.addEventListener("abort", abort, { once: true });
+      if (options.signal.aborted) abort();
+    }
 
     const finish = (error?: Error, code: number | null = null) => {
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
+      options.signal?.removeEventListener("abort", abort);
       if (error) {
         reject(error);
         return;
@@ -66,14 +79,14 @@ export async function runBoundedProcess(
       const remaining = maxStdoutBytes - stdoutBytes;
       if (remaining <= 0) {
         stdoutTruncated = true;
-        child.kill();
+        if (!options.truncateStdout) child.kill();
         return;
       }
       if (chunk.length > remaining) {
         stdout.push(chunk.subarray(0, remaining));
         stdoutBytes += remaining;
         stdoutTruncated = true;
-        child.kill();
+        if (!options.truncateStdout) child.kill();
         return;
       }
       stdout.push(chunk);
@@ -98,11 +111,12 @@ export async function runBoundedProcess(
     });
 
     child.once("error", (error) => finish(error));
-    child.once("close", (code) => finish(undefined, code));
+    child.once("close", (code) => finish(failure, code));
 
     timer = setTimeout(() => {
-      child.kill();
-      finish(new Error(`Process timed out after ${timeoutMs} ms`));
+      failure = new Error(`Process timed out after ${timeoutMs} ms`);
+      if (options.owned) void stopOwnedProcess(child).then(() => finish(failure));
+      else { child.kill(); finish(failure); }
     }, timeoutMs);
     timer.unref();
   });

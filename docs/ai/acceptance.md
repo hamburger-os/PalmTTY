@@ -236,28 +236,20 @@ The task summary should identify:
 - Run the runtime checker against `.node-version` and `package.json` engine range; Node types must be major 24 and frozen-lockfile installation must succeed.
 - Windows PowerShell/ConPTY and Linux `node-pty` worker tests must pass on Node 24, including spawn, exit, resize, restart/replay and recovery.
 - Native Windows/Linux distribution smoke must run the bundled Node binary and match `release-manifest.nodeVersion` and `.node-version`; Security Audit and CodeQL must pass at the final head.
-- Owner-host autostart and old detached Worker cleanup need real-device confirmation; no Node 22 fallback or Harness auto-installer is in this PR.
+- Owner-host autostart and old detached Worker cleanup need real-device confirmation; no Node 22 fallback is maintained; managed Harness provisioning is covered in the integration section below.
 
 
-## Interactive official VS Code Web launcher acceptance
-
-- `pnpm start:with-vscode` is a source-checkout-only, opt-in TTY command after `pnpm build`; `pnpm start`, `pnpm autostart` and `palmtty service` remain unchanged. Non-TTY invocation fails before spawning programs. Missing official CLI or unbuilt Agent fails closed.
-- CLI path detection has one shared implementation consumed by Agent and launcher; no third-party `code-server` runtime or alias returns. Windows handles official `code.cmd` safely without caller shell interpolation; Linux launches executable `code` without shell.
-- Official Web listener always uses 127.0.0.1 and a validated local port (configured loopback integration URL or 8000); no disabled tokens, no silent server-license acceptance. VS Code child receives no PalmTTY bootstrap/control credentials, retains stdin for prompts; Agent does not compete for stdin. The joint process cleans up only children it created and does not adopt arbitrary listeners.
-- Terminating the local joint session on Windows must stop Agent **without** a blanket taskkill /T of its detached independent Session Workers; the optional VS Code CLI wrapper may be tree-terminated. Do not conflate their lifetime domains. Verify this invariant on an actual Windows host.
-- Test Windows path quoting, local/external URL port selection, argument injection rejection, non-TTY refusal, and secret isolation. Host-manual checks: first-time VS Code license prompt, own token-auth login, terminal Ctrl+C and Windows descendants, port collisions, phone HTTPS via separate Origin, Codex Web compatibility.
-
-## Managed Web application acceptance
-
-- For local/no-integration YAML, authenticated `GET /api/v1/integrations` returns both known IDs with explicit states; unauthorized clients get 401; mutation without exact Origin gets 403.
-- Harness single-flight ensure accepts no client path/URL/package/port parameters. npm provisioning targets a fixed user directory, pinned RC release, no admin privileges, no automatic latest. Failure does not mutate Workspace or terminal sessions.
-- Agent never logs or returns DSH process-token URLs to LAN/reverse-proxy clients, never attaches to an unknown port/PID, and kills only processes it created. An HTTPS URL in an operator config is a navigation entry, not a managed-service trust assertion.
-- official VS Code Server must be launched independently in a licensed interactive-user context; a running backend does not imply remote-phone accessibility. Real-host Windows, NAS, mobile and upstream auth remain separate acceptance.
-
-- Web app tests must reject arbitrary stdout URLs and accept only the validated official DSH readiness URL on loopback. A failure must survive discovery even when a partial CLI exists.
 
 
-### Bundled npm release acceptance
+## Managed Web applications and embedded views
 
-- Every Windows/Linux installed runtime carries official npm CLI with its Node 24 binary. Verify the copied `runtime/npm/package.json` name and license, include npm and its redistributed dependencies in CycloneDX SBOM, record `npmVersion` in `release-manifest.json`, and execute bundled npm with the bundled Node in installed-runtime smoke.
-- Managed Harness installation in release mode must try bundled npm before source/host paths, and never require a global npm executable or administrator privileges. Registry/network availability and a dedicated phone HTTPS Origin are separate acceptance boundaries.
+- Legacy strings, conflicting listener ports and shared PalmTTY/application Origins are rejected. External mode never installs locally; absent entries are disabled; autoStart is host-only and default off.
+- Agent starts configured apps without browser login; catalogue polling has no launch side effects. Distinguish install/startup timeouts. Bounded npm output truncates without terminating successful installation.
+- Reclaim owned descendants after lease close, wrapper exit and creator termination; verify listeners release while independent Terminal Workers survive. Never kill by saved PID or unknown port.
+- Complete Harness readiness lines only; official Code URLs without trailing newline require successful token authentication, not partial-token matching.
+- Catalogue/iframe src never contain secrets. Authorization requires authentication + exact Origin, no-store/no-referrer, fixed configured remote HTTPS target; local operator classification rejects proxy headers and nonlocal socket addresses.
+- Lazy frame mounting and switching preserve iframe and terminal instances; hidden terminal geometry is paused. Verify 3 themes x 2 performance modes, reduced motion, portrait/short landscape, first-sign-in, HTTP/WebSocket and exact upstream frame/Cookie behavior. Local smoke is not phone HTTPS acceptance.
+
+- Required private-gateway startup failure must close the listener with nonzero exit status; Fastify onListen errors alone do not propagate.
+- Direct HTTPS local deployment/authorization verifies a DNS-only certificate while connecting over loopback; wrong Origin identity remains rejected and TLS errors do not become an 11-minute retry loop.
+- Operator phone access was confirmed on 2026-10-26. Small-screen quality of third-party applications is a known upstream limitation; do not equate this confirmation with exhaustive extension/OAuth/keyboard acceptance.

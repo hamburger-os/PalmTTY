@@ -53,6 +53,10 @@ const ExposureSchema = z.discriminatedUnion("mode", [
 
 const ServerConfigSchema = z.object({
   port: z.number().int().min(1).max(65535).default(7688),
+  privateGateway: z.object({
+    listenHost: z.string().refine((value) => isPrivateIpv4(value) && !value.startsWith("127."), "Use a concrete private IPv4 address"),
+    upstreamDns: z.string().refine((value) => isPrivateIpv4(value), "Use a private IPv4 DNS resolver")
+  }).strict().optional(),
   exposure: ExposureSchema.default({ mode: "local" })
 }).strict();
 
@@ -86,9 +90,18 @@ const IntegrationUrlSchema = z.string().url().superRefine((value, ctx) => {
     ctx.addIssue({ code: "custom", message: "Integration URL must be HTTPS (or loopback HTTP), without credentials, query or fragment" });
   }
 });
+const integrationSchema = (port: number) => z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("external"), url: IntegrationUrlSchema }).strict(),
+  z.object({
+    mode: z.literal("managed"),
+    port: z.number().int().min(1024).max(65535).default(port),
+    autoStart: z.boolean().default(false),
+    url: IntegrationUrlSchema.optional()
+  }).strict()
+]);
 const IntegrationsConfigSchema = z.object({
-  vscodeWeb: IntegrationUrlSchema.optional(),
-  harness: IntegrationUrlSchema.optional()
+  vscodeWeb: integrationSchema(8000).optional(),
+  harness: integrationSchema(3080).optional()
 }).strict();
 
 export const PalmTTYConfigSchema = z.object({
@@ -111,7 +124,50 @@ export const PalmTTYConfigSchema = z.object({
   }),
   speech: SpeechConfigSchema.default({ qwen: { enabled: false, port: 18765 } }),
   integrations: IntegrationsConfigSchema.default({})
-}).strict();
+}).strict().superRefine((config, ctx) => {
+  if (config.server.privateGateway) {
+    const exposure = config.server.exposure;
+    const urls = exposure.mode === "reverseProxy" ? [...exposure.origins, ...Object.values(config.integrations).flatMap((entry) => entry?.url ? [entry.url] : [])] : [];
+    const names = urls.map((value) => new URL(value));
+    const parent = names[0]?.hostname.split(".").slice(1).join(".");
+    if (config.server.privateGateway.upstreamDns === config.server.privateGateway.listenHost || exposure.mode !== "reverseProxy" || exposure.listenHost !== "127.0.0.1" || exposure.origins.length !== 1 || names.length !== 3 ||
+        !parent?.endsWith(".home.arpa") || new Set(names.map((u) => u.hostname)).size !== 3 ||
+        names.some((u) => u.protocol !== "https:" || u.port || !/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/u.test(u.hostname) || u.hostname.split(".").slice(1).join(".") !== parent) ||
+        Object.values(config.integrations).some((entry) => entry?.mode !== "managed") || config.server.port === 443 || config.server.port === 53 ||
+        Object.values(config.integrations).some((entry) => entry?.mode === "managed" && [443, 53].includes(entry.port))) {
+      ctx.addIssue({ code: "custom", path: ["server", "privateGateway"], message: "Private gateway requires loopback reverseProxy, three distinct HTTPS sibling names under .home.arpa on port 443, and two managed applications" });
+    }
+  }
+  const entries = Object.entries(config.integrations);
+  const exposure = config.server.exposure;
+  const origins = exposure.mode === "https" || exposure.mode === "reverseProxy"
+    ? exposure.origins.map((value) => new URL(value).origin)
+    : [`http://127.0.0.1:${config.server.port}`, `http://localhost:${config.server.port}`];
+  const ports = new Set<number>([config.server.port]);
+  const appOrigins = new Set<string>();
+  const httpsHosts = new Set(origins.filter((origin) => origin.startsWith("https:")).map((origin) => new URL(origin).hostname));
+  for (const [id, entry] of entries) {
+    if (!entry) continue;
+    if (entry.mode === "managed") {
+      if (ports.has(entry.port)) ctx.addIssue({ code: "custom", path: ["integrations", id, "port"], message: "Managed listeners must use distinct ports" });
+      ports.add(entry.port);
+    }
+    if (entry.url) {
+      const uri = new URL(entry.url);
+      if (entry.mode === "managed" && uri.protocol === "http:" && uri.origin !== `http://127.0.0.1:${entry.port}`) {
+        ctx.addIssue({ code: "custom", path: ["integrations", id, "url"], message: "Managed HTTP URL must match its IPv4 loopback listener" });
+      }
+      if (uri.protocol === "https:" && httpsHosts.has(uri.hostname)) {
+        ctx.addIssue({ code: "custom", path: ["integrations", id, "url"], message: "HTTPS application hosts must differ; cookies are not isolated by port" });
+      }
+      if (uri.protocol === "https:") httpsHosts.add(uri.hostname);
+      if (uri.pathname !== "/" || origins.includes(uri.origin) || appOrigins.has(uri.origin)) {
+        ctx.addIssue({ code: "custom", path: ["integrations", id, "url"], message: "Each application needs a distinct root Origin, separate from PalmTTY" });
+      }
+      appOrigins.add(uri.origin);
+    }
+  }
+});
 
 export type PalmTTYConfig = z.infer<typeof PalmTTYConfigSchema>;
 export type NetworkInterfaces = ReturnType<typeof os.networkInterfaces>;

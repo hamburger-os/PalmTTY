@@ -3,7 +3,6 @@ import {
   isActiveSessionState,
   isTerminalSessionState,
   type CreateWorkspaceInput,
-  WEB_APP_IDS,
   type RuntimeCapabilities,
   type SessionPublic,
   type WorkspacePublic
@@ -28,6 +27,7 @@ import {
   terminateSession,
   updateWorkspace
 } from "./api.js";
+import { WebApplicationPanel } from "./WebApplications.js";
 import { AppearanceControls } from "./AppearanceControls.js";
 import { Brand } from "./Brand.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
@@ -60,6 +60,7 @@ export function App() {
   const { t, error: translateError, connections } = useI18n();
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null>(null);
+  const [applicationView, setApplicationView] = useState<"home" | "harness">("home");
   const [integrations, setIntegrations] = useState<WebAppCatalog | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspacePublic[]>([]);
   const [sessions, setSessions] = useState<SessionPublic[]>([]);
@@ -91,9 +92,6 @@ export function App() {
       });
     void integrationLinks().then(setIntegrations)
       .catch(() => setError(t("integrations.loadFailed")));
-    void ensureWebApp("harness").catch(() =>
-      setError(t("integrations.ensureFailed"))
-    );
     await refreshCatalog();
   }, [refreshCatalog, translateError, t]);
 
@@ -182,12 +180,15 @@ export function App() {
     }
   };
 
-  if (activeSession) {
+  const workbench = activeSession ? (() => {
+    if (!activeSession) return null;
     const activeWorkspace = workspaces.find(
       (workspace) => workspace.id === activeSession.workspaceId
     );
     return (
-      <WorkspaceWorkbench
+      <WorkspaceWorkbench visible={applicationView === "home"}
+        codeStatus={integrations?.apps.vscodeWeb}
+        onRefreshApps={async () => setIntegrations(await integrationLinks())}
         {...(activeWorkspace ? { workspace: activeWorkspace } : {})}
         activity={{
           kind: "terminal",
@@ -220,7 +221,7 @@ export function App() {
         }}
       />
     );
-  }
+  })() : null;
 
   const stateLabel = (state: SessionPublic["state"]) => {
     switch (state) {
@@ -323,7 +324,7 @@ export function App() {
   const renderWebApp = (id: WebAppId) => {
     const info = integrations?.apps[id];
     const phase = info?.phase ?? "detecting";
-    const canRetry = id === "harness" &&
+    const canRetry = info?.canEnsure &&
       !["running", "installing", "starting", "detecting"].includes(phase);
     return (
       <section className="glass-card integration-entry" key={id}>
@@ -339,7 +340,10 @@ export function App() {
         </div>
         <div className="integration-actions">
           {info?.accessUrl && (
-            <a className="ghost compact" href={info.accessUrl}
+            <button className="compact" type="button" onClick={() => setApplicationView("harness")}>{t("integrations.openEmbedded")}</button>
+          )}
+          {info?.accessUrl && (
+            <a className="action ghost compact" href={info.accessUrl}
                target="_blank" rel="noopener noreferrer">
               {t("integrations.open")} ↗
             </a>
@@ -359,7 +363,9 @@ export function App() {
   const activities = [...sessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   return (
-    <main className="app-shell">
+    <>
+    <div hidden={applicationView !== "home"}>
+    {workbench ?? <main className="app-shell">
       <header className="topbar glass-shell">
         <Brand eyebrow={t("app.eyebrow")} />
         <div className="topbar-actions">
@@ -373,6 +379,7 @@ export function App() {
                 setAuth({ enabled: true, authenticated: false });
                 setCapabilities(null);
                 setIntegrations(null);
+                setApplicationView("home");
                 setWorkspaces([]);
                 setSessions([]);
               })()}
@@ -385,7 +392,7 @@ export function App() {
 
       {error && <div className="error-banner">{error}</div>}
       <div className="card-grid" aria-label={t("integrations.applications")}>
-        {WEB_APP_IDS.map(renderWebApp)}
+        {renderWebApp("harness")}
       </div>
 
       <section>
@@ -545,8 +552,26 @@ export function App() {
           }}
         />
       )}
-    </main>
+    </main>}
+    </div>
+    {integrations && <HarnessView visible={applicationView === "harness"} status={integrations.apps.harness}
+      onBack={() => setApplicationView("home")} onRefresh={async () => setIntegrations(await integrationLinks())}/> }
+    </>
   );
+}
+
+function HarnessView({ visible, status, onBack, onRefresh }: {
+  visible: boolean; status: import("@palmtty/protocol").WebAppStatus;
+  onBack(): void; onRefresh(): Promise<void>;
+}) {
+  const { t } = useI18n();
+  const [visited, setVisited] = useState(false);
+  useEffect(() => { if (visible) setVisited(true); }, [visible]);
+  if (!visited) return null;
+  return <main className="web-app-view" hidden={!visible}>
+    <div><button className="ghost compact" onClick={onBack}>← {t("integrations.backHome")}</button></div>
+    <WebApplicationPanel id="harness" status={status} onRefresh={onRefresh}/>
+  </main>;
 }
 
 function LanguageSwitcher() {

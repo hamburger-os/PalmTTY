@@ -6,6 +6,15 @@ using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Threading;
+
+[DataContract]
+internal sealed class OwnedLaunch
+{
+    [DataMember(Name = "executable", IsRequired = true)] public string Executable { get; set; }
+    [DataMember(Name = "args", IsRequired = true)] public string[] Arguments { get; set; }
+    [DataMember(Name = "cwd", IsRequired = true)] public string WorkingDirectory { get; set; }
+}
 
 [DataContract]
 internal sealed class Installation
@@ -162,19 +171,85 @@ internal static class Program
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr hObject);
 
+    [DllImport("kernel32.dll")] private static extern IntPtr GetStdHandle(int which);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetHandleInformation(IntPtr handle, uint mask, uint flags);
+
     [STAThread]
     private static int Main(string[] args)
     {
         string installationPath = null;
         try
         {
+            if (args.Length == 1 && args[0] == "--owned-child") return RunOwnedChild();
             installationPath = ParseInstallationPath(args);
             return Run(installationPath);
         }
         catch (Exception error)
         {
+            if (args.Length == 1 && args[0] == "--owned-child") return 1;
             WriteError(installationPath, error);
             return 1;
+        }
+    }
+
+    // A private stdin lease ties this job to its creator, even if the Agent
+    // is forcibly terminated by Task Scheduler. No PID files grant authority.
+    private static int RunOwnedChild()
+    {
+        StreamReader input = new StreamReader(Console.OpenStandardInput(), Encoding.UTF8);
+        StringBuilder line = new StringBuilder();
+        int c;
+        while ((c = input.Read()) != -1 && c != '\n')
+        {
+            if (line.Length >= 65536) throw new InvalidDataException("Launch frame too large");
+            line.Append((char)c);
+        }
+        OwnedLaunch launch;
+        using (MemoryStream stream = new MemoryStream(Encoding.UTF8.GetBytes(line.ToString())))
+            launch = (OwnedLaunch)new DataContractJsonSerializer(typeof(OwnedLaunch)).ReadObject(stream);
+        RequireFile(launch.Executable, "Owned executable");
+        if (!Path.IsPathRooted(launch.Executable) || !Directory.Exists(launch.WorkingDirectory))
+            throw new InvalidDataException("Invalid launch paths");
+
+        IntPtr job = IntPtr.Zero;
+        PROCESS_INFORMATION process = new PROCESS_INFORMATION();
+        bool resumed = false;
+        try
+        {
+            job = CreateJobObject(IntPtr.Zero, null);
+            if (job == IntPtr.Zero) ThrowLastError("CreateJobObject");
+            ConfigureJob(job, false);
+            STARTUPINFO startup = new STARTUPINFO();
+            startup.cb = (uint)Marshal.SizeOf(typeof(STARTUPINFO));
+            startup.dwFlags = 0x100; // STARTF_USESTDHANDLES; stdin belongs only to the lease.
+            startup.hStdOutput = GetStdHandle(-11);
+            startup.hStdError = GetStdHandle(-12);
+            SetHandleInformation(startup.hStdOutput, 1, 1);
+            SetHandleInformation(startup.hStdError, 1, 1);
+            if (!CreateProcess(launch.Executable, BuildCommandLine(launch.Executable, launch.Arguments),
+                IntPtr.Zero, IntPtr.Zero, true, CREATE_SUSPENDED | CREATE_NO_WINDOW,
+                IntPtr.Zero, launch.WorkingDirectory, ref startup, out process)) ThrowLastError("CreateProcess");
+            if (!AssignProcessToJobObject(job, process.hProcess)) ThrowLastError("AssignProcessToJobObject");
+            if (ResumeThread(process.hThread) == RESUME_FAILED) ThrowLastError("ResumeThread");
+            resumed = true;
+            Thread lease = new Thread(delegate() {
+                try { while (input.Read() != -1) { } } catch { }
+                Environment.Exit(0); // Closing our only job handle kills every descendant.
+            });
+            lease.IsBackground = true;
+            lease.Start();
+            if (WaitForSingleObject(process.hProcess, INFINITE) != WAIT_OBJECT_0) ThrowLastError("WaitForSingleObject");
+            uint code;
+            if (!GetExitCodeProcess(process.hProcess, out code)) ThrowLastError("GetExitCodeProcess");
+            return unchecked((int)code);
+        }
+        finally
+        {
+            if (!resumed && process.hProcess != IntPtr.Zero) TerminateProcess(process.hProcess, 1);
+            if (job != IntPtr.Zero) CloseHandle(job);
+            if (process.hThread != IntPtr.Zero) CloseHandle(process.hThread);
+            if (process.hProcess != IntPtr.Zero) CloseHandle(process.hProcess);
         }
     }
 
@@ -402,13 +477,13 @@ internal static class Program
         return result.ToString();
     }
 
-    private static void ConfigureJob(IntPtr job)
+    private static void ConfigureJob(IntPtr job, bool allowBreakaway = true)
     {
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION information =
             new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
         information.BasicLimitInformation.LimitFlags =
             JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE |
-            JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK;
+            (allowBreakaway ? JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK : 0);
 
         int size = Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
         IntPtr buffer = Marshal.AllocHGlobal(size);

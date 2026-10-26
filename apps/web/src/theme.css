@@ -248,7 +248,8 @@ select {
   font: inherit;
 }
 
-button {
+button,
+.action {
   color: var(--text-primary);
   border: 1px solid var(--border);
   background: var(--control-bg);
@@ -263,13 +264,15 @@ button {
     transform var(--transition-control);
 }
 
-button:hover:not(:disabled) {
+button:hover:not(:disabled),
+.action:hover {
   background: var(--control-hover);
   border-color: var(--border-strong);
   transform: translateY(-1px);
 }
 
-button:active:not(:disabled) {
+button:active:not(:disabled),
+.action:active {
   transform: translateY(0);
 }
 

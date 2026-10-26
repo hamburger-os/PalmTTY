@@ -40,10 +40,14 @@ describe("workspace file access", () => {
     roots.add(outside);
     const outsideFile = path.join(outside, "secret.txt");
     await writeFile(outsideFile, "outside-private", "utf8");
-    const link = path.join(definition.cwd, "escape.txt");
-    await symlink(outsideFile, link, "file");
-    await expect(readWorkspaceFile(definition, "escape.txt")).rejects.toThrow();
-    await expect(readWorkspaceFileContent(definition, "escape.txt")).rejects.toThrow();
+    // A Windows directory junction exercises canonical containment without
+    // requiring Developer Mode or administrator-only file-symlink privileges.
+    const windows = process.platform === "win32";
+    const relative = windows ? "escape/secret.txt" : "escape.txt";
+    const link = path.join(definition.cwd, windows ? "escape" : "escape.txt");
+    await symlink(windows ? outside : outsideFile, link, windows ? "junction" : "file");
+    await expect(readWorkspaceFile(definition, relative)).rejects.toThrow();
+    await expect(readWorkspaceFileContent(definition, relative)).rejects.toThrow();
   });
 
 

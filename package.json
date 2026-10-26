@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "pnpm -r --if-present build",
-    "preflight": "pnpm --filter @palmtty/protocol build && pnpm --filter @palmtty/config build && pnpm --filter @palmtty/agent run preflight",
+    "preflight": "pnpm --filter @palmtty/protocol build && pnpm --filter @palmtty/config build && node scripts/build-windows-host.mjs && pnpm --filter @palmtty/agent run preflight",
     "dev": "pnpm run preflight && node scripts/dev.mjs",
     "start": "pnpm --filter @palmtty/agent start",
     "test": "pnpm -r --if-present test && pnpm scripts:test",
@@ -17,8 +17,8 @@
     "docs:check": "node scripts/docs-check.mjs",
     "theme:check": "node scripts/theme-check.mjs",
     "terminal:check": "node scripts/terminal-stack-check.mjs",
-    "scripts:check": "node scripts/node-runtime-check.mjs && node --check scripts/node-runtime-check.mjs && node --check scripts/dev.mjs && node --check scripts/dev-network.mjs && node --check scripts/dev-network.test.mjs && node --check scripts/docs-check.mjs && node --check scripts/theme-check.mjs && node --check scripts/terminal-stack-check.mjs && node --check scripts/terminal-stack-check.test.mjs && node --check scripts/release-tools.mjs && node --check scripts/release-check.mjs && node --check scripts/release-notes.mjs && node --check scripts/license-check.mjs && node --check scripts/autostart-core.mjs && node --check scripts/autostart.mjs && node --check scripts/autostart.test.mjs && node --check scripts/release-tools.test.mjs && node --check scripts/installed-cli.mjs && node --check scripts/package-runtime.mjs && node --check scripts/package-smoke.mjs && node --check scripts/package-linux-deb.mjs && node --check scripts/migrate-workspaces-v4.mjs && node --check scripts/start-with-vscode.mjs && node --check scripts/start-with-vscode.test.mjs",
-    "scripts:test": "pnpm --filter @palmtty/protocol build && pnpm --filter @palmtty/config build && node --test scripts/dev-network.test.mjs scripts/terminal-stack-check.test.mjs scripts/release-tools.test.mjs scripts/autostart.test.mjs scripts/migrate-workspaces-v4.test.mjs scripts/node-runtime-check.test.mjs scripts/start-with-vscode.test.mjs",
+    "scripts:check": "node scripts/node-runtime-check.mjs && node --check scripts/node-runtime-check.mjs && node --check scripts/dev.mjs && node --check scripts/dev-network.mjs && node --check scripts/dev-network.test.mjs && node --check scripts/docs-check.mjs && node --check scripts/theme-check.mjs && node --check scripts/terminal-stack-check.mjs && node --check scripts/terminal-stack-check.test.mjs && node --check scripts/release-tools.mjs && node --check scripts/release-check.mjs && node --check scripts/release-notes.mjs && node --check scripts/license-check.mjs && node --check scripts/autostart-core.mjs && node --check scripts/autostart.mjs && node --check scripts/autostart.test.mjs && node --check scripts/release-tools.test.mjs && node --check scripts/installed-cli.mjs && node --check scripts/package-runtime.mjs && node --check scripts/package-smoke.mjs && node --check scripts/package-linux-deb.mjs && node --check scripts/migrate-workspaces-v4.mjs && node --check scripts/build-windows-host.mjs && node --check scripts/deploy-local.mjs && node --check scripts/authorize-web-app.mjs && node --check scripts/private-network.mjs && node --check scripts/local-agent-client.mjs && node --check scripts/local-agent-client.test.mjs",
+    "scripts:test": "pnpm --filter @palmtty/protocol build && pnpm --filter @palmtty/config build && node --test scripts/local-agent-client.test.mjs scripts/dev-network.test.mjs scripts/terminal-stack-check.test.mjs scripts/release-tools.test.mjs scripts/autostart.test.mjs scripts/migrate-workspaces-v4.test.mjs scripts/node-runtime-check.test.mjs",
     "lint": "pnpm typecheck && pnpm scripts:check && pnpm docs:check && pnpm theme:check && pnpm terminal:check && pnpm version:check",
     "check": "pnpm lint && pnpm test && pnpm build",
     "version:check": "node scripts/release-check.mjs",
@@ -29,7 +29,8 @@
     "package:runtime": "node scripts/package-runtime.mjs",
     "package:smoke": "node scripts/package-smoke.mjs",
     "package:deb": "node scripts/package-linux-deb.mjs",
-    "start:with-vscode": "node scripts/start-with-vscode.mjs"
+    "deploy:local": "node scripts/deploy-local.mjs",
+    "app:authorize": "node scripts/authorize-web-app.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

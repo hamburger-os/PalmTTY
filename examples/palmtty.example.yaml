@@ -32,8 +32,17 @@ sessions:
 # Optional independently managed official VS Code Web / DeepSeek Harness links.
 # URLs must use HTTPS (or loopback HTTP) and must NOT contain connection tokens.
 # integrations:
-#   vscodeWeb: https://code.example.test/
-#   harness: https://harness.example.test/
+#   vscodeWeb:
+#     mode: managed
+#     autoStart: false # personal opt-in; install official VS Code and accept its terms first
+#     port: 8000
+#     url: https://code.example.test/
+#   harness:
+#     mode: managed
+#     autoStart: true
+#     port: 3080
+#     url: https://harness.example.test/
+# External alternative: harness: { mode: external, url: https://harness.example.test/ }
 
 # Optional high-quality local novel reader. Start the separate Python sidecar,
 # configure PALMTTY_QWEN_TOKEN in both its environment and the Agent's env-file,

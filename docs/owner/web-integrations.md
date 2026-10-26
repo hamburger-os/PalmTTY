@@ -1,30 +1,52 @@
-# 官方 VS Code Web 与 Harness 的独立 Web 入口
+# 独立 Web 应用、受管启动与页内嵌入
 
-## 管理边界
+## 单一配置与边界
 
-PalmTTY 首页固定展示微软官方 **VS Code Web（`code serve-web`）**和 DeepSeek Harness；它们不创建新的 Workspace 或 Terminal Session 类型。Web 应用身份、状态定义于 `@palmtty/protocol`，Agent 提供认证状态 API，浏览器只展示状态和安全入口。
+`integrations.vscodeWeb` 和 `integrations.harness` 可缺省（禁用），或明确选择：
 
-- **VS Code Web**：仅发现主机上官方 `code` CLI（Windows 用户级/系统级安装目录与 PATH，Linux 常见目录与 PATH），以及部署者配置的 `integrations.vscodeWeb`。微软官方 VS Code Server 许可不允许将其作为托管服务。PalmTTY Agent 不自动安装、不作为 Agent 子进程启动、不停止官方 Server，也不冒认未知端口进程。源码 checkout 提供明确由当前用户在交互式终端执行的 `pnpm start:with-vscode` 前台联合启动器；它与 Agent Web API、系统自启无关，只负责这次自己创建的官方 CLI 子进程。部署者需在符合许可的交互式用户会话中独立运行 `code serve-web`。配置 URL 或发现 CLI 不能证明 Web 服务正在运行。
-- **Harness**：先复用已知 CLI，否则在用户隔离目录用 npm 安装锁定 `@deepseek-ai/dsh@0.2.1-rc.2`。Windows/Linux 安装包捆绑官方 Node 24/npm，源码部署则需要系统 npm 和 Registry 访问。用随机回环端口启动自有子进程；先在临时同卷目录完成 npm 安装，校验包名、版本及入口后再发布到正式目录。错误状态不会被轮询抹除；只有重试触发新的安装/启动。监听自有子进程关闭，关闭 Agent 时只终止自有进程并有界等待，未知 PID 或第三方进程绝不可被清理。
+- `managed`：本机固定 IPv4 回环端口、默认关闭的 `autoStart` 与可选独立根 URL。显式开启后由 Agent 监听就绪时启动，网页登录/轮询不触发部署。
+- `external`：仅保存独立 URL；不安装、启动或停止本机程序，不将外部入口与本机状态混用。
 
-`GET /api/v1/integrations` 需登录且 no-store，`POST /api/v1/integrations/:id/ensure` 还需精确 Origin 校验，且只接受协议中定义的应用 ID。`vscodeWeb` 的 ensure 仅重新发现官方 CLI；`harness` 的 ensure 可触发有界安装/启动，不接受任何客户端提供的路径、端口、版本或命令。
+旧字符串直接拒绝，删除前台联合启动器，不维护兼容路径。身份/状态只定义于协议包，配置只定义于 config 包；Code/Harness 不变成 Workspace/Terminal Session 类型。
 
-## 用户显式前台联合启动
+官方 Code 由操作者自行安装；个人启动由本机配置显式选择，网页不能提交命令、版本或路径。PalmTTY 不捆绑微软二进制、不自动接受许可、不关闭连接令牌。官方 tunnel service 与 Server 托管限制是不同问题，不再笼统宣称所有后台运行都被禁止，也不保证私人用法获得许可；参照 standards/vscode-web.md，不引入 Azure Tunnel。
 
-`pnpm build` 后，在拥有官方 VS Code 安装且已配置 PalmTTY Token 的用户交互式终端中执行 `pnpm start:with-vscode`。它在启动任何进程前检查 Agent 构建文件、配置和官方 `code` CLI，不允许通过非交互式 TTY 启动，不自动接受微软许可。官方 Web 使用 `--host 127.0.0.1`、配置中的回环端口（否则 8000）；使用官方生成/要求的连接令牌，不传递 `PALMTTY_*` 或 PalmTTY bootstrap Token 环境变量。Agent 仍由原本入口启动，关闭联合启动器时只停止本次创建的官方 CLI 子树与 Agent 主进程，不接管未知 PID；Windows Agent 不能使用 `taskkill /T` 误杀有意独立持久的 Session Worker。Windows `code.cmd` 通过已转义的 PowerShell 命令在当前用户控制台执行；Linux 启动真实 `code` 可执行程序。
+Harness 只执行已校验固定 `@deepseek-ai/dsh@0.2.1-rc.2` 私有安装，不执行未校验全局入口。安装先 staging 后发布；输出保留有界但不因普通输出多杀掉安装器。区分安装超时与启动超时，失败保持可见、重试显式触发。
 
-`pnpm start` 仍然只启动 Agent；发行版 `palmtty service` 和源码 `pnpm autostart` 仍然只启动 Agent。微软官方许可限制以微软文档为准；这个助手不把 VS Code 服务器作为 PalmTTY 内嵌发行产品提供。上述联合脚本是用户明确发起的前台辅助工具，不是无人值守服务模式。Windows 实机子进程树清理与首次许可证提示需验证。
+## 进程所有权
 
-## 安全边界
+应用/安装器使用私有管道租约：Windows 在恢复执行前加入不可 breakaway 的 kill-on-close Job，POSIX 使用租约监督器与工作负载进程组。包装进程先退出也清理后代；Agent 强停导致租约断开。Terminal Worker 继续独立持久，不能对 Agent 树形全杀，也不能凭端口或持久 PID 接管未知程序。
 
-官方 VS Code Web 与 Harness Web 分别拥有独立浏览器 Origin、认证与工作区；第三方 JavaScript 绝不能通过 PalmTTY 已登录的同源路径反代。外部访问 URL 只允许无凭据、无查询字符串和片段的 HTTPS（本机回环 HTTP 例外），不代表远程访问已安全就绪。
+Agent 正常 SIGINT/SIGTERM 调用 app.close；Windows Task Scheduler 强停由独立租约/Job 兜底，不能假设 Unix 信号语义。
 
-DSH 官方 Web 首次登录会使用自己的临时进程令牌 URL，仅向 `local` 暴露模式下受认证的同机浏览器返回；远端 LAN/NAS 不接收该 URL。PalmTTY 不持久化、记录或复用上游令牌，不共享自己的认证 Cookie。VS Code Web 固定监听 Agent 主机的 `127.0.0.1`：同机 HTTPS 反向代理可以代理它；另一台机器上的 NAS 无法直接连接这段 loopback。跨主机必须另建受保护的隧道到该主机回环，不能为方便而直接暴露无 TLS 的 Web 服务器到公网。
+## 页内展示与首次授权
 
-独立 HTTPS 代理下的 DSH 必须由部署者正确配置上游 `--public-url`、`--trusted-host`、WebSocket 与认证；当前本机自动启动模式不自动建立手机访问路径。
+三个同站、不同主机名的 HTTPS 入口保持独立 Origin 与 host-only Cookie；不同端口不能隔离 Cookie。浏览器直接 iframe 加载，PalmTTY 不代理第三方 HTML、不读取其 DOM。首次访问挂载，切换保留；隐藏终端不传播尺寸变化。主题只统一外框/导航/动作，内部主题由上游管理。
 
-## 验收与局限
+目录与 iframe src 只含无凭据根 URL。本机无域名阶段可显式运行 `pnpm app:authorize <vscodeWeb|harness>`，仅在交互终端显示私有首次登录地址；它从直接本机接口认证，代理请求不能冒认本机操作者，此项不进入默认日志。首次授权是单独认证 + 精确 Origin POST，仅把自有实例的上游引导 URL 交给操作者打开的独立标签页；远端目标只能是配置的独立 HTTPS 根，不能是回环或请求参数。响应 no-store/no-referrer，凭据不进入存储、日志或目录。这是明确的上游凭据交接，不是共享 PalmTTY 登录。第三方仍独立校验自己的 Cookie、Host、Origin、HTTP/WebSocket 权限。
 
-仍需实机验证 Windows/Linux 官方 CLI 检测、微软服务器交互式启动与登录、浏览器扩展（包括 Codex）、手机 HTTPS、DSH 首次在线安装与长期登录、Windows 子进程树清理。现有 CI/打包 Smoke 不能代替这些跨网络测试。绝不将“检测到 VS Code”写作“官方 Web Server 已成功启动”。
+同站子域有助于 SameSite Cookie，但上游 frame 限制、OAuth 回调、HTTP/WebSocket 与 iOS Safari 必须实测；独立打开始终保留。
 
-Workspace V4 仅有 Workspace 与 Terminal Profile；不恢复已取消的 Remote App/WebRTC/RDP，也不引入旧配置键兼容。旧 V3 必须关闭 Agent 后备份、构建协议包并使用 `node scripts/migrate-workspaces-v4.mjs --from <v3-file> --to <v4-file>` 显式离线转换。
+## 部署与验收
+
+源码 `pnpm deploy:local [--config <path>] [--env-file <path>]` 完成冻结依赖安装、构建、预检、当前用户自启注册和受管应用检查；Windows 无参数复用既有安装路径。发行版继续使用 bundled Node/npm 与 `palmtty service`。DNS、TLS、NAS 规则首次独立配置。
+
+NAS 不能直接连接另一主机回环：由主机独立 HTTPS 代理接入固定回环端口，参考 `examples/web-apps.Caddyfile`；禁止同源反代或代理记录引导查询串。显式运行 `scripts/cleanup-code-web.ps1` 仅清理当前用户官方 serve-web Node 树中的旧直接启动残留。
+
+本机就绪不等于远程设备可用。分别验收首次授权、iframe、HTTP API、WebSocket、切换不重连终端、正常/强停端口释放与独立 Worker 存活。
+
+## 工作区入口与内网 HTTPS
+
+删除全局三按钮导航。Code 位于工作区附件右侧，通过 URL folder 参数打开持久化主机 cwd；不重启全局 Code 服务，不把路径传给 Session 创建。Windows Code 不猜测 WSL 路径映射。终端保持 mounted，隐藏时停止几何传播；Code 仅在首次进入时挂载，保留当前工作区 iframe，不无限缓存历史工作区。Harness 从首页卡片进入，单一返回动作回到首页。已运行但缺入口时提示配置，不显示安装重试。
+
+可选 `server.privateGateway` 仅支持 Windows x64，包含具体内网 `listenHost` 和现有私有 `upstreamDns`。它要求 reverseProxy 监听 127.0.0.1、一个 PalmTTY HTTPS Origin 和两个受管应用 HTTPS 根 URL；三个不同同级主机名位于同一 `.home.arpa` 父域，统一 443。名称仅从现有 URL 派生，不另存域名列表。
+
+部署校验固定官方 Caddy/CoreDNS 归档哈希，Agent 使用同一进程租约管理它们。代理与 DNS 只绑定指定内网地址；拒绝公共来源，DNS 转发并发有界且不记录查询。私有 CA 保持当前用户数据目录，续签由 Caddy 管理。首次信任和防火墙操作由操作者明确完成；不自动改系统信任、不提权。服务意外退出会关闭 Agent 自有服务，独立 Terminal Worker 不受影响。
+
+WireGuard 客户端 DNS 指向该主机，信任导出的公有根证书，再访问三个 HTTPS 名称。父页 HTTP 会使 HTTPS 子框架失去安全上下文，故不能继续用 IP HTTP 作为内嵌入口。上游首次授权仍独立；真实浏览器登录、API、WebSocket 和 webview 验收不可用端口就绪替代。
+
+## 收尾验收
+
+操作者已确认手机通过私有 HTTPS/WireGuard 可以访问 Code 与 Harness；第三方小屏体验有限，终端继续作为主要工作流，两款应用保留可选入口。不把一般可用性确认扩展为所有扩展、OAuth 或输入法组合均已验收。
+
+网关首次启动失败也必须显式关闭 Agent 并设置非零退出，不能依赖 Fastify 忽略的 onListen 异常；运行时失败共用同一回收路径，独立 Worker 保留。部署与本机授权共用 HTTPS 请求器：连接本机地址、按首个配置 Origin 验证名称，并以配置证书链建立本地显式信任；响应有界，证书错误立即失败，不关闭校验或修改全局信任。

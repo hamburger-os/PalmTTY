@@ -141,11 +141,6 @@ Git 已完成从只读 status/diff 到受控 Source Control 工作台，并补�
 PalmTTY 源码与发行版本统一迁移至 Node 24 LTS：CI 使用 `.node-version`，Windows/Linux 原生构建、类型定义与发行包一致。此阶段不开发 Harness 自动安装管理，也不改变 VS Code Web/Harness 外部入口架构。
 
 
-## 2026-10 Web 应用可见性与有界管理
+## 2026-10 独立应用受管启动与内嵌
 
-已实现两款工具状态入口；Harness 可以复用已有 CLI 或尝试经主机 npm 在当前用户目录安装固定版本并启动回环 Web 服务；已恢复官方 VS Code Web `code` CLI 检测与外部 URL，仅允许用户交互式启动，不自动将微软 VS Code Server 作为后台服务；Harness 失败状态不被轮询擦除，并提前注册启动进程退出监听。下一阶段仍需解决 NAS 上不同浏览器 Origin 的安全远程 HTTPS 访问、Windows 实机软件发现范围与 Harness 安装网络可用性。未经实测不能把「安装并启动」解释为「手机已能打开」。
-
-
-### 用户交互式 VS Code Web 可选前台联合启动（2026-10-25）
-
-增加源码部署的显式 `pnpm start:with-vscode`，只在当前用户 TTY 联合启动 Agent 与微软官方 `code serve-web`。不改变 `pnpm start`、用户服务、自启动和二进制发行包，不下载/打包微软 Server。仅检测到官方 CLI 并以用户许可交互方式启动本次前台进程；Web 仅监听 127.0.0.1，默认 8000，上游登录令牌仍有效。手机跨设备 HTTPS、插件运行和 Windows 实机进程树清理不宣称完成。
+已实现单一 managed/external 配置、本机显式 autoStart、Code/Harness 独立进程容器、固定私有 Harness 安装、独立 Origin iframe、显式首次授权、一键源码部署与共享卡片/动作几何。旧 URL 字符串和前台联合启动器已移除。当前主机先使用回环 8000/3080；独立域名尚未准备，手机 HTTPS、首次认证及 WebSocket 内嵌链路不能标记已完成，真实 iOS 键盘/长时行为仍待验收。
