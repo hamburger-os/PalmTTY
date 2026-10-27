@@ -112,9 +112,9 @@ PTY 输出、headless mirror、seq 与 replay 都在 Worker 内按同一有序�
 
 ### External Web applications / 独立 Web 应用
 
-Explicit managed/external configuration owns lifecycle separately from Workspace/Terminal authority. Code binaries are separately installed; personal opt-in startup preserves upstream licensing/authentication. Harness uses verified pinned private installation. Independent-page navigation and explicit authenticated authorization handoff are documented in [Web integrations](web-integrations.md). No same-Origin proxy or Azure tunnel is provided.
+Explicit managed/external configuration owns lifecycle separately from Workspace/Terminal authority. Code binaries are separately installed; personal opt-in startup preserves upstream licensing/authentication. Harness reuses its official installed runtime and upstream history under cross-process single-writer ownership. Independent-page navigation and explicit authenticated authorization handoff are documented in [Web integrations](web-integrations.md). No same-Origin proxy or Azure tunnel is provided.
 
-本机明确配置应用生命周期，与 Workspace/Terminal 权限分离；官方 Code 自行安装并明确选择个人启动，Harness 校验固定私有安装。内嵌保持独立 Origin，首次授权单独认证交接，不提供同源反代或 Azure 隧道。
+本机明确配置应用生命周期，与 Workspace/Terminal 权限分离；官方 Code 自行安装并明确选择个人启动，Harness 复用已安装官方运行时及上游历史，保留跨进程单写锁。独立页面保持独立 Origin，首次授权单独认证交接，不提供同源反代或 Azure 隧道。
 
 ### Mobile recovery and browser read-aloud (October 2026)
 
@@ -200,9 +200,9 @@ Files 通过单一 GFM 解析/净化流水线展示常用安全 HTML 排版、�
 
 ### Independent application lifecycle / 独立应用生命周期
 
-Managed applications start from the Agent listening event only when host configuration opts in. External entries never launch locally. App/installer pipe leases own non-breakaway Windows Jobs or POSIX workload groups, separate from durable Terminal Workers. Catalogue reads are side-effect free; independent pages keep their own authentication. Explicit authorization handoff is bounded to derived managed IP roots or configured external roots, not shared credentials or a same-Origin proxy. See [web-integrations.md](web-integrations.md).
+Managed applications start from the Agent listening event only when host configuration opts in. External entries never launch locally. App pipe leases own non-breakaway Windows Jobs or POSIX workload groups, separate from durable Terminal Workers. Catalogue reads are side-effect free; independent pages keep their own authentication. Explicit authorization handoff is bounded to derived managed IP roots or configured external roots, not shared credentials or a same-Origin proxy. See [web-integrations.md](web-integrations.md).
 
-受管应用在 Agent 启动时按配置运行，外部模式不触发安装。应用/安装器租约与持久终端 Worker 分离；目录只读、应用在独立页面打开，首次授权显式交接到派生的受管 IP 入口，不共享凭据或同源反代。源码一键部署和本机显式授权分别使用 `pnpm deploy:local`、`pnpm app:authorize`。
+受管应用在 Agent 启动时按配置运行，外部模式不触发安装。应用租约与持久终端 Worker 分离；目录只读、应用在独立页面打开，首次授权显式交接到派生的受管 IP 入口，不共享凭据或同源反代。源码一键部署和本机显式授权分别使用 `pnpm deploy:local`、`pnpm app:authorize`。
 
 ## Private IP workbench / 私有 IP 工作台
 

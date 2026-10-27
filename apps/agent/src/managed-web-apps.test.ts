@@ -1,21 +1,23 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { spawnOwnedProcess } from "./owned-process.js";
-import os from "node:os";
-import path from "node:path";
-import { afterEach, expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { parseConfig } from "@palmtty/config";
 import { WEB_APP_IDS } from "@palmtty/protocol";
-import { ManagedWebApps, HARNESS_PIN, isPinnedHarnessPackage, parseHarnessReadyUrl } from "./managed-web-apps.js";
+import { ManagedWebApps, parseHarnessReadyUrl, thirdPartyEnvironment } from "./managed-web-apps.js";
 
-const roots: string[] = [];
-afterEach(async () => {
-  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
+it("preserves upstream shared data selection without handing PalmTTY credentials to the application", () => {
+  vi.stubEnv("DSH_HOME", "shared-harness-fixture");
+  vi.stubEnv("PALMTTY_ACCESS_TOKEN", "private-fixture");
+  vi.stubEnv("CUSTOM_ACCESS_TOKEN", "custom-private-fixture");
+  try {
+    const env = thirdPartyEnvironment("CUSTOM_ACCESS_TOKEN");
+    expect(env.DSH_HOME).toBe("shared-harness-fixture");
+    expect(env.PALMTTY_ACCESS_TOKEN).toBeUndefined();
+    expect(env.CUSTOM_ACCESS_TOKEN).toBeUndefined();
+  } finally { vi.unstubAllEnvs(); }
 });
 
 it("always returns two managed app identities without startup side effects", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-managed-"));
-  roots.push(root);
-  const mgr = new ManagedWebApps(parseConfig({}), root);
+  const mgr = new ManagedWebApps(parseConfig({}));
   const result = await mgr.catalog(false);
   expect(Object.keys(result.apps).sort()).toEqual([...WEB_APP_IDS].sort());
   expect(result.apps.harness.accessUrl).toBeUndefined();
@@ -26,14 +28,12 @@ it("always returns two managed app identities without startup side effects", asy
 });
 
 it("never exposes configured loopback links to remote clients", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-managed-"));
-  roots.push(root);
   const mgr = new ManagedWebApps(parseConfig({
     integrations: {
       vscodeWeb: { mode: "external", url: "http://127.0.0.1:8000/" },
       harness: { mode: "external", url: "http://127.0.0.1:3080/" }
     }
-  }), root);
+  }));
   const remote = await mgr.catalog(false);
   expect(remote.apps.vscodeWeb.accessUrl).toBeUndefined();
   expect(remote.apps.harness.accessUrl).toBeUndefined();
@@ -41,10 +41,6 @@ it("never exposes configured loopback links to remote clients", async () => {
   expect(local.apps.vscodeWeb.accessUrl).toBe("http://127.0.0.1:8000/");
   expect(local.apps.harness.accessUrl).toBe("http://127.0.0.1:3080/");
   await mgr.close();
-});
-
-it("uses one pinned Harness package version and rejects request-controlled versions", () => {
-  expect(HARNESS_PIN).toMatch(/^\d+\.\d+\.\d+-rc\.\d+$/);
 });
 
 // Only the official readiness line establishes that DSH booted its Web UI.
@@ -64,26 +60,23 @@ it("requires the official DSH readiness announcement", () => {
     .toBe("http://127.0.0.1:3080/?token=one-time");
 });
 
-it("does not hide an install failure when a partial Harness CLI appears", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-managed-"));
-  roots.push(root);
-  const mgr = new ManagedWebApps(parseConfig({ integrations: { harness: { mode: "managed" } } }), root);
-  const internal = mgr as unknown as { states: { harness: { phase: string; detail?: string } } };
-  internal.states.harness.phase = "failed";
-  internal.states.harness.detail = "install_failed";
-  const bin = path.join(root, "harness", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js");
-  await mkdir(path.dirname(bin), { recursive: true });
-  await writeFile(bin, "incomplete installation");
-  const state = (await mgr.catalog(false)).apps.harness;
-  expect(state.phase).toBe("failed");
-  expect(state.detail).toBe("install_failed");
+it("fails visibly without starting a process when the operator CLI is missing", async () => {
+  const mgr=new ManagedWebApps(parseConfig({integrations:{harness:{mode:"managed"}}}),{harness:async()=>undefined,vscodeWeb:async()=>undefined});
+  await mgr.ensure("harness");
+  expect((await mgr.catalog(false)).apps.harness).toMatchObject({phase:"failed",detail:"harness_not_detected"});
+  await mgr.close();
+});
+
+it("does not hide a startup failure when the installed CLI becomes discoverable", async () => {
+  let present=false;
+  const mgr=new ManagedWebApps(parseConfig({integrations:{harness:{mode:"managed"}}}),{harness:async()=>present?"installed-cli":undefined,vscodeWeb:async()=>undefined});
+  await mgr.ensure("harness");present=true;
+  expect((await mgr.catalog(false)).apps.harness).toMatchObject({phase:"failed",detail:"harness_not_detected"});
   await mgr.close();
 });
 
 it("terminates an owned Harness child and returns from close", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-managed-"));
-  roots.push(root);
-  const mgr = new ManagedWebApps(parseConfig({}), root);
+  const mgr = new ManagedWebApps(parseConfig({}));
   const child = spawnOwnedProcess({ executable: process.execPath, args: ["-e", "setInterval(() => {}, 1000)"], cwd: process.cwd(), env: process.env });
   const internal = mgr as unknown as { states: { harness: { process: typeof child } } };
   internal.states.harness.process = child;
@@ -91,26 +84,8 @@ it("terminates an owned Harness child and returns from close", async () => {
   expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
 });
 
-it("rejects wrong-version or half-installed managed Harness packages", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-managed-"));
-  roots.push(root);
-  const prefix = path.join(root, "harness");
-  const pkg = path.join(prefix, "node_modules", "@deepseek-ai", "dsh");
-  await mkdir(path.join(pkg, "lib"), { recursive: true });
-  await writeFile(path.join(pkg, "lib", "bin.js"), "entry");
-  expect(await isPinnedHarnessPackage(prefix)).toBe(false);
-  await writeFile(path.join(pkg, "package.json"),
-    JSON.stringify({ name: "@deepseek-ai/dsh", version: "0.0.0" }));
-  expect(await isPinnedHarnessPackage(prefix)).toBe(false);
-  await writeFile(path.join(pkg, "package.json"),
-    JSON.stringify({ name: "@deepseek-ai/dsh", version: HARNESS_PIN }));
-  expect(await isPinnedHarnessPackage(prefix)).toBe(true);
-});
-
-
 it("external mode never installs or starts a local application", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "palmtty-external-")); roots.push(root);
-  const mgr = new ManagedWebApps(parseConfig({ integrations: { harness: { mode: "external", url: "https://harness.example.test/" } } }), root);
+  const mgr = new ManagedWebApps(parseConfig({ integrations: { harness: { mode: "external", url: "https://harness.example.test/" } } }));
   mgr.start(); await mgr.ensure("harness");
   const status = (await mgr.catalog(false)).apps.harness;
   expect(status.phase).toBe("external"); expect(status.canEnsure).toBe(false);

@@ -7,7 +7,7 @@ export const WS_SUBPROTOCOL = "palmtty.v4";
 export const WEB_APP_IDS = ["vscodeWeb", "harness"] as const;
 export type WebAppId = (typeof WEB_APP_IDS)[number];
 export type WebAppPhase =
-  | "detecting" | "not_installed" | "installed" | "installing"
+  | "detecting" | "not_installed" | "installed"
   | "starting" | "running" | "external" | "disabled" | "failed";
 export type WebAppStatus = {
   id: WebAppId;

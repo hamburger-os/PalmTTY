@@ -149,9 +149,9 @@ PalmTTY does not downgrade browser terminal protocol v4. To protect already-runn
 
 ### Managed application handoff / 受管应用授权交接
 
-Host configuration explicitly chooses managed/external ownership. Code requires a separately installed official CLI and personal opt-in; no silent license acceptance or token bypass. Private leases reclaim only owned application/installer trees, preserving independent Terminal Workers. Independent-page navigation never grants same-Origin PalmTTY access. Catalogue/rendered link URLs contain no bootstrap token; only authenticated exact-Origin explicit authorization can hand the owned instance to its derived managed IP entry. Direct local operator traffic is distinguished from forwarded browser traffic; `pnpm app:authorize` may display a private URL only in an explicitly invoked interactive terminal. Ordinary logs/storage/argv remain secret-free. No claim of universal Microsoft TTY requirements or blanket permission for service hosting is made.
+Host configuration explicitly chooses managed/external ownership. Code requires a separately installed official CLI and personal opt-in; no silent license acceptance or token bypass. Private leases reclaim only owned application trees, preserving independent Terminal Workers. Independent-page navigation never grants same-Origin PalmTTY access. Catalogue/rendered link URLs contain no bootstrap token; only authenticated exact-Origin explicit authorization can hand the owned instance to its derived managed IP entry. Direct local operator traffic is distinguished from forwarded browser traffic; `pnpm app:authorize` may display a private URL only in an explicitly invoked interactive terminal. Ordinary logs/storage/argv remain secret-free. No claim of universal Microsoft TTY requirements or blanket permission for service hosting is made.
 
-本机配置明确应用管理方式，官方 Code 个人启动显式选择，不静默接受许可或关闭令牌。私有进程租约仅回收自有应用/安装器，保留独立终端 Worker。独立页面保持独立 Origin，目录/href 不带秘密；首次授权需认证和精确 Origin，只交接到派生的受管 IP 入口。本机操作者请求与代理请求分开；仅显式交互授权命令可显示私有 URL，普通日志、存储与 argv 不保存凭据。
+本机配置明确应用管理方式，官方 Code 个人启动显式选择，不静默接受许可或关闭令牌。私有进程租约仅回收自有应用，保留独立终端 Worker。独立页面保持独立 Origin，目录/href 不带秘密；首次授权需认证和精确 Origin，只交接到派生的受管 IP 入口。本机操作者请求与代理请求分开；仅显式交互授权命令可显示私有 URL，普通日志、存储与 argv 不保存凭据。
 
 ## Private IP workbench / 私有 IP 工作台
 

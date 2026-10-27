@@ -145,7 +145,7 @@ pnpm autostart uninstall
 
 `pnpm deploy:local [--config <path>] [--env-file <path>]` installs frozen dependencies, builds, preflights and registers current-user startup before checking configured autoStart apps. Windows can reuse an existing installation with no options. Use explicit managed/external objects from [Web integrations](web-integrations.md), not URL strings. Local ports default to Code 8000 and Harness 3080; a phone cannot reach the host through its own loopback. DNS/TLS/NAS requires separate first-time setup. Explicit interactive `pnpm app:authorize <vscodeWeb|harness>` displays the private local first-sign-in URL; do not record/share it.
 
-上述命令完成本机构建、预检、自启和就绪检查，Windows 无参数复用安装路径；应用采用明确对象配置。Code/Harness 默认回环端口为 8000/3080，手机 HTTPS 域名与代理首次单独配置。本机明确执行交互授权命令可获取私有首次登录地址，勿记录或分享。自启不表示 OS 重启后旧终端存活。
+上述命令完成本机构建、预检、自启和就绪检查，Windows 无参数复用安装路径；应用采用明确对象配置。Code/Harness 默认回环端口为 8000/3080，远程入口可选使用单一内网 IP 网关。本机明确执行交互授权命令可获取私有首次登录地址，勿记录或分享。自启不表示 OS 重启后旧终端存活。
 
 
 ### Reverse proxy to private VPN HTTP / 反代切换到 VPN 内网 HTTP
@@ -165,3 +165,7 @@ Managed Code/Harness use independent IP entries derived from one Windows LAN gat
 Owned services start once on the native listening event. A required gateway bootstrap failure closes the Agent with nonzero exit status, while durable Terminal Workers survive. Deployment and interactive authorization share a bounded local client: direct HTTPS uses the configured Origin as its TLS identity, connects to the local listener and explicitly trusts the configured certificate chain, allowing a partial chain without disabling certificate or hostname verification. TLS validation errors fail immediately; no global trust changes are made.
 
 自有服务绑定原生 listening 事件并只启动一次；必要网关启动失败会关闭 Agent 并设置失败退出码，独立终端 Worker 保留。部署与交互授权共用有界本机客户端：直接 HTTPS 连接本机监听地址，按配置 Origin 验证 TLS 身份，以配置证书链建立显式本地信任；允许部分链但不关闭证书与主机名校验。证书错误立即失败，不修改全局信任。
+
+**Harness runtime / Harness 运行时：** Windows reuses the installed official Desktop public CLI; POSIX requires an operator-installed official dsh. No duplicate download or bundled npm. Desktop/Web share DSH_HOME history with sequential single-writer handoff. Stop the PalmTTY startup task before upgrading Desktop, then redeploy; see [Web integrations](web-integrations.md).
+
+Windows 复用已安装官方桌面版公开 CLI；POSIX 需自行安装官方 dsh。不下载副本、不捆绑 npm。桌面与网页共用 DSH_HOME 历史，遵守单写锁轮流接续；升级桌面版前停止 PalmTTY 自启任务，升级后重新部署，详见上文集成说明。

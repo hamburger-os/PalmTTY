@@ -340,3 +340,5 @@ export function lanAgentUrls(
 }
 
 export { findOfficialVSCodeCli, officialVSCodeCliCandidates } from "./vscode-cli.js";
+
+export { findOfficialHarnessCli } from "./harness-cli.js";

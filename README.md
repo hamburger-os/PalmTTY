@@ -20,7 +20,7 @@ Mobile-first · self-hosted · Windows-first · Host + WSL runtimes · xterm.js
 
 PalmTTY is a self-hosted remote development workbench centered on durable Terminal Sessions, workspace Git/Files/Artifacts, and optional independent links to official VS Code Web and DeepSeek Harness. Codex/Claude/Pi CLIs remain ordinary terminal workloads.
 
-PalmTTY 是一个面向远程设备、针对移动端优化的自托管远程开发工作台。Windows Host、WSL、Linux Host 使用独立持久的 Terminal Worker；Git/Files/Artifacts 保持工作区工具。微软官方 VS Code Web 与 DeepSeek Harness 可按本机明确配置独立管理；Harness 在当前用户目录安装固定版本。两款应用都使用独立认证与 Web Origin。Codex CLI 仍是终端启动命令。
+PalmTTY 是一个面向远程设备、针对移动端优化的自托管远程开发工作台。Windows Host、WSL、Linux Host 使用独立持久的 Terminal Worker；Git/Files/Artifacts 保持工作区工具。微软官方 VS Code Web 与 DeepSeek Harness 可按本机明确配置独立管理；Harness 复用已安装的官方桌面版（Windows）或官方 CLI（POSIX），共享其会话历史。两款应用都使用独立认证与 Web Origin。Codex CLI 仍是终端启动命令。
 
 ## Terminal touch controls / 手机终端触摸控制
 
@@ -62,7 +62,7 @@ PalmTTY is intentionally narrower than a browser IDE:
 
 ## Managed Web applications / 独立 Web 应用
 
-Code and Harness have explicit `managed` / `external` configuration and independent authentication. Managed apps start with the Agent only when host autoStart is enabled; external entries never install locally. Official Code must be separately installed and its applicable terms reviewed; PalmTTY does not accept them automatically or disable token protection.
+Code and Harness have explicit `managed` / `external` configuration and independent authentication. Managed apps start with the Agent only when host autoStart is enabled; external entries never install locally. Harness reuses the official Desktop public CLI on Windows (operator-installed dsh on POSIX), preserving shared history and sequential session ownership. Official Code must be separately installed and its applicable terms reviewed; PalmTTY does not accept them automatically or disable token protection.
 
 ```yaml
 integrations:
@@ -72,7 +72,7 @@ integrations:
 
 Local defaults are `127.0.0.1:8000` and `127.0.0.1:3080`. The optional LAN gateway derives managed application IP entries from one address and ports, without private DNS or duplicated managed URLs. Code uses trusted HTTPS for secure-context features; Harness uses private HTTP. Both open independently with explicit sign-in handoff; catalogue/rendered links contain no bootstrap secrets. See [Web integrations](docs/community/web-integrations.md) and [proxy template](examples/web-apps.Caddyfile).
 
-中文：本机个人启动由配置明确选择，默认关闭；Harness 固定私有安装，受管应用有独立进程容器，停止 Agent 回收应用但保留终端 Worker。Code 从工作区附件右侧进入并打开当前主机目录；Harness 从首页卡片进入。首次单独授权，远程设备不能使用开发主机回环地址。源码一键部署使用 `pnpm deploy:local`，可选内网 IP 网关，无需私有 DNS；PalmTTY/Harness 使用 HTTP，Code 使用可信 IP HTTPS。已有根信任可复用。
+中文：本机个人启动由配置明确选择，默认关闭；Harness 不再下载副本，Windows 复用桌面版，历史按上游单写锁轮流接续；受管应用有独立进程容器，停止 Agent 回收应用但保留终端 Worker。Code 从工作区附件右侧进入并打开当前主机目录；Harness 从首页卡片进入。首次单独授权，远程设备不能使用开发主机回环地址。源码一键部署使用 `pnpm deploy:local`，可选内网 IP 网关，无需私有 DNS；PalmTTY/Harness 使用 HTTP，Code 使用可信 IP HTTPS。已有根信任可复用。
 
 ## Architecture / 架构
 

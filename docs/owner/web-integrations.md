@@ -4,9 +4,15 @@
 
 `integrations.vscodeWeb`、`integrations.harness` 缺省禁用；`managed` 管理固定回环端口、默认关闭的 autoStart；访问 URL 从内网网关派生，`external` 只保存 URL。状态由协议包定义，配置由 config 包定义，不维护旧字符串或联合启动脚本。
 
-受管应用随 Agent 监听就绪后启动，网页登录与目录轮询不安装或启动程序。Code 由操作者另行安装并确认适用条款；不自动接受许可、不关闭令牌、不引入 Azure Tunnel。Harness 使用校验后的固定私有 npm 安装，先 staging 再发布，输出有界，区分安装与启动超时：安装最多 10 分钟，Code 启动 75 秒、Harness profile 冷启动最多 180 秒。主机负载下已观察到 Harness 75 秒超时而同配置随后可就绪；延长只针对其有界启动阶段，不放宽认证或就绪来源。
+受管应用随 Agent 监听就绪后启动，网页登录与目录轮询不安装或启动程序。Code 由操作者另行安装并确认适用条款；不自动接受许可、不关闭令牌、不引入 Azure Tunnel。Windows Harness 复用当前用户官方桌面版公开的 `resources/runtime/cli/bin/dsh.cmd`，由桌面版提供 Electron/Node 与 ASAR；POSIX 识别操作者安装的官方 `@deepseek-ai/dsh` CLI。缺失时明确提示，不下载、不回退私有副本。Code 启动 75 秒、Harness profile 冷启动最多 180 秒，输出有界。
 
-应用/安装器通过私有管道租约管理。Windows 使用不可 breakaway 的 kill-on-close Job，POSIX 使用工作负载进程组；Agent 正常或强停回收自有后代。持久 Terminal Worker 的生命周期独立，禁止对 Agent 进程树整体终止或凭端口/PID 接管未知程序。
+应用通过私有管道租约管理。Windows 使用不可 breakaway 的 kill-on-close Job，POSIX 使用工作负载进程组；Agent 正常或强停回收自有后代。持久 Terminal Worker 的生命周期独立，禁止对 Agent 进程树整体终止或凭端口/PID 接管未知程序。
+
+## Harness 安装与共享历史
+
+桌面 GUI 与 Web 是同一安装的两个运行进程，桌面关闭后 Web 仍可自启。PalmTTY 不连接桌面私有 IPC 后端，不修改 ASAR，不复制运行时。桌面升级/卸载由操作者负责；升级前停止 PalmTTY 自启任务以释放自有 Web 进程，再完成桌面升级并运行 `pnpm deploy:local`，不自动终止桌面进程。
+
+保留上游默认 `DSH_HOME`（若明确设置，两端必须一致），桌面 `desktop` 与网页 `web` profile 共用上游会话/历史数据。PalmTTY Workspace/Terminal 仍独立。单一会话遵循上游跨进程单写锁：先在当前端释放会话/停止自有后端，再由另一端接续；只关闭浏览器页面不保证释放锁。不清锁、不强制双写、不承诺运行中跨端同步。旧私有安装仅在新入口验证成功、旧自有进程退出后清理；用户数据与凭据不得随程序副本删除。
 
 ## 页面入口与授权
 

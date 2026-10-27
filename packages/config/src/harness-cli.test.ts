@@ -1,0 +1,31 @@
+import {mkdir,mkdtemp,rm,symlink,writeFile} from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import {afterEach,expect,it} from "vitest";
+import {findOfficialHarnessCli} from "./harness-cli.js";
+const roots:string[]=[];
+afterEach(async()=>{for(const root of roots.splice(0))await rm(root,{recursive:true,force:true});});
+it("uses only the official Desktop command runtime on Windows",async()=>{
+  const root=await mkdtemp(path.join(os.tmpdir(),"palmtty-desktop-"));roots.push(root);
+  const install=path.join(root,"Programs","DeepSeek Harness");
+  const cli=path.join(install,"resources/runtime/cli/bin/dsh.cmd");await mkdir(path.dirname(cli),{recursive:true});
+  const env={LOCALAPPDATA:root,PATH:root};
+  expect(await findOfficialHarnessCli("win32",env,root)).toBeUndefined();
+  await writeFile(cli,'set "ELECTRON_RUN_AS_NODE=1"\n"Desktop.exe" --expose-internals "app.asar/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib\\cli.js" %*');
+  await writeFile(path.join(install,"DeepSeek Harness.exe"),"fixture");await writeFile(path.join(install,"resources/app.asar"),"fixture");
+  expect(await findOfficialHarnessCli("win32",env,root)).toBe(cli);
+  await writeFile(cli,"unrelated wrapper");expect(await findOfficialHarnessCli("win32",env,root)).toBeUndefined();
+});
+it.skipIf(process.platform === "win32")("rejects unrelated POSIX PATH commands and identifies the operator's official package",async()=>{
+  const root=await mkdtemp(path.join(os.tmpdir(),"palmtty-dsh-path-"));roots.push(root);
+  const dir=path.join(root,".local/bin");await mkdir(dir,{recursive:true});
+  await writeFile(path.join(dir,"dsh"),"unrelated");
+  expect(await findOfficialHarnessCli("linux",{PATH:dir},root)).toBeUndefined();
+  await rm(path.join(dir,"dsh"));const pkg=path.join(root,"package");await mkdir(path.join(pkg,"lib"),{recursive:true});
+  const bin=path.join(pkg,"lib/bin.js");await writeFile(bin,"fixture");
+  await symlink(bin,path.join(dir,"dsh"),"file");
+  await writeFile(path.join(pkg,"package.json"),JSON.stringify({name:"unrelated",bin:{dsh:"lib/bin.js"}}));
+  expect(await findOfficialHarnessCli("linux",{PATH:dir},root)).toBeUndefined();
+  await writeFile(path.join(pkg,"package.json"),JSON.stringify({name:"@deepseek-ai/dsh",bin:{dsh:"lib/bin.js"}}));
+  expect(await findOfficialHarnessCli("linux",{PATH:dir},root)).toBe(bin);
+});
