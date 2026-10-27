@@ -1,6 +1,6 @@
 # 当前状态与路线
 
-## 当前阶段：0.2.x Alpha，具备双 Activity 数据面、Agent 重启持久化与可安装发行链
+## 当前阶段：0.3.0 Alpha，独立终端与 Web 应用、Agent 重启持久化及可安装发行链
 
 仓库基础已经包含：
 
@@ -69,19 +69,20 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 
 代码签名凭据仍属于发布运营配置，不应硬编码进仓库；当前流水线已经把 installer 生成与后续 signing boundary 分开，后续可在拥有签名身份时接入 Authenticode，而不需要重构 runtime/package 边界。
 
-## 0.2.0 发布基线
+## 0.3.0 发布准备与迁移边界
 
-- 根 `package.json` 是唯一版本源，当前目标版本为 `0.2.0`；私有 workspace package 继续不重复维护 version；
-- `CHANGELOG.md` 已把本阶段用户可见变化收敛到 `0.2.0`，发布时 `[Unreleased]` 保持为空；
-- `0.1.0` 的旧网络暴露字段升级到 `0.2.0` 时必须显式改写为 `local` / `lan` / `reverseProxy` / `https` profile，不提供兼容迁移层；
-- 0.2.0 发布继续只由 guarded Release Action 执行：锁定 `main` SHA，重新跑质量/安全/许可证/CodeQL/原生发行包 smoke 后再创建 Tag 和 Release；
-- 当前手机实测已经提供正向可用性证据，但未实际验证的平台、浏览器、WSL/Linux 长期路径仍保持为已知验证缺口，不为了发布而虚假关闭。
+- 根 `package.json` 仍是唯一版本源，目标发布版本为 `0.3.0`；私有 workspace package 不保存重复版本号，发行标记只由受保护主分支的 Release Action 创建。
+- `CHANGELOG.md` 已将此次可见变化从 `Unreleased` 收敛进 `0.3.0`，同时明确升级约束。v0.2.0 → v0.3.0 是允许破坏性变化的 alpha 升级，无自动兼容适配。
+- 源码及安装态运行基线统一为 Node 24 LTS。Workspace Store 是 v4-only，既有 v3 数据须停机备份后执行明确的一次性离线转换；不自动加载旧存储。Remote App/WebRTC、旧式应用内嵌和私有 DNS 均已移除。
+- Code/Harness 采用各自独立的认证、生命周期和网络入口；Windows Harness 复用操作者安装的官方 Desktop 公共 CLI，不再复制或下载一套私有安装。可选 Windows 私有 IP 网关绑定具体 IPv4；同 IP 不同端口的 Cookie 主机边界不得当作多租户隔离。
+- 发布前运行 `pnpm check`、`pnpm license:check`、`pnpm release:check -- 0.3.0` 并验证 Windows/Linux 安装态发行包；Release Action 将对锁定提交再次执行所有门禁。
+- 主机端已有来自近期 PR 的 Code/Harness、私有网关和 Worker 持续性验证，但 Codex 扩展、小屏输入、不同宿主环境和长期运行仍保留实机验收缺口，不标记为已全覆盖。
 
 ## 2026-10 架构重构：取消桌面远控
 
-已取消 Remote App/WebRTC 和无人值守 Windows RDP 路线，不保留运行时兼容分支。Workspace Store 升级 V4，仅包含核心 Workspace 与 Terminal Profile；旧 V3 不自动加载。微软官方 VS Code `code serve-web` 作为独立 Web IDE，由部署者在符合许可的交互式用户会话中启动；PalmTTY 只显示官方 CLI 检测与独立外部入口。Harness 作为与 Workspace 平行的独立首页入口。Codex CLI 仍是 Terminal 启动命令。
+已取消 Remote App/WebRTC 和无人值守 Windows RDP 路线，不保留运行时兼容分支。Workspace Store 升级 V4，仅包含核心 Workspace 与 Terminal Profile；旧 V3 不自动加载。微软官方 VS Code `code serve-web` 作为独立 Web IDE，由部署者在符合许可的交互式用户会话中启动；PalmTTY 可按显式 managed/external 配置启动独立 Code 入口，Harness 作为与 Workspace 平行的独立首页入口；两者均不内嵌。Codex CLI 仍是 Terminal 启动命令。
 
-实际产品状态：此前用户曾验证官方 VS Code Web 可以在本机启动并显示项目；当前检测与独立入口已恢复，但 Codex 扩展、手机跨设备 HTTPS、第三方服务生命周期与 Ctrl+C 进程树清理仍待实机验收；不实现 Azure Tunnel、Caddy/VPN 配置、SSO 或通用插件框架。
+实际产品状态：此前用户曾验证官方 VS Code Web 可以在本机启动并显示项目；当前检测与独立入口已恢复，但 Codex 扩展、手机跨设备 HTTPS、第三方服务生命周期与 Ctrl+C 进程树清理仍待实机验收；不实现 Azure Tunnel、通用 VPN 管理、SSO 或通用插件框架；Windows 受限的 Caddy 私有 IP 网关已经实现。
 
 ## 下一阶段优先级
 
@@ -141,6 +142,6 @@ Git 已完成从只读 status/diff 到受控 Source Control 工作台，并补�
 PalmTTY 源码与发行版本统一迁移至 Node 24 LTS：CI 使用 `.node-version`，Windows/Linux 原生构建、类型定义与发行包一致。此阶段不开发 Harness 自动安装管理，也不改变 VS Code Web/Harness 外部入口架构。
 
 
-## 2026-10 独立应用受管启动与内嵌
+## 2026-10 独立应用受管启动与链接
 
 已实现单一 managed/external 配置、显式自启、独立应用容器、复用官方 Harness 桌面安装及共享历史（单写锁轮流接续）、独立页面链接、显式授权、一键部署与共享卡片/动作几何。内嵌及其状态已移除；工作区 Code 打开当前主机目录，Harness 从首页独立打开。统一 IP 方案允许 PalmTTY/Harness HTTP、Code 可信 IP HTTPS；实际手机键盘、扩展和长时上游体验仍需操作者验收。
