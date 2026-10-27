@@ -3,6 +3,15 @@
 
 ## Implemented
 
+### v0.3.0 release candidate (2026-10-27)
+
+- The root `package.json` is the only version authority. The release PR sets it to `0.3.0`; `CHANGELOG.md` contains the complete user-visible `0.3.0` section and an empty `Unreleased` section. Release tags and distributables are not created by a documentation or version commit.
+- Current design: detached Terminal Workers (Agent restart persistence only), bounded workspace Git/Files/Artifacts, Workspace Store v4-only with an explicit offline v3 conversion, Node.js 24 LTS, no Remote App/WebRTC, no application iframe or managed DNS service.
+- Optional Code and Harness use one explicit managed/external configuration and their own independent origins/authentication; managed Code requires an operator-installed official VS Code CLI. On Windows, managed Harness reuses the official Desktop public CLI and upstream state rather than installing a private copy. Backend session history is shared subject to the upstream single-writer lock; simultaneous takeover is unsupported.
+- The optional managed private-IP gateway is Windows x64-only; Code can use trusted IP HTTPS, Harness private HTTP. Shared-IP cookies are a documented trust boundary, not multi-tenant isolation.
+- Review evidence: at the base source SHA `ccd0329d45af2a4470041c4db07267a6b2a56bcd`, push CI (Windows/Ubuntu), production Security Audit and CodeQL passed; the merged Harness Desktop PR #139 had a passing Distribution gate. A release PR must independently pass required checks, then the manual Release workflow re-runs all gates and installed-runtime smoke on its immutable source.
+- Remaining acceptance gaps: not every Code extension, Harness desktop/Web handoff of personal conversations, phone input/IME/browser combination, host deployment, WSL or long-running environment has real-device coverage. OS reboot, sign-out and Worker death do not preserve a live PTY.
+
 ### Node.js 24 LTS runtime baseline (2026-10-25)
 
 - `.node-version` is the exact CI/release security pin; root `engines.node` bounds supported runtime versions within major 24. `@types/node` and frozen pnpm lockfile use major 24.
