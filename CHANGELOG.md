@@ -10,7 +10,7 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ### Added
 
-- Add explicit managed/external Code and Harness configuration, Agent-owned autoStart, pinned Harness installation, independent application links and explicit first-sign-in handoff. Reclaim owned app/installer trees without terminating durable Terminal Workers; unify card/action geometry and add source one-command deployment plus scoped legacy Code cleanup. Old URL strings and the foreground joint launcher are removed.
+- Add explicit managed/external Code and Harness configuration, Agent-owned autoStart, reuse of operator-installed official Harness runtime, independent application links and explicit first-sign-in handoff. Reclaim owned app trees without terminating durable Terminal Workers; unify card/action geometry and add source one-command deployment plus scoped legacy Code cleanup. Old URL strings and the foreground joint launcher are removed.
 - Provide a Windows private IP gateway with one canonical address/port source, pinned Caddy integrity, owned lifecycle and persistent CA. Remove private DNS; derive managed Code HTTPS and Harness HTTP entries, allow either app alone, strip the PalmTTY cookie upstream and document the trusted shared-IP cookie boundary.
 - Provide authenticated, no-store integration-link discovery. External URLs require HTTPS or loopback HTTP and cannot include credentials, query or fragment; managed URLs derive from the gateway and listener ports.
 - Provide an explicit, one-way Workspace v3 → v4 offline conversion command. It uses the canonical Workspace schema, validates records and unique IDs, never overwrites an existing v4 file, and retains the v3 source.
@@ -21,8 +21,8 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 - Use device-neutral workbench branding, replace global application switches with an independent Code action after the four workspace tabs and a Harness home-card link, open Code at the current host workspace folder, and distinguish missing access routes from installation failures.
 
-- Centralize Web-app status in the protocol, validate staged Harness installations before publication, preserve failures across polling, and register owned-child exit before startup readiness.
-- Bundle official Node 24 npm CLI in installed Windows/Linux runtimes for managed Harness provisioning, record its version in the release manifest, include its package components in CycloneDX SBOM, and verify packaged npm execution in native distribution smoke.
+- Centralize Web-app status in the protocol, preserve failures across polling, and register owned-child exit before startup readiness.
+- Reuse the Windows official Harness Desktop public CLI (operator-installed official dsh on POSIX), preserve shared Desktop/Web history with upstream single-writer handoff, and remove duplicate automatic installation, installer status and release npm payload.
 - Upgrade the supported source and bundled release runtime to Node.js 24 LTS, use `.node-version` (24.22.1) as the one CI/Release security baseline, align `@types/node` and frozen lockfile, verify embedded runtime/native PTY on Windows/Linux, and drop Node 22 support.
 - Remove the unreleased Windows Remote App, WebRTC/AppWorker, native capture host and planned unattended RDP diagnostic code paths, package dependencies, UI, CI smoke and release assets. Terminal Session Worker remains the sole runtime activity; Git, Files and Artifacts continue to use their existing scopes.
 - Increment Workspace storage generation to v4 without automatic legacy reads. External third-party Web apps have their own authentication, processes and workspaces; Codex, Pi and other CLI agents remain Terminal workloads.

@@ -57,7 +57,7 @@ PalmTTY Agent
 
 ## 独立 Web 服务入口
 
-Agent 仅按本机 managed/external 配置管理应用：显式 autoStart 在监听后启动，目录轮询无部署副作用；官方 Code 另行安装且个人启动默认关闭，Harness 校验固定私有版本。仅回收自有应用/安装器容器，不接管未知进程，不影响持久 Terminal Worker。目录与独立打开链接仅含无凭据根 URL；首次授权通过认证、精确 Origin、no-store/no-referrer 的显式动作交接到由单一网关配置派生的 IP 入口（Code HTTPS、Harness HTTP），直接本机操作者请求另行识别。第三方始终保留独立认证/工作区，详见 web-integrations.md。
+Agent 仅按本机 managed/external 配置管理应用：显式 autoStart 在监听后启动，目录轮询无部署副作用；官方 Code 另行安装且个人启动默认关闭，Harness 复用已安装官方运行时，不下载副本；Desktop/Web 保留上游历史与单写锁。仅回收自有应用容器，不接管未知进程，不影响持久 Terminal Worker。目录与独立打开链接仅含无凭据根 URL；首次授权通过认证、精确 Origin、no-store/no-referrer 的显式动作交接到由单一网关配置派生的 IP 入口（Code HTTPS、Harness HTTP），直接本机操作者请求另行识别。第三方始终保留独立认证/工作区，详见 web-integrations.md。
 
 ## Terminal runtime
 

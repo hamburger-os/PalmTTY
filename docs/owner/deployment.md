@@ -170,11 +170,11 @@ QNAP 规则的目标协议必须选择其“HTTP + WebSocket”一类组合，�
 
 ## 受管 Web 应用与一键部署
 
-应用采用明确 `managed` / `external` 配置，参见 [web-integrations.md](web-integrations.md)。Code 默认回环 8000、Harness 默认回环 3080，autoStart 默认关闭，操作者明确启用后随 Agent 启动。Code 需自行安装官方 CLI 并确认条款，Harness 用固定私有安装；没有静默接受许可、提权或共享认证。
+应用采用明确 `managed` / `external` 配置，参见 [web-integrations.md](web-integrations.md)。Code 默认回环 8000、Harness 默认回环 3080，autoStart 默认关闭，操作者明确启用后随 Agent 启动。Code 需自行安装官方 CLI 并确认条款，Harness 复用官方桌面版公开 CLI（Windows）或操作者安装的官方 CLI（POSIX）；没有静默接受许可、提权或共享认证。
 
 `pnpm deploy:local [--config <path>] [--env-file <path>]` 完成冻结依赖、构建、预检、自启安装和应用就绪检查；Windows 无参数复用已有 installation 的配置/环境文件路径。`pnpm app:authorize <vscodeWeb|harness>` 在操作者明确执行的交互终端显示本机私有首次登录地址，不进入默认日志或 argv，完成后使用干净根 URL。此命令从直接本机接口认证，不接受代理转发请求作为本机操作者。
 
-Windows 构建预编译同一个 GUI helper 的受管子进程模式，应用在恢复执行前加入不允许 breakaway 的独立 Job。Agent 强停时租约关闭回收应用/安装器树；Session Worker 继续使用原有独立持久边界。Linux 对应租约监督器和进程组，不能把 KillMode=process 当作应用清理实现。
+Windows 构建预编译同一个 GUI helper 的受管子进程模式，应用在恢复执行前加入不允许 breakaway 的独立 Job。Agent 强停时租约关闭回收应用树；Session Worker 继续使用原有独立持久边界。Linux 对应租约监督器和进程组，不能把 KillMode=process 当作应用清理实现。
 
 无需公网域名，可使用下述 IP 网关。应用后端保持回环，远端设备不能用主机 127.0.0.1；使用配置的独立入口。禁止同源反代或记录引导查询串。
 

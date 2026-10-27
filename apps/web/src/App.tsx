@@ -324,7 +324,7 @@ export function App() {
     if (!info || info.phase === "disabled") return null;
     const phase = info.phase;
     const canRetry = info?.canEnsure &&
-      !["running", "installing", "starting", "detecting"].includes(phase);
+      !["running", "starting", "detecting"].includes(phase);
     return (
       <section className="glass-card integration-entry" key={id}>
         <div className="integration-detail">

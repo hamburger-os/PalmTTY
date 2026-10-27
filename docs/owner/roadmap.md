@@ -143,4 +143,4 @@ PalmTTY 源码与发行版本统一迁移至 Node 24 LTS：CI 使用 `.node-vers
 
 ## 2026-10 独立应用受管启动与内嵌
 
-已实现单一 managed/external 配置、显式自启、独立应用容器、校验固定 Harness 安装、独立页面链接、显式授权、一键部署与共享卡片/动作几何。内嵌及其状态已移除；工作区 Code 打开当前主机目录，Harness 从首页独立打开。统一 IP 方案允许 PalmTTY/Harness HTTP、Code 可信 IP HTTPS；实际手机键盘、扩展和长时上游体验仍需操作者验收。
+已实现单一 managed/external 配置、显式自启、独立应用容器、复用官方 Harness 桌面安装及共享历史（单写锁轮流接续）、独立页面链接、显式授权、一键部署与共享卡片/动作几何。内嵌及其状态已移除；工作区 Code 打开当前主机目录，Harness 从首页独立打开。统一 IP 方案允许 PalmTTY/Harness HTTP、Code 可信 IP HTTPS；实际手机键盘、扩展和长时上游体验仍需操作者验收。

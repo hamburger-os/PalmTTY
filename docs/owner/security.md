@@ -87,7 +87,7 @@ systemd unit 使用 `KillMode=process` 是为了保持既有“Agent lifetime !=
 
 ## 独立 Web 应用边界
 
-本机 managed/external 配置区分应用所有权。Code 使用用户另装的官方 CLI，个人自启默认关闭且不自动接受许可/关闭令牌；Harness 使用校验固定版本。仅回收创建时拥有的应用容器，不能接管未知端口/PID，也不能树形终止 Agent 而误杀持久 Worker。
+本机 managed/external 配置区分应用所有权。Code 使用用户另装的官方 CLI，个人自启默认关闭且不自动接受许可/关闭令牌；Harness 使用操作者安装的官方运行时，Windows 通过桌面版公开 CLI 启动，不修改 ASAR、不接管私有 GUI 后端、不自动下载副本。Desktop/Web 共用上游数据与凭据，属于同一可信用户权限；同一会话必须遵守跨进程单写锁，不强制解锁或双写。仅回收创建时拥有的应用容器，不能接管未知端口/PID，也不能树形终止 Agent 而误杀持久 Worker。程序副本清理不包含用户数据。
 
 第三方应用仅独立页面打开，不再内嵌。目录与渲染链接无凭据；认证、精确 Origin、限流的显式授权只交接自有实例到配置的独立入口，响应 no-store/no-referrer，不写日志、存储或 PalmTTY Cookie。本机授权严格区分代理请求，只有明确调用的交互命令可以显示私有引导链接。
 
