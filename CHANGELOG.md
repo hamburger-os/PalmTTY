@@ -8,6 +8,10 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 ## [Unreleased]
 
+<!-- Add pending changes here. -->
+
+## [0.3.0]
+
 ### Added
 
 - Add explicit managed/external Code and Harness configuration, Agent-owned autoStart, reuse of operator-installed official Harness runtime, independent application links and explicit first-sign-in handoff. Reclaim owned app trees without terminating durable Terminal Workers; unify card/action geometry and add source one-command deployment plus scoped legacy Code cleanup. Old URL strings and the foreground joint launcher are removed.
@@ -34,6 +38,13 @@ The project follows a Keep-a-Changelog-style structure and uses Semantic Version
 
 - Upgrade DOMPurify and Zod to patched versions; retain production dependency security and license checks.
 - Preserve Terminal Worker authentication, bounded buffers, single input controller, Workspace/Git/file containment and exact-Origin protections. External links do not grant additional PalmTTY API or process authority.
+
+### Upgrade notes
+
+- **Breaking upgrade from v0.2.0:** source development and newly bundled distributions require Node.js 24 LTS; source installs must use the pinned `.node-version` runtime and re-run the frozen pnpm install/build/deploy steps. Do not retain Node 22 build or autostart assumptions.
+- Workspace storage now uses **v4 only**. Stop the Agent, back up the old v3 data, and explicitly run `node scripts/migrate-workspaces-v4.mjs --from <v3-file> --to <v4-file>` after building the protocol package; the command never overwrites the target. There is no automatic v3 read or fallback.
+- Remove legacy Remote App/WebRTC configuration and retired embedded-app/DNS entries. Configure Code and Harness independently as `managed` or `external`; managed Code needs an operator-installed official VS Code CLI, and managed Harness on Windows reuses the operator-installed official Harness Desktop public CLI. Each application retains its own authentication. Read [Web integrations](docs/community/web-integrations.md) before exposing either entry.
+- A trusted private-network gateway is optional, Windows x64-only, and must be provisioned through `pnpm deploy:local`; PalmTTY/Harness private HTTP is not transport encryption, and Code's IP HTTPS requires device trust of the private CA. Existing PTYs do not survive OS reboot, logoff or Worker termination.
 
 ## [0.2.0]
 
