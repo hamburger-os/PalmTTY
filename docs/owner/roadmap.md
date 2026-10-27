@@ -80,7 +80,7 @@ AI 主维护模式的 main Ruleset 已启用：PR 必须经过 Windows/Ubuntu CI
 
 ## 2026-10 架构重构：取消桌面远控
 
-已取消 Remote App/WebRTC 和无人值守 Windows RDP 路线，不保留运行时兼容分支。Workspace Store 升级 V4，仅包含核心 Workspace 与 Terminal Profile；旧 V3 不自动加载。微软官方 VS Code `code serve-web` 作为独立 Web IDE，由部署者在符合许可的交互式用户会话中启动；PalmTTY 可按显式 managed/external 配置启动独立 Code 入口，Harness 作为与 Workspace 平行的独立首页入口；两者均不内嵌。Codex CLI 仍是 Terminal 启动命令。
+已取消 Remote App/WebRTC 和无人值守 Windows RDP 路线，不保留运行时兼容分支。Workspace Store 升级 V4，仅包含核心 Workspace 与 Terminal Profile；旧 V3 不自动加载。微软官方 VS Code `code serve-web` 由操作者安装并自行确认适用许可；PalmTTY 可按显式 managed/external 配置启动本机 Code 或提供独立外部入口，Harness 作为与 Workspace 平行的独立首页入口；两者均不内嵌。Codex CLI 仍是 Terminal 启动命令。
 
 实际产品状态：此前用户曾验证官方 VS Code Web 可以在本机启动并显示项目；当前检测与独立入口已恢复，但 Codex 扩展、手机跨设备 HTTPS、第三方服务生命周期与 Ctrl+C 进程树清理仍待实机验收；不实现 Azure Tunnel、通用 VPN 管理、SSO 或通用插件框架；Windows 受限的 Caddy 私有 IP 网关已经实现。
 
