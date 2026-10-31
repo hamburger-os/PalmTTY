@@ -12,8 +12,8 @@
     "test": "pnpm --filter @palmtty/protocol build && pnpm --filter @palmtty/config build && pnpm run build && vitest run"
   },
   "dependencies": {
-    "@fastify/cookie": "^11.1.3",
-    "@fastify/static": "^10.1.7",
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/static": "^10.1.8",
     "@fastify/websocket": "^11.3.4",
     "@palmtty/config": "workspace:*",
     "@palmtty/protocol": "workspace:*",
