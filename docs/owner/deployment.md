@@ -112,6 +112,45 @@ env-file 使用严格 `NAME=value`：
 
 原地更新仓库且 Node 路径不变时，重新 build 后可通过 `pnpm autostart restart` 重新加载 Agent。
 
+## 停止与卸载服务
+
+PalmTTY 区分「临时中断当前 Agent 运行」与「彻底注销自启动配置」两类生命周期操作：
+
+### 临时停止服务（保留自启动注册）
+
+如果仅需临时停止 Agent 控制面（例如释放端口或维护），但不希望移除登录触发器：
+
+- **Windows：**
+  - CMD / PowerShell：`schtasks /End /TN "PalmTTY Agent"`
+  - PowerShell 原生：`Stop-ScheduledTask -TaskName "PalmTTY Agent"`
+  - 恢复运行：`schtasks /Run /TN "PalmTTY Agent"` 或 `pnpm autostart restart`（安装版 `palmtty service restart`）
+- **Linux：**
+  - `systemctl --user stop palmtty.service`
+  - 恢复运行：`systemctl --user start palmtty.service` 或 `systemctl --user restart palmtty.service`
+
+### 彻底卸载自启服务（Stop + Deregister + Cleanup）
+
+需要完全移除自启动任务及相关启动清单时：
+
+- **源码开发环境：** `pnpm autostart uninstall`
+- **已安装 CLI：** `palmtty service uninstall`
+
+两者的内部清理机制：
+1. **Windows 平台：**
+   - 调用 `schtasks /End /TN "PalmTTY Agent"` 中止当前运行的任务实例；
+   - 调用 `schtasks /Delete /TN "PalmTTY Agent" /F` 从 Task Scheduler 中删除任务；
+   - 清理自启动运行时目录（源码环境清理 `%LOCALAPPDATA%\PalmTTY\autostart` 目录及其下的 `installation.json`、`runtime.json`、`last-error.txt`；安装版清理对应安装清单与状态）。
+2. **Linux 平台：**
+   - 调用 `systemctl --user disable --now palmtty.service` 立即停用并禁用服务；
+   - 删除用户 unit 文件（`~/.config/systemd/user/palmtty.service`）；
+   - 执行 `systemctl --user daemon-reload` 重新加载 systemd 配置。
+
+### 停止/卸载与 Session Worker 的生命周期边界
+
+停止或卸载 Agent 服务时，必须注意：
+- **Agent 控制面与 Worker 终端解耦：** Windows 采用 `SILENT_BREAKAWAY_OK` Job Object 隔离，Linux systemd unit 采用 `KillMode=process`。因此停止 Agent（无论是通过 `schtasks /End`、`systemctl stop` 还是 `uninstall`）**均不会连带杀死已经脱离的独立 Session Worker 进程**。
+- **清理独立终端：** 若需要连同终端会话一并关闭，应在停止前通过 Web UI 显式退出会话（Terminate Session），或在操作系统中手动终止对应的 node Worker / shell 进程；系统注销/重启则会彻底回收全部用户进程。
+
 ## 持久化边界
 
 已支持：

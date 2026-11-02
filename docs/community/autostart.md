@@ -67,7 +67,7 @@ pnpm autostart restart
 pnpm autostart uninstall
 ~~~
 
-This path is for development and repository validation. It may compile the Windows helper from source and records absolute repository/Node paths, so moving the checkout or changing Node installations requires reinstalling the source autostart entry. Normal users should prefer packaged releases.
+This path is for development and repository validation. It may compile the Windows helper from source and records absolute repository/Node paths, so moving the checkout or changing Node installations requires reinstalling the source autostart entry. `pnpm autostart uninstall` stops the running Agent, unregisters the Task Scheduler task or systemd user unit, and cleans up launcher runtime state. To temporarily stop the Agent without removing the autostart registration, run `schtasks /End /TN "PalmTTY Agent"` on Windows or `systemctl --user stop palmtty.service` on Linux. Detached Session Workers survive independently in either case. Normal users should prefer packaged releases.
 
 ### Persistence boundary
 
@@ -134,7 +134,7 @@ pnpm autostart restart
 pnpm autostart uninstall
 ~~~
 
-这是开发/仓库验证路径，Windows 下仍可能从源码编译 helper，并记录仓库与 Node 的绝对路径；移动仓库或更换 Node 安装后要重新注册。普通用户应优先使用发行包。
+这是开发/仓库验证路径，Windows 下仍可能从源码编译 helper，并记录仓库与 Node 的绝对路径；移动仓库或更换 Node 安装后要重新注册。`pnpm autostart uninstall` 会停止 Agent、删除计划任务或 systemd user unit，并清理本地自启动运行时状态。如果仅需临时停止 Agent 控制面而保留开机自启注册，可在 Windows 执行 `schtasks /End /TN "PalmTTY Agent"`，在 Linux 执行 `systemctl --user stop palmtty.service`。无论临时停止还是注销自启，已脱离的独立 Session Worker 终端进程均保持存活。普通用户应优先使用发行包。
 
 ### 持久化边界
 
