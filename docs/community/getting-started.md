@@ -19,6 +19,7 @@ palmtty preflight
 palmtty start
 palmtty service status
 palmtty service restart
+palmtty service uninstall
 palmtty version
 ~~~
 
@@ -77,7 +78,13 @@ pnpm start
 
 The example config listens on `127.0.0.1:17688`. Linux uses native Host shells and Unix-domain-socket Worker IPC.
 
-For current-user startup registration on Windows or Linux, see [autostart.md](autostart.md). Autostart brings the Agent back; it does not preserve an old PTY across OS reboot.
+For current-user startup registration on Windows or Linux, see [autostart.md](autostart.md). Autostart brings the Agent back; it does not preserve an old PTY across OS reboot. For source checkouts:
+- Check status: `pnpm autostart status`
+- Restart Agent: `pnpm autostart restart`
+- Temporary stop: `schtasks /End /TN "PalmTTY Agent"` (Windows) or `systemctl --user stop palmtty.service` (Linux)
+- Complete uninstall (stop service, deregister startup task/unit, clean state): `pnpm autostart uninstall` (or `palmtty service uninstall` for installed CLI).
+
+Note that stopping or uninstalling the Agent service terminates only the Agent control plane; detached Session Workers survive independently by design. Terminate them from the Web UI or stop their respective node processes when a complete session shutdown is required.
 
 ### Development mode
 
@@ -113,6 +120,7 @@ palmtty preflight
 palmtty start
 palmtty service status
 palmtty service restart
+palmtty service uninstall
 palmtty version
 ~~~
 
@@ -183,7 +191,13 @@ pnpm start
 
 示例配置监听 `127.0.0.1:17688`。Linux 使用原生 Host Shell 与 Unix-domain-socket Worker IPC。
 
-Windows/Linux 当前用户自启动请查看 [autostart.md](autostart.md)。自启动只负责把 Agent 拉起，不代表 OS reboot 后旧 PTY 仍存在。
+Windows/Linux 当前用户自启动请查看 [autostart.md](autostart.md)。自启动只负责把 Agent 拉起，不代表 OS reboot 后旧 PTY 仍存在。源码开发常用命令：
+- 查看服务状态：`pnpm autostart status`
+- 重启 Agent 服务：`pnpm autostart restart`
+- 临时停止运行：Windows 执行 `schtasks /End /TN "PalmTTY Agent"`，Linux 执行 `systemctl --user stop palmtty.service`
+- 彻底注销自启（停止服务、删除任务/unit 并清理运行状态）：`pnpm autostart uninstall`（安装版使用 `palmtty service uninstall`）
+
+注意：停止或注销 Agent 服务仅终止控制面，已建立的独立终端会话（Session Worker）仍会保留；如需彻底关闭终端，请在 Web 界面中关闭对应标签页或手动结束对应进程。
 
 ### 开发模式
 

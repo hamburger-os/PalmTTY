@@ -170,7 +170,19 @@ Use `pnpm deploy:local` for source deployment and explicit managed/external obje
 
 Installed builds use `palmtty service install|status|restart|uninstall`. `palmtty init --install-service` creates the current user's default config/credentials when absent and installs the service in one step. Windows uses the same least-privilege Task Scheduler + GUI-subsystem host architecture, but the host is compiled and verified during release packaging rather than compiled on the user's workstation. Linux uses `systemd --user` with `KillMode=process`.
 
-Source checkouts retain `pnpm autostart ...` for contributor/development validation. Both paths keep secrets in a separate env file and preserve the existing rule that Agent restart must not redefine independent Session Worker lifetime. See [Autostart / 开机自启](docs/community/autostart.md) for details.
+Source checkouts retain `pnpm autostart install|status|restart|uninstall` for contributor/development validation. Both paths keep secrets in a separate env file and preserve the existing rule that Agent restart must not redefine independent Session Worker lifetime:
+
+- **Temporary stop (keep autostart registration):**
+  - Windows: `schtasks /End /TN "PalmTTY Agent"`
+  - Linux: `systemctl --user stop palmtty.service`
+- **Uninstall service (stop Agent, deregister task/unit, clean runtime state):**
+  - Source checkout: `pnpm autostart uninstall`
+  - Installed build: `palmtty service uninstall`
+- **Worker lifetime boundary:** Agent stop or uninstall stops the control plane and removes the startup registration, while detached Session Workers remain alive independently. To terminate terminal sessions, exit them from the Web UI or stop the respective node processes.
+
+See [Autostart / 开机自启](docs/community/autostart.md) for details.
+
+开机自启说明：安装版通过 `palmtty service install|status|restart|uninstall` 管理；源码开发使用 `pnpm autostart install|status|restart|uninstall`。临时停止控制面可使用 Windows `schtasks /End /TN "PalmTTY Agent"` 或 Linux `systemctl --user stop palmtty.service`；彻底停止并注销自启执行 `pnpm autostart uninstall`（源码）或 `palmtty service uninstall`（安装版）。停止或卸载 Agent 服务不会终止独立的 Session Worker 终端会话；如需清理会话可在 Web 界面正常退出终端或结束对应进程。详情参阅 [Autostart / 开机自启](docs/community/autostart.md)。
 
 ## Network exposure / 网络暴露
 
